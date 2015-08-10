@@ -48,12 +48,23 @@ namespace bx
     template <typename Ty> 
     void removeListNode(ListNode<Ty>** _ref, ListNode<Ty>* _node)
     {
-       if (item->next)
-           item->next->prev = item->prev;
-       if (item->prev)
-           item->prev->next = item->next;
-       if (*_ref == item)
-           *_ref = item->next;
-       item->next = item->prev = nullptr;
+       if (_node->next)
+           _node->next->prev = _node->prev;
+       if (_node->prev)
+           _node->prev->next = _node->next;
+       if (*_ref == _node)
+           *_ref = _node->next;
+       _node->next = _node->prev = nullptr;
+    }
+
+    template <typename Ty> 
+    void insertListNode(ListNode<Ty>* _insertAfter, ListNode<Ty>* _node, const Ty& _data)
+    {
+        if (_insertAfter->next)
+            _insertAfter->next->prev = _node;
+        _node->prev = _insertAfter;
+        _node->next = _insertAfter->next;
+        _insertAfter->next = _node;
+        _node->data = _data;
     }
 }
