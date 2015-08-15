@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../bx/allocator.h"
+#include <cassert>
 
 namespace bx
 {
@@ -20,6 +21,7 @@ namespace bx
         int getCount() const    {   return m_numItems;  }
         Ty* getBuffer() const   {   return m_buff;      }
         void clear()            {   m_numItems = 0;     }
+        Ty* detach(int* _count, ReallocatorI** _palloc = nullptr);
 
         int find(const Ty& _item) const;
 
@@ -127,11 +129,27 @@ namespace bx
         return -1;
     }
 
-    template <typename Ty>
-    int alignValue(int _value, int _alignment)
+    template <typename Ty> 
+    int Array<Ty>::alignValue(int _value, int _alignment)
     {
         int misalign = _value & (_alignment - 1);
         int adjust = _alignment - misalign;
         return _value + adjust;
+    }
+
+    template <typename Ty> 
+    Ty* Array<Ty>::detach(int* _count, ReallocatorI** _palloc)
+    {
+        *_count = m_numItems;
+        Ty* buff = m_buff;
+        if (_palloc)
+            *_palloc = m_alloc;
+
+        m_buff = nullptr;
+        m_numItems = 0;
+        m_maxItems = 0;
+        m_numExpand = 0;
+        m_alloc = nullptr;
+        return buff;
     }
 }
