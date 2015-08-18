@@ -48,6 +48,7 @@ namespace bx
         m_numItems = 0;
         m_maxItems = 0;
         m_numExpand = 0;
+        assert(BX_TYPE_IS_POD(Ty));
     }
 
     template <typename Ty>
