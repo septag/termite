@@ -101,12 +101,14 @@ namespace bx
         if (!b)
             return nullptr;
 
-        return b->ptrs[--b->iter];
+        return new(b->ptrs[--b->iter]) Ty;
     }
 
     template <typename Ty>
     void Pool<Ty>::deleteInstance(Ty* _inst)
     {
+        _inst->~Ty();
+
         Bucket* b = m_firstBucket;
         size_t buffer_sz = sizeof(Ty)*m_maxItemsPerBucket;
         uint8_t* u8ptr = (uint8_t*)_inst;

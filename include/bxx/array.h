@@ -26,7 +26,8 @@ namespace bx
         int find(const Ty& _item) const;
 
         Ty* itemPtr(int _index)  {   assert(_index < m_numItems); return &m_buff[_index];   }
-        const Ty& operator[](int _index) const   {   assert(_index < m_numItems);  return &m_buff[_index]; }
+        const Ty& operator[](int _index) const   {   assert(_index < m_numItems);  return m_buff[_index]; }
+        Ty& operator[](int _index) { assert(_index < m_numItems);  return m_buff[_index]; }
 
     private:
         int alignValue(int _value, int _alignment);

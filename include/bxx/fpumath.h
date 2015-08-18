@@ -1,5 +1,7 @@
 #pragma once
 
+#include <math.h>
+
 namespace bx
 {
     union Vec2
@@ -193,29 +195,42 @@ namespace bx
     }
 
     //
-    inline int imin(int _a, int _b)
+    inline void vec2Add(float* __restrict _result, const float* __restrict _a, const float* __restrict _b)
     {
-        return _a < _b ? _a : _b;
+        _result[0] = _a[0] + _b[0];
+        _result[1] = _a[1] + _b[1];
     }
 
-    inline int imax(int _a, int _b)
+    inline void vec2Sub(float* __restrict _result, const float* __restrict _a, const float* __restrict _b)
     {
-        return _a < _b ? _a : _b;
+        _result[0] = _a[0] - _b[0];
+        _result[1] = _a[1] - _b[1];
     }
 
-    inline int imin3(int _a, int _b, int _c)
+    inline void vec2Mul(float* __restrict _result, const float* __restrict _a, float _b)
     {
-        return imin(_a, imin(_b, _c));
+        _result[0] = _a[0] * _b;
+        _result[1] = _a[1] * _b;
     }
 
-    inline int imax3(int _a, int _b, int _c)
+    inline float vec2Dot(const float* __restrict _a, const float* __restrict _b)
     {
-        return imax(_a, imax(_b, _c));
+        return _a[0] * _b[0] + _a[1] * _b[1];
     }
 
-    inline int iclamp(int _a, int _min, int _max)
+    inline float vec2Length(const float* _a)
     {
-        return imin(imax(_a, _min), _max);
+        return fsqrt(vec2Dot(_a, _a));
+    }
+
+    inline float vec2Norm(float* __restrict _result, const float* __restrict _a)
+    {
+        const float len = vec2Length(_a);
+        const float invLen = 1.0f / len;
+        _result[0] = _a[0] * invLen;
+        _result[1] = _a[1] * invLen;
+        _result[2] = _a[2] * invLen;
+        return len;
     }
 
 }   // namespace: bx
