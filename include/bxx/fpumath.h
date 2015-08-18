@@ -218,9 +218,9 @@ namespace bx
         return _a[0] * _b[0] + _a[1] * _b[1];
     }
 
-    inline float vec2Length(const float* _a)
+    inline float vec2Length(const float* __restrict _a)
     {
-        return fsqrt(vec2Dot(_a, _a));
+        return sqrtf(vec2Dot(_a, _a));
     }
 
     inline float vec2Norm(float* __restrict _result, const float* __restrict _a)
