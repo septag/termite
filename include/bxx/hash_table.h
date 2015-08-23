@@ -22,7 +22,7 @@ namespace bx
         explicit HashTable(HashTableType type);
         ~HashTable();
 
-        bool create(int capacity, AllocatorI* alloc = GetDefaultAllocator());
+        bool create(int capacity, AllocatorI* alloc);
         void destroy();
 
         int addStr(const char* str_key, const Ty& value);
