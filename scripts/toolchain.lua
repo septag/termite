@@ -990,9 +990,10 @@ function strip()
 --				.. "-s EMTERPRETIFY=1 "
 --				.. "-s EMTERPRETIFY_ASYNC=1 "
 				.. "-s TOTAL_MEMORY=268435456 "
+--				.. "-s ALLOW_MEMORY_GROWTH=1 "
 				.. "--memory-init-file 1 "
-				.. "\"$(TARGET)\" -o \"$(TARGET)\".html"
-			-- ALLOW_MEMORY_GROWTH
+				.. "\"$(TARGET)\" -o \"$(TARGET)\".html "
+--				.. "--preload-file ../../../examples/runtime@/"
 		}
 
 	configuration {} -- reset configuration
