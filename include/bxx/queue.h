@@ -39,7 +39,7 @@ namespace bx
         if (*_ref) {
             *_ref =(*_ref)->next;
             item->next = nullptr;
-        }
+        } 
         return item->data;
     }
 
