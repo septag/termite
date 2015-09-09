@@ -244,7 +244,7 @@ namespace bx
     template <typename Ty>
     int HashTable<Ty>::addStr(const char* str_key, const Ty& value)
     {
-        return add(hashMurmur2A(str_key, strlen(str_key)), value);
+        return add(hashMurmur2A(str_key, (uint32_t)strlen(str_key)), value);
     }
 
     template <typename Ty>
@@ -297,7 +297,7 @@ namespace bx
     template <typename Ty>
     int HashTable<Ty>::findStr(const char* str_key)
     {
-        return find(hashMurmur2A(str_key, strlen(str_key)));
+        return find(hashMurmur2A(str_key, (uint32_t)strlen(str_key)));
     }
 
     template <typename Ty>
