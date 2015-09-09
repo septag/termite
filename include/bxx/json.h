@@ -213,14 +213,14 @@ namespace bx
 
 #define CHECK_TOP() if (!top) {JSON_ERROR(it, "Unexpected character");}
 
-    static JsonNode* craeteJsonNode(bx::AllocatorI* alloc)
+    JsonNode* craeteJsonNode(bx::AllocatorI* alloc)
     {
         JsonNode* node = BX_NEW(alloc, JsonNode);
         node->alloc = alloc;
         return node;
     }
 
-    static JsonNode* parseJsonImpl(char* source, char** error_pos, const char** error_desc, int* error_line, bx::AllocatorI* alloc)
+    JsonNode* parseJsonImpl(char* source, char** error_pos, const char** error_desc, int* error_line, bx::AllocatorI* alloc)
     {
         JsonNode* root = nullptr;
         JsonNode* top = nullptr;
