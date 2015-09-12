@@ -5,25 +5,26 @@
 
 namespace bx
 {
-    static void generateUUID(char _uuid[37])
-    {
-        int t = 0;
-        char* temp = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
-        char* hex = "0123456789ABCDEF-";
-        int len = (int)strlen(temp);
 
-        for (t = 0; t < len + 1; t++) {
-            int r = rand() % 16;
-            char c = ' ';
+#if BX_COMPILER_MSVC
+#   include <rpc.h>
+static void generateUUID(char uuidStr[37])
+{
+    UUID guid;
+    UuidCreate(&guid);
 
-            switch (temp[t]) {
-            case 'x': { c = hex[r]; } break;
-            case 'y': { c = hex[r & 0x03 | 0x08]; } break;
-            case '-': { c = '-'; } break;
-            case '4': { c = '4'; } break;
-            }
+    bx::snprintf(uuidStr, 37, "%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX",
+                 guid.Data1, guid.Data2, guid.Data3,
+                 guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
+                 guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
+}
+#else
+#   include <uuid/uuid.h>
+static void generateUUID(char uuidStr[37])
+{
+    uuid_t uid;
+    uuid_unparse(uid, uuidStr);
+}
+#endif
 
-            _uuid[t] = (t < len) ? c : 0x00;
-        }
-    }
 }   // namespace: bx

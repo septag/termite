@@ -194,7 +194,7 @@ namespace bx
         m_numTotal = 0;
         m_blockSize = 0;
         m_alloc = nullptr;
-        assert(BX_TYPE_IS_POD(Ty));
+        //assert(BX_TYPE_IS_POD(Ty));
     }
 
     template <typename Ty>
@@ -381,14 +381,14 @@ namespace bx
         m_numItems = 0;
         m_numTotal = 0;
         m_blockSize = 0;
-        assert(BX_TYPE_IS_POS(Ty));
+        assert(BX_TYPE_IS_POD(Ty));
     }
 
     template <typename Ty>
     MultiHashTable<Ty>::~MultiHashTable()
     {
-        assert(nodes == nullptr);
-        assert(keys == nullptr);
+        assert(m_nodes == nullptr);
+        assert(m_keys == nullptr);
     }
 
     template <typename Ty>
