@@ -6,7 +6,7 @@
 namespace bx
 {
 
-#if BX_COMPILER_MSVC
+#if _WIN32
 #   include <rpc.h>
 static void generateUUID(char uuidStr[37])
 {
@@ -18,9 +18,7 @@ static void generateUUID(char uuidStr[37])
                  guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
                  guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
 }
-#endif
-
-#ifndef __APPLE__
+#elif !__APPLE__ && !_WIN32
 #   include <uuid/uuid.h>
 static void generateUUID(char uuidStr[37])
 {
@@ -28,10 +26,7 @@ static void generateUUID(char uuidStr[37])
     uuid_generate(uid);
     uuid_unparse(uid, uuidStr);
 }
-#endif
-
-
-#ifdef __APPLE__
+#elif __APPLE__
 #	include <CoreFoundation/CFUUID.h>
 
 static void generateUUID(char uuidStr[37])
