@@ -12,7 +12,7 @@
 #include <string.h> //::memmove
 #include <new>
 
-#if BX_CONFIG_ALLOCATOR_CRT
+#if BX_CONFIG_ALLOCATOR_CRT && !__APPLE__
 #	include <malloc.h>
 #endif // BX_CONFIG_ALLOCATOR_CRT
 
