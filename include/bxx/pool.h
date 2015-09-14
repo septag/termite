@@ -101,7 +101,7 @@ namespace bx
         if (!b)
             return nullptr;
 
-        return new(b->ptrs[--b->iter]) Ty;
+        return new(b->ptrs[--b->iter]) Ty();
     }
 
     template <typename Ty>
