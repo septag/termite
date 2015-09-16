@@ -17,9 +17,9 @@
 #define BX_FATAL(_Fmt, ...) bx::logPrintf(__FILE__, __LINE__, bx::LogType::Fatal, _Fmt, ##__VA_ARGS__)
 #define BX_WARN(_Fmt, ...) bx::logPrintf(__FILE__, __LINE__, bx::LogType::Warning, _Fmt, ##__VA_ARGS__)
 #define BX_BEGINP(_Fmt, ...) bx::logBeginProgress(__FILE__, __LINE__, _Fmt, ##__VA_ARGS__)
-#define BX_END_OK(_Result) bx::logEndProgress(bx::LogProgressResult::Ok)
-#define BX_END_FATAL(_Result) bx::logEndProgress(bx::LogProgressResult::Fatal)
-#define BX_END_NONFATAL(_Result) bx::logEndProgress(bx::LogProgressResult::NonFatal)
+#define BX_END_OK() bx::logEndProgress(bx::LogProgressResult::Ok)
+#define BX_END_FATAL() bx::logEndProgress(bx::LogProgressResult::Fatal)
+#define BX_END_NONFATAL() bx::logEndProgress(bx::LogProgressResult::NonFatal)
 
 #define EXCLUDE_LIST_COUNT 6
 
@@ -33,6 +33,19 @@ namespace bx
         Warning,
         Init,
         Shutdown
+    };
+
+    enum LogColor
+    {
+        None = 0,
+        Green,
+        Red,
+        Gray,
+        Cyan,
+        Yellow,
+        Magenta,
+        Black,
+        White
     };
 
     enum class LogProgressResult
@@ -76,6 +89,7 @@ namespace bx
 
     void excludeFromLog(LogType type);
     void includeToLog(LogType type);
+    void overrideLogColor(LogColor color);
 }
 
 #ifdef BX_IMPLEMENT_LOGGER
@@ -103,6 +117,7 @@ namespace bx
         int numErrors;
         int numWarnings;
         int numMessages;
+        LogColor colorOverride;
 
 #if BX_PLATFORM_WINDOWS
         HANDLE consoleHdl;
@@ -122,6 +137,7 @@ namespace bx
             numErrors = 0;
             numWarnings = 0;
             numMessages = 0;
+            colorOverride = LogColor::None;
 
 #if BX_PLATFORM_WINDOWS
             consoleHdl = nullptr;
@@ -272,59 +288,113 @@ namespace bx
                 formatted = true;
                 // Choose color for the log line
 #if !BX_PLATFORM_WINDOWS
-                if (extra == LogExtraParam::None || extra == LogExtraParam::InProgress) {
-                    switch (type) {
-                    case LogType::Text:
-                        prefix = TERM_RESET;        break;
-                    case LogType::Verbose:
-                        prefix = TERM_DIM;          break;
-                    case LogType::Fatal:
-                        prefix = TERM_RED_BOLD;      break;
-                    case LogType::Warning:
-                        prefix = TERM_YELLOW_BOLD;   break;
-                    case LogType::Init:
-                    case LogType::Shutdown:
-                        prefix = TERM_CYAN;          break;
-                    default:
-                        prefix = TERM_RESET;        break;
+                if (gLogger.colorOverride == LogColor::None) {
+                    if (extra == LogExtraParam::None || extra == LogExtraParam::InProgress) {
+                        switch (type) {
+                        case LogType::Text:
+                            prefix = TERM_RESET;        break;
+                        case LogType::Verbose:
+                            prefix = TERM_DIM;          break;
+                        case LogType::Fatal:
+                            prefix = TERM_RED_BOLD;      break;
+                        case LogType::Warning:
+                            prefix = TERM_YELLOW_BOLD;   break;
+                        case LogType::Init:
+                        case LogType::Shutdown:
+                            prefix = TERM_CYAN;          break;
+                        default:
+                            prefix = TERM_RESET;        break;
+                        }
+                    } else {
+                        switch (extra) {
+                        case LogExtraParam::ProgressEndOk:
+                            prefix = TERM_GREEN_BOLD;    break;
+                        case LogExtraParam::ProgressEndFatal:
+                            prefix = TERM_RED_BOLD;      break;
+                        case LogExtraParam::ProgressEndNonFatal:
+                            prefix = TERM_YELLOW_BOLD;   break;
+                        default:
+                            break;
+                        }
                     }
                 } else {
-                    switch (extra) {
-                    case LogExtraParam::ProgressEndOk:
-                        prefix = TERM_GREEN_BOLD;    break;
-                    case LogExtraParam::ProgressEndFatal:
-                        prefix = TERM_RED_BOLD;      break;
-                    case LogExtraParam::ProgressEndNonFatal:
-                        prefix = TERM_YELLOW_BOLD;   break;
+                    switch (gLogger.colorOverride) {
+                    case LogColor::Black:
+                        prefix = TERM_BLACK;                       break;
+                    case LogColor::Cyan:
+                        prefix = TERM_CYAN;                        break;
+                    case LogColor::Gray:
+                        prefix = TERM_DIM;                         break;
+                    case LogColor::Green:
+                        prefix = TERM_GREEN;                       break;
+                    case LogColor::Magenta:
+                        prefix = TERM_MAGENTA;                     break;
+                    case LogColor::Red:
+                        prefix = TERM_RED;                         break;
+                    case LogColor::White:
+                        prefix = TERM_WHITE;                       break;
+                    case LogColor::Yellow:
+                        prefix = TERM_YELLOW                       break;
                     default:
                         break;
                     }
                 }
 #else
-                if (extra == LogExtraParam::None || extra == LogExtraParam::InProgress) {
-                    switch (type) {
-                    case LogType::Text:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);        break;
-                    case LogType::Verbose:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, gLogger.consoleAttrs);          break;
-                    case LogType::Fatal:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_INTENSITY);      break;
-                    case LogType::Warning:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);   break;
-                    case LogType::Init:
-                    case LogType::Shutdown:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_BLUE | FOREGROUND_GREEN);      break;
-                    default:
-                        break;
+                if (gLogger.colorOverride == LogColor::None) {
+                    if (extra == LogExtraParam::None || extra == LogExtraParam::InProgress) {
+                        switch (type) {
+                        case LogType::Text:
+                            SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);        break;
+                        case LogType::Verbose:
+                            SetConsoleTextAttribute(gLogger.consoleHdl, gLogger.consoleAttrs);          break;
+                        case LogType::Fatal:
+                            SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_INTENSITY);      break;
+                        case LogType::Warning:
+                            SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);   break;
+                        case LogType::Init:
+                        case LogType::Shutdown:
+                            SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_BLUE | FOREGROUND_GREEN);      break;
+                        default:
+                            break;
+                        }
+                    } else {
+                        switch (extra) {
+                        case LogExtraParam::ProgressEndOk:
+                            SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_GREEN | FOREGROUND_INTENSITY);    break;
+                        case LogExtraParam::ProgressEndFatal:
+                            SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_INTENSITY);      break;
+                        case LogExtraParam::ProgressEndNonFatal:
+                            SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);   break;
+                        }
                     }
                 } else {
-                    switch (extra) {
-                    case LogExtraParam::ProgressEndOk:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_GREEN | FOREGROUND_INTENSITY);    break;
-                    case LogExtraParam::ProgressEndFatal:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_INTENSITY);      break;
-                    case LogExtraParam::ProgressEndNonFatal:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);   break;
+                    switch (gLogger.colorOverride) {
+                    case LogColor::Black:
+                        SetConsoleTextAttribute(gLogger.consoleHdl, 0);
+                        break;
+                    case LogColor::Cyan:
+                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_BLUE | FOREGROUND_GREEN);
+                        break;
+                    case LogColor::Gray:
+                        SetConsoleTextAttribute(gLogger.consoleHdl, gLogger.consoleAttrs);
+                        break;
+                    case LogColor::Green:
+                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_GREEN);
+                        break;
+                    case LogColor::Magenta:
+                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_BLUE);
+                        break;
+                    case LogColor::Red:
+                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED);
+                        break;
+                    case LogColor::White:
+                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_BLUE);
+                        break;
+                    case LogColor::Yellow:
+                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN);
+                        break;
+                    default:
+                        break;
                     }
                 }
 #endif
@@ -354,8 +424,6 @@ namespace bx
 
     void logPrintf(const char* sourceFile, int line, LogType type, const char* fmt, ...)
     {
-        assert(!gLogger.insideProgress);
-
         char text[4096];
 
         va_list args;
@@ -388,17 +456,17 @@ namespace bx
         switch (result) {
         case LogProgressResult::Ok:
             extra = LogExtraParam::ProgressEndOk;
-            text = "Ok";
+            text = "[   OK   ]";
             break;
 
         case LogProgressResult::Fatal:
             extra = LogExtraParam::ProgressEndFatal;
-            text = "Failed";
+            text = "[ FAILED ]";
             break;
 
         case LogProgressResult::NonFatal:
             extra = LogExtraParam::ProgressEndNonFatal;
-            text = "Failed";
+            text = "[ FAILED ]";
             break;
 
         default:
@@ -432,6 +500,11 @@ namespace bx
                 break;
             }
         }
+    }
+
+    void overrideLogColor(LogColor color)
+    {
+        gLogger.colorOverride = color;
     }
 
 }
