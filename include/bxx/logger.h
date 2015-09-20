@@ -334,7 +334,7 @@ namespace bx
                     case LogColor::White:
                         prefix = TERM_WHITE;                       break;
                     case LogColor::Yellow:
-                        prefix = TERM_YELLOW                       break;
+                        prefix = TERM_YELLOW;                       break;
                     default:
                         break;
                     }
