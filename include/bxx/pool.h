@@ -92,8 +92,8 @@ namespace bx
     {
         Bucket* b = m_firstBucket;
         while (b)   {
-            if (b->iter > 0) 
-                return b->ptrs[--b->iter];
+            if (b->iter > 0)
+                return new(b->ptrs[--b->iter]) Ty;
             b = b->next;
         }
 
@@ -101,7 +101,7 @@ namespace bx
         if (!b)
             return nullptr;
 
-        return new(b->ptrs[--b->iter]) Ty();
+        return new(b->ptrs[--b->iter]) Ty;
     }
 
     template <typename Ty>
