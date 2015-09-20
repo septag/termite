@@ -5,10 +5,6 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 
-#ifndef __APPLE__
-#   include <stropts.h>
-#endif
-
 inline int _kbhit()
 {
     static const int STDIN = 0;
