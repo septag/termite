@@ -401,7 +401,7 @@ namespace bx
             }
 
             if (extra != LogExtraParam::InProgress)
-                post = "\n";
+                post = "\n" TERM_RESET;
             else if (extra == LogExtraParam::InProgress)
                 post = "... ";
 
