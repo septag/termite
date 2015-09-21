@@ -409,7 +409,7 @@ namespace bx
             if (gLogger.errFile && type == LogType::Fatal)
                 output = gLogger.errFile;
             if (output) {
-                if (gLogger.timestamps && extra != LogExtraParam::InProgress && extra != LogExtraParam::None) {
+                if (!gLogger.timestamps || (extra != LogExtraParam::InProgress && extra != LogExtraParam::None)) {
                     fprintf(output, "%s%s%s", prefix, text, post);
                 } else {
                     fprintf(output, "[%s] %s%s%s", timestr, prefix, text, post);
