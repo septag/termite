@@ -44,8 +44,8 @@ namespace bx
 		struct timeval now;
 		gettimeofday(&now, 0);
 		int64_t i64 = now.tv_sec*INT64_C(1000000) + now.tv_usec;
+        return i64;
 #endif // BX_PLATFORM_
-		return i64;
 	}
 
 	inline double getHPFrequency()
@@ -59,7 +59,7 @@ namespace bx
         clock_getres(CLOCK_MONOTONIC, &res);
         return (double)res.tv_nsec * 1e9;
 #elif BX_PLATFORM_OSX || BX_PLATFORM_IOS
-        mach_timebase_info tmbase;
+        struct mach_timebase_info tmbase;
         mach_timebase_info(&tmbase);
         return ((double)tmbase.numer / (double)tmbase.denom)*1e9;
 #elif BX_PLATFORM_EMSCRIPTEN
