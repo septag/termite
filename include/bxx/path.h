@@ -130,7 +130,7 @@ namespace bx
         if (this->text[0] == 0)
             return *this;
 
-    #if defined(BX_PLATFORM_WINDOWS)
+    #if BX_PLATFORM_WINDOWS
         char tmp[256];
         GetFullPathName(this->text, sizeof(tmp), tmp, nullptr);
         toWindows();
