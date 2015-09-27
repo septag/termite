@@ -243,6 +243,8 @@ namespace bx
                 {
                     // create new value
                     JsonNode* object = craeteJsonNode(alloc);
+                    if (!object)
+                        return nullptr;
 
                     // name
                     object->name = name;
@@ -380,6 +382,8 @@ namespace bx
                     }  else  {
                         // new string value
                         JsonNode *object = craeteJsonNode(alloc);
+                        if (!object)
+                            return nullptr;
 
                         object->name = name;
                         name = 0;
@@ -400,6 +404,8 @@ namespace bx
 
                     // new null/bool value
                     JsonNode* object = craeteJsonNode(alloc);
+                    if (!object)
+                        return nullptr;
 
                     object->name = name;
                     name = 0;
@@ -446,6 +452,8 @@ namespace bx
 
                     // new number value
                     JsonNode* object = craeteJsonNode(alloc);
+                    if (!object)
+                        return nullptr;
 
                     object->name = name;
                     name = 0;

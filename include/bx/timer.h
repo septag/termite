@@ -40,7 +40,7 @@ namespace bx
 #elif BX_PLATFORM_OSX || BX_PLATFORM_IOS
         return mach_absolute_time();
 #elif BX_PLATFORM_EMSCRIPTEN
-		int64_t i64 = int64_t(1000.0f * emscripten_get_now() );
+		return int64_t(1000.0f * emscripten_get_now() );
 #else
 		struct timeval now;
 		gettimeofday(&now, 0);

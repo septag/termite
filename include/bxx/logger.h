@@ -2,6 +2,7 @@
 
 #include "../bx/platform.h"
 #include "terminal_colors.h"
+#include <atomic>
 
 #define BX_LOG(_Type, _Fmt, ...) bx::logPrintf(__FILE__, __LINE__, _Type, ##__VA_ARGS__)
 
@@ -101,22 +102,21 @@ namespace bx
 {
     struct Logger
     {
-        bool timestamps;
+        std::atomic_bool timestamps;
 
         FILE* logFile;
         FILE* errFile;
         LogCallbackFn callback;
         void* userParam;
 
-        bool insideProgress;
+        std::atomic_bool insideProgress;
         LogTimeFormat timeFormat;
 
         LogType excludeList[EXCLUDE_LIST_COUNT];
-        int numExcludes;
-
-        int numErrors;
-        int numWarnings;
-        int numMessages;
+        std::atomic_int numExcludes;
+        std::atomic_int numErrors;
+        std::atomic_int numWarnings;
+        std::atomic_int numMessages;
         LogColor colorOverride;
 
 #if BX_PLATFORM_WINDOWS
