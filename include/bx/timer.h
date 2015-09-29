@@ -13,7 +13,11 @@
 #elif BX_PLATFORM_EMSCRIPTEN
 #	include <emscripten.h>
 #elif BX_PLATFORM_WINDOWS || BX_PLATFORM_WINRT
+#   define WIN32_LEAN_AND_MEAN
 #	include <windows.h>
+#   undef WIN32_LEAN_AND_MEAN
+#elif BX_PLATFORM_OSX || BX_PLATFORM_IOS
+#   include <mach/mach_time.h>
 #else
 #	include <sys/time.h> // gettimeofday
 #endif // BX_PLATFORM_
@@ -27,29 +31,38 @@ namespace bx
 		// Performance counter value may unexpectedly leap forward
 		// http://support.microsoft.com/kb/274323
 		QueryPerformanceCounter(&li);
-		int64_t i64 = li.QuadPart;
+		return li.QuadPart;
 #elif BX_PLATFORM_ANDROID || BX_PLATFORM_LINUX
 		struct timespec now;
 		clock_gettime(CLOCK_MONOTONIC, &now);
 		int64_t i64 = now.tv_sec*INT64_C(1000000000) + now.tv_nsec;
+        return i64;
+#elif BX_PLATFORM_OSX || BX_PLATFORM_IOS
+        return mach_absolute_time();
 #elif BX_PLATFORM_EMSCRIPTEN
-		int64_t i64 = int64_t(1000.0f * emscripten_get_now() );
+		return int64_t(1000.0f * emscripten_get_now() );
 #else
 		struct timeval now;
 		gettimeofday(&now, 0);
 		int64_t i64 = now.tv_sec*INT64_C(1000000) + now.tv_usec;
+        return i64;
 #endif // BX_PLATFORM_
-		return i64;
 	}
 
-	inline int64_t getHPFrequency()
+	inline double getHPFrequency()
 	{
 #if BX_PLATFORM_WINDOWS || BX_PLATFORM_XBOX360 || BX_PLATFORM_WINRT
 		LARGE_INTEGER li;
 		QueryPerformanceFrequency(&li);
-		return li.QuadPart;
+		return (double)li.QuadPart;
 #elif BX_PLATFORM_ANDROID || BX_PLATFORM_LINUX
-		return INT64_C(1000000000);
+        timespec res;
+        clock_getres(CLOCK_MONOTONIC, &res);
+        return (double)res.tv_nsec * 1e9;
+#elif BX_PLATFORM_OSX || BX_PLATFORM_IOS
+        struct mach_timebase_info tmbase;
+        mach_timebase_info(&tmbase);
+        return ((double)tmbase.numer / (double)tmbase.denom)*1e9;
 #elif BX_PLATFORM_EMSCRIPTEN
 		return INT64_C(1000000);
 #else
