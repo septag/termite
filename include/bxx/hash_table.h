@@ -25,7 +25,6 @@ namespace bx
         bool create(int capacity, AllocatorI* alloc);
         void destroy();
 
-        int addStr(const char* str_key, const Ty& value);
         int add(Ky key, const Ty& value);
 
         void remove(int index);
@@ -42,7 +41,7 @@ namespace bx
 
     private:
         int probeLinear(int index, Ky key, const Ky* keys, int count);
-        void Reorder(Ky* keys, Ty* values, int count);
+        void reorder(Ky* keys, Ty* values, int count);
 
     private:
         HashTableType m_type;
@@ -91,7 +90,7 @@ namespace bx
 
     private:
         int probeLinear(int index, Ky key, const Ky* keys, int count);
-        void Reorder(Ky* keys, Node** nodes, int count);
+        void reorder(Ky* keys, Node** nodes, int count);
 
     private:
         HashTableType m_type;
@@ -254,7 +253,7 @@ namespace bx
             memset(values, 0x00, sizeof(Ty)*new_cnt);
             memset(keys, 0x00, sizeof(Ky)*new_cnt);
 
-            Reorder(keys, values, new_cnt);
+            reorder(keys, values, new_cnt);
 
             m_numTotal = new_cnt;
             BX_FREE(m_alloc, m_values);
@@ -338,7 +337,7 @@ namespace bx
     }
 
     template <typename Ty, typename Ky>
-    void HashTable<Ty, Ky>::Reorder(Ky* keys, Ty* values, int count)
+    void HashTable<Ty, Ky>::reorder(Ky* keys, Ty* values, int count)
     {
         for (int i = 0, total = m_numTotal; i < total; i++)  {
             Ky key = m_keys[i];
@@ -432,7 +431,7 @@ namespace bx
             memset(nodes, 0x00, sizeof(Node*)*new_cnt);
             memset(keys, 0x00, sizeof(Ky)*new_cnt);
 
-            Reorder(keys, nodes, new_cnt);
+            reorder(keys, nodes, new_cnt);
 
             m_numTotal = new_cnt;
             BX_FREE(m_alloc, m_nodes);
@@ -537,7 +536,7 @@ namespace bx
     }
 
     template <typename Ty, typename Ky>
-    void MultiHashTable<Ty, Ky>::Reorder(Ky* keys, typename MultiHashTable<Ty, Ky>::Node** nodes, int count)
+    void MultiHashTable<Ty, Ky>::reorder(Ky* keys, typename MultiHashTable<Ty, Ky>::Node** nodes, int count)
     {
         for (int i = 0, total = m_numTotal; i < total; i++)  {
             Ky key = m_keys[i];
