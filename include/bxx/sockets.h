@@ -139,6 +139,8 @@ namespace bx
 }
 
 #ifdef BX_IMPLEMENT_SOCKETS
+#   include <cassert>
+
 #if !BX_PLATFORM_WINDOWS
 #   include <sys/socket.h>
 #   include <netinet/in.h>
@@ -149,31 +151,32 @@ namespace bx
 #   define closesocket ::close
 #   define INET6_ADDR(a)   a.__in6_u.__u6_addr8
 #else
-//#   include <Ws2tcpip.h>
-//#   define inet_ntop InetNtop
+#   include <Ws2tcpip.h>
+
+#define inet_ntop InetNtop
 #   define INET6_ADDR(a)   a.u.Byte
+ typedef int socklen_t;
 
 static const char *inet_ntop(int af, const void *src, char *dst, socklen_t size)
 {
     struct sockaddr_storage ss;
     unsigned long s = size;
 
-    ZeroMemory(&ss, sizeof(ss));
+    memset(&ss, 0x00, sizeof(ss));
     ss.ss_family = af;
 
     switch (af) {
     case AF_INET:
-        ((struct sockaddr_in *)&ss)->sin_addr = *(struct in_addr *)src;
+        ((sockaddr_in*)&ss)->sin_addr = *(struct in_addr*)src;
         break;
     case AF_INET6:
-        ((struct sockaddr_in6 *)&ss)->sin6_addr = *(struct in6_addr *)src;
+        ((sockaddr_in6*)&ss)->sin6_addr = *(struct in6_addr*)src;
         break;
     default:
         return NULL;
     }
-    /* cannot direclty use &size because of strict aliasing rules */
-    return (WSAAddressToString((sockaddr*)&ss, sizeof(ss), NULL, dst, &s) == 0) ?
-        dst : NULL;
+    // cannot direclty use &size because of strict aliasing rules
+    return (WSAAddressToString((sockaddr*)&ss, sizeof(ss), NULL, dst, &s) == 0) ? dst : NULL;
 }
 
 namespace bx {
