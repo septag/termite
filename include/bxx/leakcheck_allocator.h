@@ -120,27 +120,27 @@ namespace bx
 
         virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) BX_OVERRIDE
         {
-            // free
             if (_size == 0) {
-                if (BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT >= _align) {
-                    stb_leakcheck_free(_ptr);
-                    return nullptr;
+                // free
+                if (_ptr != NULL) {
+                    if (BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT >= _align) {
+                        stb_leakcheck_free(_ptr);
+                        return nullptr;
+                    }
+                    bx::alignedFree(this, _ptr, _align, _file, _line);
                 }
-                bx::alignedFree(this, _ptr, _align, _file, _line);
-                return nullptr;
-            }
-            
-            // malloc
-            if (_ptr == nullptr) {
+                return NULL;
+            } else if (_ptr == NULL) {
+                // malloc
                 if (BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT >= _align)
                     return stb_leakcheck_malloc(_size, _file, _line);
                 return bx::alignedAlloc(this, _size, _align, _file, _line);
+            }  else {
+                // realloc
+                if (BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT >= _align)
+                    return stb_leakcheck_realloc(_ptr, _size, _file, _line);
+                return bx::alignedRealloc(this, _ptr, _size, _align, _file, _line);
             }
-
-            // realloc
-            if (BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT >= _align)
-                return stb_leakcheck_realloc(_ptr, _size, _file, _line);
-            return bx::alignedRealloc(this, _ptr, _size, _align, _file, _line);
         }
     };
 }
