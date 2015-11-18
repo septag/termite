@@ -20,18 +20,17 @@ namespace bx
         {
         }
 
-        virtual void* alloc(size_t _size, size_t _align, const char* _file, uint32_t _line) override
+        virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) BX_OVERRIDE
         {
-            if (m_offset + _size > m_size)
-                return nullptr;
+            if (_size) {
+                if (m_offset + _size > m_size)
+                    return nullptr;
 
-            void* p = m_ptr + m_offset;
-            m_offset += _size;
-            return p;
-        }
-
-        virtual void free(void* _ptr, size_t _align, const char* _file, uint32_t _line) override
-        {
+                void* p = m_ptr + m_offset;
+                m_offset += _size;
+                return p;
+            }
+            return nullptr;
         }
 
     private:
