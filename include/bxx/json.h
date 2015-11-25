@@ -37,7 +37,8 @@ namespace bx
         bool isNull() const                 {   return type == JsonType::Null;  }
         JsonType getType() const            {   return type;    }
         const char* getName() const         {   return name;    }
-        int getArrayCount() const           {   return numArrayItems;    }
+        int getArrayCount() const           {   return numChildItems;    }
+        int getChildCount() const           {   return numChildItems;    }
 
         const JsonNode* findChild(const char* name) const;
         const JsonNode* getArrayItem(int index) const;
@@ -53,7 +54,7 @@ namespace bx
         JsonNode* firstChild;
         JsonNode* lastChild;
         bx::AllocatorI* alloc;
-        int numArrayItems;
+        int numChildItems;
 
         union   {
             float f;
@@ -73,9 +74,14 @@ namespace bx
         int line;
     };
 
+
+
     // Parse json string
     // String should stay in memory until working with nodes are done. Data content is all in-place
     JsonNode* parseJson(char* str, bx::AllocatorI* nodeAlloc, JsonError* errors);
+
+    // Make json string from given root node
+    char* makeJson(const JsonNode* root, bx::AllocatorI* alloc, bool packed);
 }
 
 
@@ -85,6 +91,9 @@ namespace bx
 #include <cstdlib>
 #include <cctype>
 #include <cassert>    
+
+#include "array.h"
+#include "string.h"
 
 namespace bx
 {
@@ -512,6 +521,105 @@ namespace bx
 
         return root;
     }
+    
+    static void makeJsonFromNode(const JsonNode* node, bx::Array<char>* buff, bool packed, bool isRoot)
+    {
+        // Name
+        if (!isRoot) {
+            int s = (int)strlen(node->getName());
+            char* name = buff->pushMany(s + 3);
+            name[0] = '\"';
+            memcpy(&name[1], node->getName(), s);
+            name[s + 1] = '\"';
+            name[s + 2] = ':';
+        }
+
+        // Value
+        switch (node->getType()) {
+        case JsonType::Object:
+        {
+            *buff->push() = '{';
+            for (int i = 0, c = node->getChildCount(); i < c; i++) {
+                makeJsonFromNode(node->getArrayItem(i), buff, packed, false);
+                if (i < c - 1)
+                    *buff->push() = ',';
+            }
+            *buff->push() = '}';
+            break;
+        }
+        case JsonType::Array:
+        {
+            *buff->push() = '[';
+            for (int i = 0, c = node->getArrayCount(); i < c; i++) {
+                makeJsonFromNode(node->getArrayItem(i), buff, packed, false);
+                if (i < c - 1)
+                    *buff->push() = ',';
+            }
+            *buff->push() = ']';
+            break;
+        }
+        case JsonType::Bool:
+        {
+            const char* value = node->valueBool() ? "true" : "false";
+            int s = (int)strlen(value);
+            char* valuestr = buff->pushMany(s);
+            memcpy(valuestr, value, s);
+            break;
+        }
+        case JsonType::Float:
+        {
+            bx::String32 f;
+            f.format("%f", node->valueFloat());
+            int s = f.getLength();
+            char* valuestr = buff->pushMany(s);
+            memcpy(valuestr, f.cstr(), s);
+            break;
+        }
+
+        case JsonType::Int:
+        {
+            bx::String32 i;
+            i.format("%d", node->valueInt());
+            int s = i.getLength();
+            char* valuestr = buff->pushMany(s);
+            memcpy(valuestr, i.cstr(), s);
+            break;
+        }
+
+        case JsonType::Null:
+        {
+            const char* value = "null";
+            int s = (int)strlen(value);
+            char* valuestr = buff->pushMany(s);
+            memcpy(valuestr, value, s);
+            break;
+        }
+
+        case JsonType::String:
+        {
+            int s = (int)strlen(node->valueString());
+            char* value = buff->pushMany(s + 2);
+            value[0] = '\"';
+            memcpy(&value[1], node->valueString(), s);
+            value[s + 1] = '\"';
+            break;
+        }
+        }
+    }
+
+    char* makeJson(const JsonNode* root, bx::AllocatorI* alloc, bool packed)
+    {
+        bx::Array<char> buff;
+        buff.create(512, 1024, alloc);
+
+        makeJsonFromNode(root, &buff, packed, true);
+        *buff.push() = '\0';    // terminate the string
+        
+        int size;
+        char* r = buff.detach(&size);
+        return r;
+    }
+
 
     // JsonNode
     const JsonNode JsonNode::None;
@@ -524,7 +632,7 @@ namespace bx
         parent = next = prev = firstChild = lastChild = nullptr;
         alloc = nullptr;
         value.s = nullptr;
-        numArrayItems = 0;
+        numChildItems = 0;
     }
 
     JsonNode::~JsonNode()
@@ -545,8 +653,7 @@ namespace bx
             this->firstChild = this->lastChild = node;
         }
 
-        if (this->type == JsonType::Array)
-            this->numArrayItems ++;
+        this->numChildItems ++;
 
         node->parent = this;
         return *this;            
@@ -565,7 +672,7 @@ namespace bx
 
     const JsonNode* JsonNode::getArrayItem(int index) const
     {
-        assert(index < this->numArrayItems);
+        assert(index < this->numChildItems);
 
         int i = 0;
         JsonNode* node = this->firstChild;
