@@ -265,12 +265,24 @@ namespace bx
 	class MemoryBlock : public MemoryBlockI
 	{
 	public:
+        MemoryBlock()
+        {
+            m_allocator = NULL;
+            m_data = NULL;
+            m_size = 0;
+        }
+
 		MemoryBlock(AllocatorI* _allocator)
 			: m_allocator(_allocator)
 			, m_data(NULL)
 			, m_size(0)
 		{
 		}
+
+        void setAllocator(AllocatorI* _allocator)
+        {
+            m_allocator = _allocator;
+        }
 
 		virtual ~MemoryBlock()
 		{
@@ -471,7 +483,7 @@ namespace bx
 			return size;
 		}
 
-	private:
+	protected:
 		MemoryBlockI* m_memBlock;
 		uint8_t* m_data;
 		int64_t m_pos;
