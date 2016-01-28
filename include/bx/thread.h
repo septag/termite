@@ -63,9 +63,9 @@ namespace bx
 			m_running = true;
 
 #if BX_PLATFORM_WINDOWS || BX_PLATFORM_XBOX360
-			m_handle = CreateThread(NULL
+			m_handle = ::CreateThread(NULL
 				, m_stackSize
-				, threadFunc
+				, (LPTHREAD_START_ROUTINE)threadFunc
 				, this
 				, 0
 				, NULL
@@ -149,7 +149,7 @@ namespace bx
 		{
 #if BX_PLATFORM_OSX || BX_PLATFORM_IOS
 			pthread_setname_np(_name);
-#elif BX_PLATFORM_LINUX || BX_PLATFORM_FREEBSD
+#elif (BX_PLATFORM_LINUX && defined(__GLIBC__)) || BX_PLATFORM_FREEBSD
 			pthread_setname_np(m_handle, _name);
 #elif BX_PLATFORM_WINDOWS && BX_COMPILER_MSVC
 #	pragma pack(push, 8)

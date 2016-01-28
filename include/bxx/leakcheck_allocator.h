@@ -107,7 +107,7 @@ extern void   stb_leakcheck_dumpmem(void);
 namespace bx
 {
     //
-    class LeakCheckAllocator : public ReallocatorI
+    class LeakCheckAllocator : public AllocatorI
     {
     public:
         LeakCheckAllocator()
@@ -118,35 +118,29 @@ namespace bx
         {
         }
 
-        virtual void* alloc(size_t _size, size_t _align, const char* _file, uint32_t _line) BX_OVERRIDE
-        {
-            if (BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT >= _align)
-            {
-                return stb_leakcheck_malloc(_size, _file, _line);
-            }
-
-            return bx::alignedAlloc(this, _size, _align, _file, _line);
-        }
-
-        virtual void free(void* _ptr, size_t _align, const char* _file, uint32_t _line) BX_OVERRIDE
-        {
-            if (BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT >= _align)
-            {
-                stb_leakcheck_free(_ptr);
-                return;
-            }
-
-            bx::alignedFree(this, _ptr, _align, _file, _line);
-        }
-
         virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) BX_OVERRIDE
         {
-            if (BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT >= _align)
-            {
-                return stb_leakcheck_realloc(_ptr, _size, _file, _line);
+            if (_size == 0) {
+                // free
+                if (_ptr != NULL) {
+                    if (BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT >= _align) {
+                        stb_leakcheck_free(_ptr);
+                        return nullptr;
+                    }
+                    bx::alignedFree(this, _ptr, _align, _file, _line);
+                }
+                return NULL;
+            } else if (_ptr == NULL) {
+                // malloc
+                if (BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT >= _align)
+                    return stb_leakcheck_malloc(_size, _file, _line);
+                return bx::alignedAlloc(this, _size, _align, _file, _line);
+            }  else {
+                // realloc
+                if (BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT >= _align)
+                    return stb_leakcheck_realloc(_ptr, _size, _file, _line);
+                return bx::alignedRealloc(this, _ptr, _size, _align, _file, _line);
             }
-
-            return bx::alignedRealloc(this, _ptr, _size, _align, _file, _line);
         }
     };
 }

@@ -12,7 +12,7 @@ namespace bx
         Array();
         ~Array();
 
-        bool create(int _initCount, int _growCount, ReallocatorI* _alloc);
+        bool create(int _initCount, int _growCount, AllocatorI* _alloc);
         void destroy();
 
         Ty* push();
@@ -21,7 +21,7 @@ namespace bx
         int getCount() const    {   return m_numItems;  }
         Ty* getBuffer() const   {   return m_buff;      }
         void clear()            {   m_numItems = 0;     }
-        Ty* detach(int* _count, ReallocatorI** _palloc = nullptr);
+        Ty* detach(int* _count, AllocatorI** _palloc = nullptr);
 
         int find(const Ty& _item) const;
 
@@ -33,7 +33,7 @@ namespace bx
         int alignValue(int _value, int _alignment);
 
     private:
-        ReallocatorI* m_alloc;
+        AllocatorI* m_alloc;
         Ty* m_buff;
         int m_numItems;
         int m_maxItems;
@@ -49,7 +49,6 @@ namespace bx
         m_numItems = 0;
         m_maxItems = 0;
         m_numExpand = 0;
-        assert(BX_TYPE_IS_POD(Ty));
     }
 
     template <typename Ty>
@@ -59,7 +58,7 @@ namespace bx
     }
 
     template <typename Ty>
-    bool Array<Ty>::create(int _initCount, int _growCount, ReallocatorI* _alloc)
+    bool Array<Ty>::create(int _initCount, int _growCount, AllocatorI* _alloc)
     {
         assert(_alloc);
 
@@ -140,7 +139,7 @@ namespace bx
     }
 
     template <typename Ty> 
-    Ty* Array<Ty>::detach(int* _count, ReallocatorI** _palloc)
+    Ty* Array<Ty>::detach(int* _count, AllocatorI** _palloc)
     {
         *_count = m_numItems;
         Ty* buff = m_buff;

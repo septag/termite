@@ -39,7 +39,7 @@ namespace bx
         if (*_ref) {
             *_ref =(*_ref)->next;
             item->next = nullptr;
-        }
+        } 
         return item->data;
     }
 
@@ -61,10 +61,12 @@ namespace bx
 
     public:
         explicit SpScUnboundedQueueAlloc(AllocatorI* _alloc)
-            : m_first(BX_NEW(_alloc, Node))
+            :
+              m_alloc(_alloc)
+            , m_first(BX_NEW(_alloc, Node))
             , m_divider(m_first)
             , m_last(m_first)
-            , m_alloc(_alloc)
+
         {
         }
 

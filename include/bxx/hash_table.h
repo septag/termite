@@ -15,7 +15,7 @@ namespace bx
     };
 
     // Normal hash table
-    template <typename Ty>
+    template <typename Ty, typename Ky = uint32_t>
     class HashTable
     {
     public:
@@ -25,14 +25,12 @@ namespace bx
         bool create(int capacity, AllocatorI* alloc);
         void destroy();
 
-        int addStr(const char* str_key, const Ty& value);
-        int add(uint32_t key, const Ty& value);
+        int add(Ky key, const Ty& value);
 
         void remove(int index);
 
         // Returns 'invalidValue' if item is not found
-        int find(uint32_t key);
-        int findStr(const char* str_key);
+        int find(Ky key);
 
         void clear();
         bool isEmpty();
@@ -42,12 +40,12 @@ namespace bx
         static size_t GetImmutableSizeBytes(int capacity);
 
     private:
-        int probeLinear(int index, uint32_t key, const uint32_t* keys, int count);
-        void Reorder(uint32_t* keys, Ty* values, int count);
+        int probeLinear(int index, Ky key, const Ky* keys, int count);
+        void reorder(Ky* keys, Ty* values, int count);
 
     private:
         HashTableType m_type;
-        uint32_t* m_keys;
+        Ky* m_keys;
         Ty* m_values;
         int m_numTotal;
         int m_numItems;
@@ -55,10 +53,10 @@ namespace bx
         AllocatorI* m_alloc;
     };
     typedef HashTable<int> HashTableInt;
-
+    
     // MultiHashTables can have multiple values per hash key
     // You should iterate over the list for all values on each search
-    template <typename Ty>
+    template <typename Ty, typename Ky = uint32_t>
     class MultiHashTable
     {
     public:
@@ -79,13 +77,11 @@ namespace bx
         bool create(int capacity, AllocatorI* alloc, AllocatorI* node_alloc);
         void destroy();
 
-        int addStr(const char* str_key, const Ty& value);
-        int add(uint32_t key, const Ty& value);
+        int add(Ky key, const Ty& value);
 
         void remove(int index, Node* node);
 
-        int find(uint32_t key);
-        int findStr(const char* str_key);
+        int find(Ky key);
 
         Node* getNode(int index) const;
 
@@ -93,15 +89,15 @@ namespace bx
         bool isEmpty();
 
     private:
-        int probeLinear(int index, uint32_t key, const uint32_t* keys, int count);
-        void Reorder(uint32_t* keys, Node** nodes, int count);
+        int probeLinear(int index, Ky key, const Ky* keys, int count);
+        void reorder(Ky* keys, Node** nodes, int count);
 
     private:
         HashTableType m_type;
         AllocatorI* m_alloc;
         AllocatorI* m_nodeAlloc;
         Node** m_nodes;
-        uint32_t* m_keys;
+        Ky* m_keys;
         int m_numItems;
         int m_numTotal;
         int m_blockSize;
@@ -184,8 +180,8 @@ namespace bx
     }
 
 #pragma region HashTable
-    template <typename Ty>
-    HashTable<Ty>::HashTable(HashTableType type)
+    template <typename Ty, typename Ky>
+    HashTable<Ty, Ky>::HashTable(HashTableType type)
     {
         m_type = type;
         m_values = nullptr;
@@ -194,18 +190,18 @@ namespace bx
         m_numTotal = 0;
         m_blockSize = 0;
         m_alloc = nullptr;
-        assert(BX_TYPE_IS_POD(Ty));
+        //assert(BX_TYPE_IS_POD(Ty));
     }
 
-    template <typename Ty>
-    HashTable<Ty>::~HashTable()
+    template <typename Ty, typename Ky>
+    HashTable<Ty, Ky>::~HashTable()
     {
         assert(m_keys == nullptr);
         assert(m_values == nullptr);
     }
 
-    template <typename Ty>
-    bool HashTable<Ty>::create(int capacity, AllocatorI* alloc)
+    template <typename Ty, typename Ky>
+    bool HashTable<Ty, Ky>::create(int capacity, AllocatorI* alloc)
     {
         assert(capacity);
         assert(alloc);
@@ -216,17 +212,17 @@ namespace bx
         m_numItems = 0;
         m_alloc = alloc;
         m_values = (Ty*)BX_ALLOC(alloc, sizeof(Ty)*capacity);
-        m_keys = (uint32_t*)BX_ALLOC(alloc, sizeof(uint32_t)*capacity);
+        m_keys = (Ky*)BX_ALLOC(alloc, sizeof(Ky)*capacity);
         if (!m_values || !m_keys)
             return false;
         memset(m_values, 0x00, sizeof(Ty)*capacity);
-        memset(m_keys, 0x00, sizeof(uint32_t)*capacity);
+        memset(m_keys, 0x00, sizeof(Ky)*capacity);
 
         return true;
     }
 
-    template <typename Ty>
-    void HashTable<Ty>::destroy()
+    template <typename Ty, typename Ky>
+    void HashTable<Ty, Ky>::destroy()
     {
         if (!m_alloc)
             return;
@@ -241,14 +237,8 @@ namespace bx
         m_numTotal = 0;
     }
 
-    template <typename Ty>
-    int HashTable<Ty>::addStr(const char* str_key, const Ty& value)
-    {
-        return add(hashMurmur2A(str_key, strlen(str_key)), value);
-    }
-
-    template <typename Ty>
-    int HashTable<Ty>::add(uint32_t key, const Ty& value)
+    template <typename Ty, typename Ky>
+    int HashTable<Ty, Ky>::add(Ky key, const Ty& value)
     {
         assert(m_keys && m_values);
 
@@ -257,13 +247,13 @@ namespace bx
             int new_cnt = getClosestPrime(m_numTotal + m_blockSize);
 
             Ty* values = (Ty*)BX_ALLOC(m_alloc, sizeof(Ty)*new_cnt);
-            uint32_t* keys = (uint32_t*)BX_ALLOC(m_alloc, sizeof(uint32_t)*new_cnt);
+            Ky* keys = (Ky*)BX_ALLOC(m_alloc, sizeof(Ky)*new_cnt);
             if (!keys || !values)
                 return -1;
             memset(values, 0x00, sizeof(Ty)*new_cnt);
-            memset(keys, 0x00, sizeof(uint32_t)*new_cnt);
+            memset(keys, 0x00, sizeof(Ky)*new_cnt);
 
-            Reorder(keys, values, new_cnt);
+            reorder(keys, values, new_cnt);
 
             m_numTotal = new_cnt;
             BX_FREE(m_alloc, m_values);
@@ -285,8 +275,8 @@ namespace bx
         return idx;
     }
 
-    template <typename Ty>
-    void HashTable<Ty>::remove(int index)
+    template <typename Ty, typename Ky>
+    void HashTable<Ty, Ky>::remove(int index)
     {
         assert(index>=0);
 
@@ -294,14 +284,8 @@ namespace bx
         m_numItems --;
     }
 
-    template <typename Ty>
-    int HashTable<Ty>::findStr(const char* str_key)
-    {
-        return find(hashMurmur2A(str_key, strlen(str_key)));
-    }
-
-    template <typename Ty>
-    int HashTable<Ty>::find(uint32_t key)
+    template <typename Ty, typename Ky>
+    int HashTable<Ty, Ky>::find(Ky key)
     {
         if (!m_numItems)
             return -1;
@@ -314,35 +298,35 @@ namespace bx
         return probeLinear(idx, key, m_keys, total);
     }
 
-    template <typename Ty>
-    void HashTable<Ty>::clear()
+    template <typename Ty, typename Ky>
+    void HashTable<Ty, Ky>::clear()
     {
-        memset(m_keys, 0x00, sizeof(uint32_t)*m_numTotal);
+        memset(m_keys, 0x00, sizeof(Ky)*m_numTotal);
         m_numItems = 0;
     }
 
-    template <typename Ty>
-    bool HashTable<Ty>::isEmpty()
+    template <typename Ty, typename Ky>
+    bool HashTable<Ty, Ky>::isEmpty()
     {
         return m_numItems > 0;
     }
 
-    template <typename Ty>
-    const Ty& HashTable<Ty>::getValue(int index) const
+    template <typename Ty, typename Ky>
+    const Ty& HashTable<Ty, Ky>::getValue(int index) const
     {
         assert(index>=0);
         return m_values[index];
     }
 
-    template <typename Ty>
-    size_t HashTable<Ty>::GetImmutableSizeBytes(int capacity)
+    template <typename Ty, typename Ky>
+    size_t HashTable<Ty, Ky>::GetImmutableSizeBytes(int capacity)
     {
         capacity = getClosestPrime(capacity + capacity/2);
-        return capacity*(sizeof(Ty)+sizeof(uint32_t));
+        return capacity*(sizeof(Ty)+sizeof(Ky));
     }
 
-    template <typename Ty>
-    int HashTable<Ty>::probeLinear(int index, uint32_t key, const uint32_t* keys, int count)
+    template <typename Ty, typename Ky>
+    int HashTable<Ty, Ky>::probeLinear(int index, Ky key, const Ky* keys, int count)
     {
         for (int i = 1; i < count; i++)  {
             int r = (index + i) % count;
@@ -352,11 +336,11 @@ namespace bx
         return -1;
     }
 
-    template <typename Ty>
-    void HashTable<Ty>::Reorder(uint32_t* keys, Ty* values, int count)
+    template <typename Ty, typename Ky>
+    void HashTable<Ty, Ky>::reorder(Ky* keys, Ty* values, int count)
     {
         for (int i = 0, total = m_numTotal; i < total; i++)  {
-            uint32_t key = m_keys[i];
+            Ky key = m_keys[i];
 
             int idx = key % total;
             if (keys[idx])
@@ -370,8 +354,8 @@ namespace bx
 #pragma endregion HashTable
 
 #pragma region MultiHashTable
-    template <typename Ty>
-    MultiHashTable<Ty>::MultiHashTable(HashTableType type)
+    template <typename Ty, typename Ky>
+    MultiHashTable<Ty, Ky>::MultiHashTable(HashTableType type)
     {
         m_type = type;
         m_alloc = nullptr;
@@ -381,18 +365,18 @@ namespace bx
         m_numItems = 0;
         m_numTotal = 0;
         m_blockSize = 0;
-        assert(BX_TYPE_IS_POS(Ty));
+        assert(BX_TYPE_IS_POD(Ty));
     }
 
-    template <typename Ty>
-    MultiHashTable<Ty>::~MultiHashTable()
+    template <typename Ty, typename Ky>
+    MultiHashTable<Ty, Ky>::~MultiHashTable()
     {
-        assert(nodes == nullptr);
-        assert(keys == nullptr);
+        assert(m_nodes == nullptr);
+        assert(m_keys == nullptr);
     }
 
-    template <typename Ty>
-    bool MultiHashTable<Ty>::create(int capacity, AllocatorI* alloc, AllocatorI* node_alloc)
+    template <typename Ty, typename Ky>
+    bool MultiHashTable<Ty, Ky>::create(int capacity, AllocatorI* alloc, AllocatorI* node_alloc)
     {
         assert(alloc);
         assert(node_alloc);
@@ -402,11 +386,11 @@ namespace bx
         m_alloc = alloc;
         m_nodeAlloc = node_alloc;
         m_nodes = (Node**)BX_ALLOC(alloc, sizeof(Node*)*capacity);
-        m_keys = (uint32_t*)BX_ALLOC(alloc, sizeof(uint32_t)*capacity);
+        m_keys = (Ky*)BX_ALLOC(alloc, sizeof(Ky)*capacity);
         if (!m_nodes || !m_keys)
             return false;
         memset(m_nodes, 0x00, sizeof(Node*)*capacity);
-        memset(m_keys, 0x00, sizeof(uint32_t)*capacity);
+        memset(m_keys, 0x00, sizeof(Ky)*capacity);
 
         m_numItems = 0;
         m_numTotal = capacity;
@@ -415,8 +399,8 @@ namespace bx
         return true;
     }
 
-    template <typename Ty>
-    void MultiHashTable<Ty>::destroy()
+    template <typename Ty, typename Ky>
+    void MultiHashTable<Ty, Ky>::destroy()
     {
         if (!m_alloc)
             return;
@@ -431,14 +415,8 @@ namespace bx
         m_keys = nullptr;
     }
 
-    template <typename Ty>
-    int MultiHashTable<Ty>::addStr(const char* str_key, const Ty& value)
-    {
-        return add(hashMurmur2A(str_key, strlen(str_key)), value);
-    }
-
-    template <typename Ty>
-    int MultiHashTable<Ty>::add(uint32_t key, const Ty& value)
+    template <typename Ty, typename Ky>
+    int MultiHashTable<Ty, Ky>::add(Ky key, const Ty& value)
     {
         assert(m_keys && m_nodes);
 
@@ -447,13 +425,13 @@ namespace bx
             int new_cnt = getClosestPrime(m_numTotal + m_blockSize);
 
             Node** nodes = (Node**)BX_ALLOC(m_alloc, sizeof(Node*)*new_cnt);
-            uint32_t* keys = (uint32_t*)BX_ALLOC(m_alloc, sizeof(uint32_t)*new_cnt);
+            Ky* keys = (Ky*)BX_ALLOC(m_alloc, sizeof(Ky)*new_cnt);
             if (!keys || !nodes)
                 return -1;
             memset(nodes, 0x00, sizeof(Node*)*new_cnt);
-            memset(keys, 0x00, sizeof(uint32_t)*new_cnt);
+            memset(keys, 0x00, sizeof(Ky)*new_cnt);
 
-            Reorder(keys, nodes, new_cnt);
+            reorder(keys, nodes, new_cnt);
 
             m_numTotal = new_cnt;
             BX_FREE(m_alloc, m_nodes);
@@ -489,8 +467,8 @@ namespace bx
         return idx;
     }
 
-    template <typename Ty>
-    void MultiHashTable<Ty>::remove(int index, Node* node)
+    template <typename Ty, typename Ky>
+    void MultiHashTable<Ty, Ky>::remove(int index, Node* node)
     {
         assert(index>=0);
         assert(node);
@@ -515,8 +493,8 @@ namespace bx
         m_numItems --;
     }
 
-    template <typename Ty>
-    int MultiHashTable<Ty>::find(uint32_t key)
+    template <typename Ty, typename Ky>
+    int MultiHashTable<Ty, Ky>::find(Ky key)
     {
         int idx = key % m_numTotal;
         if (m_keys[idx] != key)
@@ -524,21 +502,15 @@ namespace bx
         return idx;
     }
 
-    template <typename Ty>
-    int MultiHashTable<Ty>::findStr(const char* str_key)
-    {
-        return find(hashMurmur2A(str_key, strlen(str_key)));
-    }
-
-    template <typename Ty>
-    typename MultiHashTable<Ty>::Node* MultiHashTable<Ty>::getNode(int index) const
+    template <typename Ty, typename Ky>
+    typename MultiHashTable<Ty, Ky>::Node* MultiHashTable<Ty, Ky>::getNode(int index) const
     {
         assert(index>=0);
         return m_nodes[index];
     }
 
-    template <typename Ty>
-    void MultiHashTable<Ty>::clear()
+    template <typename Ty, typename Ky>
+    void MultiHashTable<Ty, Ky>::clear()
     {
         for (int i = 0, c = m_numTotal; i < c; i++)  {
             while (m_nodes[i])
@@ -546,14 +518,14 @@ namespace bx
         }
     }
 
-    template <typename Ty>
-    bool MultiHashTable<Ty>::isEmpty()
+    template <typename Ty, typename Ky>
+    bool MultiHashTable<Ty, Ky>::isEmpty()
     {
         return m_numItems > 0;
     }
 
-    template <typename Ty>
-    int MultiHashTable<Ty>::probeLinear(int index, uint32_t key, const uint32_t* keys, int count)
+    template <typename Ty, typename Ky>
+    int MultiHashTable<Ty, Ky>::probeLinear(int index, Ky key, const Ky* keys, int count)
     {
         for (int i = 1; i < count; i++)  {
             int r = (index + i) % count;
@@ -563,11 +535,11 @@ namespace bx
         return -1;
     }
 
-    template <typename Ty>
-    void MultiHashTable<Ty>::Reorder(uint32_t* keys, typename MultiHashTable<Ty>::Node** nodes, int count)
+    template <typename Ty, typename Ky>
+    void MultiHashTable<Ty, Ky>::reorder(Ky* keys, typename MultiHashTable<Ty, Ky>::Node** nodes, int count)
     {
         for (int i = 0, total = m_numTotal; i < total; i++)  {
-            uint32_t key = m_keys[i];
+            Ky key = m_keys[i];
 
             int idx = key % count;
             if (keys[idx])

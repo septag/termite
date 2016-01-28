@@ -31,7 +31,7 @@ namespace bx
     {
         if (*_ref)     {
             // Move to last node
-            LinkedList<_T>* last = *_ref;
+            ListNode<Ty>* last = *_ref;
             while (last->next)
                 last = last->next;
             last->next = _node;
