@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <assert.h>
+#include <string.h>
+
 typedef struct malloc_info stb_leakcheck_malloc_info;
 
 struct malloc_info
