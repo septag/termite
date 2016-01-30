@@ -3,6 +3,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\source\core.cpp" />
     <ClCompile Include="..\..\source\error_report.cpp" />
+    <ClCompile Include="..\..\source\plugins.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="include">
@@ -14,6 +15,9 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\stengine\error_report.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\stengine\plugins.h">
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>

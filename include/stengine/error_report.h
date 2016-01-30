@@ -14,7 +14,7 @@
 namespace st
 {
     // Internal
-    int errInit();
+    int errInit(bx::AllocatorI* alloc);
     void errShutdown();
 
     // Public

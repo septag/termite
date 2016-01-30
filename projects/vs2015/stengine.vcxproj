@@ -159,10 +159,12 @@
   <ItemGroup>
     <ClCompile Include="..\..\source\core.cpp" />
     <ClCompile Include="..\..\source\error_report.cpp" />
+    <ClCompile Include="..\..\source\plugins.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\stengine\core.h" />
     <ClInclude Include="..\..\include\stengine\error_report.h" />
+    <ClInclude Include="..\..\include\stengine\plugins.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
