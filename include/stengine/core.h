@@ -24,9 +24,13 @@
 #   define STENGINE_API extern "C" 
 #endif
 
+// Versioning Macros
 #define ST_MAKE_VERSION(_Major, _Minor)  (uint32_t)(((_Major & 0xffff)<<16) | (_Minor & 0xffff))
 #define ST_VERSION_MAJOR(_Ver) (uint16_t)((_Ver >> 16) & 0xffff)
 #define ST_VERSION_MINOR(_Ver) (uint16_t)(_Ver & 0xffff)
+
+#define ST_HANDLE(_Name) struct _Name { uint16_t idx; };
+#define ST_INVALID_HANDLE(_Name) (_Name.idx == UINT16_MAX)
 
 namespace st
 {

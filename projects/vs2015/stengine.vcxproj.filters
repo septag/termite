@@ -20,5 +20,8 @@
     <ClInclude Include="..\..\include\stengine\plugins.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\stengine\gfx_driver.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
