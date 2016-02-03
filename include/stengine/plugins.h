@@ -20,7 +20,7 @@ namespace st
         uint32_t engineVersion; // Expected engine version to work with, Major/Minor combined
     };
 
-    typedef void* pluginHandle;
+    ST_HANDLE(pluginHandle);
 
     // Must be Implemented by Plugins
     extern "C"

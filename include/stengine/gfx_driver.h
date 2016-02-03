@@ -8,6 +8,16 @@ namespace st
 {
     ST_HANDLE(gfxTextureHandle);
     ST_HANDLE(gfxFrameBufferHandle);
+    ST_HANDLE(gfxOccQueryHandle);
+    ST_HANDLE(gfxIndexBufferHandle);
+    ST_HANDLE(gfxDynamicIndexBufferHandle);
+    ST_HANDLE(gfxVertexBufferHandle);
+    ST_HANDLE(gfxDynamicVertexBufferHandle);
+    ST_HANDLE(gfxVertexDeclHandle);
+    ST_HANDLE(gfxUniformHandle);
+    ST_HANDLE(gfxProgramHandle);
+    ST_HANDLE(gfxIndirectBufferHandle);
+    ST_HANDLE(gfxShaderHandle);
 
     enum class gfxFatalType
     {
@@ -76,8 +86,8 @@ namespace st
         RGBA16,
         RGBA16I,
         RGBA16U,
-        RGBA16S,
         RGBA16F,
+        RGBA16S,
         RGBA32I,
         RGBA32U,
         RGBA32F,
@@ -176,6 +186,40 @@ namespace st
     };
     ST_DEFINE_FLAG_TYPE(gfxCapsFlag);
 
+    struct gfxTransform
+    {
+        float* data;    // Pointer to first matrix
+        uint16_t num;   // number of matrices
+    };
+
+    struct gfxTransientIndexBuffer
+    {
+        uint8_t* data;
+        uint32_t size;
+        uint32_t startIndex;
+        gfxIndexBufferHandle handle;
+    };
+
+    struct gfxTransientVertexBuffer
+    {
+        uint8_t* data;             // Pointer to data.
+        uint32_t size;             // Data size.
+        uint32_t startVertex;      // First vertex.
+        uint16_t stride;           // Vertex stride.
+        gfxVertexBufferHandle handle; // Vertex buffer handle.
+        gfxVertexDeclHandle decl;     // Vertex declaration handle.
+    };
+
+    struct gfxInstanceDataBuffer
+    {
+        uint8_t* data;             // Pointer to data.
+        uint32_t size;             // Data size.
+        uint32_t offset;           // Offset in vertex buffer.
+        uint32_t num;              // Number of instances.
+        uint16_t stride;           // Vertex buffer stride.
+        gfxVertexBufferHandle handle; // Vertex buffer object handle.
+    };
+
     struct gfxCaps
     {
         gfxRendererType type;
@@ -245,7 +289,7 @@ namespace st
 
     enum class gfxTextureFlag : uint32_t
     {
-        None = 0,
+        None = 0x00000000,
         U_Mirror = 0x00000001,
         U_Clamp = 0x00000002,
         U_Border = 0x00000003,
@@ -278,6 +322,7 @@ namespace st
         SRGB = 0x00200000,
         BlitDst = 0x00400000,
         ReadBack = 0x00800000,
+        FromTexture = 0xffffffff
     };
     ST_DEFINE_FLAG_TYPE(gfxTextureFlag);
 
@@ -299,6 +344,14 @@ namespace st
         Stereo = 0x01
     };
     ST_DEFINE_FLAG_TYPE(gfxViewFlag);
+
+    enum class gfxSubmitFlag : uint8_t
+    {
+        Left = 0x01,
+        Right = 0x02,
+        Both = 0x03
+    };
+    ST_DEFINE_FLAG_TYPE(gfxSubmitFlag);
 
     enum class gfxState : uint64_t
     {
@@ -456,7 +509,7 @@ namespace st
         PassDepthInvert = 0x70000000
     };
     ST_DEFINE_FLAG_TYPE(gfxStencilOp);
-    
+
     inline uint32_t gfxStencilFuncRef(uint8_t _ref)
     {
         return (uint32_t)_ref & 0x000000ff;
@@ -485,7 +538,131 @@ namespace st
         Stencil = 0x1000
     };
     ST_DEFINE_FLAG_TYPE(gfxClearFlag);
+
+    enum class gfxAccess
+    {
+        Read,
+        Write,
+        ReadWrite,
+
+        Count
+    };
+
+    struct gfxMemory
+    {
+        uint8_t* data;
+        uint32_t size;
+    };
+
+    enum class gfxUniformType
+    {
+        Int1,
+        End,
+        Vec4,
+        Mat3,
+        Mat4,
+
+        Count
+    };
+
+    enum class gfxBufferFlag : uint16_t
+    {
+        None = 0x0000,
+        ComputeRead = 0x0100,
+        ComputeWrite = 0x0200,
+        Resizable = 0x0800,
+        Index32 = 0x1000
+    };
+    ST_DEFINE_FLAG_TYPE(gfxBufferFlag);
+
+    enum class gfxAttrib
+    {
+        Position,  // a_position
+        Normal,    // a_normal
+        Tangent,   // a_tangent
+        Bitangent, // a_bitangent
+        Color0,    // a_color0
+        Color1,    // a_color1
+        Indices,   // a_indices
+        Weight,    // a_weight
+        TexCoord0, // a_texcoord0
+        TexCoord1, // a_texcoord1
+        TexCoord2, // a_texcoord2
+        TexCoord3, // a_texcoord3
+        TexCoord4, // a_texcoord4
+        TexCoord5, // a_texcoord5
+        TexCoord6, // a_texcoord6
+        TexCoord7, // a_texcoord7
+
+        Count
+    };
+
+    enum class gfxAttribType
+    {
+        Uint8,  // Uint8
+        Uint10, // Uint10, availability depends on: `BGFX_CAPS_VERTEX_ATTRIB_UINT10`.
+        Int16,  // Int16
+        Half,   // Half, availability depends on: `BGFX_CAPS_VERTEX_ATTRIB_HALF`.
+        Float,  // Float
+    };
+
+    struct gfxVertexDecl
+    {
+        uint32_t hash;
+        uint16_t stride;
+        uint16_t offset[gfxAttrib::Count];
+        uint16_t attribs[gfxAttrib::Count];
+
+        //
+        gfxVertexDecl();
+        gfxVertexDecl& begin(gfxRendererType = _type gfxRendererType::Null);
+        void end();
+
+        gfxVertexDecl& add(gfxAttrib _attrib, uint8_t _num, gfxAttribType _type, bool normalized, bool asInt = false);
+        gfxVertexDecl& skip(uint8_t _numBytes);
+        void decode(gfxAttrib _attrib, uint8_t* _num, gfxAttribType* _type, bool* normalized, bool* asInt) const;
+        bool has(gfxAttrib _attrib) const
+        {
+            return attribs[_attrib] != UINT16_MAX;
+        }
+
+        uint32_t getSize(uint32_t _num) const
+        {
+            return _num*stride;
+        }
+    };
+
+    struct gfxTextureInfo
+    {
+        gfxTextureFormat format;    // Texture format.
+        uint32_t storageSize;       // Total amount of bytes required to store texture.
+        uint16_t width;             // Texture width.
+        uint16_t height;            // Texture height.
+        uint16_t depth;             // Texture depth.
+        uint8_t numMips;            // Number of MIP maps.
+        uint8_t bitsPerPixel;       // Format bits per pixel.
+        bool    cubeMap;            // Texture is cubemap.
+    };
     
+    enum class gfxCubeSide : uint8_t
+    {
+        XPos = 0,
+        XNeg = 1,
+        YPos = 2,
+        YNeg = 3,
+        ZPos = 4,
+        ZNeg = 5
+    };
+
+    enum class gfxOccQueryResult
+    {
+        Invisible,
+        Visible,
+        NoResult,
+
+        Count
+    };
+
     class BX_NO_VTABLE gfxCallbacks
     {
     public:
@@ -501,25 +678,13 @@ namespace st
         virtual void onCaptureFrame(const void* data, uint32_t size) = 0;
     };
 
-    class BX_NO_VTABLE gfxAsyncCallbacks
-    {
-    public:
-        virtual void onInit(bool result) = 0;
-        virtual void onRendererType(gfxRendererType type) = 0;
-        virtual void onCaps(const gfxCaps& caps) = 0;
-        virtual void onStats(const gfxStats& stats) = 0;
-        virtual void onHMD(const gfxHMD& hmd) = 0;
-        virtual void onRenderFrame(gfxRenderFrameType type) = 0;
-        virtual void onInternalData(const gfxInternalData& data) = 0;
-        virtual void onTouch(uint8_t id) = 0;
-    };
+    typedef (void)(*gfxCallbackReleaseMem)(void* ptr, void* userData);
 
     class BX_NO_VTABLE gfxDriver
     {
     public:
         // Init
-        virtual bool init(uint16_t deviceId, gfxCallbacks* callbacks, gfxAsyncCallbacks* asyncCallbacks, 
-                          bx::AllocatorI* alloc) = 0;
+        virtual bool init(uint16_t deviceId, gfxCallbacks* callbacks, bx::AllocatorI* alloc) = 0;
         virtual void shutdown() = 0;
 
         virtual void reset(uint32_t width, uint32_t height, uint32_t flags) = 0;
@@ -536,7 +701,7 @@ namespace st
         virtual const gfxInternalData* getInternalData() const = 0;
         virtual void overrideInternal(gfxTextureHandle handle, uintptr_t ptr) = 0;
         virtual void overrideInternal(gfxTextureHandle handle, uint16_t width, uint16_t height, uint16_t numMips,
-                                      gfxTextureFormat fmt, uint32_t flags /*gfxTextureFlag*/) = 0;
+                                      gfxTextureFormat fmt, gfxTextureFlag flags) = 0;
 
         // Misc
         virtual void discard() = 0;
@@ -551,13 +716,13 @@ namespace st
         virtual void setViewRect(uint8_t id, uint16_t x, uint16_t y, uint16_t width, uint16_t height) = 0;
         virtual void setViewRect(uint8_t id, uint16_t x, uint16_t y, gfxBackbufferRatio ratio) = 0;
         virtual void setViewScissor(uint8_t id, uint16_t x, uint16_t y, uint16_t width, uint16_t height) = 0;
-        virtual void setViewClear(uint8_t id, uint16_t flags, uint32_t rgba, float depth, uint8_t stencil) = 0;
-        virtual void setViewClear(uint8_t id, uint16_t flags, float depth, uint8_t stencil,
+        virtual void setViewClear(uint8_t id, gfxClearFlag flags, uint32_t rgba, float depth, uint8_t stencil) = 0;
+        virtual void setViewClear(uint8_t id, gfxClearFlag flags, float depth, uint8_t stencil,
                                   uint8_t color0, uint8_t color1, uint8_t color2, uint8_t color3,
                                   uint8_t color4, uint8_t color5, uint8_t color6, uint8_t color7) = 0;
         virtual void setViewSeq(uint8_t id, bool enabled) = 0;
-        virtual void setViewTransform(uint8_t id, const void* view, const void* projLeft, uint8_t flags /*gfxViewFlag*/, 
-                                      const void* projRight) = 0;
+        virtual void setViewTransform(uint8_t id, const void* view, const void* projLeft, 
+                                      gfxViewFlag flags = gfxViewFlag::Stereo, const void* projRight = nullptr) = 0;
         virtual void setViewRemap(uint8_t id, uint8_t num, const void* remap) = 0;
         virtual void setViewFrameBuffer(uint8_t id, gfxFrameBufferHandle handle) = 0;
 
@@ -567,6 +732,160 @@ namespace st
         virtual void setStencil(uint32_t frontStencil, uint32_t backStencil) = 0;
         virtual void setScissor(uint16_t x, uint16_t y, uint16_t width, uint16_t height) = 0;
         virtual void setScissor(uint16_t cache) = 0;
+
+        // Transform
+        virtual uint32_t allocTransform(gfxTransform* transform, uint16_t num) = 0;
+        virtual uint32_t setTransform(const void* mtx, uint16_t num) = 0;
+
+        // Conditional Rendering
+        virtual void setCondition(gfxOccQueryHandle handle, bool visible) = 0;
+
+        // Buffers
+        virtual void setIndexBuffer(gfxIndexBufferHandle handle, uint32_t firstIndex, uint32_t numIndices) = 0;
+        virtual void setIndexBuffer(gfxDynamicIndexBufferHandle handle, uint32_t firstIndex, uint32_t numIndices) = 0;
+        virtual void setIndexBuffer(const gfxTransientIndexBuffer* tib, uint32_t firstIndex, uint32_t numIndices) = 0;
+        virtual void setIndexBuffer(const gfxTransientIndexBuffer* tib) = 0;
+        virtual void setVertexBuffer(gfxVertexBufferHandle handle) = 0;
+        virtual void setVertexBuffer(gfxVertexBufferHandle handle, uint32_t vertexIndex, uint32_t numVertices) = 0;
+        virtual void setVertexBuffer(gfxDynamicVertexBufferHandle handle, uint32_t numVertices) = 0;
+        virtual void setVertexBuffer(const gfxTransientVertexBuffer* tvb) = 0;
+        virtual void setVertexBuffer(const gfxTransientVertexBuffer* tvb, uint32_t startVertex, uint32_t numVertices) = 0;
+        virtual void setInstanceDataBuffer(const gfxInstanceDataBuffer* idb, uint32_t num) = 0;
+        virtual void setInstanceDataBuffer(gfxVertexBufferHandle handle, uint32_t startVertex, uint32_t num) = 0;
+        virtual void setInstanceDataBuffer(gfxDynamicVertexBufferHandle handle, uint32_t startVertex, uint32_t num) = 0;
+
+        // Textures
+        virtual void setTexture(uint8_t stage, gfxUniformHandle sampler, gfxTextureHandle handle, 
+                                gfxTextureFlag flags = gfxTextureFlag::FromTexture) = 0;
+        virtual void setTexture(uint8_t stage, gfxUniformHandle sampler, gfxFrameBufferHandle handle,
+                                uint8_t attachment, gfxTextureFlag flags = gfxTextureFlag::FromTexture) = 0;
+
+        // Submit
+        virtual uint32_t submit(uint8_t viewId, gfxProgramHandle program, int32_t depth = 0) = 0;
+        virtual uint32_t submit(uint8_t viewId, gfxProgramHandle program, gfxOccQueryHandle occQuery, int32_t depth = 0) = 0;
+        virtual uint32_t submit(uint8_t viewId, gfxProgramHandle program, gfxIndirectBufferHandle indirectHandle,
+                                uint16_t start, uint16_t num, int32_t depth = 0) = 0;
+
+        // Compute
+        virtual void setBuffer(uint8_t stage, gfxIndexBufferHandle handle, gfxAccess access) = 0;
+        virtual void setBuffer(uint8_t stage, gfxVertexBufferHandle handle, gfxAccess access) = 0;
+        virtual void setBuffer(uint8_t stage, gfxDynamicIndexBufferHandle handle, gfxAccess access) = 0;
+        virtual void setBuffer(uint8_t stage, gfxDynamicVertexBufferHandle handle, gfxAccess access) = 0;
+        virtual void setBuffer(uint8_t stage, gfxIndirectBufferHandle handle, gfxAccess access) = 0;
+
+        // Compute Images
+        virtual void setImage(uint8_t stage, gfxUniformHandle sampler, gfxTextureHandle handle, uint8_t mip,
+                              gfxAccess access, gfxTextureFormat fmt) = 0;
+        virtual void setImage(uint8_t stage, gfxUniformHandle sampler, gfxFrameBufferHandle handle, uint8_t attachment,
+                              gfxAccess access, gfxTextureFormat fmt) = 0;
+
+        // Compute Dispatch
+        uint32_t dispatch(uint8_t viewId, gfxProgramHandle handle, uint16_t numX, uint16_t numY, uint16_t numZ, 
+                          gfxSubmitFlag flags = gfxSubmitFlag::Left) = 0;
+        uint32_t dispatch(uint8_t viewId, gfxProgramHandle handle, gfxIndirectBufferHandle indirectHandle,
+                          uint16_t start, uint16_t num, gfxSubmitFlag flags = gfxSubmitFlag::Left) = 0;
+
+        // Blit
+        virtual void blit(uint8_t viewId, gfxTextureHandle dest, uint16_t destX, uint16_t destY, gfxTextureHandle src,
+                          uint16_t srcX, uint16_t srcY, uint16_t width, uint16_t height) = 0;
+        virtual void blit(uint8_t viewId, gfxTextureHandle dest, uint16_t destX, uint16_t destY, gfxFrameBufferHandle src,
+                          uint8_t attachment, uint16_t srcX, uint16_t srcY, uint16_t width, uint16_t height) = 0;
+        virtual void blit(uint8_t viewId, gfxTextureHandle dest, uint8_t destMip, uint16_t destX, uint16_t destY,
+                          uint16_t destZ, gfxTextureHandle src, uint8_t srcMip, uint16_t srcX, uint16_t srcY,
+                          uint16_t srcZ, uint16_t width, uint16_t height, uint16_t depth) = 0;
+        virtual void blit(uint8_t viewId, gfxTextureHandle dest, uint8_t destMip, uint16_t destX, uint16_t destY,
+                          uint16_t destZ, gfxFrameBufferHandle src, uint8_t attachment, uint8_t srcMip, uint16_t srcX,
+                          uint16_t srcY, uint16_t srcZ, uint16_t width, uint16_t height, uint16_t depth) = 0;
+
+        
+        // Memory
+        const gfxMemory* alloc(uint32_t size) = 0;
+        const gfxMemory* copy(const void* data, uint32_t size) = 0;
+        const gfxMemory* makeRef(const void* data, uint32_t size, gfxCallbackReleaseMem releaseFn = nullptr, 
+                                 void* userData = nullptr) = 0;
+
+        // Shaders and Programs
+        virtual gfxShaderHandle createShader(const Memory* mem) = 0;
+        virtual uint16_t getShaderUniforms(gfxShaderHandle handle, gfxUniformHandle uniforms, uint16_t _max) = 0;
+        virtual void destroyShader(gfxShaderHandle handle) = 0;
+        virtual gfxProgramHandle createProgram(gfxShaderHandle vsh, gfxShaderHandle fsh, bool destroyShaders) = 0;
+
+        // Uniforms
+        virtual gfxUniformHandle createUniform(const char* name, gfxUniformType type, uint16_t num = 1) = 0;
+        virtual void setUniform(gfxUniformHandle, const void* value, uint16_t num = 1) = 0;
+
+        // Vertex Buffers
+        virtual gfxVertexBufferHandle createVertexBuffer(const Memory* mem, const gfxVertexDecl& decl, gfxBufferFlag flags) = 0;
+        virtual gfxDynamicVertexBufferHandle createDynamicVertexBuffer(uint32_t numVertices, const gfxVertexDecl& decl,
+                                                                       gfxBufferFlag flags) = 0;
+        virtual gfxDynamicVertexBufferHandle createDynamicVertexBuffer(const gfxMemory* mem, const gfxVertexDecl& decl,
+                                                                       gfxBufferFlag flags) = 0;
+        virtual void updateDynamicVertexBuffer(gfxDynamicVertexBufferHandle handle, uint32_t startVertex, 
+                                               const gfxMemory* mem) = 0;
+        virtual void destroyVertexBuffer(gfxVertexBufferHandle handle) = 0;
+        virtual void destroyDynamicVertexBuffer(gfxDynamicVertexBufferHandle handle) = 0;
+        virtual bool checkAvailTransientVertexBuffer(uint32_t num, const gfxVertexDecl& decl) = 0;
+        virtual void allocTransientVertexBuffer(gfxTransientVertexBuffer* tvb, uint32_t num, const gfxVertexDecl& decl) = 0;
+
+        // Index buffers
+        virtual gfxIndexBufferHandle createIndexBuffer(const gfxMemory* mem, gfxBufferFlag flags) = 0;
+        virtual gfxDynamicIndexBufferHandle createDynamicIndexBuffer(uint32_t num, gfxBufferFlag flags) = 0;
+        virtual gfxDynamicIndexBufferHandle createDynamicIndexBuffer(const gfxMemory* mem, gfxBufferFlag flags) = 0;
+        virtual void updateDynamicIndexBuffer(gfxDynamicIndexBufferHandle handle, uint32_t startIndex, 
+                                              const gfxMemory* mem) = 0;
+        virtual void destroyIndexBuffer(gfxIndexBufferHandle handle) = 0;
+        virtual void destroyDynamicIndexBuffer(gfxDynamicIndexBufferHandle handle) = 0;
+        virtual bool checkAvailTransientIndexBuffer(uint32_t num) = 0;
+        virtual void allocTransientIndexBuffer(gfxTransientIndexBuffer* tib, uint32_t num) = 0;
+
+        // Textures
+        virtual void calcTextureSize(gfxTextureInfo* info, uint16_t width, uint16_t height, uint16_t depth,
+                                     bool cubemap, uint8_t numMips, gfxTextureFormat fmt) = 0;
+        virtual gfxTextureHandle createTexture(const gfxMemory* mem, gfxTextureFlag flags, uint8_t skipMips, 
+                                               gfxTextureInfo* info) = 0;
+        virtual gfxTextureHandle createTexture2D(uint16_t width, uint16_t height, uint8_t numMips, gfxTextureFormat fmt,
+                                                 gfxTextureFlag flags, const gfxMemory* mem = nullptr) = 0;
+        virtual gfxTextureHandle createTexture2D(gfxBackbufferRatio ratio, uint8_t numMips, gfxTextureFormat fmt,
+                                                 gfxTextureFlag flags) = 0;
+
+        virtual void updateTexture2D(gfxTextureHandle handle, uint8_t mip, uint16_t x, uint16_t y, uint16_t width,
+                                     uint16_t height, const gfxMemory* mem, uint16_t pitch) = 0;
+        virtual gfxTextureHandle createTexture3D(uint16_t width, uint16_t height, uint16_t depth, uint16_t numMips,
+                                                 gfxTextureFormat fmt, gfxTextureFlag flags, 
+                                                 const gfxMemory* mem = nullptr) = 0;
+        virtual void updateTexture3D(gfxTextureHandle handle, uint8_t mip, uint16_t x, uint16_t y, uint16_t z,
+                                     uint16_t width, uint16_t height, uint16_t depth, const gfxMemory* mem) = 0;
+        virtual gfxTextureHandle createTextureCube(uint16_t size, uint8_t numMips, gfxTextureFormat fmt, uint32_t flags,
+                                                   const gfxMemory* mem = nullptr) = 0;
+        virtual void updateTextureCube(gfxTextureHandle handle, gfxCubeSide side, uint8_t mip, uint16_t x, uint16_t y,
+                                       uint16_t width, uint16_t height, const gfxMemory* mem, uint16_t pitch) = 0;
+        virtual void readTexture(gfxTextureHandle handle, void* data) = 0;
+        virtual void readTexture(gfxFrameBufferHandle handle, uint8_t attachment, void* data) = 0;
+        virtual void destroyTexture(gfxTextureHandle handle) = 0;
+
+        // Frame Buffers
+        virtual gfxFrameBufferHandle createFrameBuffer(uint16_t width, uint16_t height, gfxTextureFormat fmt, 
+                                                       gfxTextureFlag flags) = 0;
+        virtual gfxFrameBufferHandle createFrameBuffer(gfxBackbufferRatio ratio, gfxTextureFormat fmt, 
+                                                       gfxTextureFlag flags) = 0;
+        virtual gfxFrameBufferHandle createFrameBuffer(uint8_t num, const gfxTextureHandle* handles, 
+                                                       bool destroyTextures) = 0;
+        virtual gfxFrameBufferHandle createFrameBuffer(void* nwh, uint16_t width, uint16_t height, 
+                                                       gfxTextureFormat depthFmt) = 0;
+        virtual void destroyFrameBuffer(gfxFrameBufferHandle handle) = 0;
+
+        // Instance Buffer
+        virtual bool checkAvailInstanceDataBuffer(uint32_t num, uint16_t stride) = 0;
+        virtual const gfxInstanceDataBuffer* allocInstanceDataBuffer(uint32_t num, uint16_t stride) = 0;
+
+        // Indirect Buffer
+        virtual gfxIndirectBufferHandle createIndirectBuffer(uint32_t num) = 0;
+        virtual void destroyIndirectBuffer(gfxIndirectBufferHandle handle) = 0;
+        
+        // Occlusion Query
+        virtual gfxOccQueryHandle createOccQuery() = 0;
+        virtual gfxOccQueryResult getResult(gfxOccQueryHandle handle) = 0;
+        virtual void destroyOccQuery(gfxOccQueryHandle handle) = 0;
     };
 }   // namespace st
 

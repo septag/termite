@@ -32,7 +32,6 @@
 #define ST_VERSION_MINOR(_Ver) (uint16_t)(_Ver & 0xffff)
 
 #define ST_HANDLE(_Name) struct _Name { uint16_t idx; }
-#define ST_INVALID_HANDLE(_Name) (_Name.idx == UINT16_MAX)
 
 #define ST_DEFINE_FLAG_TYPE(_Type) \
     template <> \
