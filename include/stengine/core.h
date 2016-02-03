@@ -5,6 +5,8 @@
 
 #include <cassert>
 
+#include "bitmask/bitmask_operators.hpp"
+
 // Export/Import API Def
 #ifdef STENGINE_SHARED_LIB
 #ifdef STENGINE_EXPORTS
@@ -29,8 +31,14 @@
 #define ST_VERSION_MAJOR(_Ver) (uint16_t)((_Ver >> 16) & 0xffff)
 #define ST_VERSION_MINOR(_Ver) (uint16_t)(_Ver & 0xffff)
 
-#define ST_HANDLE(_Name) struct _Name { uint16_t idx; };
+#define ST_HANDLE(_Name) struct _Name { uint16_t idx; }
 #define ST_INVALID_HANDLE(_Name) (_Name.idx == UINT16_MAX)
+
+#define ST_DEFINE_FLAG_TYPE(_Type) \
+    template <> \
+    struct enable_bitmask_operators<_Type> { \
+        static const bool enable = true; \
+    }
 
 namespace st
 {
