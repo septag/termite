@@ -397,73 +397,73 @@ namespace st
     };
     ST_DEFINE_FLAG_TYPE(gfxState);
 
-    inline uint64_t gfxStateDefault()
+    inline gfxState gfxStateDefault()
     {
         return gfxState::RGBWrite | gfxState::AlphaWrite | gfxState::DepthTestLess | gfxState::DepthWrite |
-            gfxState::CullCW | gfxState::MSAA;
+               gfxState::CullCW | gfxState::MSAA;
     }
 
-    inline uint64_t gfxStateAlphaRef(uint8_t _ref)
+    inline gfxState gfxStateAlphaRef(uint8_t _ref)
     {
-        return (((uint64_t)(_ref) << 40) & 0x0000ff0000000000);
+        return (gfxState)(((uint64_t)(_ref) << 40) & 0x0000ff0000000000);
     }
 
-    inline uint64_t gfxStateBlendFuncSeparate(uint64_t srcRGB, uint64_t dstRGB, uint64_t srcA, uint64_t dstA)
+    inline gfxState gfxStateBlendFuncSeparate(gfxState srcRGB, gfxState dstRGB, gfxState srcA, gfxState dstA)
     {
-        return 0ULL | (srcRGB | (dstRGB << 4)) | ((srcA | (dstA << 4)) << 8);
+        return (gfxState)(((uint64_t)srcRGB | ((uint64_t)dstRGB << 4)) | (((uint64_t)srcA | ((uint64_t)dstA << 4)) << 8));
     }
 
-    inline uint64_t gfxStateBlendEqSeparate(uint64_t rgb, uint64_t a)
+    inline gfxState gfxStateBlendEqSeparate(gfxState rgb, gfxState a)
     {
-        return rgb | (a << 3);
+        return (gfxState)((uint64_t)rgb | ((uint64_t)a << 3));
     }
 
-    inline uint64_t gfxStateBlendFunc(uint64_t src, uint64_t dst)
+    inline gfxState gfxStateBlendFunc(gfxState src, gfxState dst)
     {
         return gfxStateBlendFuncSeparate(src, dst, src, dst);
     }
 
-    inline uint64_t gfxStateBlendEq(uint64_t eq)
+    inline gfxState gfxStateBlendEq(gfxState eq)
     {
         return gfxStateBlendEqSeparate(eq, eq);
     }
 
-    inline uint64_t gfxStateBlendAdd()
+    inline gfxState gfxStateBlendAdd()
     {
         return gfxStateBlendFunc(gfxState::BlendOne, gfxState::BlendOne);
     }
 
-    inline uint64_t gfxStateBlendAlpha()
+    inline gfxState gfxStateBlendAlpha()
     {
         return gfxStateBlendFunc(gfxState::BlendSrcAlpha, gfxState::BlendInvSrcAlpha);
     }
 
-    inline uint64_t gfxStateBlendDarken()
+    inline gfxState gfxStateBlendDarken()
     {
         return gfxStateBlendFunc(gfxState::BlendOne, gfxState::BlendOne) | gfxStateBlendEq(gfxState::BlendEqMin);
     }
 
-    inline uint64_t gfxStateBlendLighten()
+    inline gfxState gfxStateBlendLighten()
     {
         return gfxStateBlendFunc(gfxState::BlendOne, gfxState::BlendOne) | gfxStateBlendEq(gfxState::BlendEqMin);
     }
 
-    inline uint64_t gfxStateBlendMultiply()
+    inline gfxState gfxStateBlendMultiply()
     {
         return gfxStateBlendFunc(gfxState::BlendDestColor, gfxState::BlendZero);
     }
 
-    inline uint64_t gfxStateBlendNormal()
+    inline gfxState gfxStateBlendNormal()
     {
         return gfxStateBlendFunc(gfxState::BlendOne, gfxState::BlendInvSrcAlpha);
     }
 
-    inline uint64_t gfxStateBlendScreen()
+    inline gfxState gfxStateBlendScreen()
     {
         return gfxStateBlendFunc(gfxState::BlendOne, gfxState::BlendInvSrcColor);
     }
 
-    inline uint64_t gfxStateBlendLinearBurn()
+    inline gfxState gfxStateBlendLinearBurn()
     {
         return gfxStateBlendFunc(gfxState::BlendDestColor, gfxState::BlendInvDestColor) | gfxStateBlendEq(gfxState::BlendEqSub);
     }
@@ -526,16 +526,16 @@ namespace st
         Color = 0x0001,
         Depth = 0x0002,
         Stencil = 0x0004,
-        Color0 = 0x0008,
-        Color1 = 0x0010,
-        Color2 = 0x0020,
-        Color3 = 0x0040,
-        Color4 = 0x0080,
-        Color5 = 0x0100,
-        Color6 = 0x0200,
-        Color7 = 0x0400,
-        Depth = 0x0800,
-        Stencil = 0x1000
+        DiscardColor0 = 0x0008,
+        DiscardColor1 = 0x0010,
+        DiscardColor2 = 0x0020,
+        DiscardColor3 = 0x0040,
+        DiscardColor4 = 0x0080,
+        DiscardColor5 = 0x0100,
+        DiscardColor6 = 0x0200,
+        DiscardColor7 = 0x0400,
+        DiscardDepth = 0x0800,
+        DiscardStencil = 0x1000
     };
     ST_DEFINE_FLAG_TYPE(gfxClearFlag);
 
@@ -615,7 +615,7 @@ namespace st
 
         //
         gfxVertexDecl();
-        gfxVertexDecl& begin(gfxRendererType = _type gfxRendererType::Null);
+        gfxVertexDecl& begin(gfxRendererType _type = gfxRendererType::Null);
         void end();
 
         gfxVertexDecl& add(gfxAttrib _attrib, uint8_t _num, gfxAttribType _type, bool normalized, bool asInt = false);
@@ -623,7 +623,7 @@ namespace st
         void decode(gfxAttrib _attrib, uint8_t* _num, gfxAttribType* _type, bool* normalized, bool* asInt) const;
         bool has(gfxAttrib _attrib) const
         {
-            return attribs[_attrib] != UINT16_MAX;
+            return attribs[(int)_attrib] != UINT16_MAX;
         }
 
         uint32_t getSize(uint32_t _num) const
@@ -678,7 +678,7 @@ namespace st
         virtual void onCaptureFrame(const void* data, uint32_t size) = 0;
     };
 
-    typedef (void)(*gfxCallbackReleaseMem)(void* ptr, void* userData);
+    typedef void (*gfxCallbackReleaseMem)(void* ptr, void* userData);
 
     class BX_NO_VTABLE gfxDriver
     {
@@ -780,10 +780,10 @@ namespace st
                               gfxAccess access, gfxTextureFormat fmt) = 0;
 
         // Compute Dispatch
-        uint32_t dispatch(uint8_t viewId, gfxProgramHandle handle, uint16_t numX, uint16_t numY, uint16_t numZ, 
-                          gfxSubmitFlag flags = gfxSubmitFlag::Left) = 0;
-        uint32_t dispatch(uint8_t viewId, gfxProgramHandle handle, gfxIndirectBufferHandle indirectHandle,
-                          uint16_t start, uint16_t num, gfxSubmitFlag flags = gfxSubmitFlag::Left) = 0;
+        virtual uint32_t dispatch(uint8_t viewId, gfxProgramHandle handle, uint16_t numX, uint16_t numY, uint16_t numZ, 
+                                  gfxSubmitFlag flags = gfxSubmitFlag::Left) = 0;
+        virtual uint32_t dispatch(uint8_t viewId, gfxProgramHandle handle, gfxIndirectBufferHandle indirectHandle,
+                                  uint16_t start, uint16_t num, gfxSubmitFlag flags = gfxSubmitFlag::Left) = 0;
 
         // Blit
         virtual void blit(uint8_t viewId, gfxTextureHandle dest, uint16_t destX, uint16_t destY, gfxTextureHandle src,
@@ -799,13 +799,13 @@ namespace st
 
         
         // Memory
-        const gfxMemory* alloc(uint32_t size) = 0;
-        const gfxMemory* copy(const void* data, uint32_t size) = 0;
-        const gfxMemory* makeRef(const void* data, uint32_t size, gfxCallbackReleaseMem releaseFn = nullptr, 
-                                 void* userData = nullptr) = 0;
+        virtual const gfxMemory* alloc(uint32_t size) = 0;
+        virtual const gfxMemory* copy(const void* data, uint32_t size) = 0;
+        virtual const gfxMemory* makeRef(const void* data, uint32_t size, gfxCallbackReleaseMem releaseFn = nullptr, 
+                                         void* userData = nullptr) = 0;
 
         // Shaders and Programs
-        virtual gfxShaderHandle createShader(const Memory* mem) = 0;
+        virtual gfxShaderHandle createShader(const gfxMemory* mem) = 0;
         virtual uint16_t getShaderUniforms(gfxShaderHandle handle, gfxUniformHandle uniforms, uint16_t _max) = 0;
         virtual void destroyShader(gfxShaderHandle handle) = 0;
         virtual gfxProgramHandle createProgram(gfxShaderHandle vsh, gfxShaderHandle fsh, bool destroyShaders) = 0;
@@ -815,7 +815,7 @@ namespace st
         virtual void setUniform(gfxUniformHandle, const void* value, uint16_t num = 1) = 0;
 
         // Vertex Buffers
-        virtual gfxVertexBufferHandle createVertexBuffer(const Memory* mem, const gfxVertexDecl& decl, gfxBufferFlag flags) = 0;
+        virtual gfxVertexBufferHandle createVertexBuffer(const gfxMemory* mem, const gfxVertexDecl& decl, gfxBufferFlag flags) = 0;
         virtual gfxDynamicVertexBufferHandle createDynamicVertexBuffer(uint32_t numVertices, const gfxVertexDecl& decl,
                                                                        gfxBufferFlag flags) = 0;
         virtual gfxDynamicVertexBufferHandle createDynamicVertexBuffer(const gfxMemory* mem, const gfxVertexDecl& decl,

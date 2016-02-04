@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core.h"
+#include "bx/allocator.h"
 
 // Maximum error stack size that is allocated inside error handler
 // Which means that more throws than the maximum number will not be saved unless they are 'Clear'ed
@@ -10,6 +10,12 @@
 #endif
 
 #define ST_ERROR(_Fmt, ...) st::errReportf(__FILE__, __LINE__, _Fmt, ##__VA_ARGS__)
+
+#define ST_OK 0
+#define ST_ERR_FAILED -1
+#define ST_ERR_OUTOFMEM -2
+#define ST_ERR_ALREADY_INITIALIZED -3
+#define ST_ERR_BUSY -4
 
 namespace st
 {

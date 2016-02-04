@@ -1,4 +1,4 @@
-#include "error_report.h"
+#include "core.h"
 
 #include <cstring>
 #include <cstdarg>
@@ -33,12 +33,12 @@ int st::errInit(bx::AllocatorI* alloc)
 {
     if (gErr) {
         assert(false);
-        return -1;
+        return ST_ERR_ALREADY_INITIALIZED;
     }
 
     gErr = BX_NEW(alloc, ErrorReport)(alloc);
     if (!gErr)
-        return -1;
+        return ST_ERR_OUTOFMEM;
 
     return 0;
 }

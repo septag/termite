@@ -2,10 +2,13 @@
 
 #include "bx/bx.h"
 #include "bx/allocator.h"
+#include "bxx/logger.h"
 
 #include <cassert>
 
 #include "bitmask/bitmask_operators.hpp"
+
+#include "uv.h"
 
 // Export/Import API Def
 #ifdef STENGINE_SHARED_LIB
@@ -26,6 +29,8 @@
 #   define STENGINE_API extern "C" 
 #endif
 
+#include "error_report.h"
+
 // Versioning Macros
 #define ST_MAKE_VERSION(_Major, _Minor)  (uint32_t)(((_Major & 0xffff)<<16) | (_Minor & 0xffff))
 #define ST_VERSION_MAJOR(_Ver) (uint16_t)((_Ver >> 16) & 0xffff)
@@ -41,9 +46,30 @@
 
 namespace st
 {
-    STENGINE_API int coreInit();
+    struct coreConfig
+    {
+        int updateInterval;
+        char pluginPath[128];
+
+        coreConfig()
+        {
+            updateInterval = 0;
+            pluginPath[0] = 0;
+        }
+    };
+
+    typedef void(*coreFnUpdate)();
+
+    // Public
+    STENGINE_API coreConfig* coreLoadConfig(const char* confFilepath);
+    STENGINE_API void coreFreeConfig(coreConfig* conf);
+
+    STENGINE_API int coreInit(const coreConfig& conf, coreFnUpdate updateFn);
     STENGINE_API void coreShutdown();
+    STENGINE_API void coreRun();
+    STENGINE_API uint32_t coreGetVersion();
 
     STENGINE_API bx::AllocatorI* coreGetAlloc();
+    STENGINE_API uv_loop_t* coreGetMainLoop();
 } // namespace st
 

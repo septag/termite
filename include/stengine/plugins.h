@@ -2,6 +2,16 @@
 
 #include "core.h"
 
+#ifdef STENGINE_SHARED_LIB
+#   if BX_COMPILER_MSVC
+#       define STPLUGIN_API extern "C" __declspec(dllexport) 
+#   else
+#       define STPLUGIN_API extern "C" __attribute__ ((dllexport))
+#   endif
+#else
+#   define STPLUGIN_API extern "C" 
+#endif
+
 namespace st
 {
     enum class pluginType : int
@@ -20,7 +30,7 @@ namespace st
         uint32_t engineVersion; // Expected engine version to work with, Major/Minor combined
     };
 
-    ST_HANDLE(pluginHandle);
+    typedef void* pluginHandle;
 
     // Must be Implemented by Plugins
     extern "C"
@@ -39,5 +49,9 @@ namespace st
     // Internal
     int pluginInit(const char* pluginPath);
     void pluginShutdown();
+    
+    // Public
+    STENGINE_API int pluginIsInit();
+
 }   // namespace st
 
