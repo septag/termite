@@ -24,6 +24,24 @@
 
 #define EXCLUDE_LIST_COUNT 6
 
+#ifdef BX_SHARED_LIB
+#ifdef BX_IMPLEMENT_LOGGER
+#   if BX_COMPILER_MSVC
+#       define BX_LOGGER_API extern "C" __declspec(dllexport) 
+#   else
+#       define BX_LOGGER_API extern "C" __attribute__ ((dllexport))
+#   endif
+#else
+#   if BX_COMPILER_MSVC
+#       define BX_LOGGER_API extern "C" __declspec(dllimport)
+#   else
+#       define BX_LOGGER_API extern "C" __attribute__ ((dllimport))
+#   endif
+#endif
+#else
+#   define BX_LOGGER_API extern "C" 
+#endif
+
 namespace bx
 {
     enum class LogType
@@ -75,22 +93,22 @@ namespace bx
     typedef void(*LogCallbackFn)(const char* filename, int line, LogType type, const char* text, void* userData, 
                                  LogExtraParam extra, time_t tm);
 
-    bool enableLogToFile(const char* filepath, const char* errFilepath = nullptr);
-    bool enableLogToFileHandle(FILE* file, FILE* errFile = nullptr);
-    void enableLogToCallback(LogCallbackFn callback, void* userParam);
-    void enableLogTimestamps(LogTimeFormat timeFormat);
+    BX_LOGGER_API bool enableLogToFile(const char* filepath, const char* errFilepath = nullptr);
+    BX_LOGGER_API bool enableLogToFileHandle(FILE* file, FILE* errFile = nullptr);
+    BX_LOGGER_API void enableLogToCallback(LogCallbackFn callback, void* userParam);
+    BX_LOGGER_API void enableLogTimestamps(LogTimeFormat timeFormat);
 
-    void disableLogToFile();
-    void disableLogToCallback();
-    void disableLogTimestamps();
+    BX_LOGGER_API void disableLogToFile();
+    BX_LOGGER_API void disableLogToCallback();
+    BX_LOGGER_API void disableLogTimestamps();
 
-    void logPrintf(const char* sourceFile, int line, LogType type, const char* fmt, ...);
-    void logBeginProgress(const char* sourceFile, int line, const char* fmt, ...);
-    void logEndProgress(LogProgressResult result);
+    BX_LOGGER_API void logPrintf(const char* sourceFile, int line, LogType type, const char* fmt, ...);
+    BX_LOGGER_API void logBeginProgress(const char* sourceFile, int line, const char* fmt, ...);
+    BX_LOGGER_API void logEndProgress(LogProgressResult result);
 
-    void excludeFromLog(LogType type);
-    void includeToLog(LogType type);
-    void overrideLogColor(LogColor color);
+    BX_LOGGER_API void excludeFromLog(LogType type);
+    BX_LOGGER_API void includeToLog(LogType type);
+    BX_LOGGER_API void overrideLogColor(LogColor color);
 }
 
 #ifdef BX_IMPLEMENT_LOGGER
