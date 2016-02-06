@@ -1,5 +1,8 @@
 #define BX_IMPLEMENT_LOGGER
 #define STB_LEAKCHECK_IMPLEMENTATION
+#ifdef STENGINE_SHARED_LIB
+#   define BX_SHARED_LIB
+#endif
 
 #include "core.h"
 #include "bx/readerwriter.h"
@@ -112,7 +115,6 @@ int st::coreInit(const coreConfig& conf, coreFnUpdate updateFn)
         return ST_ERR_OUTOFMEM;
 
     memcpy(&gCore->conf, &conf, sizeof(gCore->conf));
-    bx::enableLogToFileHandle(stdout, stderr);
 
     gCore->updateFn = updateFn;
 

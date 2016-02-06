@@ -125,7 +125,7 @@ namespace st
         FlushAfterRender = 0x00002000,
         FlipAfterRender = 0x00004000,
         SRGB_BackBuffer = 0x00008000,
-        HiPi = 0x00010000,
+        HiDPi = 0x00010000,
         DepthClamp = 0x00020000
     };
     ST_DEFINE_FLAG_TYPE(gfxResetFlag);
@@ -177,7 +177,7 @@ namespace st
         HMD = 0x0000000000001000,
         Index32 = 0x0000000000002000,
         DrawIndirect = 0x0000000000004000,
-        HiPi = 0x0000000000008000,
+        HiDPi = 0x0000000000008000,
         TextureBlit = 0x0000000000010000,
         TextureReadBack = 0x0000000000020000,
         OcclusionQuery = 0x0000000000040000,
@@ -223,7 +223,7 @@ namespace st
     struct gfxCaps
     {
         gfxRendererType type;
-        uint64_t supported; // gfxCapsFlag
+        gfxCapsFlag supported;
         uint32_t maxDrawCalls;
         uint16_t maxTextureSize;
         uint16_t maxViews;
@@ -468,56 +468,52 @@ namespace st
         return gfxStateBlendFunc(gfxState::BlendDestColor, gfxState::BlendInvDestColor) | gfxStateBlendEq(gfxState::BlendEqSub);
     }
 
-    enum class gfxStencilTest : uint32_t
+    enum class gfxStencil : uint32_t
     {
-        Less = 0x00010000,
-        Lequal = 0x00020000,
-        Equal = 0x00030000,
-        Gequal = 0x00040000,
-        Greater = 0x00050000,
-        NotEqual = 0x00060000,
-        Never = 0x00070000,
-        Always = 0x00080000
+        None = 0x00000000,
+        TestLess = 0x00010000,
+        TestLequal = 0x00020000,
+        TestEqual = 0x00030000,
+        TestGequal = 0x00040000,
+        TestGreater = 0x00050000,
+        TestNotEqual = 0x00060000,
+        TestNever = 0x00070000,
+        TestAlways = 0x00080000,
+        OpStencilFailZero = 0x00000000,
+        OpStencilFailKeep = 0x00100000,
+        OpStencilFailReplace = 0x00200000,
+        OpStencilFailIncr = 0x00300000,
+        OpStencilFailIncrSat = 0x00400000,
+        OpStencilFailDecr = 0x00500000,
+        OpStencilFailDecrSat = 0x00600000,
+        OpStencilFailInvert = 0x00700000,
+        OpDepthFailZero = 0x00000000,
+        OpDepthFailKeep = 0x01000000,
+        OpDepthFailReplace = 0x02000000,
+        OpDepthFailIncr = 0x03000000,
+        OpDepthFailIncrSat = 0x04000000,
+        OpDepthFailDecr = 0x05000000,
+        OpDepthFailDecrSat = 0x06000000,
+        OpDepthFailInvert = 0x07000000,
+        OpDepthPassZero = 0x00000000,
+        OpDepthPassKeep = 0x10000000,
+        OpDepthPassReplace = 0x20000000,
+        OpDepthPassIncr = 0x30000000,
+        OpDepthPassIncrSat = 0x40000000,
+        OpDepthPassDecr = 0x50000000,
+        OpDepthPassDecrSat = 0x60000000,
+        OpDepthPassInvert = 0x70000000
     };
-    ST_DEFINE_FLAG_TYPE(gfxStencilTest);
+    ST_DEFINE_FLAG_TYPE(gfxStencil);
 
-    enum class gfxStencilOp : uint32_t
+    inline gfxStencil gfxStencilFuncRef(uint8_t _ref)
     {
-        FailStencilZero = 0x00000000,
-        FailStencilKeep = 0x00100000,
-        FailStencilReplace = 0x00200000,
-        FailStencilIncr = 0x00300000,
-        FailStencilIncrSat = 0x00400000,
-        FailStencilDecr = 0x00500000,
-        FailStencilDecrSat = 0x00600000,
-        FailStencilInvert = 0x00700000,
-        FailDepthZero = 0x00000000,
-        FailDepthKeep = 0x01000000,
-        FailDepthReplace = 0x02000000,
-        FailDepthIncr = 0x03000000,
-        FailDepthIncrSat = 0x04000000,
-        FailDepthDecr = 0x05000000,
-        FailDepthDecrSat = 0x06000000,
-        FailDepthInvert = 0x07000000,
-        PassDepthZero = 0x00000000,
-        PassDepthKeep = 0x10000000,
-        PassDepthReplace = 0x20000000,
-        PassDepthIncr = 0x30000000,
-        PassDepthIncrSat = 0x40000000,
-        PassDepthDecr = 0x50000000,
-        PassDepthDecrSat = 0x60000000,
-        PassDepthInvert = 0x70000000
-    };
-    ST_DEFINE_FLAG_TYPE(gfxStencilOp);
-
-    inline uint32_t gfxStencilFuncRef(uint8_t _ref)
-    {
-        return (uint32_t)_ref & 0x000000ff;
+        return (gfxStencil)((uint32_t)_ref & 0x000000ff);
     }
 
-    inline uint32_t gfxStencilRMask(uint8_t mask)
+    inline gfxStencil gfxStencilRMask(uint8_t mask)
     {
-        return ((uint32_t)mask << 8) & 0x0000ff00;
+        return (gfxStencil)(((uint32_t)mask << 8) & 0x0000ff00);
     }
 
     enum class gfxClearFlag : uint16_t
@@ -687,27 +683,27 @@ namespace st
         virtual bool init(uint16_t deviceId, gfxCallbacks* callbacks, bx::AllocatorI* alloc) = 0;
         virtual void shutdown() = 0;
 
-        virtual void reset(uint32_t width, uint32_t height, uint32_t flags) = 0;
-        virtual void frame() = 0;
-        virtual void setDebug(uint32_t debugFlags) = 0;
+        virtual void reset(uint32_t width, uint32_t height, gfxClearFlag flags) = 0;
+        virtual uint32_t frame() = 0;
+        virtual void setDebug(gfxDebugFlag debugFlags) = 0;
         virtual gfxRendererType getRendererType() const = 0;
-        virtual const gfxCaps* getCaps() const = 0;
-        virtual const gfxStats* getStats() const = 0;
-        virtual const gfxHMD* getHMD() const = 0;
+        virtual const gfxCaps& getCaps() = 0;
+        virtual const gfxStats& getStats() = 0;
+        virtual const gfxHMD& getHMD() = 0;
 
         // Platform specific
         virtual gfxRenderFrameType renderFrame() = 0;
         virtual void setPlatformData(const gfxPlatformData& data) = 0;
-        virtual const gfxInternalData* getInternalData() const = 0;
+        virtual const gfxInternalData& getInternalData() = 0;
         virtual void overrideInternal(gfxTextureHandle handle, uintptr_t ptr) = 0;
-        virtual void overrideInternal(gfxTextureHandle handle, uint16_t width, uint16_t height, uint16_t numMips,
+        virtual void overrideInternal(gfxTextureHandle handle, uint16_t width, uint16_t height, uint8_t numMips,
                                       gfxTextureFormat fmt, gfxTextureFlag flags) = 0;
 
         // Misc
         virtual void discard() = 0;
         virtual uint32_t touch(uint8_t id) = 0;
         virtual void setPaletteColor(uint8_t index, uint32_t rgba) = 0;
-        virtual void setPaletteColor(uint8_t index, float rgba) = 0;
+        virtual void setPaletteColor(uint8_t index, float rgba[4]) = 0;
         virtual void setPaletteColor(uint8_t index, float r, float g, float b, float a) = 0;
         virtual void saveScreenshot(const char* filepath) = 0;
 
@@ -728,8 +724,8 @@ namespace st
 
         // Draw
         virtual void setMarker(const char* marker) = 0;
-        virtual void setState(uint64_t state, uint32_t rgba = 0) = 0;
-        virtual void setStencil(uint32_t frontStencil, uint32_t backStencil) = 0;
+        virtual void setState(gfxState state, uint32_t rgba = 0) = 0;
+        virtual void setStencil(gfxStencil frontStencil, gfxStencil backStencil = gfxStencil::None) = 0;
         virtual void setScissor(uint16_t x, uint16_t y, uint16_t width, uint16_t height) = 0;
         virtual void setScissor(uint16_t cache) = 0;
 
@@ -787,15 +783,18 @@ namespace st
 
         // Blit
         virtual void blit(uint8_t viewId, gfxTextureHandle dest, uint16_t destX, uint16_t destY, gfxTextureHandle src,
-                          uint16_t srcX, uint16_t srcY, uint16_t width, uint16_t height) = 0;
+                          uint16_t srcX = 0, uint16_t srcY = 0, uint16_t width = UINT16_MAX, uint16_t height = UINT16_MAX) = 0;
         virtual void blit(uint8_t viewId, gfxTextureHandle dest, uint16_t destX, uint16_t destY, gfxFrameBufferHandle src,
-                          uint8_t attachment, uint16_t srcX, uint16_t srcY, uint16_t width, uint16_t height) = 0;
+                          uint8_t attachment = 0, uint16_t srcX = 0, uint16_t srcY = 0, uint16_t width = UINT16_MAX, 
+                          uint16_t height = UINT16_MAX) = 0;
         virtual void blit(uint8_t viewId, gfxTextureHandle dest, uint8_t destMip, uint16_t destX, uint16_t destY,
-                          uint16_t destZ, gfxTextureHandle src, uint8_t srcMip, uint16_t srcX, uint16_t srcY,
-                          uint16_t srcZ, uint16_t width, uint16_t height, uint16_t depth) = 0;
+                          uint16_t destZ, gfxTextureHandle src, uint8_t srcMip = 0, uint16_t srcX = 0, uint16_t srcY = 0,
+                          uint16_t srcZ = 0, uint16_t width = UINT16_MAX, uint16_t height = UINT16_MAX, 
+                          uint16_t depth = UINT16_MAX) = 0;
         virtual void blit(uint8_t viewId, gfxTextureHandle dest, uint8_t destMip, uint16_t destX, uint16_t destY,
-                          uint16_t destZ, gfxFrameBufferHandle src, uint8_t attachment, uint8_t srcMip, uint16_t srcX,
-                          uint16_t srcY, uint16_t srcZ, uint16_t width, uint16_t height, uint16_t depth) = 0;
+                          uint16_t destZ, gfxFrameBufferHandle src, uint8_t attachment = 0, uint8_t srcMip = 0, 
+                          uint16_t srcX = 0, uint16_t srcY = 0, uint16_t srcZ = 0, uint16_t width = UINT16_MAX, 
+                          uint16_t height = UINT16_MAX, uint16_t depth = UINT16_MAX) = 0;
 
         
         // Memory
@@ -806,13 +805,13 @@ namespace st
 
         // Shaders and Programs
         virtual gfxShaderHandle createShader(const gfxMemory* mem) = 0;
-        virtual uint16_t getShaderUniforms(gfxShaderHandle handle, gfxUniformHandle uniforms, uint16_t _max) = 0;
+        virtual uint16_t getShaderUniforms(gfxShaderHandle handle, gfxUniformHandle* uniforms = nullptr, uint16_t _max = 0) = 0;
         virtual void destroyShader(gfxShaderHandle handle) = 0;
         virtual gfxProgramHandle createProgram(gfxShaderHandle vsh, gfxShaderHandle fsh, bool destroyShaders) = 0;
 
         // Uniforms
         virtual gfxUniformHandle createUniform(const char* name, gfxUniformType type, uint16_t num = 1) = 0;
-        virtual void setUniform(gfxUniformHandle, const void* value, uint16_t num = 1) = 0;
+        virtual void setUniform(gfxUniformHandle handle, const void* value, uint16_t num = 1) = 0;
 
         // Vertex Buffers
         virtual gfxVertexBufferHandle createVertexBuffer(const gfxMemory* mem, const gfxVertexDecl& decl, gfxBufferFlag flags) = 0;
