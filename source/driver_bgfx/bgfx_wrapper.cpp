@@ -763,113 +763,177 @@ public:
 
     bool checkAvailTransientIndexBuffer(uint32_t num) override
     {
+        return bgfx::checkAvailTransientIndexBuffer(num);
     }
 
     void allocTransientIndexBuffer(gfxTransientIndexBuffer* tib, uint32_t num) override
     {
+        bgfx::allocTransientIndexBuffer((bgfx::TransientIndexBuffer*)tib, num);
     }
 
     void calcTextureSize(gfxTextureInfo* info, uint16_t width, uint16_t height, uint16_t depth, bool cubemap,
                          uint8_t numMips, gfxTextureFormat fmt) override
     {
+        bgfx::calcTextureSize((bgfx::TextureInfo&)(*info), width, height, depth, cubemap, numMips, 
+                              (bgfx::TextureFormat::Enum)fmt);
     }
 
     gfxTextureHandle createTexture(const gfxMemory* mem, gfxTextureFlag flags, uint8_t skipMips, gfxTextureInfo* info) override
     {
+        gfxTextureHandle r;
+        r.idx = bgfx::createTexture((const bgfx::Memory*)mem, (uint32_t)flags, skipMips, (bgfx::TextureInfo*)info).idx;
+        return r;
     }
 
     gfxTextureHandle createTexture2D(uint16_t width, uint16_t height, uint8_t numMips, gfxTextureFormat fmt,
                                      gfxTextureFlag flags, const gfxMemory* mem) override
     {
+        gfxTextureHandle r;
+        r.idx = bgfx::createTexture2D(width, height, numMips, (bgfx::TextureFormat::Enum)fmt, (uint32_t)flags,
+                                      (const bgfx::Memory*)mem).idx;
+        return r;
     }
 
     gfxTextureHandle createTexture2D(gfxBackbufferRatio ratio, uint8_t numMips, gfxTextureFormat fmt,
                                      gfxTextureFlag flags) override
     {
+        gfxTextureHandle r;
+        r.idx = bgfx::createTexture2D((bgfx::BackbufferRatio::Enum)ratio, numMips, (bgfx::TextureFormat::Enum)fmt,
+                                      (uint32_t)flags).idx;
+        return r;
     }
 
     void updateTexture2D(gfxTextureHandle handle, uint8_t mip, uint16_t x, uint16_t y, uint16_t width,
                          uint16_t height, const gfxMemory* mem, uint16_t pitch) override
     {
+        BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
+        bgfx::updateTexture2D(h, mip, x, y, width, height, (const bgfx::Memory*)mem, pitch);
     }
 
-    gfxTextureHandle createTexture3D(uint16_t width, uint16_t height, uint16_t depth, uint16_t numMips,
+    gfxTextureHandle createTexture3D(uint16_t width, uint16_t height, uint16_t depth, uint8_t numMips,
                                      gfxTextureFormat fmt, gfxTextureFlag flags, const gfxMemory* mem) override
     {
+        gfxTextureHandle r;
+        r.idx = bgfx::createTexture3D(width, height, depth, numMips, (bgfx::TextureFormat::Enum)fmt,
+                                      (uint32_t)flags, (const bgfx::Memory*)mem).idx;
+        return r;
     }
 
     void updateTexture3D(gfxTextureHandle handle, uint8_t mip, uint16_t x, uint16_t y, uint16_t z,
                          uint16_t width, uint16_t height, uint16_t depth, const gfxMemory* mem) override
     {
+        BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
+        bgfx::updateTexture3D(h, mip, x, y, z, width, height, depth, (const bgfx::Memory*)mem);
     }
 
-    gfxTextureHandle createTextureCube(uint16_t size, uint8_t numMips, gfxTextureFormat fmt, uint32_t flags,
+    gfxTextureHandle createTextureCube(uint16_t size, uint8_t numMips, gfxTextureFormat fmt, gfxTextureFlag flags,
                                        const gfxMemory* mem) override
     {
+        gfxTextureHandle r;
+        r.idx = bgfx::createTextureCube(size, numMips, (bgfx::TextureFormat::Enum)fmt, (uint32_t)flags, 
+                                        (const bgfx::Memory*)mem).idx;
+        return r;
     }
 
     void updateTextureCube(gfxTextureHandle handle, gfxCubeSide side, uint8_t mip, uint16_t x, uint16_t y,
                            uint16_t width, uint16_t height, const gfxMemory* mem, uint16_t pitch) override
     {
+        BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
+        bgfx::updateTextureCube(h, (uint8_t)side, mip, x, y, width, height, (const bgfx::Memory*)mem, pitch);
     }
 
     void readTexture(gfxTextureHandle handle, void* data) override
     {
+        BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
+        bgfx::readTexture(h, data);
     }
 
     void readTexture(gfxFrameBufferHandle handle, uint8_t attachment, void* data) override
     {
+        BGFX_DECLARE_HANDLE(FrameBufferHandle, h, handle);
+        bgfx::readTexture(h, attachment, data);
     }
 
     void destroyTexture(gfxTextureHandle handle) override
     {
+        BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
+        bgfx::destroyTexture(h);
     }
 
     gfxFrameBufferHandle createFrameBuffer(uint16_t width, uint16_t height, gfxTextureFormat fmt, gfxTextureFlag flags) override
     {
+        gfxFrameBufferHandle r;
+        r.idx = bgfx::createFrameBuffer(width, height, (bgfx::TextureFormat::Enum)fmt, (uint32_t)flags).idx;
+        return r;
     }
 
     gfxFrameBufferHandle createFrameBuffer(gfxBackbufferRatio ratio, gfxTextureFormat fmt, gfxTextureFlag flags) override
     {
+        gfxFrameBufferHandle r;
+        r.idx = bgfx::createFrameBuffer((bgfx::BackbufferRatio::Enum)ratio, (bgfx::TextureFormat::Enum)fmt, 
+                                        (uint32_t)flags).idx;
+        return r;
     }
 
     gfxFrameBufferHandle createFrameBuffer(uint8_t num, const gfxTextureHandle* handles, bool destroyTextures) override
     {
+        gfxFrameBufferHandle r;
+        r.idx = bgfx::createFrameBuffer(num, (const bgfx::TextureHandle*)handles, destroyTextures).idx;
+        return r;
     }
 
     gfxFrameBufferHandle createFrameBuffer(void* nwh, uint16_t width, uint16_t height, gfxTextureFormat depthFmt) override
     {
+        gfxFrameBufferHandle r;
+        r.idx = bgfx::createFrameBuffer(nwh, width, height, (bgfx::TextureFormat::Enum)depthFmt).idx;
+        return r;
     }
 
     void destroyFrameBuffer(gfxFrameBufferHandle handle) override
     {
+        BGFX_DECLARE_HANDLE(FrameBufferHandle, h, handle);
+        bgfx::destroyFrameBuffer(h);
     }
 
     bool checkAvailInstanceDataBuffer(uint32_t num, uint16_t stride) override
     {
+        return bgfx::checkAvailInstanceDataBuffer(num, stride);
     }
 
     const gfxInstanceDataBuffer* allocInstanceDataBuffer(uint32_t num, uint16_t stride) override
     {
+        return (const gfxInstanceDataBuffer*)bgfx::allocInstanceDataBuffer(num, stride);
     }
 
     gfxIndirectBufferHandle createIndirectBuffer(uint32_t num) override
     {
+        gfxIndirectBufferHandle r;
+        r.idx = bgfx::createIndirectBuffer(num).idx;
+        return r;
     }
 
     void destroyIndirectBuffer(gfxIndirectBufferHandle handle) override
     {
+        BGFX_DECLARE_HANDLE(IndirectBufferHandle, h, handle);
+        bgfx::destroyIndirectBuffer(h);
     }
 
     gfxOccQueryHandle createOccQuery() override
     {
+        gfxOccQueryHandle r;
+        r.idx = bgfx::createOcclusionQuery().idx;
+        return r;
     }
 
     gfxOccQueryResult getResult(gfxOccQueryHandle handle) override
     {
+        BGFX_DECLARE_HANDLE(OcclusionQueryHandle, h, handle);
+        return (gfxOccQueryResult)bgfx::getResult(h);
     }
 
     void destroyOccQuery(gfxOccQueryHandle handle) override
     {
+        BGFX_DECLARE_HANDLE(OcclusionQueryHandle, h, handle);
+        bgfx::destroyOcclusionQuery(h);
     }
 };

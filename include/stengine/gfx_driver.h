@@ -849,13 +849,13 @@ namespace st
 
         virtual void updateTexture2D(gfxTextureHandle handle, uint8_t mip, uint16_t x, uint16_t y, uint16_t width,
                                      uint16_t height, const gfxMemory* mem, uint16_t pitch) = 0;
-        virtual gfxTextureHandle createTexture3D(uint16_t width, uint16_t height, uint16_t depth, uint16_t numMips,
+        virtual gfxTextureHandle createTexture3D(uint16_t width, uint16_t height, uint16_t depth, uint8_t numMips,
                                                  gfxTextureFormat fmt, gfxTextureFlag flags, 
                                                  const gfxMemory* mem = nullptr) = 0;
         virtual void updateTexture3D(gfxTextureHandle handle, uint8_t mip, uint16_t x, uint16_t y, uint16_t z,
                                      uint16_t width, uint16_t height, uint16_t depth, const gfxMemory* mem) = 0;
-        virtual gfxTextureHandle createTextureCube(uint16_t size, uint8_t numMips, gfxTextureFormat fmt, uint32_t flags,
-                                                   const gfxMemory* mem = nullptr) = 0;
+        virtual gfxTextureHandle createTextureCube(uint16_t size, uint8_t numMips, gfxTextureFormat fmt, 
+                                                   gfxTextureFlag flags, const gfxMemory* mem = nullptr) = 0;
         virtual void updateTextureCube(gfxTextureHandle handle, gfxCubeSide side, uint8_t mip, uint16_t x, uint16_t y,
                                        uint16_t width, uint16_t height, const gfxMemory* mem, uint16_t pitch) = 0;
         virtual void readTexture(gfxTextureHandle handle, void* data) = 0;
