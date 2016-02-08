@@ -33,13 +33,20 @@ namespace bx
         while (true) {
             const char* lineEnd = bx::streol(lineBegin);
             size_t lineSize = (size_t)(lineEnd - lineBegin);
+            char* equal;
+            const char* nextLine;
+
             if (lineSize != 0) {
                 bx::strlcpy(line, lineBegin, bx::uint32_min((uint32_t)lineSize+1, sizeof(line) - 1));
             } else {
                 bx::strlcpy(line, lineBegin, sizeof(line));
             }
 
-            char* equal = strchr(line, '=');
+            if (line[0] == '#') {
+                goto skipToNextLine;
+            }
+
+            equal = strchr(line, '=');
             if (equal) {
                 char key[256];
                 char value[256];
@@ -51,7 +58,8 @@ namespace bx
                 callback(bx::strws(key), bx::strws(value), userParam);
             }
 
-            const char* nextLine = bx::strnl(lineBegin);   // Proceed to next line
+        skipToNextLine:
+            nextLine = bx::strnl(lineBegin);   // Proceed to next line
             if (nextLine == lineBegin)
                 break;
             lineBegin = nextLine;
