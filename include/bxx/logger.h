@@ -25,8 +25,8 @@
 #define EXCLUDE_LIST_COUNT 6
 
 // Export/Import API Def
-#ifdef BX_LOGGER_SHARED_LIB
-#ifdef BX_LOGGER_EXPORT
+#ifdef BX_SHARED_LIB
+#ifdef BX_IMPLEMENT_LOGGER
 #   if BX_COMPILER_MSVC
 #       define BX_LOGGER_API extern "C" __declspec(dllexport) 
 #   else
