@@ -1,0 +1,12 @@
+#!/bin/bash
+
+CONFIG_FILE = "source/config.h"
+
+# make header
+echo "#pragma once" > $CONFIG_FILE
+
+# output version
+version=$(git describe --tags --long)
+echo $version
+echo "#define STENGINE_VERSION \"${version}\"" >> $CONFIG_FILE
+
