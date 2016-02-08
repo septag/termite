@@ -602,6 +602,7 @@ namespace st
         Float,  // Float
     };
 
+    
     struct gfxVertexDecl
     {
         uint32_t hash;
@@ -611,7 +612,7 @@ namespace st
 
         //
         gfxVertexDecl();
-        gfxVertexDecl& begin(gfxRendererType _type = gfxRendererType::Null);
+        gfxVertexDecl& begin();
         void end();
 
         gfxVertexDecl& add(gfxAttrib _attrib, uint8_t _num, gfxAttribType _type, bool normalized, bool asInt = false);

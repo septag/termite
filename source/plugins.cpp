@@ -68,6 +68,8 @@ static void uvScanDir(uv_fs_t* handle)
         bx::Path fileext = fullpath.getFileExt();
         if (bx::stricmp(fileext.cstr(), PLUGIN_EXT) == 0) {
             Plugin p;
+
+            // TODO: check filepath so we don't open the same DLL twice
             p.dlHandle = bx::dlopen(fullpath.cstr());
             if (!p.dlHandle) {
                 BX_WARN("Opening plugin '%s' failed: Invalid shared library", fullpath.cstr());

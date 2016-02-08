@@ -5,29 +5,6 @@
 
 using namespace st;
 
-#ifdef STENGINE_SHARED_LIB
-STPLUGIN_API pluginDesc* stPluginGetDesc()
-{
-    static pluginDesc desc;
-    desc.name = "Bgfx"; 
-    desc.description = "Bgfx wrapper driver";
-    desc.engineVersion = ST_MAKE_VERSION(0, 1);
-    desc.type = pluginType::Graphics;
-    desc.version = ST_MAKE_VERSION(1, 0);
-    return &desc;
-}
-
-STPLUGIN_API st::pluginHandle stPluginInit()
-{
-    static int dummy = 1;
-    return &dummy;
-}
-
-STPLUGIN_API void stPluginShutdown(pluginHandle handle)
-{
-}
-#endif
-
 #define BGFX_DECLARE_HANDLE(_Type, _Name, _Handle) bgfx::_Type _Name; _Name.idx = _Handle.idx
 
 class BgfxCallbacks : public bgfx::CallbackI
@@ -160,6 +137,10 @@ public:
         memset(&m_stats, 0x00, sizeof(m_stats));
         memset(&m_hmd, 0x00, sizeof(m_hmd));
         memset(&m_internal, 0x00, sizeof(m_internal));
+    }
+
+    virtual ~BgfxWrapper()
+    {
     }
 
     bool init(uint16_t deviceId, gfxCallbacks* callbacks, bx::AllocatorI* alloc) override
@@ -937,3 +918,50 @@ public:
         bgfx::destroyOcclusionQuery(h);
     }
 };
+
+#ifdef STENGINE_SHARED_LIB
+#define MY_NAME "Bgfx"
+static bx::AllocatorI* gAlloc = nullptr;
+static st::srvHandle gMyHandle = ST_INVALID_HANDLE;
+
+STPLUGIN_API pluginDesc* stPluginGetDesc()
+{
+    static pluginDesc desc;
+    desc.name = MY_NAME;
+    desc.description = "Bgfx wrapper driver";
+    desc.engineVersion = ST_MAKE_VERSION(0, 1);
+    desc.type = srvDriverType::Graphics;
+    desc.version = ST_MAKE_VERSION(1, 0);
+    return &desc;
+}
+
+STPLUGIN_API st::pluginHandle stPluginInit(bx::AllocatorI* alloc)
+{
+    assert(alloc);
+
+    gAlloc = alloc;
+    BgfxWrapper* driver = BX_NEW(alloc, BgfxWrapper)();
+    if (driver) {
+        gMyHandle = srvRegisterGraphicsDriver(driver, MY_NAME);
+        if (gMyHandle == ST_INVALID_HANDLE) {
+            BX_DELETE(alloc, driver);
+            gAlloc = nullptr;
+            return nullptr;
+        }
+    }
+
+    return driver;
+}
+
+STPLUGIN_API void stPluginShutdown(pluginHandle handle)
+{
+    assert(handle);
+    assert(gAlloc);
+
+    if (gMyHandle != ST_INVALID_HANDLE)
+        srvUnregisterGraphicsDriver(gMyHandle);
+    BX_DELETE(gAlloc, handle);
+    gAlloc = nullptr;
+    gMyHandle = ST_INVALID_HANDLE;
+}
+#endif

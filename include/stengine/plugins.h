@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core.h"
+#include "driver_server.h"
 
 #ifdef STENGINE_SHARED_LIB
 #   if BX_COMPILER_MSVC
@@ -14,18 +15,11 @@
 
 namespace st
 {
-    enum class pluginType : int
-    {
-        Graphics,
-        Sound,
-        Storage
-    };
-
     struct pluginDesc
     {
         const char* name;
         const char* description;
-        pluginType type;
+        srvDriverType type;
         uint32_t version;       // Plugin version
         uint32_t engineVersion; // Expected engine version to work with, Major/Minor combined
     };
@@ -40,7 +34,7 @@ namespace st
 
         // If compatible with engine, it will be called by engine core to initialize the plugin
         // So It can register itself (or register multiple classes) with engine
-        pluginHandle stPluginInit();
+        pluginHandle stPluginInit(bx::AllocatorI* alloc);
 
         // Loaded plugins will be called by engine to cleanup and unregister
         void stPluginShutdown(pluginHandle handle);

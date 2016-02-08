@@ -36,8 +36,12 @@
 #define ST_VERSION_MAJOR(_Ver) (uint16_t)((_Ver >> 16) & 0xffff)
 #define ST_VERSION_MINOR(_Ver) (uint16_t)(_Ver & 0xffff)
 
+// Handles
 #define ST_HANDLE(_Name) struct _Name { uint16_t idx; }
+namespace st { static const uint16_t sInvalidHandle = UINT16_MAX; }
+#define ST_INVALID_HANDLE  {st::sInvalidHandle}
 
+// Use this macro to define flag enum types
 #define ST_DEFINE_FLAG_TYPE(_Type) \
     template <> \
     struct enable_bitmask_operators<_Type> { \
