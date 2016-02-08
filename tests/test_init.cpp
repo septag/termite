@@ -1,4 +1,3 @@
-#define BX_IMPLEMENT_LOGGER
 #include "stengine/core.h"
 #include "bxx/path.h"
 
