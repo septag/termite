@@ -4,6 +4,7 @@
     <ClCompile Include="..\..\source\core.cpp" />
     <ClCompile Include="..\..\source\error_report.cpp" />
     <ClCompile Include="..\..\source\plugins.cpp" />
+    <ClCompile Include="..\..\source\driver_server.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="include">

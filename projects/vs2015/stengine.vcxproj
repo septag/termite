@@ -160,6 +160,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\source\core.cpp" />
+    <ClCompile Include="..\..\source\driver_server.cpp" />
     <ClCompile Include="..\..\source\error_report.cpp" />
     <ClCompile Include="..\..\source\plugins.cpp" />
   </ItemGroup>
