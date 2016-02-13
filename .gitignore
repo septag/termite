@@ -39,3 +39,4 @@ sharedir.h
 *.a
 *.lib
 *.exe
+.build
