@@ -1,20 +1,15 @@
 #include "stengine/core.h"
 #include "bxx/path.h"
+#include "bxx/logger.h"
 
-static void uvSignalInt(uv_signal_t* handle, int signum)
-{
-    st::coreShutdown();
-}
+#include <conio.h>
 
 int main(int argc, char* argv[])
 {
-    uv_signal_t shutdownSignal;
-
     bx::enableLogToFileHandle(stdout, stderr);
     
     st::coreConfig conf;
     bx::Path pluginPath(argv[0]);
-    conf.updateInterval = 10;
 
     strcpy(conf.pluginPath, pluginPath.getDirectory().cstr());
 
@@ -25,10 +20,18 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    uv_signal_init(st::coreGetMainLoop(), &shutdownSignal);
-    uv_signal_start(&shutdownSignal, uvSignalInt, SIGINT);
+    BX_TRACE("");
+    puts("Press ESC to quit ...");
+    while (true) {
+        if (_kbhit()) {
+            if (_getch() == 27)
+                break;
+        }
 
-    st::coreRun();
+        st::coreFrame();
+    }
+
+    st::coreShutdown();
 
     return 0;
 }

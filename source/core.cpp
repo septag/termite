@@ -1,34 +1,36 @@
-#define BX_IMPLEMENT_LOGGER
-#define STB_LEAKCHECK_IMPLEMENTATION
-#ifdef STENGINE_SHARED_LIB
-#   define BX_SHARED_LIB
-#endif
-
 #include "core.h"
+
 #include "bx/readerwriter.h"
 #include "bxx/inifile.h"
-#include "bxx/leakcheck_allocator.h"
 #include "bx/os.h"
 
 #include "plugins.h"
+#include "driver_server.h"
+
+#define STB_LEAKCHECK_IMPLEMENTATION
+#include "bxx/leakcheck_allocator.h"
+
+#define BX_IMPLEMENT_LOGGER
+#ifdef STENGINE_SHARED_LIB
+#   define BX_SHARED_LIB
+#endif
+#include "bxx/logger.h"
+
+#include "gfx_render.h"
 
 using namespace st;
 using namespace bx;
 
 struct Core
 {
-    uv_loop_t mainLoop;
-    uv_timer_t updateTimer;
     coreFnUpdate updateFn;
     coreConfig conf;
-    uv_async_t wakeupReq;
-    uv_check_t checkReq;
-    uv_prepare_t prepareReq;
-    uv_idle_t idleReq;
+    gfxRender* renderer;
 
     Core()
     {
         updateFn = nullptr;
+        renderer = nullptr;
     }
 };
 
@@ -40,44 +42,18 @@ static bx::CrtAllocator gAlloc;
 
 static Core* gCore = nullptr;
 
-namespace libuvMemoryProxy
-{
-    static void* malloc(size_t size)
-    {
-        return BX_ALLOC(&gAlloc, size);
-    }
-
-    static void* realloc(void* ptr, size_t size)
-    {
-        return BX_REALLOC(&gAlloc, ptr, size);
-    }
-
-    static void free(void* ptr)
-    {
-        BX_FREE(&gAlloc, ptr);
-    }
-
-    static void* calloc(size_t count, size_t size)
-    {
-        void* p = BX_ALLOC(&gAlloc, size*count);
-        if (p)
-            memset(p, 0x00, size*count);
-        return p;
-    }
-};
-
-static void update()
-{
-}
-
 static void callbackConf(const char* key, const char* value, void* userParam)
 {
     coreConfig* conf = (coreConfig*)userParam;
 
-    if (bx::stricmp(key, "UpdateInterval") == 0)
-        sscanf(value, "%d", &conf->updateInterval);
-    else if (bx::stricmp(key, "PluginPath") == 0)
+    if (bx::stricmp(key, "PluginPath") == 0)
         bx::strlcpy(conf->pluginPath, value, sizeof(conf->pluginPath));
+    else if (bx::stricmp(key, "gfxDeviceId") == 0)
+        sscanf(value, "%hu", &conf->gfxDeviceId);
+    else if (bx::stricmp(key, "gfxWidth") == 0)
+        sscanf(value, "%hu", &conf->gfxWidth);
+    else if (bx::stricmp(key, "gfxHeight") == 0)
+        sscanf(value, "%hu", &conf->gfxHeight);
 }
 
 coreConfig* st::coreLoadConfig(const char* confFilepath)
@@ -88,10 +64,6 @@ coreConfig* st::coreLoadConfig(const char* confFilepath)
     if (!parseIniFile(confFilepath, callbackConf, conf, &gAlloc)) {
         BX_WARN("Loading config file '%s' failed: Loading default config");
     }
-
-    // Sanity checks
-    if (conf->updateInterval < 0)
-        conf->updateInterval = 0;
 
     return conf;
 }
@@ -118,20 +90,37 @@ int st::coreInit(const coreConfig& conf, coreFnUpdate updateFn)
 
     gCore->updateFn = updateFn;
 
-    // initialize libuv and Override allocations for libuv
-    uv_replace_allocator(libuvMemoryProxy::malloc, libuvMemoryProxy::realloc, libuvMemoryProxy::calloc, 
-                         libuvMemoryProxy::free);
-    uv_loop_init(&gCore->mainLoop);
-    uv_timer_init(&gCore->mainLoop, &gCore->updateTimer);
-    uv_async_init(&gCore->mainLoop, &gCore->wakeupReq, nullptr);
-    uv_check_init(&gCore->mainLoop, &gCore->checkReq);
-    uv_idle_init(&gCore->mainLoop, &gCore->idleReq);
-    uv_prepare_init(&gCore->mainLoop, &gCore->prepareReq);
+    // Initialize Driver server
+    if (drvInit()) {
+        ST_ERROR("Core init failed: Driver Server failed");
+        return ST_ERR_FAILED;
+    }
 
     // Initialize plugins
     if (pluginInit(conf.pluginPath)) {
         ST_ERROR("Core init failed: PluginSystem failed");
         return ST_ERR_FAILED;
+    }
+
+    // Find Renderer plugins and run them
+    drvDriver* rendererDriver;
+    int r = drvFindHandlesByType(drvType::Renderer, &rendererDriver, 1);
+    if (r) {
+        gCore->renderer = drvGetRenderer(rendererDriver);
+
+        BX_TRACE("Found Renderer: %s v%d.%d", drvGetName(rendererDriver), 
+                 ST_VERSION_MAJOR(drvGetVersion(rendererDriver)), ST_VERSION_MINOR(drvGetVersion(rendererDriver)));
+
+        drvDriver* graphicsDriver;
+        r = drvFindHandlesByType(drvType::GraphicsDriver, &graphicsDriver, 1);
+        if (!r) {
+            ST_ERROR("No Graphics driver found");
+            return ST_ERR_FAILED;
+        }
+        
+        BX_TRACE("Found Graphics Driver: %s v%d.%d", drvGetName(graphicsDriver),
+                 ST_VERSION_MAJOR(drvGetVersion(graphicsDriver)), ST_VERSION_MINOR(drvGetVersion(graphicsDriver)));
+        gCore->renderer->init(&gAlloc, drvGetGraphics(graphicsDriver), conf.sdlWindow);
     }
 
     return 0;
@@ -144,14 +133,13 @@ void st::coreShutdown()
         return;
     }
 
-    uv_idle_stop(&gCore->idleReq);
-    uv_prepare_stop(&gCore->prepareReq);
-    uv_check_stop(&gCore->checkReq);
-    uv_timer_stop(&gCore->updateTimer);
-    uv_stop(&gCore->mainLoop);
-    uv_loop_close(&gCore->mainLoop);
+    if (gCore->renderer) {
+        gCore->renderer->shutdown();
+        gCore->renderer = nullptr;
+    }
 
     pluginShutdown();
+    drvShutdown();
 
     BX_DELETE(&gAlloc, gCore);
     gCore = nullptr;
@@ -161,46 +149,13 @@ void st::coreShutdown()
 #endif
 }
 
-static void uvFrameTimer(uv_timer_t* handle)
+void st::coreFrame()
 {
-    assert(gCore);
-
     if (gCore->updateFn)
         gCore->updateFn();
-}
 
-static void uvFrameIdle(uv_idle_t* handle)
-{
-    assert(gCore);
-    if (gCore->updateFn)
-        gCore->updateFn();
-}
-
-static void uvFramePrepare(uv_prepare_t* handle)
-{
-    assert(gCore);
-}
-
-static void uvFrameCheck(uv_check_t* handle)
-{
-    assert(gCore);
-}
-
-void st::coreRun()
-{
-    assert(gCore);
-
-    uv_check_start(&gCore->checkReq, uvFrameCheck);
-    uv_prepare_start(&gCore->prepareReq, uvFramePrepare);   // Do update in prepare callback
-
-    // Run the event loop
-    if (gCore->conf.updateInterval == 0) {
-        uv_idle_start(&gCore->idleReq, uvFrameIdle);
-    } else {
-        uv_timer_start(&gCore->updateTimer, uvFrameTimer, gCore->conf.updateInterval, gCore->conf.updateInterval);
-    }
-
-    uv_run(&gCore->mainLoop, UV_RUN_DEFAULT);
+    if (gCore->renderer)
+        gCore->renderer->render();
 }
 
 uint32_t st::coreGetVersion()
@@ -213,8 +168,8 @@ bx::AllocatorI* st::coreGetAlloc()
     return &gAlloc;
 }
 
-uv_loop_t* st::coreGetMainLoop()
+const coreConfig& st::coreGetConfig()
 {
-    return &gCore->mainLoop;
+    return gCore->conf;
 }
 

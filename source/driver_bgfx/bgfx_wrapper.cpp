@@ -1,7 +1,15 @@
+#include "stengine/core.h"
 #include "stengine/plugins.h"
 #include "stengine/gfx_driver.h"
 #include "bgfx/bgfx.h"
+
+#ifdef SUPPORT_SDL
+#   include <SDL2\SDL_syswm.h>
+#endif
 #include "bgfx/bgfxplatform.h"
+
+#include <cstdarg>
+#include <cstdio>
 
 using namespace st;
 
@@ -59,7 +67,7 @@ public:
     /// @returns Number of bytes to read.
     uint32_t cacheReadSize(uint64_t _id) override
     {
-        m_callbacks->onCacheReadSize(_id);
+        return m_callbacks->onCacheReadSize(_id);
     }
 
     /// Read cached item.
@@ -69,7 +77,7 @@ public:
     /// @param[in] _size Size of data to read.
     bool cacheRead(uint64_t _id, void* _data, uint32_t _size) override
     {
-        m_callbacks->onCacheRead(_id, _data, _size);
+        return m_callbacks->onCacheRead(_id, _data, _size);
     }
 
     /// Write cached item.
@@ -128,11 +136,16 @@ private:
     gfxHMD m_hmd;
     gfxInternalData m_internal;
 
+#ifdef SUPPORT_SDL
+    SDL_Window* m_sdl;
+#endif
+
 public:
     BgfxWrapper()
     {
         m_callbacks = nullptr;
         m_alloc = nullptr;
+        m_sdl = nullptr;
         memset(&m_caps, 0x00, sizeof(m_caps));
         memset(&m_stats, 0x00, sizeof(m_stats));
         memset(&m_hmd, 0x00, sizeof(m_hmd));
@@ -143,6 +156,11 @@ public:
     {
     }
 
+    void setSDLWindow(void* windowHandle)
+    {
+        m_sdl = (SDL_Window*)windowHandle;
+    }
+
     bool init(uint16_t deviceId, gfxCallbacks* callbacks, bx::AllocatorI* alloc) override
     {
         m_alloc = alloc;
@@ -151,6 +169,11 @@ public:
             if (!m_callbacks)
                 return false;
         }
+
+#ifdef SUPPORT_SDL
+        if (m_sdl)
+            bgfx::sdlSetWindow(m_sdl);
+#endif
 
         return bgfx::init(bgfx::RendererType::Count, 0, deviceId, m_callbacks, alloc);
     }
@@ -163,7 +186,7 @@ public:
         }
     }
 
-    void reset(uint32_t width, uint32_t height, gfxClearFlag flags) override
+    void reset(uint32_t width, uint32_t height, gfxResetFlag flags) override
     {
         bgfx::reset(width, height, (uint32_t)flags);
     }
@@ -275,7 +298,7 @@ public:
 
     uint32_t touch(uint8_t id) override
     {
-        bgfx::touch(id);
+        return bgfx::touch(id);
     }
 
     void setPaletteColor(uint8_t index, uint32_t rgba) override
@@ -485,14 +508,14 @@ public:
     uint32_t submit(uint8_t viewId, gfxProgramHandle program, int32_t depth) override
     {
         BGFX_DECLARE_HANDLE(ProgramHandle, p, program);
-        bgfx::submit(viewId, p, depth);
+        return bgfx::submit(viewId, p, depth);
     }
 
     uint32_t submit(uint8_t viewId, gfxProgramHandle program, gfxOccQueryHandle occQuery, int32_t depth) override
     {
         BGFX_DECLARE_HANDLE(ProgramHandle, p, program);
         BGFX_DECLARE_HANDLE(OcclusionQueryHandle, o, occQuery);
-        bgfx::submit(viewId, p, o, depth);
+        return bgfx::submit(viewId, p, o, depth);
     }
 
     uint32_t submit(uint8_t viewId, gfxProgramHandle program, gfxIndirectBufferHandle indirectHandle, uint16_t start,
@@ -500,7 +523,7 @@ public:
     {
         BGFX_DECLARE_HANDLE(ProgramHandle, p, program);
         BGFX_DECLARE_HANDLE(IndirectBufferHandle, i, indirectHandle);
-        bgfx::submit(viewId, p, i, start, num, depth);
+        return bgfx::submit(viewId, p, i, start, num, depth);
     }
 
     void setBuffer(uint8_t stage, gfxIndexBufferHandle handle, gfxAccess access) override
@@ -553,7 +576,7 @@ public:
                       gfxSubmitFlag flags) override
     {
         BGFX_DECLARE_HANDLE(ProgramHandle, h, handle);
-        bgfx::dispatch(viewId, h, numX, numY, numZ, (uint8_t)flags);
+        return bgfx::dispatch(viewId, h, numX, numY, numZ, (uint8_t)flags);
     }
 
     uint32_t dispatch(uint8_t viewId, gfxProgramHandle handle, gfxIndirectBufferHandle indirectHandle,
@@ -561,7 +584,7 @@ public:
     {
         BGFX_DECLARE_HANDLE(ProgramHandle, h, handle);
         BGFX_DECLARE_HANDLE(IndirectBufferHandle, i, indirectHandle);
-        bgfx::dispatch(viewId, h, i, start, num, (uint8_t)flags);
+        return bgfx::dispatch(viewId, h, i, start, num, (uint8_t)flags);
     }
 
     void blit(uint8_t viewId, gfxTextureHandle dest, uint16_t destX, uint16_t destY, gfxTextureHandle src,
@@ -636,7 +659,9 @@ public:
     {
         BGFX_DECLARE_HANDLE(ShaderHandle, v, vsh);
         BGFX_DECLARE_HANDLE(ShaderHandle, f, fsh);
-        bgfx::createProgram(v, f, destroyShaders);
+        gfxProgramHandle h;
+        h.idx = bgfx::createProgram(v, f, destroyShaders).idx;
+        return h;
     }
 
     gfxUniformHandle createUniform(const char* name, gfxUniformType type, uint16_t num) override
@@ -917,12 +942,35 @@ public:
         BGFX_DECLARE_HANDLE(OcclusionQueryHandle, h, handle);
         bgfx::destroyOcclusionQuery(h);
     }
+
+    void dbgTextClear(uint8_t attr, bool small)
+    {
+        bgfx::dbgTextClear(attr, small);
+    }
+
+    void dbgTextPrintf(uint16_t x, uint16_t y, uint8_t attr, const char* format, ...)
+    {
+        char text[256];
+
+        va_list args;
+        va_start(args, format);
+        vsnprintf(text, sizeof(text), format, args);
+        va_end(args);
+
+        bgfx::dbgTextPrintf(x, y, attr, text);
+    }
+
+    void dbgTextImage(uint16_t x, uint16_t y, uint16_t width, uint16_t height, const void* data, uint16_t pitch)
+    {
+        bgfx::dbgTextImage(x, y, width, height, data, pitch);
+    }
 };
 
 #ifdef STENGINE_SHARED_LIB
 #define MY_NAME "Bgfx"
+#define MY_VERSION ST_MAKE_VERSION(1, 0)
 static bx::AllocatorI* gAlloc = nullptr;
-static st::srvHandle gMyHandle = ST_INVALID_HANDLE;
+static st::drvDriver* gMyDriver = nullptr;
 
 STPLUGIN_API pluginDesc* stPluginGetDesc()
 {
@@ -930,8 +978,8 @@ STPLUGIN_API pluginDesc* stPluginGetDesc()
     desc.name = MY_NAME;
     desc.description = "Bgfx wrapper driver";
     desc.engineVersion = ST_MAKE_VERSION(0, 1);
-    desc.type = srvDriverType::Graphics;
-    desc.version = ST_MAKE_VERSION(1, 0);
+    desc.type = drvType::GraphicsDriver;
+    desc.version = MY_VERSION;
     return &desc;
 }
 
@@ -942,8 +990,8 @@ STPLUGIN_API st::pluginHandle stPluginInit(bx::AllocatorI* alloc)
     gAlloc = alloc;
     BgfxWrapper* driver = BX_NEW(alloc, BgfxWrapper)();
     if (driver) {
-        gMyHandle = srvRegisterGraphicsDriver(driver, MY_NAME);
-        if (gMyHandle == ST_INVALID_HANDLE) {
+        gMyDriver = drvRegisterGraphics(driver, MY_NAME, MY_VERSION);
+        if (gMyDriver == nullptr) {
             BX_DELETE(alloc, driver);
             gAlloc = nullptr;
             return nullptr;
@@ -958,10 +1006,10 @@ STPLUGIN_API void stPluginShutdown(pluginHandle handle)
     assert(handle);
     assert(gAlloc);
 
-    if (gMyHandle != ST_INVALID_HANDLE)
-        srvUnregisterGraphicsDriver(gMyHandle);
+    if (gMyDriver != nullptr)
+        drvUnregister(gMyDriver);
     BX_DELETE(gAlloc, handle);
     gAlloc = nullptr;
-    gMyHandle = ST_INVALID_HANDLE;
+    gMyDriver = nullptr;
 }
 #endif

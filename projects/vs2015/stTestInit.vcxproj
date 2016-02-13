@@ -111,7 +111,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libuv_d.lib;stengine_d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>stengine_d.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\lib\$(PlatformName)\</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -148,7 +148,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libuv.lib;stengine.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>stengine.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\lib\$(PlatformName)\</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>

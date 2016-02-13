@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core.h"
 #include "driver_server.h"
 
 #ifdef STENGINE_SHARED_LIB
@@ -19,7 +18,7 @@ namespace st
     {
         const char* name;
         const char* description;
-        srvDriverType type;
+        drvType type;
         uint32_t version;       // Plugin version
         uint32_t engineVersion; // Expected engine version to work with, Major/Minor combined
     };
@@ -44,8 +43,5 @@ namespace st
     int pluginInit(const char* pluginPath);
     void pluginShutdown();
     
-    // Public
-    STENGINE_API int pluginIsInit();
-
 }   // namespace st
 

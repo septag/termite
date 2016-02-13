@@ -1,102 +1,177 @@
+#include "core.h"
 #include "driver_server.h"
 
 #include "bx/string.h"
 #include "bxx/linked_list.h"
 #include "bxx/pool.h"
+#include "bxx/logger.h"
 
-struct Driver
+using namespace st;
+
+namespace st
 {
-    typedef bx::ListNode<Driver*> LNode;
-    
-    char name[32];
-    srvDriverType type;
-    st::srvHandle handle;
-    LNode lnode;
-};
+    struct drvDriver
+    {
+        typedef bx::ListNode<drvDriver*> LNode;
+
+        char name[32];
+        drvType type;
+        void* data;
+        uint32_t version;
+
+        LNode lnode;
+    };
+}   // namespace st
 
 struct DriverServer
 {
-    Driver::LNode* drivers;
-    bx::Pool<Driver> driverPool;
-    uint16_t driverId;
+    drvDriver::LNode* drivers;
+    bx::Pool<drvDriver> driverPool;
 
     DriverServer()
     {
         drivers = nullptr;
-        driverId = 0;
     }
 };
 
 static DriverServer* gServer = nullptr;
 
-int st::srvInit()
+int st::drvInit()
 {
     if (gServer) {
         assert(false);
         return ST_ERR_ALREADY_INITIALIZED;
     }
 
+    BX_BEGINP("Initializing Driver Server");
     bx::AllocatorI* alloc = coreGetAlloc();
     gServer = BX_NEW(alloc, DriverServer);
-    if (!gServer)
+    if (!gServer) {
+        BX_END_FATAL();
         return ST_ERR_OUTOFMEM;
+    }
 
-    if (!gServer->driverPool.create(20, alloc))
+    if (!gServer->driverPool.create(20, alloc)) {
+        BX_END_FATAL();
         return ST_ERR_OUTOFMEM;
+    }
 
+    BX_END_OK();
     return ST_OK;
 }
 
-void st::srvShutdown()
+void st::drvShutdown()
 {
     if (!gServer) {
         assert(false);
         return;
     }
 
+    BX_BEGINP("Shutting down Driver Server");
     bx::AllocatorI* alloc = coreGetAlloc();
     assert(alloc);
 
     gServer->driverPool.destroy();
     BX_DELETE(alloc, gServer);
+    gServer = nullptr;
+    BX_END_OK();
 }
 
-st::srvHandle st::srvRegisterGraphicsDriver(st::gfxDriver* driver, const char* name)
+static drvDriver* createDriver(const char* name, uint32_t version, drvType type, void* data)
 {
-    Driver* driver = gServer->driverPool.newInstance();
-    if (!driver)
-        return ST_INVALID_HANDLE;
-    
-    
-    driver->handle.idx = ++gServer->driverId;
+    drvDriver* d = gServer->driverPool.newInstance();
+    if (!d)
+        return nullptr;
 
-    
+    bx::strlcpy(d->name, name, sizeof(d->name));
+    d->data = data;
+    d->type = type;
+    d->version = version;
+
+    bx::addListNode(&gServer->drivers, &d->lnode, d);
+
+    return d;
 }
 
-void st::srvUnregisterGraphicsDriver(srvHandle handle)
+static void destroyDriver(drvDriver* drv)
 {
-
+    assert(drv);
+    bx::removeListNode(&gServer->drivers, &drv->lnode);
+    gServer->driverPool.deleteInstance(drv);
 }
 
-st::gfxDriver* st::srvGetGraphicsDriver(srvHandle handle)
+drvDriver* st::drvRegisterGraphics(gfxDriver* driver, const char* name, uint32_t version)
 {
-    return nullptr;
+    return createDriver(name, version, drvType::GraphicsDriver, driver);
 }
 
-st::srvHandle st::srvFindDriverHandleByName(const char* name)
+gfxDriver* st::drvGetGraphics(drvDriver* drv)
 {
-    Driver::LNode* node = gServer->drivers;
+    if (drv->type != drvType::GraphicsDriver)
+        return nullptr;
+
+    return (gfxDriver*)drv->data;
+}
+
+drvDriver* st::drvRegisterRenderer(gfxRender* render, const char* name, uint32_t version)
+{
+    return createDriver(name, version, drvType::Renderer, render);
+}
+
+gfxRender* st::drvGetRenderer(drvDriver* drv)
+{
+    if (drv->type != drvType::Renderer)
+        return nullptr;
+
+    return (gfxRender*)drv->data;
+}
+
+drvDriver* st::drvFindHandleByName(const char* name)
+{
+    drvDriver::LNode* node = gServer->drivers;
     while (node) {
-        Driver* drv = node->data;
+        drvDriver* drv = node->data;
         if (bx::stricmp(drv->name, name) == 0)
-            return drv->handle;
+            return drv;
         node = node->next;
     }
 
-    return ST_INVALID_HANDLE;
+    return nullptr;
 }
 
-int st::srvFindDriverHandleByType(srvDriverType type, srvHandle* handles, int maxHandles)
+int st::drvFindHandlesByType(drvType type, drvDriver** handles, int maxHandles)
 {
-    return -1;
+    int count = 0;
+
+    drvDriver::LNode* node = gServer->drivers;
+    while (node) {
+        drvDriver* drv = node->data;
+        if (drv->type == type) {
+            if (handles) {
+                if (count <= maxHandles)
+                    handles[count++] = drv;
+            } else {
+                count++;
+            }
+        }
+        node = node->next;
+    }
+
+    return count;
 }
+
+uint32_t st::drvGetVersion(drvDriver* drv)
+{
+    return drv->version;
+}
+
+const char* st::drvGetName(drvDriver* drv)
+{
+    return drv->name;
+}
+
+void st::drvUnregister(drvDriver* drv)
+{
+    destroyDriver(drv);
+}
+

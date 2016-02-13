@@ -1,26 +1,31 @@
 #pragma once
 
-#include "core.h"
-
 namespace st
 {
     class gfxDriver;
+    class gfxRender;
 
-    enum srvDriverType : int
+    struct drvDriver;
+
+    enum class drvType : int
     {
-        Graphics,
-        Storage
+        GraphicsDriver,
+        Storage,
+        Renderer
     };
 
-    ST_HANDLE(srvHandle);
+    int drvInit();
+    void drvShutdown();
 
-    int srvInit();
-    void srvShutdown();
+    STENGINE_API drvDriver* drvRegisterGraphics(gfxDriver* driver, const char* name, uint32_t version);
+    STENGINE_API gfxDriver* drvGetGraphics(drvDriver* drv);
 
-    STENGINE_API srvHandle srvRegisterGraphicsDriver(gfxDriver* driver, const char* name = nullptr);
-    STENGINE_API void srvUnregisterGraphicsDriver(srvHandle handle);
-    STENGINE_API gfxDriver* srvGetGraphicsDriver(srvHandle handle);
+    STENGINE_API drvDriver* drvRegisterRenderer(gfxRender* render, const char* name, uint32_t version);
+    STENGINE_API gfxRender* drvGetRenderer(drvDriver* drv);
 
-    STENGINE_API srvHandle srvFindDriverHandleByName(const char* name);
-    STENGINE_API int srvFindDriverHandleByType(srvDriverType type, srvHandle* handles, int maxHandles);
+    STENGINE_API drvDriver* drvFindHandleByName(const char* name);
+    STENGINE_API int drvFindHandlesByType(drvType type, drvDriver** handles = nullptr, int maxHandles = 0);
+    STENGINE_API uint32_t drvGetVersion(drvDriver* drv);
+    STENGINE_API const char* drvGetName(drvDriver* drv);
+    STENGINE_API void drvUnregister(drvDriver* drv);
 }   // namespace st

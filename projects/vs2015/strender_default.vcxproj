@@ -19,9 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{1E6551C7-B411-482F-87B2-1D25EA249B90}</ProjectGuid>
+    <ProjectGuid>{A29AE3EA-E94F-4EE9-8765-C5046590221E}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>stengine</RootNamespace>
+    <RootNamespace>strender_default</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -92,7 +92,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;STENGINE_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;STRENDER_DEFAULT_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -101,21 +101,20 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>STENGINE_SHARED_LIB;STENGINE_EXPORTS;_HAS_EXCEPTIONS=0;_HAS_ITERATOR_DEBUGGING=0;_SCL_SECURE=0;_SECURE_SCL=0;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;BX_CONFIG_ALLOCATOR_DEBUG;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\include\stengine\;..\..\..\bx\include\;..\..\..\bx\include\compat\msvc\</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>STENGINE_SHARED_LIB;_HAS_EXCEPTIONS=0;_HAS_ITERATOR_DEBUGGING=0;_SCL_SECURE=0;_SECURE_SCL=0;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_DEBUG;_WINDOWS;_USRDLL;STRENDER_DEFAULT_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\include\;..\..\..\bx\include\;..\..\..\bx\include\compat\msvc\</AdditionalIncludeDirectories>
       <ExceptionHandling>false</ExceptionHandling>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
-      <PrecompiledHeaderFile>core.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>stengine_d.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\lib\$(PlatformName)\</AdditionalLibraryDirectories>
-      <ImportLibrary>..\..\lib\$(PlatformName)\$(TargetName).lib</ImportLibrary>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -126,7 +125,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;STENGINE_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;STRENDER_DEFAULT_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -138,45 +137,27 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>STENGINE_SHARED_LIB;STENGINE_EXPORTS;_HAS_EXCEPTIONS=0;_HAS_ITERATOR_DEBUGGING=0;_SCL_SECURE=0;_SECURE_SCL=0;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;NDEBUG;_WINDOWS;_USRDLL;STENGINE_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\include\stengine\;..\..\..\bx\include\;..\..\..\bx\include\compat\msvc\</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>STENGINE_SHARED_LIB;_HAS_EXCEPTIONS=0;_HAS_ITERATOR_DEBUGGING=0;_SCL_SECURE=0;_SECURE_SCL=0;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;NDEBUG;_WINDOWS;_USRDLL;STRENDER_DEFAULT_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\include\;..\..\..\bx\include\;..\..\..\bx\include\compat\msvc\</AdditionalIncludeDirectories>
       <ExceptionHandling>false</ExceptionHandling>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
-      <PrecompiledHeaderFile>core.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>No</GenerateDebugInformation>
+      <AdditionalDependencies>stengine.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\lib\$(PlatformName)\</AdditionalLibraryDirectories>
-      <ImportLibrary>..\..\lib\$(PlatformName)\$(TargetName).lib</ImportLibrary>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\source\core.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\..\source\driver_server.cpp" />
-    <ClCompile Include="..\..\source\error_report.cpp" />
-    <ClCompile Include="..\..\source\gfx_driver.cpp" />
-    <ClCompile Include="..\..\source\plugins.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\include\stengine\core.h" />
-    <ClInclude Include="..\..\include\stengine\error_report.h" />
-    <ClInclude Include="..\..\include\stengine\gfx_defines.h" />
-    <ClInclude Include="..\..\include\stengine\gfx_driver.h" />
-    <ClInclude Include="..\..\include\stengine\driver_server.h" />
-    <ClInclude Include="..\..\include\stengine\plugins.h" />
-    <ClInclude Include="..\..\include\stengine\gfx_render.h" />
-    <ClInclude Include="..\..\include\stengine\gfx_render_vector.h" />
+    <ClCompile Include="..\..\source\render_default\render_default.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

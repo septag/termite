@@ -2,13 +2,14 @@
 
 #include "bx/bx.h"
 #include "bx/allocator.h"
-#include "bxx/logger.h"
-
 #include <cassert>
+#include "bxx/bitmask_operators.hpp"
 
-#include "bitmask/bitmask_operators.hpp"
-
-#include "uv.h"
+// Windows
+#if BX_PLATFORM_WINDOWS
+#   define WIN32_LEAN_AND_MEAN
+#   include <Windows.h>
+#endif
 
 // Export/Import API Def
 #ifdef STENGINE_SHARED_LIB
@@ -52,13 +53,24 @@ namespace st
 {
     struct coreConfig
     {
-        int updateInterval;
+        // Plugins
         char pluginPath[128];
+
+        // Graphics
+        uint16_t gfxDeviceId;
+        uint16_t gfxWidth;
+        uint16_t gfxHeight;
+        uint32_t gfxDriverFlags;    // see gfxResetFlag
+
+        void* sdlWindow;
 
         coreConfig()
         {
-            updateInterval = 0;
             pluginPath[0] = 0;
+            gfxWidth = 0;
+            gfxHeight = 0;
+            gfxDeviceId = 0;
+            sdlWindow = nullptr;
         }
     };
 
@@ -70,10 +82,10 @@ namespace st
 
     STENGINE_API int coreInit(const coreConfig& conf, coreFnUpdate updateFn);
     STENGINE_API void coreShutdown();
-    STENGINE_API void coreRun();
+    STENGINE_API void coreFrame();
     STENGINE_API uint32_t coreGetVersion();
 
     STENGINE_API bx::AllocatorI* coreGetAlloc();
-    STENGINE_API uv_loop_t* coreGetMainLoop();
+    STENGINE_API const coreConfig& coreGetConfig();
 } // namespace st
 
