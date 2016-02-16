@@ -1,9 +1,16 @@
 #pragma once
 
 #include "string.h"
+#include "../bx/platform.h"
 
 namespace bx
 {
+    enum class PathType
+    {
+        Invalid = 0,
+        Directory,
+        File
+    };
 
     class Path : public String256
     {
@@ -22,6 +29,7 @@ namespace bx
 
         Path& normalizeSelf();
         Path& join(const char* path);
+        PathType getType();        
     };
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -130,7 +138,7 @@ namespace bx
         if (this->text[0] == 0)
             return *this;
 
-    #if BX_PLATFORM_WINDOWS
+#if BX_PLATFORM_WINDOWS
         char tmp[256];
         GetFullPathName(this->text, sizeof(tmp), tmp, nullptr);
         toWindows();
@@ -138,7 +146,7 @@ namespace bx
         if (this->text[sz-1] == '\\')
             this->text[sz-1] = 0;
         return *this;
-    #else
+#else
         char* tmp = realpath(this->text, nullptr);
         if (tmp)    {
             toUnix();
@@ -153,16 +161,16 @@ namespace bx
         if (this->text[sz-1] == '/')
             this->text[sz-1] = 0;
         return *this;
-    #endif
+#endif
     }
 
     Path& Path::join(const char* path)
     {
-    #if BX_PLATFORM_WINDOWS
+#if BX_PLATFORM_WINDOWS
         const char* sep = "\\";
-    #else
+#else
         const char* sep = "/";
-    #endif
+#endif
 
         if (this->text[0] != 0) {
             if (path[0] != 0)   {
@@ -174,6 +182,33 @@ namespace bx
         }
 
         return *this;
+    }
+
+
+    bx::PathType Path::getType()
+    {
+#if BX_PLATFORM_WINDOWS
+        DWORD atts = GetFileAttributes(text);
+        if (atts & FILE_ATTRIBUTE_DIRECTORY)
+            return PathType::Directory;
+        else if (atts == INVALID_FILE_ATTRIBUTES)
+            return PathType::Invalid;
+        else
+            return PathType::File;
+#else
+        struct stat s;
+        if (stat(text, &s) == 0) {
+            if (s.st_mode & S_IFDIR)
+                return PathType::Directory;
+            else if ((s.st_mode & (S_IFREG | S_IFLNK)))
+                return PathType::File;
+            else
+                return PathType::Invalid;
+
+        } else {
+            return PathType::Invalid;
+        }
+#endif
     }
 
 }   // namespace: bx
