@@ -21,7 +21,9 @@ namespace bx
         String<_Size>& operator=(const String<_Size>& str);
         String<_Size>& operator=(const char* str);
         String<_Size> operator+(const char* str) const;
+        String<_Size> operator+(const String<_Size>& str) const;
         String<_Size>& operator+=(const char* str);
+        String<_Size>& operator+=(const String<_Size>& str);
 
         int getLength() const           {   return (int)strlen(text);    }
         char* getBuffer()               {   return text;    }
@@ -117,9 +119,25 @@ namespace bx
     }
 
     template <int _Size>
+    String<_Size> String<_Size>::operator+(const String<_Size>& str) const
+    {
+        String<_Size> r;
+        bx::strlcpy(r.text, this->text, _Size);
+        bx::strlcat(r.text, str.cstr(), _Size);
+        return r;
+    }
+
+    template <int _Size>
     String<_Size>& String<_Size>::operator+=(const char* str)
     {
         bx::strlcat(this->text, str, _Size);
+        return *this;
+    }
+
+    template <int _Size>
+    String<_Size>& String<_Size>::operator+=(const String<_Size>& str)
+    {
+        bx::strlcat(this->text, str.cstr(), _Size);
         return *this;
     }
 

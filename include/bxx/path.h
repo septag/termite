@@ -18,6 +18,16 @@ namespace bx
         Path() : String256() {}
         explicit Path(const char* text) : String256(text) {}
 
+        Path& operator=(const Path& str)
+        {
+            return (Path&)String256::operator=((const String256&)str);
+        }
+
+        Path& operator=(const char* str)
+        {
+            return (Path&)String256::operator=(str);
+        }
+
         Path getDirectory() const;
         Path getFilename() const;
         Path getFileExt() const;
@@ -58,7 +68,7 @@ namespace bx
         Path p;
 
         const char* ri = strrchr((const char*)this->text, '/');
-        if (ri)
+        if (!ri)
             ri = strrchr((const char*)this->text, '\\');
 
         if (ri)
