@@ -142,7 +142,7 @@ namespace bx
         if (m_freeIndexIter == 0) {
             int newsz = m_numExpand + m_maxItems;
             m_buff = (Ty*)BX_REALLOC(m_alloc, m_buff, sizeof(Ty)*newsz);
-            m_freeIndexes = (Ty*)BX_REALLOC(m_alloc, m_freeIndexes, sizeof(int)*newsz);
+            m_freeIndexes = (int*)BX_REALLOC(m_alloc, m_freeIndexes, sizeof(int)*newsz);
             if (!m_buff || !m_freeIndexes)
                 return nullptr;
 
