@@ -100,15 +100,15 @@ namespace bx
             return NULL;
         }
 
-        Ty pop() // consumer only
+        bool pop(Ty* val) // consumer only
         {
             if (m_divider != m_last) {
-                Ty& val = m_divider->m_next->m_value;
+                *val = m_divider->m_next->m_value;
                 atomicExchangePtr((void**)&m_divider, m_divider->m_next);
                 return val;
             }
 
-            return Ty();
+            return false;
         }
 
     private:
