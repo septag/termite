@@ -664,6 +664,7 @@ function toolchain(_buildDir, _libDir)
 		}
 
 	configuration { "android-*" }
+		targetprefix ("lib")
 		flags {
 			"NoImportLib",
 		}
@@ -800,7 +801,7 @@ function toolchain(_buildDir, _libDir)
 		linkoptions {
 			"--sysroot=" .. path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86"),
 			path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86/usr/lib/crtbegin_so.o"),
-			path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "/arch-x86/usr/lib/crtend_so.o"),
+			path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86/usr/lib/crtend_so.o"),
 		}
 
 	configuration { "asmjs" }
@@ -1126,7 +1127,13 @@ function strip()
 			"$(SILENT) $(ANDROID_NDK_X86)/bin/i686-linux-android-strip -s \"$(TARGET)\""
 		}
 
-	configuration { "linux-* or rpi", "Release" }
+	configuration { "linux-steamlink", "Release" }
+		postbuildcommands {
+			"$(SILENT) echo Stripping symbols.",
+			"$(SILENT) $(MARVELL_SDK_PATH)/toolchain/bin/armv7a-cros-linux-gnueabi-strip -s \"$(TARGET)\""
+		}
+
+	configuration { "linux-* or rpi", "not linux-steamlink", "Release" }
 		postbuildcommands {
 			"$(SILENT) echo Stripping symbols.",
 			"$(SILENT) strip -s \"$(TARGET)\""
