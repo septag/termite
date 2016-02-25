@@ -96,6 +96,10 @@ namespace bx
         m_freeIndexes = (int*)BX_ALLOC(_alloc, _initCount*sizeof(int));
         if (!m_buff || !m_freeIndexes)
             return false;
+
+        for (int i = 0, c = _initCount; i < c; i++)
+            m_freeIndexes[i] = c - i - 1;
+
         m_alloc = _alloc;
         m_maxItems = _initCount;
         m_numItems = 0;

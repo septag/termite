@@ -44,7 +44,7 @@ namespace bx
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////
     // Path
-    Path Path::getDirectory() const
+    inline Path Path::getDirectory() const
     {
         Path p;
 
@@ -63,7 +63,7 @@ namespace bx
         return p;
     }
 
-    Path Path::getFilename() const
+    inline Path Path::getFilename() const
     {
         Path p;
 
@@ -83,7 +83,7 @@ namespace bx
         return p;
     }
 
-    Path Path::getFileExt() const
+    inline Path Path::getFileExt() const
     {
         Path p;
 
@@ -94,7 +94,7 @@ namespace bx
         return p;
     }
 
-    Path Path::getFilenameFull() const
+    inline  Path Path::getFilenameFull() const
     {
         Path p;
 
@@ -109,7 +109,7 @@ namespace bx
         return p;
     }
 
-    Path& Path::goUp()
+    inline Path& Path::goUp()
     {
         int s = getLength();
 
@@ -133,17 +133,17 @@ namespace bx
         return *this;
     }
 
-    Path& Path::toUnix()
+    inline Path& Path::toUnix()
     {
         return (Path&)replace('\\', '/');
     }
 
-    Path& Path::toWindows()
+    inline Path& Path::toWindows()
     {
         return (Path&)replace('/', '\\');
     }
 
-    Path& Path::normalizeSelf()
+    inline Path& Path::normalizeSelf()
     {
         if (this->text[0] == 0)
             return *this;
@@ -174,7 +174,7 @@ namespace bx
 #endif
     }
 
-    Path& Path::join(const char* path)
+    inline Path& Path::join(const char* path)
     {
 #if BX_PLATFORM_WINDOWS
         const char* sep = "\\";
@@ -195,7 +195,7 @@ namespace bx
     }
 
 
-    bx::PathType Path::getType()
+    inline bx::PathType Path::getType()
     {
 #if BX_PLATFORM_WINDOWS
         DWORD atts = GetFileAttributes(text);
