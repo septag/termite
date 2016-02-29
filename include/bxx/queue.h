@@ -105,7 +105,7 @@ namespace bx
             if (m_divider != m_last) {
                 *val = m_divider->m_next->m_value;
                 atomicExchangePtr((void**)&m_divider, m_divider->m_next);
-                return val;
+                return true;
             }
 
             return false;
