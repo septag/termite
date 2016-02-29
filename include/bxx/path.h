@@ -3,6 +3,11 @@
 #include "string.h"
 #include "../bx/platform.h"
 
+#if !BX_PLATFORM_WINDOWS
+#  include <sys/types.h>
+#  include <sys/stat.h>
+#endif
+
 namespace bx
 {
     enum class PathType
