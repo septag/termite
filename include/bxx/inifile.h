@@ -14,7 +14,7 @@ namespace bx
 
         bx::CrtFileReader reader;
         bx::Error err;
-        if (reader.open(iniFilepath, &err))
+        if (!reader.open(iniFilepath, &err))
             return false;
 
         int32_t size = (int32_t)reader.seek(0, bx::Whence::End);
