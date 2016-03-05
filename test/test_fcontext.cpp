@@ -23,14 +23,14 @@ inline void sleep(uint32_t _ms)
 #endif
 }
 
-static void doo(transfer_t t)
+static void doo(fcontext_transfer_t t)
 {
     puts("DOO");
     sleep(1000);
     jump_fcontext(t.ctx, NULL);
 }
 
-static void foo(transfer_t t)
+static void foo(fcontext_transfer_t t)
 {
     puts("FOO");
     sleep(1000);
@@ -42,11 +42,11 @@ static void foo(transfer_t t)
 
 int main()
 {
-    contextstack_t s;
-    stack_create(&s, 16*1024);
+    fcontext_stack_t s;
+    create_fcontext_stack(&s, 16*1024);
 
-    contextstack_t s2;
-    stack_create(&s2);
+    fcontext_stack_t s2;
+    create_fcontext_stack(&s2);
 
     ctx = make_fcontext(s.sptr, s.ssize, foo);
     ctx2 = make_fcontext(s2.sptr, s2.ssize, doo);
@@ -54,7 +54,7 @@ int main()
     jump_fcontext(ctx, NULL);
     puts("END");
 
-    stack_destroy(&s);
-    stack_destroy(&s2);
+    destroy_fcontext_stack(&s);
+    destroy_fcontext_stack(&s2);
     return 0;
 }

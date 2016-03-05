@@ -94,7 +94,7 @@ static size_t getDefaultSize()
 #endif
 
 /* Stack allocation and protection*/
-int stack_create(contextstack_t* s, size_t size)
+int create_fcontext_stack(fcontext_stack_t* s, size_t size)
 {
     size_t pages;
     size_t size_;
@@ -139,7 +139,7 @@ int stack_create(contextstack_t* s, size_t size)
     return 1;
 }
 
-void stack_destroy(contextstack_t* s)
+void destroy_fcontext_stack(fcontext_stack_t* s)
 {
     void* vp;
 
@@ -154,5 +154,5 @@ void stack_destroy(contextstack_t* s)
     munmap(vp, s->ssize);
 #endif
 
-    memset(s, 0x00, sizeof(contextstack_t));
+    memset(s, 0x00, sizeof(fcontext_stack_t));
 }
