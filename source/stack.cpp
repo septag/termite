@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 
 #include "fcontext.h"
 
@@ -43,7 +44,7 @@ static size_t getDefaultSize()
     return 64 * 1024;   /* 64Kb */
 }
 
-#elif _POSIX_VERSION
+#else
 #include <signal.h>
 #include <sys/resource.h>
 #include <sys/time.h>
@@ -71,7 +72,7 @@ static size_t getMinSize()
 static size_t getMaxSize()
 {
     rlimit limit;
-    getrlimit(&limit);
+    getrlimit(RLIMIT_STACK, &limit);
 
     return (size_t)limit.rlim_max;
 }
@@ -82,7 +83,7 @@ static size_t getDefaultSize()
     size_t maxSize;
     rlimit limit;
 
-    getrlimit(&limit);
+    getrlimit(RLIMIT_STACK, &limit);
 
     size = 8 * getMinSize();
     if (RLIM_INFINITY == limit.rlim_max)
@@ -93,12 +94,11 @@ static size_t getDefaultSize()
 #endif
 
 /* Stack allocation and protection*/
-int stack_create(stack_t* s, size_t size)
+int stack_create(contextstack_t* s, size_t size)
 {
     size_t pages;
     size_t size_;
     void* vp;
-    DWORD old_options;
 
     if (size == 0)
         size = getDefaultSize();
@@ -120,8 +120,9 @@ int stack_create(stack_t* s, size_t size)
     if (!vp)
         return 0;
 
+    DWORD old_options;
     VirtualProtect(vp, getPageSize(), PAGE_READWRITE | PAGE_GUARD, &old_options);
-#elif _POSIX_VERSION
+#else
 # if defined(MAP_ANON)
     vp = mmap(0, size_, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
 # else
@@ -138,7 +139,7 @@ int stack_create(stack_t* s, size_t size)
     return 1;
 }
 
-void stack_destroy(stack_t* s)
+void stack_destroy(contextstack_t* s)
 {
     void* vp;
 
@@ -153,5 +154,5 @@ void stack_destroy(stack_t* s)
     munmap(vp, s->ssize);
 #endif
 
-    memset(s, 0x00, sizeof(stack_t));
+    memset(s, 0x00, sizeof(contextstack_t));
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,7 +14,7 @@ extern "C" {
         void* data;
     };
 
-    struct stack_t
+    struct contextstack_t
     {
         void* sptr;
         size_t ssize;
@@ -41,8 +42,8 @@ extern "C" {
 
     transfer_t ontop_fcontext(fcontext_t const to, void * vp, transfer_t(*fn)(transfer_t));   
 
-    int stack_create(stack_t* s, size_t size = 0);
-    void stack_destroy(stack_t* s);
+    int stack_create(contextstack_t* s, size_t size = 0);
+    void stack_destroy(contextstack_t* s);
 
 #ifdef __cplusplus
 }

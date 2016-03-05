@@ -42,10 +42,10 @@ static void foo(transfer_t t)
 
 int main()
 {
-    stack_t s;
+    contextstack_t s;
     stack_create(&s, 16*1024);
 
-    stack_t s2;
+    contextstack_t s2;
     stack_create(&s2);
 
     ctx = make_fcontext(s.sptr, s.ssize, foo);
@@ -54,5 +54,7 @@ int main()
     jump_fcontext(ctx, NULL);
     puts("END");
 
+    stack_destroy(&s);
+    stack_destroy(&s2);
     return 0;
 }
