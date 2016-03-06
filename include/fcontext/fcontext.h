@@ -21,7 +21,7 @@ extern "C" {
     };
 
     /**
-     * Callback definition for coroutine
+     * Callback definition for context (coroutine)
      */
     typedef void (*pfn_fcontext)(fcontext_transfer_t);
 
@@ -36,7 +36,7 @@ extern "C" {
      * Make a new context
      * @param sp Pointer to allocated stack memory
      * @param size Stack memory size
-     * @param 
+     * @param corofn Callback function for context (coroutine)
      */
     fcontext_t make_fcontext(void * sp, size_t size, pfn_fcontext corofn);
 
