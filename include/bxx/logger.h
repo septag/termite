@@ -3,6 +3,7 @@
 #include "../bx/platform.h"
 #include "terminal_colors.h"
 #include <atomic>
+#include <cstdio>
 
 #define BX_LOG(_Type, _Fmt, ...) bx::logPrintf(__FILE__, __LINE__, _Type, ##__VA_ARGS__)
 
@@ -30,13 +31,13 @@
 #   if BX_COMPILER_MSVC
 #       define BX_LOGGER_API extern "C" __declspec(dllexport) 
 #   else
-#       define BX_LOGGER_API extern "C" __attribute__ ((dllexport))
+#       define BX_LOGGER_API extern "C" __attribute__ ((visibility ("default")))
 #   endif
 #else
 #   if BX_COMPILER_MSVC
 #       define BX_LOGGER_API extern "C" __declspec(dllimport)
 #   else
-#       define BX_LOGGER_API extern "C" __attribute__ ((dllimport))
+#       define BX_LOGGER_API extern "C" __attribute__ ((visibility ("default")))
 #   endif
 #endif
 #else
