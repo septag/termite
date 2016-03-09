@@ -48,7 +48,7 @@ namespace bx
         bool create(int _initCount, int _growCount, AllocatorI* _alloc);
         void destroy();
 
-        Ty* push();
+        Ty* push(int* pindex = nullptr);
         Ty* pop(int index);
 
         int getCount() const { return m_numItems; }
@@ -96,6 +96,10 @@ namespace bx
         m_freeIndexes = (int*)BX_ALLOC(_alloc, _initCount*sizeof(int));
         if (!m_buff || !m_freeIndexes)
             return false;
+
+        for (int i = 0, c = _initCount; i < c; i++)
+            m_freeIndexes[i] = c - i - 1;
+
         m_alloc = _alloc;
         m_maxItems = _initCount;
         m_numItems = 0;
@@ -137,12 +141,12 @@ namespace bx
     }
 
     template <typename Ty>
-    Ty* ArrayWithPop<Ty>::push()
+    Ty* ArrayWithPop<Ty>::push(int* pindex)
     {
         if (m_freeIndexIter == 0) {
             int newsz = m_numExpand + m_maxItems;
             m_buff = (Ty*)BX_REALLOC(m_alloc, m_buff, sizeof(Ty)*newsz);
-            m_freeIndexes = (Ty*)BX_REALLOC(m_alloc, m_freeIndexes, sizeof(int)*newsz);
+            m_freeIndexes = (int*)BX_REALLOC(m_alloc, m_freeIndexes, sizeof(int)*newsz);
             if (!m_buff || !m_freeIndexes)
                 return nullptr;
 
@@ -153,6 +157,8 @@ namespace bx
         }
 
         int index = m_freeIndexes[--m_freeIndexIter];
+        if (pindex)
+            *pindex = index;
         Ty* item = &m_buff[index];
         m_numItems++;
         return item;

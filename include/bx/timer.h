@@ -12,7 +12,7 @@
 #	include <time.h> // clock, clock_gettime
 #elif BX_PLATFORM_EMSCRIPTEN
 #	include <emscripten.h>
-#elif BX_PLATFORM_WINDOWS || BX_PLATFORM_WINRT
+#elif BX_PLATFORM_WINDOWS || BX_PLATFORM_XBOXONE || BX_PLATFORM_WINRT
 #   define WIN32_LEAN_AND_MEAN
 #	include <windows.h>
 #   undef WIN32_LEAN_AND_MEAN
@@ -26,7 +26,7 @@ namespace bx
 {
 	inline int64_t getHPCounter()
 	{
-#if BX_PLATFORM_WINDOWS || BX_PLATFORM_XBOX360 || BX_PLATFORM_WINRT
+#if BX_PLATFORM_WINDOWS || BX_PLATFORM_XBOX360 || BX_PLATFORM_XBOXONE || BX_PLATFORM_WINRT
 		LARGE_INTEGER li;
 		// Performance counter value may unexpectedly leap forward
 		// http://support.microsoft.com/kb/274323
@@ -51,7 +51,7 @@ namespace bx
 
 	inline double getHPFrequency()
 	{
-#if BX_PLATFORM_WINDOWS || BX_PLATFORM_XBOX360 || BX_PLATFORM_WINRT
+#if BX_PLATFORM_WINDOWS || BX_PLATFORM_XBOX360 || BX_PLATFORM_XBOXONE || BX_PLATFORM_WINRT
 		LARGE_INTEGER li;
 		QueryPerformanceFrequency(&li);
 		return (double)li.QuadPart;

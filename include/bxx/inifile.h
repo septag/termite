@@ -1,6 +1,6 @@
 #pragma once
 
-#include "bx/readerwriter.h"
+#include "bx/crtimpl.h"
 #include "bx/string.h"
 
 namespace bx 
@@ -13,7 +13,8 @@ namespace bx
         assert(alloc);
 
         bx::CrtFileReader reader;
-        if (reader.open(iniFilepath))
+        bx::Error err;
+        if (!reader.open(iniFilepath, &err))
             return false;
 
         int32_t size = (int32_t)reader.seek(0, bx::Whence::End);
@@ -24,7 +25,7 @@ namespace bx
         }
 
         reader.seek(0, bx::Whence::Begin);
-        reader.read(contents, size);
+        reader.read(contents, size, &err);
         contents[size] = 0;
         reader.close();
 

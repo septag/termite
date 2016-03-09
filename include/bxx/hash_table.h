@@ -4,6 +4,8 @@
 #include "../bx/string.h"
 #include "../bx/hash.h"
 
+#include <cassert>
+
 namespace bx
 {
     // Mutable hash tables change size when added or removed, removing objects from mutable hash tables resizes the internal arrays

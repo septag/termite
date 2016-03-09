@@ -99,4 +99,10 @@ operator^=(E& lhs,E rhs){
     return lhs;
 }
 
+#define C11_DEFINE_FLAG_TYPE(_Type) \
+    template <> \
+    struct enable_bitmask_operators<_Type> { \
+        static const bool enable = true; \
+    }
+
 #endif

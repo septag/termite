@@ -1,15 +1,37 @@
 #pragma once
 
 #include "string.h"
+#include "../bx/platform.h"
+
+#if !BX_PLATFORM_WINDOWS
+#  include <sys/types.h>
+#  include <sys/stat.h>
+#endif
 
 namespace bx
 {
+    enum class PathType
+    {
+        Invalid = 0,
+        Directory,
+        File
+    };
 
     class Path : public String256
     {
     public:
         Path() : String256() {}
         explicit Path(const char* text) : String256(text) {}
+
+        Path& operator=(const Path& str)
+        {
+            return (Path&)String256::operator=((const String256&)str);
+        }
+
+        Path& operator=(const char* str)
+        {
+            return (Path&)String256::operator=(str);
+        }
 
         Path getDirectory() const;
         Path getFilename() const;
@@ -22,11 +44,12 @@ namespace bx
 
         Path& normalizeSelf();
         Path& join(const char* path);
+        PathType getType();        
     };
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////
     // Path
-    Path Path::getDirectory() const
+    inline Path Path::getDirectory() const
     {
         Path p;
 
@@ -45,12 +68,12 @@ namespace bx
         return p;
     }
 
-    Path Path::getFilename() const
+    inline Path Path::getFilename() const
     {
         Path p;
 
         const char* ri = strrchr((const char*)this->text, '/');
-        if (ri)
+        if (!ri)
             ri = strrchr((const char*)this->text, '\\');
 
         if (ri)
@@ -65,7 +88,7 @@ namespace bx
         return p;
     }
 
-    Path Path::getFileExt() const
+    inline Path Path::getFileExt() const
     {
         Path p;
 
@@ -76,7 +99,7 @@ namespace bx
         return p;
     }
 
-    Path Path::getFilenameFull() const
+    inline  Path Path::getFilenameFull() const
     {
         Path p;
 
@@ -91,7 +114,7 @@ namespace bx
         return p;
     }
 
-    Path& Path::goUp()
+    inline Path& Path::goUp()
     {
         int s = getLength();
 
@@ -115,22 +138,22 @@ namespace bx
         return *this;
     }
 
-    Path& Path::toUnix()
+    inline Path& Path::toUnix()
     {
         return (Path&)replace('\\', '/');
     }
 
-    Path& Path::toWindows()
+    inline Path& Path::toWindows()
     {
         return (Path&)replace('/', '\\');
     }
 
-    Path& Path::normalizeSelf()
+    inline Path& Path::normalizeSelf()
     {
         if (this->text[0] == 0)
             return *this;
 
-    #if BX_PLATFORM_WINDOWS
+#if BX_PLATFORM_WINDOWS
         char tmp[256];
         GetFullPathName(this->text, sizeof(tmp), tmp, nullptr);
         toWindows();
@@ -138,7 +161,7 @@ namespace bx
         if (this->text[sz-1] == '\\')
             this->text[sz-1] = 0;
         return *this;
-    #else
+#else
         char* tmp = realpath(this->text, nullptr);
         if (tmp)    {
             toUnix();
@@ -153,16 +176,16 @@ namespace bx
         if (this->text[sz-1] == '/')
             this->text[sz-1] = 0;
         return *this;
-    #endif
+#endif
     }
 
-    Path& Path::join(const char* path)
+    inline Path& Path::join(const char* path)
     {
-    #if BX_PLATFORM_WINDOWS
+#if BX_PLATFORM_WINDOWS
         const char* sep = "\\";
-    #else
+#else
         const char* sep = "/";
-    #endif
+#endif
 
         if (this->text[0] != 0) {
             if (path[0] != 0)   {
@@ -174,6 +197,33 @@ namespace bx
         }
 
         return *this;
+    }
+
+
+    inline bx::PathType Path::getType()
+    {
+#if BX_PLATFORM_WINDOWS
+        DWORD atts = GetFileAttributes(text);
+        if (atts & FILE_ATTRIBUTE_DIRECTORY)
+            return PathType::Directory;
+        else if (atts == INVALID_FILE_ATTRIBUTES)
+            return PathType::Invalid;
+        else
+            return PathType::File;
+#else
+        struct stat s;
+        if (stat(text, &s) == 0) {
+            if (s.st_mode & S_IFDIR)
+                return PathType::Directory;
+            else if ((s.st_mode & (S_IFREG | S_IFLNK)))
+                return PathType::File;
+            else
+                return PathType::Invalid;
+
+        } else {
+            return PathType::Invalid;
+        }
+#endif
     }
 
 }   // namespace: bx
