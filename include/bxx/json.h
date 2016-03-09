@@ -17,11 +17,13 @@ namespace bx
 
     class JsonNode
     {
-        friend JsonNode* craeteJsonNode(bx::AllocatorI*);
+        friend JsonNode* createJsonNode(bx::AllocatorI*, const char*, JsonType);
         friend JsonNode* parseJsonImpl(char*, char**, const char**, int*, bx::AllocatorI*);
 
-    public:
+    private:
         JsonNode();
+
+    public:
         ~JsonNode();
         JsonNode(const JsonNode& n) = delete;
         JsonNode& operator=(const JsonNode& n) = delete;
@@ -39,6 +41,35 @@ namespace bx
         const char* getName() const         {   return name;    }
         int getArrayCount() const           {   return numChildItems;    }
         int getChildCount() const           {   return numChildItems;    }
+
+        // Note: Strings should be handled by caller, will not be handled by the node
+        JsonNode* setString(const char* str)
+        {
+            value.s = const_cast<char*>(str);  
+            type = JsonType::String;
+            return this;
+        }
+
+        JsonNode* setFloat(float f)
+        {
+            value.f = f;
+            type = JsonType::Float;
+            return this;
+        }
+
+        JsonNode* setBool(bool b)
+        {
+            value.b = b;
+            type = JsonType::Bool;
+            return this;
+        }
+
+        JsonNode* setInt(int i)
+        {
+            value.i = i;
+            type = JsonType::Int;
+            return this;
+        }
 
         const JsonNode* findChild(const char* name) const;
         const JsonNode* getArrayItem(int index) const;
@@ -74,14 +105,14 @@ namespace bx
         int line;
     };
 
-
-
     // Parse json string
     // String should stay in memory until working with nodes are done. Data content is all in-place
     JsonNode* parseJson(char* str, bx::AllocatorI* nodeAlloc, JsonError* errors);
 
     // Make json string from given root node
     char* makeJson(const JsonNode* root, bx::AllocatorI* alloc, bool packed);
+
+    JsonNode* createJsonNode(bx::AllocatorI* alloc, const char* name = nullptr, JsonType type = JsonType::Null);
 }
 
 
@@ -222,10 +253,15 @@ namespace bx
 
 #define CHECK_TOP() if (!top) {JSON_ERROR(it, "Unexpected character");}
 
-    JsonNode* craeteJsonNode(bx::AllocatorI* alloc)
+    JsonNode* createJsonNode(bx::AllocatorI* alloc, const char* name, JsonType type)
     {
         JsonNode* node = BX_NEW(alloc, JsonNode);
         node->alloc = alloc;
+        if (type != JsonType::Null) {
+            node->name = const_cast<char*>(name);
+            node->type = type;
+        }
+
         return node;
     }
 
@@ -251,7 +287,7 @@ namespace bx
             case '[':
                 {
                     // create new value
-                    JsonNode* object = craeteJsonNode(alloc);
+                    JsonNode* object = createJsonNode(alloc);
                     if (!object)
                         return nullptr;
 
@@ -390,7 +426,7 @@ namespace bx
                         name = first;
                     }  else  {
                         // new string value
-                        JsonNode *object = craeteJsonNode(alloc);
+                        JsonNode *object = createJsonNode(alloc);
                         if (!object)
                             return nullptr;
 
@@ -412,7 +448,7 @@ namespace bx
                     CHECK_TOP();
 
                     // new null/bool value
-                    JsonNode* object = craeteJsonNode(alloc);
+                    JsonNode* object = createJsonNode(alloc);
                     if (!object)
                         return nullptr;
 
@@ -460,7 +496,7 @@ namespace bx
                     CHECK_TOP();
 
                     // new number value
-                    JsonNode* object = craeteJsonNode(alloc);
+                    JsonNode* object = createJsonNode(alloc);
                     if (!object)
                         return nullptr;
 
@@ -525,7 +561,7 @@ namespace bx
     static void makeJsonFromNode(const JsonNode* node, bx::Array<char>* buff, bool packed, bool isRoot)
     {
         // Name
-        if (!isRoot) {
+        if (!isRoot && node->getName()) {
             int s = (int)strlen(node->getName());
             char* name = buff->pushMany(s + 3);
             name[0] = '\"';
