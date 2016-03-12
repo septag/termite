@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../bx/allocator.h"
+#include "../bx/platform.h"
+#include "../bx/cpu.h"
 
 namespace bx
 {
@@ -10,8 +12,8 @@ namespace bx
     {
     private:
         uint32_t m_id;
-        size_t m_size;
         AllocatorI* m_alloc;
+        volatile uintptr_t m_size;
 
     public:
         ProxyAllocator(AllocatorI* _alloc, uint32_t _id)
@@ -41,7 +43,7 @@ namespace bx
                 // free
                 uint8_t* ptr = (uint8_t*)_ptr - sizeof(size_t);
                 size_t curSize = *((size_t*)ptr);
-                m_size -= curSize;
+                bx::atomicFetchAndSub<uintptr_t>(&m_size, curSize);
                 m_alloc->realloc(ptr, 0, _align, _file, _line);
                 return NULL;
             } else if (_ptr == NULL) {
@@ -49,6 +51,7 @@ namespace bx
                 uint8_t* p = (uint8_t*)m_alloc->realloc(NULL, _size + sizeof(size_t), _align, _file, _line);
                 if (p) {
                     *((size_t*)p) = _size;  // save size
+                    bx::atomicAddAndFetch<uintptr_t>(&m_size, _size);
                     return p + sizeof(size_t);
                 } else {
                     return NULL;
@@ -57,10 +60,11 @@ namespace bx
                 // realloc
                 uint8_t* ptr = (uint8_t*)_ptr - sizeof(size_t);
                 size_t curSize = *((size_t*)ptr);
-                m_size -= curSize;
+                bx::atomicFetchAndSub<uintptr_t>(&m_size, curSize);
                 uint8_t* newp = (uint8_t*)m_alloc->realloc(ptr, _size + sizeof(size_t), _align, _file, _line);
                 if (newp) {
                     *((size_t*)newp) = _size;  // save size
+                    bx::atomicAddAndFetch<uintptr_t>(&m_size, _size);
                     return newp + sizeof(size_t);
                 } else {
                     return NULL;

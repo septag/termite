@@ -93,6 +93,11 @@ namespace bx
 			pthread_mutex_unlock(&m_handle);
 		}
 
+        bool tryLock()
+        {
+            return pthread_mutex_trylock(&m_handle) == 0;
+        }
+
 	private:
 		pthread_mutex_t m_handle;
 	};

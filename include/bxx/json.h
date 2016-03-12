@@ -257,10 +257,8 @@ namespace bx
     {
         JsonNode* node = BX_NEW(alloc, JsonNode);
         node->alloc = alloc;
-        if (type != JsonType::Null) {
-            node->name = const_cast<char*>(name);
-            node->type = type;
-        }
+        node->name = const_cast<char*>(name);
+        node->type = type;
 
         return node;
     }
