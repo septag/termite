@@ -42,17 +42,19 @@ static void foo(fcontext_transfer_t t)
 
 int main()
 {
-    fcontext_stack_t s;
-    create_fcontext_stack(&s, 16*1024);
-
-    fcontext_stack_t s2;
-    create_fcontext_stack(&s2);
+    fcontext_stack_t s = create_fcontext_stack(16 * 1024);
+    fcontext_stack_t s2 = create_fcontext_stack();
 
     ctx = make_fcontext(s.sptr, s.ssize, foo);
     ctx2 = make_fcontext(s2.sptr, s2.ssize, doo);
 
     jump_fcontext(ctx, NULL);
     puts("END");
+
+    ctx = make_fcontext(s.sptr, s.ssize, foo);
+    ctx2 = make_fcontext(s2.sptr, s2.ssize, doo);
+    jump_fcontext(ctx, NULL);
+    puts("SecondEND");
 
     destroy_fcontext_stack(&s);
     destroy_fcontext_stack(&s2);
