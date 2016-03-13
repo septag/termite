@@ -4,6 +4,16 @@
 
 #include "fcontext.h"
 
+// Detect posix
+#if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
+/* UNIX-style OS. ------------------------------------------- */
+#   include <unistd.h>
+#if defined(_POSIX_VERSION)
+#   define _HAVE_POSIX
+#endif
+#endif
+
+
 #ifdef _WIN32
 
 #define WIN32_LEAN_AND_LEAN
@@ -44,13 +54,12 @@ static size_t getDefaultSize()
     return 64 * 1024;   /* 64Kb */
 }
 
-#else
+#elif _HAVE_POSIX
 #include <signal.h>
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <fcntl.h>
 
 #if !defined (SIGSTKSZ)
@@ -94,11 +103,14 @@ static size_t getDefaultSize()
 #endif
 
 /* Stack allocation and protection*/
-int create_fcontext_stack(fcontext_stack_t* s, size_t size)
+fcontext_stack_t create_fcontext_stack(size_t size)
 {
     size_t pages;
     size_t size_;
     void* vp;
+    fcontext_stack_t s;
+    s.sptr = NULL;
+    s.ssize = 0;
 
     if (size == 0)
         size = getDefaultSize();
@@ -118,25 +130,28 @@ int create_fcontext_stack(fcontext_stack_t* s, size_t size)
 #ifdef _WIN32
     vp = VirtualAlloc(0, size_, MEM_COMMIT, PAGE_READWRITE);
     if (!vp)
-        return 0;
+        return s;
 
     DWORD old_options;
     VirtualProtect(vp, getPageSize(), PAGE_READWRITE | PAGE_GUARD, &old_options);
-#else
+#elif _HAVE_POSIX
 # if defined(MAP_ANON)
     vp = mmap(0, size_, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
 # else
     vp = mmap(0, size_, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 # endif
     if (vp == MAP_FAILED)
-        return 0;
-
+        return s;
     mprotect(vp, getPageSize(), PROT_NONE);
+#else
+    vp = malloc(size_);
+    if (!vp)
+        return s;
 #endif
 
-    s->sptr = (char*)vp + size_;
-    s->ssize = size_;
-    return 1;
+    s.sptr = (char*)vp + size_;
+    s.ssize = size_;
+    return s;
 }
 
 void destroy_fcontext_stack(fcontext_stack_t* s)
@@ -150,8 +165,10 @@ void destroy_fcontext_stack(fcontext_stack_t* s)
 
 #ifdef _WIN32
     VirtualFree(vp, 0, MEM_RELEASE);
-#elif _POSIX_VERSION
+#elif _HAVE_POSIX
     munmap(vp, s->ssize);
+#else
+    free(vp);
 #endif
 
     memset(s, 0x00, sizeof(fcontext_stack_t));

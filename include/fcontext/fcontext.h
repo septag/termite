@@ -42,7 +42,7 @@ extern "C" {
 
     fcontext_transfer_t ontop_fcontext(fcontext_t const to, void * vp, fcontext_transfer_t(*fn)(fcontext_transfer_t));   
 
-    int create_fcontext_stack(fcontext_stack_t* s, size_t size = 0);
+    fcontext_stack_t create_fcontext_stack(size_t size = 0);
     void destroy_fcontext_stack(fcontext_stack_t* s);
 
 #ifdef __cplusplus
