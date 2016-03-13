@@ -118,8 +118,6 @@ fcontext_stack_t create_fcontext_stack(size_t size)
     assert(size >= getMinSize());
     assert(size <= getMaxSize());
 
-    memset(s, 0x00, sizeof(s));
-
     pages = (size_t)floorf(float(size) / float(getPageSize()));
     assert(pages >= 2);     /* at least two pages must fit into stack (one page is guard-page) */
 
