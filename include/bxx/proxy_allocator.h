@@ -10,7 +10,7 @@ namespace bx
     // Saves an Id and sizes per allocation
     class ProxyAllocator : public AllocatorI
     {
-        BX_CLASS(StackAllocator
+        BX_CLASS(ProxyAllocator
                  , NO_COPY
                  , NO_ASSIGNMENT
                  );

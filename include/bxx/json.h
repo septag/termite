@@ -18,6 +18,8 @@ namespace bx
 
     class JsonNode
     {
+        friend class bx::Pool<JsonNode>;
+        friend class JsonNodeAllocator;
         friend JsonNode* createJsonNode(bx::AllocatorI*, const char*, JsonType);
         friend JsonNode* parseJsonImpl(char*, char**, const char**, int*, bx::AllocatorI*);
 
@@ -110,14 +112,19 @@ namespace bx
     // Helps to parse and make fast json nodes in case you don't want to use the slow allocators like heap
     class JsonNodeAllocator : public bx::AllocatorI
     {
+        BX_CLASS(JsonNodeAllocator
+                 , NO_COPY
+                 , NO_ASSIGNMENT
+                 );
+
     public:
-        JsonNodeAllocator(bx::AllocatorI* alloc, int bucketSize = 256) :
-            m_alloc = alloc;
+        JsonNodeAllocator(bx::AllocatorI* alloc, int bucketSize = 256)
         {
             m_pool.create(bucketSize, alloc);
+            m_alloc = alloc;
         }
 
-        virtual ~AllocatorI()
+        virtual ~JsonNodeAllocator()
         {
             m_pool.destroy();
         }
