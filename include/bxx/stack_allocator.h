@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../bx/allocator.h"
+
 namespace bx
 {
     class StackAllocator : public AllocatorI

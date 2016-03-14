@@ -224,6 +224,21 @@ namespace bx
 		}
 #endif // BX_PLATFORM_
 
+        void setAffinityMask(uint64_t mask)
+        {
+#if BX_PLATFORM_WINDOWS || BX_PLATFORM_XBOX360 || BX_PLATFORM_XBOXONE || BX_PLATFORM_WINRT
+            SetThreadAffinityMask(m_handle, (DWORD_PTR)mask);
+#elif BX_PLATFORM_POSIX
+            cpu_set_t cpuset;
+            CPU_ZERO(&cpuset);
+            for (int i = 0; i < 64; i++) {
+                if ((mask >> i) & 0x1)
+                    CPU_SET(i, &cpuset);
+            }
+            pthread_setaffinity_np(m_handle, sizeof(cpu_set_t), &cpuset);
+#endif
+        }
+
 #if BX_PLATFORM_WINDOWS || BX_PLATFORM_XBOX360 || BX_PLATFORM_XBOXONE || BX_PLATFORM_WINRT
 		HANDLE m_handle;
 		DWORD  m_threadId;

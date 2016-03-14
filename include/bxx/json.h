@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../bx/allocator.h"
+#include "pool.h"
 
 namespace bx
 {
@@ -105,14 +106,55 @@ namespace bx
         int line;
     };
 
+    // JsonNodeAllocator is a fast, pool based, node allocator
+    // Helps to parse and make fast json nodes in case you don't want to use the slow allocators like heap
+    class JsonNodeAllocator : public bx::AllocatorI
+    {
+    public:
+        JsonNodeAllocator(bx::AllocatorI* alloc, int bucketSize = 256) :
+            m_alloc = alloc;
+        {
+            m_pool.create(bucketSize, alloc);
+        }
+
+        virtual ~AllocatorI()
+        {
+            m_pool.destroy();
+        }
+
+        void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) override
+        {
+            if (_size == 0) {
+                // free
+                m_pool.deleteInstance((JsonNode*)_ptr);
+                return NULL;
+            } else if (_ptr == NULL) {
+                // malloc
+                return m_pool.newInstance();
+            } else {
+                // realloc
+                JsonNode* node = (JsonNode*)_ptr;
+                node->~JsonNode();
+                return new(node) JsonNode();
+            }
+        }
+
+    private:
+        bx::AllocatorI* m_alloc;
+        bx::Pool<JsonNode> m_pool;
+    };
+
     // Parse json string
     // String should stay in memory until working with nodes are done. Data content is all in-place
     JsonNode* parseJson(char* str, bx::AllocatorI* nodeAlloc, JsonError* errors);
 
     // Make json string from given root node
+    // Returned char* should be freed by caller using the provided 'alloc'
     char* makeJson(const JsonNode* root, bx::AllocatorI* alloc, bool packed);
 
-    JsonNode* createJsonNode(bx::AllocatorI* alloc, const char* name = nullptr, JsonType type = JsonType::Null);
+    // Creates a Json node
+    JsonNode* createJsonNode(bx::AllocatorI* nodeAlloc, const char* name = nullptr, JsonType type = JsonType::Null);
+
 }
 
 
@@ -253,10 +295,10 @@ namespace bx
 
 #define CHECK_TOP() if (!top) {JSON_ERROR(it, "Unexpected character");}
 
-    JsonNode* createJsonNode(bx::AllocatorI* alloc, const char* name, JsonType type)
+    JsonNode* createJsonNode(bx::AllocatorI* nodeAlloc, const char* name, JsonType type)
     {
-        JsonNode* node = BX_NEW(alloc, JsonNode);
-        node->alloc = alloc;
+        JsonNode* node = BX_NEW(nodeAlloc, JsonNode);
+        node->alloc = nodeAlloc;
         node->name = const_cast<char*>(name);
         node->type = type;
 
@@ -644,7 +686,7 @@ namespace bx
     char* makeJson(const JsonNode* root, bx::AllocatorI* alloc, bool packed)
     {
         bx::Array<char> buff;
-        buff.create(512, 1024, alloc);
+        buff.create(512, 2048, alloc);
 
         makeJsonFromNode(root, &buff, packed, true);
         *buff.push() = '\0';    // terminate the string

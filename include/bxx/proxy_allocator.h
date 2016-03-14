@@ -10,6 +10,10 @@ namespace bx
     // Saves an Id and sizes per allocation
     class ProxyAllocator : public AllocatorI
     {
+        BX_CLASS(StackAllocator
+                 , NO_COPY
+                 , NO_ASSIGNMENT
+                 );
     private:
         uint32_t m_id;
         AllocatorI* m_alloc;

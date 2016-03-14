@@ -27,6 +27,7 @@
 #define BX_PLATFORM_WINRT      0
 #define BX_PLATFORM_XBOX360    0
 #define BX_PLATFORM_XBOXONE    0
+#define BX_PLATFORM_POSIX      0
 
 #define BX_CPU_ARM  0
 #define BX_CPU_JIT  0
@@ -200,20 +201,6 @@
 #	error "BX_PLATFORM_* is not defined!"
 #endif //
 
-#define BX_PLATFORM_POSIX (0 \
-						|| BX_PLATFORM_ANDROID \
-						|| BX_PLATFORM_EMSCRIPTEN \
-						|| BX_PLATFORM_BSD \
-						|| BX_PLATFORM_IOS \
-						|| BX_PLATFORM_LINUX \
-						|| BX_PLATFORM_NACL \
-						|| BX_PLATFORM_OSX \
-						|| BX_PLATFORM_QNX \
-						|| BX_PLATFORM_STEAMLINK \
-						|| BX_PLATFORM_PS4 \
-						|| BX_PLATFORM_RPI \
-						)
-
 #ifndef  BX_CONFIG_ENABLE_MSVC_LEVEL4_WARNINGS
 #	define BX_CONFIG_ENABLE_MSVC_LEVEL4_WARNINGS 0
 #endif // BX_CONFIG_ENABLE_MSVC_LEVEL4_WARNINGS
@@ -318,5 +305,15 @@
 #	pragma warning(error:4189) // ENABLE warning C4189: '' : local variable is initialized but not referenced
 #	pragma warning(error:4505) // ENABLE warning C4505: '' : unreferenced local function has been removed
 #endif // BX_CONFIG_ENABLE_MSVC_LEVEL4_WARNINGS && BX_COMPILER_MSVC
+
+// Posix Api
+#if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
+/* UNIX-style OS. ------------------------------------------- */
+#   include <unistd.h>
+#if defined(_POSIX_VERSION)
+#   undef BX_PLATFORM_POSIX
+#   define BX_PLATFORM_POSIX _POSIX_VERSION
+#endif
+#endif
 
 #endif // BX_PLATFORM_H_HEADER_GUARD
