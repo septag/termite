@@ -11,6 +11,28 @@
 namespace bx
 {
     template <typename Ty>
+    class FixedPool
+    {
+    public:
+        FixedPool();
+        ~FixedPool();
+
+        bool create(int _bucketSize, AllocatorI* _alloc);
+        void destroy();
+
+        Ty* newInstance();
+        void deleteInstance(Ty* _inst);
+        void clear();
+
+    private:
+        AllocatorI* m_alloc;
+        int m_maxItems;
+        Ty* m_buffer;
+        Ty** m_ptrs;
+        int m_index;
+    };
+
+    template <typename Ty>
     class Pool 
     {
     public:
@@ -47,6 +69,88 @@ namespace bx
     };
 
     // Implementation
+    template <typename Ty>
+    bx::FixedPool<Ty>::FixedPool()
+    {
+        m_alloc = nullptr;
+        m_maxItems = 0;
+        m_buffer = nullptr;
+        m_ptrs = nullptr;
+        m_index = 0;
+    }
+
+    template <typename Ty>
+    bx::FixedPool<Ty>::~FixedPool()
+    {
+        assert(m_buffer == nullptr);
+        assert(m_ptrs == nullptr);
+    }
+
+    template <typename Ty>
+    bool bx::FixedPool<Ty>::create(int _bucketSize, AllocatorI* _alloc)
+    {
+        m_alloc = _alloc;
+        m_maxItems = _bucketSize;
+
+        size_t total_sz =
+            sizeof(Ty)*m_maxItems +
+            sizeof(Ty*)*m_maxItems;
+        uint8_t* buff = (uint8_t*)BX_ALLOC(m_alloc, total_sz);
+        if (!buff)
+            return false;
+        memset(buff, 0x00, total_sz);
+
+        m_buffer = (Ty*)buff;
+        buff += sizeof(Ty)*m_maxItems;
+        m_ptrs = (Ty**)buff;
+
+        // Assign pointer references
+        for (int i = 0, c = m_maxItems; i < c; i++)
+            m_ptrs[c - i - 1] = &m_buffer[i];
+        m_index = m_maxItems;
+
+        return true;
+    }
+
+    template <typename Ty>
+    void bx::FixedPool<Ty>::destroy()
+    {
+        if (m_buffer) {
+            BX_FREE(m_alloc, m_buffer);
+            m_buffer = nullptr;
+            m_ptrs = nullptr;
+        }
+        m_maxItems = 0;
+        m_index = 0;
+        m_alloc = nullptr;
+    }
+
+    template <typename Ty>
+    Ty* bx::FixedPool<Ty>::newInstance()
+    {
+        if (m_index > 0)
+            return new(m_ptrs[--m_index]) Ty;
+        else
+            return nullptr;
+    }
+
+    template <typename Ty>
+    void bx::FixedPool<Ty>::deleteInstance(Ty* _inst)
+    {
+        assert(m_index != m_maxItems);
+        m_ptrs[m_index++] = _inst;
+        return;
+    }
+
+    template <typename Ty>
+    void bx::FixedPool<Ty>::clear()
+    {
+        int bucketSize = m_maxItems;
+        for (int i = 0; i < bucketSize; i++)
+            b->ptrs[bucketSize - i - 1] = &b->buffer[i];
+        b->iter = bucketSize;
+    }
+
     template <typename Ty>
     Pool<Ty>::Pool()
     {
