@@ -241,18 +241,82 @@ namespace bx
 		return uint64_t(atomicSubAndFetch<int64_t>( (volatile int64_t*)_ptr, int64_t(_add) ) );
 	}
 
+	template<>
+	inline int64_t atomicInc<int64_t>(volatile int64_t* _ptr)
+	{
+#if BX_COMPILER_MSVC
+		return _InterlockedIncrement64((volatile LONG64*)_ptr);
+#else
+		return __sync_add_and_fetch(_ptr, 1);
+#endif
+	}
+
+	template<>
+	inline int32_t atomicInc<int32_t>(volatile int32_t* _ptr)
+	{
+#if BX_COMPILER_MSVC
+		return _InterlockedIncrement((volatile LONG*)_ptr);
+#else
+		return __sync_add_and_fetch(_ptr, 1);
+#endif
+	}
+
+	template<>
+	inline uint64_t atomicInc<uint64_t>(volatile uint64_t* _ptr)
+	{
+		return uint64_t(atomicInc<int64_t>((volatile int64_t*)_ptr));
+	}
+
+	template<>
+	inline uint32_t atomicInc<uint32_t>(volatile uint32_t* _ptr)
+	{
+		return uint32_t(atomicInc<int32_t>((volatile int32_t*)_ptr));
+	}
+
 	/// Returns the resulting incremented value.
 	template<typename Ty>
 	inline Ty atomicInc(volatile Ty* _ptr)
 	{
-		return atomicAddAndFetch(_ptr, Ty(1) );
+		return atomicInc(_ptr);
+	}
+
+	template<>
+	inline int64_t atomicDec<int64_t>(volatile int64_t* _ptr)
+	{
+#if BX_COMPILER_MSVC
+		return _InterlockedDecrement64((volatile LONG64*)_ptr);
+#else
+		return __sync_add_and_fetch(_ptr, 1);
+#endif
+	}
+
+	template<>
+	inline int32_t atomicDec<int32_t>(volatile int32_t* _ptr)
+	{
+#if BX_COMPILER_MSVC
+		return _InterlockedDecrement((volatile LONG*)_ptr);
+#else
+		return __sync_add_and_fetch(_ptr, 1);
+#endif
+	}
+
+	template<>
+	inline uint64_t atomicDec<uint64_t>(volatile uint64_t* _ptr)
+	{
+		return uint64_t(atomicDec<int64_t>((volatile int64_t*)_ptr));
+	}
+
+	template<>
+	inline uint32_t atomicDec<uint32_t>(volatile uint32_t* _ptr)
+	{
+		return uint32_t(atomicDec<int32_t>((volatile int32_t*)_ptr));
 	}
 
 	/// Returns the resulting decremented value.
 	template<typename Ty>
 	inline Ty atomicDec(volatile Ty* _ptr)
 	{
-		return atomicSubAndFetch(_ptr, Ty(1) );
+		return atomicDec(_ptr);
 	}
 
 	///
@@ -278,13 +342,51 @@ namespace bx
 	}
 
 	///
-	inline void* atomicExchangePtr(void** _ptr, void* _new)
+	inline void* atomicExchangePtr(void* volatile* _ptr, void* _new)
 	{
 #if BX_COMPILER_MSVC
-		return InterlockedExchangePointer(_ptr, _new);
+		return _InterlockedExchangePointer(_ptr, _new);
 #else
 		return __sync_lock_test_and_set(_ptr, _new);
 #endif // BX_COMPILER
+	}
+
+	template<>
+	inline int64_t atomicExchange(volatile int64_t* _ptr, int64_t _new)
+	{
+#if BX_COMPILER_MSVC
+		return _InterlockedExchange64((volatile LONG64*)_ptr, _new);
+#else
+		return __sync_lock_test_and_set(_ptr, _new);
+#endif
+	}
+
+	template<>
+	inline int32_t atomicExchange(volatile int32_t* _ptr, int32_t _new)
+	{
+#if BX_COMPILER_MSVC
+		return _InterlockedExchange((volatile LONG)_ptr, _new);
+#else
+		return __sync_lock_test_and_set(_ptr, _new);
+#endif
+	}
+
+	template<>
+	inline uint64_t atomicExchange(volatile uint64_t* _ptr, uint64_t _new)
+	{
+		return uint64_t(atomicExchange<int64_t>((volatile int64_t*)_ptr, int64_t(_new)));
+	}
+
+	template<>
+	inline uint32_t atomicExchange(volatile uint32_t* _ptr, uint32_t _new)
+	{
+		return uint32_t(atomicExchange<int32_t>((volatile int32_t*)_ptr, int32_t(_new)));
+	}
+
+	template<typename Ty>
+	inline Ty atomicExchange(volatile Ty* _ptr, Ty _new)
+	{
+		return atomicExchange(_ptr, _new);
 	}
 
 	///
@@ -317,6 +419,119 @@ namespace bx
 		return oldVal;
 	}
 
+	template<>
+	inline int64_t atomicOR(volatile int64_t* _ptr, int64_t _value)
+	{
+#if BX_COMPILER_MSVC
+		return _InterlockedOr64((volatile LONG64*)_ptr, _value);
+#else
+		return __sync_fetch_and_or(_ptr, _value);
+#endif
+	}
+
+	template<>
+	inline int32_t atomicOR(volatile int32_t* _ptr, int32_t _value)
+	{
+#if BX_COMPILER_MSVC
+		return _InterlockedOr((volatile LONG*)_ptr, _value);
+#else
+		return __sync_fetch_and_or(_ptr, _value);
+#endif
+	}
+
+	template<>
+	inline uint64_t atomicOR(volatile uint64_t* _ptr, uint64_t _value)
+	{
+		return uint64_t(atomicOR<int64_t>((volatile int64_t*)_ptr, int64_t(_value)));
+	}
+
+	template<>
+	inline uint32_t atomicOR(volatile uint32_t* _ptr, uint32_t _value)
+	{
+		return uint32_t(atomicOR<int32_t>((volatile int32_t*)_ptr, int32_t(_value)));
+	}
+
+	template<typename Ty>
+	inline Ty atomicOR(volatile Ty* _ptr, Ty _value)
+	{
+		return atomicOR(_ptr, _value);
+	}
+
+	template<>
+	inline int64_t atomicAND(volatile int64_t* _ptr, int64_t _value)
+	{
+#if BX_COMPILER_MSVC
+		return _InterlockedAnd64((volatile LONG64*)_ptr, _value);
+#else
+		return __sync_fetch_and_and(_ptr, _value);
+#endif
+	}
+
+	template<>
+	inline int32_t atomicAND(volatile int32_t* _ptr, int32_t _value)
+	{
+#if BX_COMPILER_MSVC
+		return _InterlockedAnd((volatile LONG*)_ptr, _value);
+#else
+		return __sync_fetch_and_and(_ptr, _value);
+#endif
+	}
+
+	template<>
+	inline uint64_t atomicAND(volatile uint64_t* _ptr, uint64_t _value)
+	{
+		return uint64_t(atomicAND<int64_t>((volatile int64_t*)_ptr, int64_t(_value)));
+	}
+
+	template<>
+	inline uint32_t atomicAND(volatile uint32_t* _ptr, uint32_t _value)
+	{
+		return uint32_t(atomicAND<int32_t>((volatile int32_t*)_ptr, int32_t(_value)));
+	}
+
+	template<typename Ty>
+	inline Ty atomicAND(volatile Ty* _ptr, Ty _value)
+	{
+		return atomicAND(_ptr, _value);
+	}
+
+	template<>
+	inline int64_t atomicXOR(volatile int64_t* _ptr, int64_t _value)
+	{
+#if BX_COMPILER_MSVC
+		return _InterlockedXor64((volatile LONG64*)_ptr, _value);
+#else
+		return __sync_fetch_and_and(_ptr, _value);
+#endif
+	}
+
+	template<>
+	inline int32_t atomicXOR(volatile int32_t* _ptr, int32_t _value)
+	{
+#if BX_COMPILER_MSVC
+		return _InterlockedXor((volatile LONG*)_ptr, _value);
+#else
+		return __sync_fetch_and_and(_ptr, _value);
+#endif
+	}
+
+	template<>
+	inline uint64_t atomicXOR(volatile uint64_t* _ptr, uint64_t _value)
+	{
+		return uint64_t(atomicXOR<int64_t>((volatile int64_t*)_ptr, int64_t(_value)));
+	}
+
+	template<>
+	inline uint32_t atomicXOR(volatile uint32_t* _ptr, uint32_t _value)
+	{
+		return uint32_t(atomicXOR<int32_t>((volatile int32_t*)_ptr, int32_t(_value)));
+	}
+
+	template<typename Ty>
+	inline Ty atomicXOR(volatile Ty* _ptr, Ty _value)
+	{
+		return atomicXOR(_ptr, _value);
+	}
 } // namespace bx
 
 #endif // BX_CPU_H_HEADER_GUARD
