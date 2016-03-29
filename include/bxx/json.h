@@ -23,13 +23,14 @@ namespace bx
         friend JsonNode* createJsonNode(bx::AllocatorI*, const char*, JsonType);
         friend JsonNode* parseJsonImpl(char*, char**, const char**, int*, bx::AllocatorI*);
 
+        BX_CLASS(JsonNode, 
+                 NO_COPY, 
+                 NO_ASSIGNMENT);
     private:
         JsonNode();
 
     public:
         ~JsonNode();
-        JsonNode(const JsonNode& n) = delete;
-        JsonNode& operator=(const JsonNode& n) = delete;
 
         JsonNode& addChild(JsonNode* node);
 
