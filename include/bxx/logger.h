@@ -104,6 +104,7 @@ namespace bx
     BX_LOGGER_API void disableLogToCallback();
     BX_LOGGER_API void disableLogTimestamps();
 
+    BX_LOGGER_API void logPrint(const char* sourceFile, int line, LogType type, const char* text);
     BX_LOGGER_API void logPrintf(const char* sourceFile, int line, LogType type, const char* fmt, ...);
     BX_LOGGER_API void logBeginProgress(const char* sourceFile, int line, const char* fmt, ...);
     BX_LOGGER_API void logEndProgress(LogProgressResult result);
@@ -458,6 +459,11 @@ namespace bx
         vsnprintf(text, sizeof(text), fmt, args);
         va_end(args);
 
+        logPrintRaw(sourceFile, line, type, LogExtraParam::None, text);
+    }
+
+    void logPrint(const char* sourceFile, int line, LogType type, const char* text)
+    {
         logPrintRaw(sourceFile, line, type, LogExtraParam::None, text);
     }
 

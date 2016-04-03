@@ -17,6 +17,7 @@ namespace bx
 
         bool isEqual(const char* text) const;
         bool isEqualNoCase(const char* text) const;
+        bool isEmpty() const { return text[0] == 0; }
 
         String<_Size>& operator=(const String<_Size>& str);
         String<_Size>& operator=(const char* str);

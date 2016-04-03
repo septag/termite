@@ -6,6 +6,9 @@
 #if !BX_PLATFORM_WINDOWS
 #  include <sys/types.h>
 #  include <sys/stat.h>
+#else
+#  define WIN32_LEAN_AND_MEAN
+#  include <Windows.h>
 #endif
 
 namespace bx

@@ -18,6 +18,13 @@ namespace bx
             m_ptr = (uint8_t*)_ptr;
         }
 
+        void init(void* _ptr, size_t _size)
+        {
+            m_offset = 0;
+            m_size = _size;
+            m_ptr = (uint8_t*)_ptr;
+        }
+
         virtual ~StackAllocator()
         {
         }
