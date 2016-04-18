@@ -23,6 +23,11 @@ namespace bx
 		return ch == 't' ||  ch == '1';
 	}
 
+    inline int toInt(const char* _str)
+    {
+        return atoi(_str);
+    }
+
 	/// Case insensitive string compare.
 	inline int32_t stricmp(const char* _a, const char* _b)
 	{
