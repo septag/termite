@@ -7,8 +7,7 @@
 - Linux (x86_64/x86)
 - More will be added soon ...
 
-#### CMake
-_deboost.context_ can be built and installed on multiple platforms using _cmake_.  
+#### Linux/Unix
 ```
 cd deboost.context
 mkdir .build
@@ -19,7 +18,14 @@ make install
 ```
 
 #### Windows
-For windows, I have provided VisualStudio2015 project/solution files under _msvc140_ directory.
+Assuming you have visual studio installed on your system
+```
+cd deboost.context
+mkdir .build
+cd .build
+cmake .. -G "Visual Studio 14 2015 Win64"
+```
+Now open the generated solution file and build
 
 ### Usage
 See _include/fcontext/fcontext.h_ for API usage.  
