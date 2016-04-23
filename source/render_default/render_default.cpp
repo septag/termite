@@ -1,11 +1,13 @@
-#include "stengine/core.h"
-#include "stengine/plugins.h"
-#include "stengine/gfx_render.h"
-#include "stengine/gfx_driver.h"
+#include "termite/core.h"
+#include "termite/plugins.h"
+#include "termite/gfx_render.h"
+#include "termite/gfx_driver.h"
 
 #include "bxx/logger.h"
 
-using namespace st;
+#include "../imgui_impl/imgui_impl.h"
+
+using namespace termite;
 
 class RenderDefault : public gfxRender
 {
@@ -20,34 +22,46 @@ public:
         m_driver = nullptr;
     }
 
-    int init(bx::AllocatorI* alloc, gfxDriver* driver, void* sdlWindow) override
+    int init(bx::AllocatorI* alloc, gfxDriver* driver, const gfxPlatformData* platformData, const int* uiKeymap) override
     {
         m_alloc = alloc;
         m_driver = driver;
 
         const coreConfig& conf = coreGetConfig();
 
-        if (sdlWindow)
-            driver->setSDLWindow(sdlWindow);
+        if (platformData) {
+            driver->setPlatformData(*platformData);
+        } else {
+            BX_WARN("Renderer initilization is skipped");
+            return T_ERR_NOT_INITIALIZED;
+        }            
 
         BX_BEGINP("Initializing Graphics Driver");
-        if (!driver->init(conf.gfxDeviceId, nullptr, alloc)) {
+        if (driver->init(conf.gfxDeviceId, nullptr, alloc)) {
             BX_END_FATAL();
             BX_FATAL("Init Graphics Driver failed");
-            return ST_ERR_FAILED;
+            return T_ERR_FAILED;
         }
 
-        //driver->reset(conf.gfxWidth, conf.gfxHeight, gfxResetFlag::None);
-        driver->reset(conf.gfxWidth, conf.gfxHeight, gfxResetFlag::None);
+        driver->reset(conf.gfxWidth, conf.gfxHeight, gfxResetFlag(conf.gfxDriverFlags));
         driver->setViewClear(0, gfxClearFlag::Color | gfxClearFlag::Depth, 0x303030ff, 1.0f, 0);
         driver->setDebug(gfxDebugFlag::Text);
         BX_END_OK();
 
-        return 0;
+        BX_VERBOSE("Graphics Driver: %s", rendererTypeToStr(driver->getRendererType()));
+
+        if (imguiInit(conf.gfxWidth, conf.gfxHeight, driver, uiKeymap)) {
+            BX_FATAL("Init ImGui Integration failed");
+            return T_ERR_FAILED;
+        }
+
+        return T_OK;
     }
 
     void shutdown() override
     {
+        imguiShutdown();
+
         if (m_driver) {
             BX_BEGINP("Shutting down Graphics Driver");
             m_driver->shutdown();
@@ -60,56 +74,90 @@ public:
     {
         m_driver->touch(0);
         m_driver->setViewRect(0, 0, 0, gfxBackbufferRatio::Equal);
+        imguiRender();
+
         m_driver->dbgTextClear(0, true);
-        m_driver->dbgTextPrintf(1, 1, 0x03, "Hello World");
+        m_driver->dbgTextPrintf(1, 1, 0x03, "Fps: %.2f", coreGetFps());
+        m_driver->dbgTextPrintf(1, 2, 0x03, "FrameTime: %.4f", coreGetFrameTime());
+        m_driver->dbgTextPrintf(1, 3, 0x03, "ElapsedTime: %.2f", coreGetElapsedTime());
         m_driver->frame();
+    }
+
+    void frame()
+    {
+        imguiNewFrame();
+    }
+
+    void sendImInputMouse(float mousePos[2], int mouseButtons[3], float mouseWheel)
+    {
+        ImGuiIO& io = ImGui::GetIO();
+        io.MousePos = ImVec2(mousePos[0], mousePos[1]);
+        io.MouseDown[0] = mouseButtons[0] ? true : false;
+        io.MouseDown[1] = mouseButtons[1] ? true : false;
+        io.MouseDown[2] = mouseButtons[2] ? true : false;
+        io.MouseWheel = mouseWheel;
+    }
+
+    void sendImInputChars(const char* chars) override
+    {
+        ImGuiIO& io = ImGui::GetIO();
+        io.AddInputCharactersUTF8(chars);
+    }
+
+    void sendImInputKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl)
+    {
+        ImGuiIO& io = ImGui::GetIO();
+        memcpy(io.KeysDown, keysDown, sizeof(io.KeysDown));
+        io.KeyShift = shift;
+        io.KeyAlt = alt;
+        io.KeyCtrl = ctrl;
     }
 };
 
-#ifdef STENGINE_SHARED_LIB
+#ifdef termite_SHARED_LIB
 #define MY_NAME "RenderDefault"
-#define MY_VERSION ST_MAKE_VERSION(1, 0)
-static st::drvDriver* gMyDriver = nullptr;
-struct bx::AllocatorI* gAlloc = nullptr;
+#define MY_VERSION T_MAKE_VERSION(1, 0)
+static termite::drvHandle g_driver = nullptr;
+struct bx::AllocatorI* g_alloc = nullptr;
 
-STPLUGIN_API pluginDesc* stPluginGetDesc()
+TERMITE_PLUGIN_API pluginDesc* stPluginGetDesc()
 {
     static pluginDesc desc;
     desc.name = MY_NAME;
     desc.description = "Default Simple Forward Renderer";
-    desc.engineVersion = ST_MAKE_VERSION(0, 1);
+    desc.engineVersion = T_MAKE_VERSION(0, 1);
     desc.type = drvType::Renderer;
-    desc.version = ST_MAKE_VERSION(1, 0);
+    desc.version = T_MAKE_VERSION(1, 0);
     return &desc;
 }
 
-STPLUGIN_API st::pluginHandle stPluginInit(bx::AllocatorI* alloc)
+TERMITE_PLUGIN_API int stPluginInit(bx::AllocatorI* alloc)
 {
     assert(alloc);
 
-    gAlloc = alloc;
+    g_alloc = alloc;
     RenderDefault* renderer = BX_NEW(alloc, RenderDefault);
     if (renderer) {
-        gMyDriver = drvRegisterRenderer(renderer, MY_NAME, MY_VERSION);
-        if (gMyDriver == nullptr) {
+        g_driver = drvRegister(drvType::Renderer, MY_NAME, MY_VERSION, renderer);
+        if (g_driver == nullptr) {
             BX_DELETE(alloc, renderer);
-            gAlloc = nullptr;
-            return nullptr;
+            g_alloc = nullptr;
+            return T_ERR_FAILED;
         }
     }
 
-    return renderer;
+    return T_OK;
 }
 
-STPLUGIN_API void stPluginShutdown(pluginHandle handle)
+TERMITE_PLUGIN_API void stPluginShutdown()
 {
-    assert(handle);
-    assert(gAlloc);
+    assert(g_alloc);
 
-    if (gMyDriver != nullptr)
-        drvUnregister(gMyDriver);
-    BX_DELETE(gAlloc, handle);
-    gAlloc = nullptr;
-    gMyDriver = nullptr;
+    if (g_driver != nullptr) {
+        BX_DELETE(g_alloc, drvGetRenderer(g_driver));
+        drvUnregister(g_driver);
+    }
+    g_alloc = nullptr;
+    g_driver = nullptr;
 }
 #endif

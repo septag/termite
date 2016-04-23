@@ -1,17 +1,13 @@
-#include "stengine/core.h"
-#include "stengine/plugins.h"
-#include "stengine/gfx_driver.h"
+#include "termite/core.h"
+#include "termite/plugins.h"
+#include "termite/gfx_driver.h"
 #include "bgfx/bgfx.h"
-
-#ifdef SUPPORT_SDL
-#   include <SDL2\SDL_syswm.h>
-#endif
 #include "bgfx/bgfxplatform.h"
 
 #include <cstdarg>
 #include <cstdio>
 
-using namespace st;
+using namespace termite;
 
 #define BGFX_DECLARE_HANDLE(_Type, _Name, _Handle) bgfx::_Type _Name; _Name.idx = _Handle.idx
 
@@ -136,16 +132,11 @@ private:
     gfxHMD m_hmd;
     gfxInternalData m_internal;
 
-#ifdef SUPPORT_SDL
-    SDL_Window* m_sdl;
-#endif
-
 public:
     BgfxWrapper()
     {
         m_callbacks = nullptr;
         m_alloc = nullptr;
-        m_sdl = nullptr;
         memset(&m_caps, 0x00, sizeof(m_caps));
         memset(&m_stats, 0x00, sizeof(m_stats));
         memset(&m_hmd, 0x00, sizeof(m_hmd));
@@ -156,12 +147,7 @@ public:
     {
     }
 
-    void setSDLWindow(void* windowHandle)
-    {
-        m_sdl = (SDL_Window*)windowHandle;
-    }
-
-    bool init(uint16_t deviceId, gfxCallbacks* callbacks, bx::AllocatorI* alloc) override
+    int init(uint16_t deviceId, gfxCallbacks* callbacks, bx::AllocatorI* alloc) override
     {
         m_alloc = alloc;
         if (callbacks) {
@@ -170,12 +156,7 @@ public:
                 return false;
         }
 
-#ifdef SUPPORT_SDL
-        if (m_sdl)
-            bgfx::sdlSetWindow(m_sdl);
-#endif
-
-        return bgfx::init(bgfx::RendererType::Count, 0, deviceId, m_callbacks, alloc);
+        return bgfx::init(bgfx::RendererType::Count, 0, deviceId, m_callbacks, alloc) ? T_OK : T_ERR_FAILED;
     }
 
     void shutdown() override
@@ -391,9 +372,9 @@ public:
         bgfx::setStencil((uint32_t)frontStencil, (uint32_t)backStencil);
     }
 
-    void setScissor(uint16_t x, uint16_t y, uint16_t width, uint16_t height) override
+    uint16_t setScissor(uint16_t x, uint16_t y, uint16_t width, uint16_t height) override
     {
-        bgfx::setScissor(x, y, width, height);
+        return bgfx::setScissor(x, y, width, height);
     }
 
     void setScissor(uint16_t cache) override
@@ -455,10 +436,10 @@ public:
         bgfx::setVertexBuffer(h);
     }
 
-    void setVertexBuffer(gfxDynamicVertexBufferHandle handle, uint32_t numVertices) override
+    void setVertexBuffer(gfxDynamicVertexBufferHandle handle, uint32_t startVertex, uint32_t numVertices) override
     {
         BGFX_DECLARE_HANDLE(DynamicVertexBufferHandle, h, handle);
-        bgfx::setVertexBuffer(h, numVertices);
+        bgfx::setVertexBuffer(h, startVertex, numVertices);
     }
 
     void setVertexBuffer(const gfxTransientVertexBuffer* tvb) override
@@ -655,6 +636,12 @@ public:
         bgfx::destroyShader(h);
     }
 
+    void destroyUniform(gfxUniformHandle handle) override
+    {
+        BGFX_DECLARE_HANDLE(UniformHandle, h, handle);
+        bgfx::destroyUniform(h);
+    }
+
     gfxProgramHandle createProgram(gfxShaderHandle vsh, gfxShaderHandle fsh, bool destroyShaders) override
     {
         BGFX_DECLARE_HANDLE(ShaderHandle, v, vsh);
@@ -662,6 +649,12 @@ public:
         gfxProgramHandle h;
         h.idx = bgfx::createProgram(v, f, destroyShaders).idx;
         return h;
+    }
+
+    void destroyProgram(gfxProgramHandle handle) override
+    {
+        BGFX_DECLARE_HANDLE(ProgramHandle, h, handle);
+        bgfx::destroyProgram(h);
     }
 
     gfxUniformHandle createUniform(const char* name, gfxUniformType type, uint16_t num) override
@@ -684,8 +677,7 @@ public:
         return handle;
     }
 
-    gfxDynamicVertexBufferHandle createDynamicVertexBuffer(uint32_t numVertices, const gfxVertexDecl& decl,
-                                                           gfxBufferFlag flags) override
+    gfxDynamicVertexBufferHandle createDynamicVertexBuffer(uint32_t numVertices, const gfxVertexDecl& decl, gfxBufferFlag flags) override
     {
         gfxDynamicVertexBufferHandle handle;
         handle.idx = bgfx::createDynamicVertexBuffer(numVertices, (const bgfx::VertexDecl&)decl, (uint16_t)flags).idx;
@@ -693,7 +685,7 @@ public:
     }
 
     gfxDynamicVertexBufferHandle createDynamicVertexBuffer(const gfxMemory* mem, const gfxVertexDecl& decl,
-                                                           gfxBufferFlag flags) override
+                                                           gfxBufferFlag flags = gfxBufferFlag::None) override
     {
         gfxDynamicVertexBufferHandle handle;
         handle.idx = bgfx::createDynamicVertexBuffer((const bgfx::Memory*)mem, (const bgfx::VertexDecl&)decl, (uint16_t)flags).idx;
@@ -966,50 +958,50 @@ public:
     }
 };
 
-#ifdef STENGINE_SHARED_LIB
+#ifdef termite_SHARED_LIB
 #define MY_NAME "Bgfx"
-#define MY_VERSION ST_MAKE_VERSION(1, 0)
-static bx::AllocatorI* gAlloc = nullptr;
-static st::drvDriver* gMyDriver = nullptr;
+#define MY_VERSION T_MAKE_VERSION(1, 0)
+static bx::AllocatorI* g_alloc = nullptr;
+static termite::drvHandle g_driver = nullptr;
 
-STPLUGIN_API pluginDesc* stPluginGetDesc()
+TERMITE_PLUGIN_API pluginDesc* stPluginGetDesc()
 {
     static pluginDesc desc;
     desc.name = MY_NAME;
     desc.description = "Bgfx wrapper driver";
-    desc.engineVersion = ST_MAKE_VERSION(0, 1);
+    desc.engineVersion = T_MAKE_VERSION(0, 1);
     desc.type = drvType::GraphicsDriver;
     desc.version = MY_VERSION;
     return &desc;
 }
 
-STPLUGIN_API st::pluginHandle stPluginInit(bx::AllocatorI* alloc)
+TERMITE_PLUGIN_API int stPluginInit(bx::AllocatorI* alloc)
 {
     assert(alloc);
 
-    gAlloc = alloc;
+    g_alloc = alloc;
     BgfxWrapper* driver = BX_NEW(alloc, BgfxWrapper)();
     if (driver) {
-        gMyDriver = drvRegisterGraphics(driver, MY_NAME, MY_VERSION);
-        if (gMyDriver == nullptr) {
+        g_driver = drvRegister(drvType::GraphicsDriver, MY_NAME, MY_VERSION, driver);
+        if (g_driver == nullptr) {
             BX_DELETE(alloc, driver);
-            gAlloc = nullptr;
-            return nullptr;
+            g_alloc = nullptr;
+            return T_ERR_FAILED;
         }
     }
 
-    return driver;
+    return T_OK;
 }
 
-STPLUGIN_API void stPluginShutdown(pluginHandle handle)
+TERMITE_PLUGIN_API void stPluginShutdown()
 {
-    assert(handle);
-    assert(gAlloc);
+    assert(g_alloc);
 
-    if (gMyDriver != nullptr)
-        drvUnregister(gMyDriver);
-    BX_DELETE(gAlloc, handle);
-    gAlloc = nullptr;
-    gMyDriver = nullptr;
+    if (g_driver != nullptr) {
+        BX_DELETE(g_alloc, drvGetGraphicsDriver(g_driver));
+        drvUnregister(g_driver);
+    }
+    g_alloc = nullptr;
+    g_driver = nullptr;
 }
 #endif
