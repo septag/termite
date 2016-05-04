@@ -91,7 +91,7 @@ public:
         }
     }
 
-    int init(bx::AllocatorI* alloc, const char* uri, const void* params, dsDriverCallbacks* callbacks) override
+    result_t init(bx::AllocatorI* alloc, const char* uri, const void* params, dsDriverCallbacks* callbacks) override
     {
         BX_BEGINP("Initializing DataStore Async disk driver");
         m_alloc = alloc;
@@ -469,7 +469,7 @@ TERMITE_PLUGIN_API pluginDesc* stPluginGetDesc()
     return &desc;
 }
 
-TERMITE_PLUGIN_API int stPluginInit(bx::AllocatorI* alloc)
+TERMITE_PLUGIN_API result_t stPluginInit(bx::AllocatorI* alloc)
 {
     assert(alloc);
 

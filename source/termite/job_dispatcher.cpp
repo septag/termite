@@ -449,10 +449,10 @@ static int32_t threadFunc(void* userData)
     return 0;
 }
 
-int termite::jobInit(bx::AllocatorI* alloc,
-                uint16_t maxSmallFibers, uint32_t smallFiberStackSize,
-                uint16_t maxBigFibers, uint32_t bigFiberStackSize,
-                bool lockThreadsToCores, uint8_t numWorkerThreads)
+result_t termite::jobInit(bx::AllocatorI* alloc,
+                          uint16_t maxSmallFibers, uint32_t smallFiberStackSize,
+                          uint16_t maxBigFibers, uint32_t bigFiberStackSize,
+                          bool lockThreadsToCores, uint8_t numWorkerThreads)
 {
     if (gDispatcher) {
         assert(false);

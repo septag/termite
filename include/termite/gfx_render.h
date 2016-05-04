@@ -10,8 +10,8 @@ namespace termite
     class gfxRender
     {
     public:
-        virtual int init(bx::AllocatorI* alloc, gfxDriver* driver, const gfxPlatformData* platformData = nullptr,
-                         const int* uiKeymap = nullptr) = 0;
+        virtual result_t init(bx::AllocatorI* alloc, gfxDriver* driver, const gfxPlatformData* platformData = nullptr,
+                              const int* uiKeymap = nullptr) = 0;
         virtual void shutdown() = 0;
         virtual void render() = 0;
         virtual void frame() = 0;

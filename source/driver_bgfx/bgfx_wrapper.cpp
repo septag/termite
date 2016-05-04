@@ -147,13 +147,13 @@ public:
     {
     }
 
-    int init(uint16_t deviceId, gfxCallbacks* callbacks, bx::AllocatorI* alloc) override
+    result_t init(uint16_t deviceId, gfxCallbacks* callbacks, bx::AllocatorI* alloc) override
     {
         m_alloc = alloc;
         if (callbacks) {
             m_callbacks = BX_NEW(alloc, BgfxCallbacks)(callbacks);
             if (!m_callbacks)
-                return false;
+                return T_ERR_OUTOFMEM;
         }
 
         return bgfx::init(bgfx::RendererType::Count, 0, deviceId, m_callbacks, alloc) ? T_OK : T_ERR_FAILED;
@@ -975,7 +975,7 @@ TERMITE_PLUGIN_API pluginDesc* stPluginGetDesc()
     return &desc;
 }
 
-TERMITE_PLUGIN_API int stPluginInit(bx::AllocatorI* alloc)
+TERMITE_PLUGIN_API result_t stPluginInit(bx::AllocatorI* alloc)
 {
     assert(alloc);
 

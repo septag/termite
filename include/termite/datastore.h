@@ -5,6 +5,9 @@ namespace termite
     class dsDriver;
     class dsDataStore;
 
+    T_HANDLE(dsResourceTypeHandle);
+    T_HANDLE(dsResourceHandle);
+
     enum class dsInitFlag : uint8_t
     {
         None = 0x00,
@@ -17,9 +20,6 @@ namespace termite
         None = 0x00,
         Reload = 0x01
     };
-
-    T_HANDLE(dsResourceTypeHandle);
-    T_HANDLE(dsResourceHandle);
 
     struct dsResourceTypeParams
     {

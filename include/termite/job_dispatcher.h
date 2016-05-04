@@ -36,10 +36,10 @@ namespace termite
     TERMITE_API jobHandle jobDispatchBig(const jobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE;
     TERMITE_API void jobWait(jobHandle handle) T_THREAD_SAFE;
 
-    int jobInit(bx::AllocatorI* alloc, 
-                uint16_t maxSmallFibers = 0, uint32_t smallFiberStackSize = 0, 
-                uint16_t maxBigFibers = 0, uint32_t bigFiberStackSize = 0,
-                bool lockThreadsToCores = true, uint8_t numWorkerThreads = UINT8_MAX);
+    result_t jobInit(bx::AllocatorI* alloc, 
+                     uint16_t maxSmallFibers = 0, uint32_t smallFiberStackSize = 0, 
+                     uint16_t maxBigFibers = 0, uint32_t bigFiberStackSize = 0,
+                     bool lockThreadsToCores = true, uint8_t numWorkerThreads = UINT8_MAX);
     void jobShutdown();
     
 } // namespace st

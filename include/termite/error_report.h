@@ -20,6 +20,8 @@
 
 namespace termite
 {
+	typedef int result_t;	// used for returning results 
+
     // Internal
     int errInit(bx::AllocatorI* alloc);
     void errShutdown();

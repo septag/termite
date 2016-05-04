@@ -55,7 +55,7 @@ namespace termite
     {
     public:
         // Init
-        virtual int init(uint16_t deviceId, gfxCallbacks* callbacks, bx::AllocatorI* alloc) = 0;
+        virtual result_t init(uint16_t deviceId, gfxCallbacks* callbacks, bx::AllocatorI* alloc) = 0;
         virtual void shutdown() = 0;
 
         virtual void reset(uint32_t width, uint32_t height, gfxResetFlag flags = gfxResetFlag::None) = 0;

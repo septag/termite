@@ -22,7 +22,7 @@ public:
         m_driver = nullptr;
     }
 
-    int init(bx::AllocatorI* alloc, gfxDriver* driver, const gfxPlatformData* platformData, const int* uiKeymap) override
+    result_t init(bx::AllocatorI* alloc, gfxDriver* driver, const gfxPlatformData* platformData, const int* uiKeymap) override
     {
         m_alloc = alloc;
         m_driver = driver;
@@ -131,7 +131,7 @@ TERMITE_PLUGIN_API pluginDesc* stPluginGetDesc()
     return &desc;
 }
 
-TERMITE_PLUGIN_API int stPluginInit(bx::AllocatorI* alloc)
+TERMITE_PLUGIN_API result_t stPluginInit(bx::AllocatorI* alloc)
 {
     assert(alloc);
 

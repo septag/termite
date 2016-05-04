@@ -44,8 +44,8 @@ namespace termite
     class BX_NO_VTABLE dsDriver
     {
     public:
-        virtual int init(bx::AllocatorI* alloc, const char* uri, const void* params, 
-                         dsDriverCallbacks* callbacks = nullptr) = 0;
+        virtual result_t init(bx::AllocatorI* alloc, const char* uri, const void* params, 
+                              dsDriverCallbacks* callbacks = nullptr) = 0;
         virtual void shutdown() = 0;
 
         virtual void setCallbacks(dsDriverCallbacks* callbacks) = 0;

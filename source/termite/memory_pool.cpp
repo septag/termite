@@ -104,7 +104,7 @@ static void destroyBucket(Bucket* bucket, bx::AllocatorI* alloc)
     BX_FREE(alloc, bucket);
 }
 
-int termite::memInit(bx::AllocatorI* alloc, size_t pageSize /*= 0*/, int maxPagesPerPool /* =0*/)
+result_t termite::memInit(bx::AllocatorI* alloc, size_t pageSize /*= 0*/, int maxPagesPerPool /* =0*/)
 {
     if (gMemPool) {
         assert(false);

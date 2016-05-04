@@ -31,7 +31,7 @@ namespace termite
 
         // If compatible with engine, it will be called by engine core to initialize the plugin
         // So It can register itself (or register multiple classes) with engine
-        int stPluginInit(bx::AllocatorI* alloc);
+        result_t stPluginInit(bx::AllocatorI* alloc);
 
         // Loaded plugins will be called by engine to cleanup and unregister
         void stPluginShutdown();

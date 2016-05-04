@@ -123,7 +123,7 @@ void termite::coreFreeConfig(coreConfig* conf)
     BX_DELETE(g_alloc, conf);
 }
 
-int termite::coreInit(const coreConfig& conf, coreFnUpdate updateFn, const gfxPlatformData* platform)
+result_t termite::coreInit(const coreConfig& conf, coreFnUpdate updateFn, const gfxPlatformData* platform)
 {
     if (g_core) {
         assert(false);

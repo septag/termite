@@ -183,7 +183,6 @@ int termite::pluginInit(const char* pluginPath)
                    desc.name, T_VERSION_MAJOR(desc.version), T_VERSION_MINOR(desc.version));
     }
 
-
     return T_OK;
 }
 

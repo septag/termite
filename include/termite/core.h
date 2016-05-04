@@ -89,8 +89,8 @@ namespace termite
     TERMITE_API coreConfig* coreLoadConfig(const char* confFilepath);
     TERMITE_API void coreFreeConfig(coreConfig* conf);
 
-    TERMITE_API int coreInit(const coreConfig& conf, coreFnUpdate updateFn = nullptr, 
-                              const gfxPlatformData* platformData = nullptr);
+    TERMITE_API result_t coreInit(const coreConfig& conf, coreFnUpdate updateFn = nullptr, 
+                                  const gfxPlatformData* platformData = nullptr);
     TERMITE_API void coreShutdown();
     TERMITE_API void coreFrame();
     TERMITE_API uint32_t coreGetVersion();

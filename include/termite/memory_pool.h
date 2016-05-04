@@ -4,7 +4,7 @@
 
 namespace termite
 {
-    int memInit(bx::AllocatorI* alloc, size_t pageSize = 0, int maxPagesPerPool = 0);
+    result_t memInit(bx::AllocatorI* alloc, size_t pageSize = 0, int maxPagesPerPool = 0);
     void memShutdown();
 
     TERMITE_API bx::AllocatorI* memAllocPage(uint32_t tag) T_THREAD_SAFE;
