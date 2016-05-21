@@ -162,37 +162,37 @@ namespace bx
 
 	inline uint32_t uint32_cmpeq(uint32_t _a, uint32_t _b)
 	{
-		return -(_a == _b);
+		return -(_a == _b); //-V732
 	}
 
 	inline uint32_t uint32_cmpneq(uint32_t _a, uint32_t _b)
 	{
-		return -(_a != _b);
+		return -(_a != _b); //-V732
 	}
 
 	inline uint32_t uint32_cmplt(uint32_t _a, uint32_t _b)
 	{
-		return -(_a < _b);
+		return -(_a < _b); //-V732
 	}
 
 	inline uint32_t uint32_cmple(uint32_t _a, uint32_t _b)
 	{
-		return -(_a <= _b);
+		return -(_a <= _b); //-V732
 	}
 
 	inline uint32_t uint32_cmpgt(uint32_t _a, uint32_t _b)
 	{
-		return -(_a > _b);
+		return -(_a > _b); //-V732
 	}
 
 	inline uint32_t uint32_cmpge(uint32_t _a, uint32_t _b)
 	{
-		return -(_a >= _b);
+		return -(_a >= _b); //-V732
 	}
 
 	inline uint32_t uint32_setnz(uint32_t _a)
 	{
-		return -!!_a;
+		return -!!_a; //-V732
 	}
 
 	inline uint32_t uint32_satadd(uint32_t _a, uint32_t _b)

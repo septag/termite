@@ -103,8 +103,8 @@ namespace bx
         bool connect(const SocketAddr& addr);
         const SocketAddr& getPeerAddr() const { return m_peerAddr; }
 
-        int32_t read(void* data, int32_t size) override;
-        int32_t write(const void* data, int32_t size) override;
+        int32_t read(void* data, int32_t size, Error* err = nullptr) override;
+        int32_t write(const void* data, int32_t size, Error* err = nullptr) override;
 
         void flush() override;
 
@@ -122,8 +122,8 @@ namespace bx
         void setRemoteAddr(const SocketAddr& addr);
         const SocketAddr& getRemoteAddr() const { return m_remoteAddr; }
 
-        int32_t read(void* data, int32_t size) override;
-        int32_t write(const void* data, int32_t size) override;
+        int32_t read(void* data, int32_t size, Error* err = nullptr) override;
+        int32_t write(const void* data, int32_t size, Error* err = nullptr) override;
 
         void flush() override;
 
@@ -139,6 +139,7 @@ namespace bx
 }
 
 #ifdef BX_IMPLEMENT_SOCKETS
+#   undef BX_IMPLEMENT_SOCKETS
 #   include <cassert>
 
 #if !BX_PLATFORM_WINDOWS
@@ -441,7 +442,7 @@ namespace bx
         return false;
     }
 
-    int32_t SocketTCP::read(void* data, int32_t size)
+    int32_t SocketTCP::read(void* data, int32_t size, Error* err)
     {
         if (m_sock == SOCK_NULL)
             return -1;
@@ -449,7 +450,7 @@ namespace bx
         return (int)::recv(m_sock, (char*)data, size, 0);
     }
 
-    int32_t SocketTCP::write(const void* data, int32_t size)
+    int32_t SocketTCP::write(const void* data, int32_t size, Error* err)
     {
         if (m_sock == SOCK_NULL)
             return -1;
@@ -523,7 +524,7 @@ namespace bx
         m_remoteAddr = addr;
     }
 
-    int32_t SocketUDP::read(void* data, int32_t size)
+    int32_t SocketUDP::read(void* data, int32_t size, Error* err)
     {
         if (m_sock == SOCK_NULL)
             return -1;
@@ -548,7 +549,7 @@ namespace bx
         return r;
     }
 
-    int32_t SocketUDP::write(const void* data, int32_t size)
+    int32_t SocketUDP::write(const void* data, int32_t size, Error* err)
     {
         if (!m_remoteAddr.isValid())
             return -1;

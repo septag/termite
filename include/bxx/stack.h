@@ -21,7 +21,7 @@ namespace bx
     {
         _node->down = *_ref;
         *_ref = _node;
-        _node->data = data;
+        _node->data = _data;
     }
 
     template <typename Ty>
