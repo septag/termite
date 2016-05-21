@@ -70,7 +70,7 @@
 #	define BX_NO_INLINE __attribute__( (noinline) )
 #	define BX_NO_RETURN __attribute__( (noreturn) )
 #	define BX_NO_VTABLE
-#	define BX_OVERRIDE override
+#	define BX_OVERRIDE
 #	define BX_PRINTF_ARGS(_format, _args) __attribute__ ( (format(__printf__, _format, _args) ) )
 #	if BX_CLANG_HAS_FEATURE(cxx_thread_local)
 #		define BX_THREAD_LOCAL __thread
@@ -189,13 +189,13 @@
 #endif
 ///
 #define BX_CLASS_NO_DEFAULT_CTOR(_class) \
-			private: _class() = delete;
+			private: _class()
 
 #define BX_CLASS_NO_COPY(_class) \
-			private: _class(const _class& _rhs) = delete;
+			private: _class(const _class& _rhs)
 
 #define BX_CLASS_NO_ASSIGNMENT(_class) \
-			private: _class& operator=(const _class& _rhs) = delete;
+			private: _class& operator=(const _class& _rhs)
 
 #define BX_CLASS_ALLOCATOR(_class) \
 			public: void* operator new(size_t _size); \
