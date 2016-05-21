@@ -26,9 +26,9 @@ namespace bx
 
     private:
         AllocatorI* m_alloc;
-        int m_maxItems;
         Ty* m_buffer;
         Ty** m_ptrs;
+        int m_maxItems;
         int m_index;
     };
 
@@ -147,8 +147,8 @@ namespace bx
     {
         int bucketSize = m_maxItems;
         for (int i = 0; i < bucketSize; i++)
-            b->ptrs[bucketSize - i - 1] = &b->buffer[i];
-        b->iter = bucketSize;
+            m_ptrs[bucketSize - i - 1] = &m_buffer[i];
+        m_index = bucketSize;
     }
 
     template <typename Ty>

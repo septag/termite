@@ -17,7 +17,6 @@ namespace bx
     public:
         Lock()
         {
-            m_data.u = 0;
         }
 
         void lock()
@@ -62,6 +61,22 @@ namespace bx
                 volatile int32_t ticket;
                 volatile int32_t users;
             } s;
+
+			Data()
+			{
+				this->u = 0;
+			}
+
+            Data(const Data& d)
+            {
+                this->u = d.u;
+            }
+            
+            Data& operator=(const Data& d)
+            {
+                this->u = d.u;
+                return *this;
+            }
         };
 
         Data m_data;
@@ -173,6 +188,22 @@ namespace bx
                 volatile int16_t read;
                 volatile int16_t users;
             } s;
+
+			Data()
+			{
+				this->u = 0;
+			}
+            
+            Data(const Data& d)
+            {
+                this->u = d.u;
+            }
+            
+            Data& operator=(const Data& d)
+            {
+                this->u = d.u;
+                return *this;
+            }
         };
 
         Data m_data;

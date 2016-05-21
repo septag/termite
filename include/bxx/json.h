@@ -708,7 +708,7 @@ namespace bx
     // JsonNode
     const JsonNode JsonNode::None;
 
-    JsonNode::JsonNode()
+    JsonNode::JsonNode() //-V730
     {
         type = JsonType::Null;
         alloc = nullptr;
@@ -743,11 +743,11 @@ namespace bx
         return *this;            
     }
 
-    const JsonNode* JsonNode::findChild(const char* name) const
+    const JsonNode* JsonNode::findChild(const char* _name) const
     {
         JsonNode* node = this->firstChild;
         while (node)    {
-            if (strcmp(node->name, name) == 0)
+            if (strcmp(node->name, _name) == 0)
                 return node;
             node = node->next;
         }
@@ -772,8 +772,8 @@ namespace bx
     void JsonNode::destroy()
     {
         // Remove from children
-        JsonNode* parent = this->parent;
-        if (parent) {
+        JsonNode* _parent = this->parent;
+        if (_parent) {
             if (parent->firstChild != this)   {
                 if (this->next)
                     this->next->prev = this->prev;

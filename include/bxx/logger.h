@@ -53,10 +53,11 @@ namespace bx
         Fatal,
         Warning,
         Init,
-        Shutdown
+        Shutdown,
+        Debug
     };
 
-    enum LogColor
+    enum class LogColor
     {
         None = 0,
         Green,
@@ -166,6 +167,7 @@ namespace bx
             numWarnings = 0;
             numMessages = 0;
             colorOverride = LogColor::None;
+            memset(excludeList, 0x00, sizeof(excludeList));
 
 #if BX_PLATFORM_WINDOWS
             consoleHdl = nullptr;
@@ -393,6 +395,8 @@ namespace bx
                             SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_INTENSITY);      break;
                         case LogExtraParam::ProgressEndNonFatal:
                             SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);   break;
+                        default:
+                            break;
                         }
                     }
                 } else {

@@ -32,17 +32,17 @@ namespace bx
         void remove(int index);
 
         // Returns 'invalidValue' if item is not found
-        int find(Ky key);
+        int find(Ky key) const;
 
         void clear();
-        bool isEmpty();
+        bool isEmpty() const;
 
         const Ty& getValue(int index) const;
 
         static size_t GetImmutableSizeBytes(int capacity);
 
     private:
-        int probeLinear(int index, Ky key, const Ky* keys, int count);
+        int probeLinear(int index, Ky key, const Ky* keys, int count) const;
         void reorder(Ky* keys, Ty* values, int count);
 
     private:
@@ -83,15 +83,15 @@ namespace bx
 
         void remove(int index, Node* node);
 
-        int find(Ky key);
+        int find(Ky key) const;
 
         Node* getNode(int index) const;
 
         void clear();
-        bool isEmpty();
+        bool isEmpty() const;
 
     private:
-        int probeLinear(int index, Ky key, const Ky* keys, int count);
+        int probeLinear(int index, Ky key, const Ky* keys, int count) const;
         void reorder(Ky* keys, Node** nodes, int count);
 
     private:
@@ -287,7 +287,7 @@ namespace bx
     }
 
     template <typename Ty, typename Ky>
-    int HashTable<Ty, Ky>::find(Ky key)
+    int HashTable<Ty, Ky>::find(Ky key) const
     {
         if (!m_numItems)
             return -1;
@@ -308,7 +308,7 @@ namespace bx
     }
 
     template <typename Ty, typename Ky>
-    bool HashTable<Ty, Ky>::isEmpty()
+    bool HashTable<Ty, Ky>::isEmpty() const
     {
         return m_numItems > 0;
     }
@@ -328,7 +328,7 @@ namespace bx
     }
 
     template <typename Ty, typename Ky>
-    int HashTable<Ty, Ky>::probeLinear(int index, Ky key, const Ky* keys, int count)
+    int HashTable<Ty, Ky>::probeLinear(int index, Ky key, const Ky* keys, int count) const
     {
         for (int i = 1; i < count; i++)  {
             int r = (index + i) % count;
@@ -367,7 +367,6 @@ namespace bx
         m_numItems = 0;
         m_numTotal = 0;
         m_blockSize = 0;
-        assert(BX_TYPE_IS_POD(Ty));
     }
 
     template <typename Ty, typename Ky>
@@ -496,7 +495,7 @@ namespace bx
     }
 
     template <typename Ty, typename Ky>
-    int MultiHashTable<Ty, Ky>::find(Ky key)
+    int MultiHashTable<Ty, Ky>::find(Ky key) const
     {
         int idx = key % m_numTotal;
         if (m_keys[idx] != key)
@@ -521,13 +520,13 @@ namespace bx
     }
 
     template <typename Ty, typename Ky>
-    bool MultiHashTable<Ty, Ky>::isEmpty()
+    bool MultiHashTable<Ty, Ky>::isEmpty() const
     {
         return m_numItems > 0;
     }
 
     template <typename Ty, typename Ky>
-    int MultiHashTable<Ty, Ky>::probeLinear(int index, Ky key, const Ky* keys, int count)
+    int MultiHashTable<Ty, Ky>::probeLinear(int index, Ky key, const Ky* keys, int count) const
     {
         for (int i = 1; i < count; i++)  {
             int r = (index + i) % count;

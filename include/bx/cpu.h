@@ -34,6 +34,8 @@ extern "C" void _ReadWriteBarrier();
 #   pragma intrinsic(_InterlockedXor)
 #   pragma intrinsic(_InterlockedAnd)
 #   pragma intrinsic(_InterlockedOr)
+#else
+#	include <xmmintrin.h>
 #endif // BX_COMPILER_MSVC
 
 namespace bx

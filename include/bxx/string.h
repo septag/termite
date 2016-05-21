@@ -194,7 +194,7 @@ namespace bx
     template <int _Size>
     String<_Size>& String<_Size>::trimWhitespace()
     {
-        bx::strws(this->text);
+        bx::strws(this->text); //-V530
         return *this;
     }
 
