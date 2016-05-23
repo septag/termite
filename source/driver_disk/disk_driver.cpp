@@ -32,6 +32,7 @@ struct DiskFileRequest
     {
         driver = nullptr;
         mem = nullptr;
+        memset(&buff, 0x00, sizeof(buff));
 
         uv_fs_req_cleanup(&openReq);
         uv_fs_req_cleanup(&rwReq);
@@ -48,7 +49,7 @@ struct DiskFileRequest
     }
 };
 
-class AsyncDiskDriver : public dsDriver
+class AsyncDiskDriver : public dsDriverI
 {
 private:
     dsDriverCallbacks* m_callbacks;
@@ -63,6 +64,8 @@ public:
     {
         m_callbacks = nullptr;
         m_alloc = nullptr;
+        memset(&m_dirChange, 0x00, sizeof(m_dirChange));
+        memset(&m_loop, 0x00, sizeof(m_loop));
     }
 
     static void uvCallbackFsEvent(uv_fs_event_t* handle, const char* filename, int events, int status)
@@ -327,13 +330,18 @@ public:
     {
     }
 
-    dsOperationMode getOpMode() override
+    dsOperationMode getOpMode() const override
     {
         return dsOperationMode::Async;
     }
+
+    const char* getUri() const override
+    {
+        return m_rootDir.cstr();
+    }
 };
 
-class BlockingDiskDriver : public dsDriver
+class BlockingDiskDriver : public dsDriverI
 {
 private:
     bx::Path m_rootDir;
@@ -383,8 +391,8 @@ public:
 
         bx::CrtFileReader file;
         bx::Error err;
-        if (file.open(filepath.cstr(), &err)) {
-            T_ERROR("Unable to open file '%s' for reading", filepath.cstr());
+        if (!file.open(filepath.cstr(), &err)) {
+            T_ERROR("Unable to open file '%s' for reading", uri);
             return nullptr;
         }
 
@@ -445,9 +453,14 @@ public:
     {
     }
 
-    dsOperationMode getOpMode() override
+    dsOperationMode getOpMode() const override
     {
         return dsOperationMode::Blocking;
+    }
+
+    const char* getUri() const override
+    {
+        return m_rootDir.cstr();
     }
 };
 

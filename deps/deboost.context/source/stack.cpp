@@ -8,17 +8,12 @@
 #if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
 /* UNIX-style OS. ------------------------------------------- */
 #   include <unistd.h>
-#if defined(_POSIX_VERSION)
-#   define _HAVE_POSIX
+#   define _HAVE_POSIX 1
 #endif
-#endif
-
 
 #ifdef _WIN32
-
-#define WIN32_LEAN_AND_LEAN
-#include <Windows.h>
-
+#   define WIN32_LEAN_AND_LEAN
+#   include <Windows.h>
 /* x86_64
  * test x86_64 before i386 because icc might
  * define __i686__ for x86_64 too */
@@ -27,9 +22,9 @@
     || defined(_M_X64) || defined(_M_AMD64)
 /* Windows seams not to provide a constant or function
  * telling the minimal stacksize */
-# define MIN_STACKSIZE  8 * 1024
+#   define MIN_STACKSIZE  8 * 1024
 #else
-# define MIN_STACKSIZE  4 * 1024
+#   define MIN_STACKSIZE  4 * 1024
 #endif
 
 static size_t getPageSize()

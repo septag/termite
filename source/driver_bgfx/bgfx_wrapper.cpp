@@ -14,10 +14,10 @@ using namespace termite;
 class BgfxCallbacks : public bgfx::CallbackI
 {
 private:
-    gfxCallbacks* m_callbacks;
+    gfxCallbacksI* m_callbacks;
 
 public:
-    BgfxCallbacks(gfxCallbacks* callbacks)
+    BgfxCallbacks(gfxCallbacksI* callbacks)
     {
         assert(callbacks);
         m_callbacks = callbacks;
@@ -122,7 +122,7 @@ public:
     }
 };
 
-class BgfxWrapper : public gfxDriver
+class BgfxWrapper : public gfxDriverI
 {
 private:
     BgfxCallbacks* m_callbacks;
@@ -147,7 +147,7 @@ public:
     {
     }
 
-    result_t init(uint16_t deviceId, gfxCallbacks* callbacks, bx::AllocatorI* alloc) override
+    result_t init(uint16_t deviceId, gfxCallbacksI* callbacks, bx::AllocatorI* alloc) override
     {
         m_alloc = alloc;
         if (callbacks) {
@@ -227,11 +227,14 @@ public:
         m_hmd.deviceHeight = hmd->deviceHeight;
         m_hmd.width = hmd->width;
         m_hmd.height = hmd->height;
-        memcpy(m_hmd.eye.rotation, hmd->eye->rotation, sizeof(float) * 4);
-        memcpy(m_hmd.eye.translation, hmd->eye->translation, sizeof(float) * 3);
-        memcpy(m_hmd.eye.fov, hmd->eye->fov, sizeof(float) * 4);
-        memcpy(m_hmd.eye.viewOffset, hmd->eye->viewOffset, sizeof(float) * 3);
         m_hmd.flags = hmd->flags;
+
+        for (int i = 0; i < 2; i++) {
+            memcpy(m_hmd.eye[i].rotation, hmd->eye[i].rotation, sizeof(float) * 4);
+            memcpy(m_hmd.eye[i].translation, hmd->eye[i].translation, sizeof(float) * 3);
+            memcpy(m_hmd.eye[i].fov, hmd->eye[i].fov, sizeof(float) * 4);
+            memcpy(m_hmd.eye[i].viewOffset, hmd->eye[i].viewOffset, sizeof(float) * 3);
+        }
         return m_hmd;
     }
 
@@ -326,7 +329,7 @@ public:
     {
         bgfx::setViewClear(id, (uint16_t)flags, rgba, depth, stencil);
     }
-
+        
     void setViewClear(uint8_t id, gfxClearFlag flags, float depth, uint8_t stencil,
                       uint8_t color0, uint8_t color1, uint8_t color2, uint8_t color3,
                       uint8_t color4, uint8_t color5, uint8_t color6, uint8_t color7) override
@@ -486,25 +489,25 @@ public:
         bgfx::setTexture(stage, s, h, attachment, (uint32_t)flags);
     }
 
-    uint32_t submit(uint8_t viewId, gfxProgramHandle program, int32_t depth) override
+    uint32_t submit(uint8_t viewId, gfxProgramHandle program, int32_t depth, bool preserveState) override
     {
         BGFX_DECLARE_HANDLE(ProgramHandle, p, program);
-        return bgfx::submit(viewId, p, depth);
+        return bgfx::submit(viewId, p, depth, preserveState);
     }
 
-    uint32_t submit(uint8_t viewId, gfxProgramHandle program, gfxOccQueryHandle occQuery, int32_t depth) override
+    uint32_t submit(uint8_t viewId, gfxProgramHandle program, gfxOccQueryHandle occQuery, int32_t depth, bool preserveState) override
     {
         BGFX_DECLARE_HANDLE(ProgramHandle, p, program);
         BGFX_DECLARE_HANDLE(OcclusionQueryHandle, o, occQuery);
-        return bgfx::submit(viewId, p, o, depth);
+        return bgfx::submit(viewId, p, o, depth, preserveState);
     }
 
     uint32_t submit(uint8_t viewId, gfxProgramHandle program, gfxIndirectBufferHandle indirectHandle, uint16_t start,
-                    uint16_t num, int32_t depth) override
+                    uint16_t num, int32_t depth, bool preserveState) override
     {
         BGFX_DECLARE_HANDLE(ProgramHandle, p, program);
         BGFX_DECLARE_HANDLE(IndirectBufferHandle, i, indirectHandle);
-        return bgfx::submit(viewId, p, i, start, num, depth);
+        return bgfx::submit(viewId, p, i, start, num, depth, preserveState);
     }
 
     void setBuffer(uint8_t stage, gfxIndexBufferHandle handle, gfxAccess access) override

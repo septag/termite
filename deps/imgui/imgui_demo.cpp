@@ -416,10 +416,10 @@ void ImGui::ShowTestWindow(bool* p_opened)
                     if (ImGui::Selectable("Me", &selected[i], 0, ImVec2(50,50)))
                     {
                         int x = i % 4, y = i / 4;
-                        if (x > 0) selected[i - 1] ^= 1;
-                        if (x < 3) selected[i + 1] ^= 1;
-                        if (y > 0) selected[i - 4] ^= 1;
-                        if (y < 3) selected[i + 4] ^= 1;
+                        if (x > 0) selected[i - 1] ^= 1; //-V557
+                        if (x < 3) selected[i + 1] ^= 1; //-V557
+                        if (y > 0) selected[i - 4] ^= 1; //-V557
+                        if (y < 3) selected[i + 4] ^= 1; //-V557
                     }
                     if ((i % 4) < 3) ImGui::SameLine();
                     ImGui::PopID();
@@ -1083,7 +1083,7 @@ void ImGui::ShowTestWindow(bool* p_opened)
             ImGui::SmallButton("<<"); if (ImGui::IsItemActive()) scroll_x_delta = -ImGui::GetIO().DeltaTime * 1000.0f;
             ImGui::SameLine(); ImGui::Text("Scroll from code"); ImGui::SameLine(); 
             ImGui::SmallButton(">>"); if (ImGui::IsItemActive()) scroll_x_delta = +ImGui::GetIO().DeltaTime * 1000.0f;
-            if (scroll_x_delta != 0.0f)
+            if (scroll_x_delta != 0.0f) //-V550
             {
                 ImGui::BeginChild("scrolling"); // Demonstrate a trick: you can use Begin to set yourself in the context of another window (here we are already out of your child window)
                 ImGui::SetScrollX(ImGui::GetScrollX() + scroll_x_delta);

@@ -2,7 +2,7 @@
 
 namespace termite
 {
-    class dsDriver;
+    class dsDriverI;
     class dsDataStore;
 
     T_HANDLE(dsResourceTypeHandle);
@@ -27,23 +27,23 @@ namespace termite
         const void* userParams;
     };
 
-    class BX_NO_VTABLE dsResourceCallbacks
+    class BX_NO_VTABLE dsResourceCallbacksI
     {
     public:
         virtual bool loadObj(const MemoryBlock* mem, const dsResourceTypeParams& params, uintptr_t* obj) = 0;
         virtual void unloadObj(uintptr_t obj) = 0;
-        virtual void onReload(dsResourceHandle handle) = 0;
+        virtual void onReload(dsDataStore* ds, dsResourceHandle handle) = 0;
         virtual uintptr_t getDefaultAsyncObj() = 0;
     };
 
-    TERMITE_API dsDataStore* dsCreate(dsInitFlag flags, dsDriver* driver);
+    TERMITE_API dsDataStore* dsCreate(dsInitFlag flags, dsDriverI* driver);
     TERMITE_API void dsDestroy(dsDataStore* ds);
 
     TERMITE_API dsResourceTypeHandle dsRegisterResourceType(dsDataStore* ds, const char* name,
-                                                             dsResourceCallbacks* callbacks, int userParamsSize = 0);
+                                                            dsResourceCallbacksI* callbacks, int userParamsSize = 0);
     TERMITE_API void dsUnregisterResourceType(dsDataStore* ds, dsResourceTypeHandle handle);
     TERMITE_API dsResourceHandle dsLoadResource(dsDataStore* ds, const char* name, const char* uri,
-                                                 const void* userParams = nullptr, dsFlag flags = dsFlag::None);
+                                                const void* userParams = nullptr, dsFlag flags = dsFlag::None);
     TERMITE_API void dsUnloadResource(dsDataStore* ds, dsResourceHandle handle);
     TERMITE_API uintptr_t dsGetObj(dsDataStore* ds, dsResourceHandle handle);
 

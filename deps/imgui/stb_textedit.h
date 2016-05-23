@@ -827,7 +827,7 @@ retry:
             for (i=0; i < row.num_chars; ++i) {
                float dx = STB_TEXTEDIT_GETWIDTH(str, start, i);
                #ifdef STB_TEXTEDIT_GETWIDTH_NEWLINE
-               if (dx == STB_TEXTEDIT_GETWIDTH_NEWLINE)
+               if (dx == STB_TEXTEDIT_GETWIDTH_NEWLINE) //-V550
                   break;
                #endif
                x += dx;
@@ -878,7 +878,7 @@ retry:
             for (i=0; i < row.num_chars; ++i) {
                float dx = STB_TEXTEDIT_GETWIDTH(str, find.prev_first, i);
                #ifdef STB_TEXTEDIT_GETWIDTH_NEWLINE
-               if (dx == STB_TEXTEDIT_GETWIDTH_NEWLINE)
+               if (dx == STB_TEXTEDIT_GETWIDTH_NEWLINE) //-V550
                   break;
                #endif
                x += dx;

@@ -9,11 +9,13 @@
 
 using namespace termite;
 
-class RenderDefault : public gfxRender
+#define DEBUG_HUD_ID 200
+
+class RenderDefault : public gfxRenderI
 {
 private:
     bx::AllocatorI* m_alloc;
-    gfxDriver* m_driver;
+    gfxDriverI* m_driver;
 
 public:
     RenderDefault()
@@ -22,7 +24,7 @@ public:
         m_driver = nullptr;
     }
 
-    result_t init(bx::AllocatorI* alloc, gfxDriver* driver, const gfxPlatformData* platformData, const int* uiKeymap) override
+    result_t init(bx::AllocatorI* alloc, gfxDriverI* driver, const gfxPlatformData* platformData, const int* uiKeymap) override
     {
         m_alloc = alloc;
         m_driver = driver;
@@ -45,12 +47,11 @@ public:
 
         driver->reset(conf.gfxWidth, conf.gfxHeight, gfxResetFlag(conf.gfxDriverFlags));
         driver->setViewClear(0, gfxClearFlag::Color | gfxClearFlag::Depth, 0x303030ff, 1.0f, 0);
-        driver->setDebug(gfxDebugFlag::Text);
         BX_END_OK();
 
-        BX_VERBOSE("Graphics Driver: %s", rendererTypeToStr(driver->getRendererType()));
+        BX_VERBOSE("Graphics Driver: %s", gfxRendererTypeToStr(driver->getRendererType()));
 
-        if (imguiInit(conf.gfxWidth, conf.gfxHeight, driver, uiKeymap)) {
+        if (imguiInit(DEBUG_HUD_ID, conf.gfxWidth, conf.gfxHeight, driver, uiKeymap)) {
             BX_FATAL("Init ImGui Integration failed");
             return T_ERR_FAILED;
         }
@@ -76,10 +77,6 @@ public:
         m_driver->setViewRect(0, 0, 0, gfxBackbufferRatio::Equal);
         imguiRender();
 
-        m_driver->dbgTextClear(0, true);
-        m_driver->dbgTextPrintf(1, 1, 0x03, "Fps: %.2f", coreGetFps());
-        m_driver->dbgTextPrintf(1, 2, 0x03, "FrameTime: %.4f", coreGetFrameTime());
-        m_driver->dbgTextPrintf(1, 3, 0x03, "ElapsedTime: %.2f", coreGetElapsedTime());
         m_driver->frame();
     }
 

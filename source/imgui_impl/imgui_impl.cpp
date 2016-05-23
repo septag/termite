@@ -20,7 +20,7 @@ using namespace termite;
 struct ImGuiImpl
 {
     bx::AllocatorI* alloc;
-    gfxDriver* driver;
+    gfxDriverI* driver;
     gfxProgramHandle progHandle;
     gfxDynamicVertexBufferHandle vertexBuffer;
     gfxDynamicIndexBufferHandle indexBuffer;
@@ -28,17 +28,22 @@ struct ImGuiImpl
     gfxTextureHandle fontTexHandle;
     gfxUniformHandle uniformTexture;
 
+    uint8_t viewId;
+
     ImGuiImpl()
     {
+        viewId = 0;
         fontTexHandle = T_INVALID_HANDLE;
         progHandle = T_INVALID_HANDLE;
         vertexBuffer = T_INVALID_HANDLE;
+        indexBuffer = T_INVALID_HANDLE;
         uniformTexture = T_INVALID_HANDLE;
+        driver = nullptr;
         alloc = nullptr;
     }
 };
 
-struct VertexPosCoordColor
+struct imVertexPosCoordColor
 {
     float x;
     float y;
@@ -56,33 +61,39 @@ struct VertexPosCoordColor
     }
     static gfxVertexDecl Decl;
 };
-gfxVertexDecl VertexPosCoordColor::Decl;
+gfxVertexDecl imVertexPosCoordColor::Decl;
 
-static ImGuiImpl* gIm = nullptr;
+static ImGuiImpl* g_Im = nullptr;
 
 static void* imguiAlloc(size_t size)
 {
-    return BX_ALLOC(gIm->alloc, size);
+    return BX_ALLOC(g_Im->alloc, size);
 }
 
 static void imguiFree(void* ptr)
 {
-    if (gIm)
-        BX_FREE(gIm->alloc, ptr);
+    if (g_Im)
+        BX_FREE(g_Im->alloc, ptr);
 }
 
 static void imguiDrawLists(ImDrawData* data)
 {
-    assert(gIm);
+    assert(g_Im);
 
-    gfxDriver* driver = gIm->driver;
+    gfxDriverI* driver = g_Im->driver;
 
     float proj[16];
-    bx::mtxOrtho(proj, 0.0f, ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y, 0.0f, -1.0f, 1.0f);
-    driver->setViewTransform(0, nullptr, proj);
+    float width = ImGui::GetIO().DisplaySize.x;
+    float height = ImGui::GetIO().DisplaySize.y;
+    uint8_t viewId = g_Im->viewId;
+    bx::mtxOrtho(proj, 0.0f, width, height, 0.0f, -1.0f, 1.0f);
 
     gfxState state = gfxStateBlendAlpha() |
         gfxState::RGBWrite | gfxState::AlphaWrite | gfxState::DepthTestAlways | gfxState::CullCCW;
+    driver->touch(viewId);
+    driver->setViewRect(viewId, 0, 0, gfxBackbufferRatio::Equal);
+    driver->setViewSeq(viewId, true);
+    driver->setViewTransform(viewId, nullptr, proj);
 
     for (int n = 0; n < data->CmdListsCount; n++) {
         const ImDrawList* cmdList = data->CmdLists[n];
@@ -93,17 +104,17 @@ static void imguiDrawLists(ImDrawData* data)
         uint32_t numVertices = (uint32_t)cmdList->VtxBuffer.size();
         uint32_t numIndices = (uint32_t)cmdList->IdxBuffer.size();
 
-        if (!driver->checkAvailTransientVertexBuffer(numVertices, VertexPosCoordColor::Decl) ||
+        if (!driver->checkAvailTransientVertexBuffer(numVertices, imVertexPosCoordColor::Decl) ||
             !driver->checkAvailTransientIndexBuffer(numIndices)) 
         {
             break;
         }
 
-        driver->allocTransientVertexBuffer(&tvb, numVertices, VertexPosCoordColor::Decl);
+        driver->allocTransientVertexBuffer(&tvb, numVertices, imVertexPosCoordColor::Decl);
         driver->allocTransientIndexBuffer(&tib, numIndices);
 
         // Fill Vertex/Index data
-        VertexPosCoordColor* verts = (VertexPosCoordColor*)tvb.data;
+        imVertexPosCoordColor* verts = (imVertexPosCoordColor*)tvb.data;
         uint16_t* indices = (uint16_t*)tib.data;
         const ImDrawVert* vertexSrc = &cmdList->VtxBuffer[0];
 
@@ -133,11 +144,12 @@ static void imguiDrawLists(ImDrawData* data)
                                    uint16_t(cmd.ClipRect.w - cmd.ClipRect.y));
                 gfxTextureHandle* handle = (gfxTextureHandle*)cmd.TextureId;
                 if (handle)
-                    driver->setTexture(0, gIm->uniformTexture, *handle);
-                driver->setState(state);
+                    driver->setTexture(0, g_Im->uniformTexture, *handle);
                 driver->setIndexBuffer(&tib, indexOffset, cmd.ElemCount);
                 driver->setVertexBuffer(&tvb, 0, numVertices);
-                driver->submit(0, gIm->progHandle);
+                driver->setState(state);
+
+                driver->submit(viewId, g_Im->progHandle);
             }
 
             indexOffset += cmd.ElemCount;
@@ -145,9 +157,9 @@ static void imguiDrawLists(ImDrawData* data)
     }
 }
 
-int termite::imguiInit(uint16_t viewWidth, uint16_t viewHeight, gfxDriver* driver, const int* keymap)
+int termite::imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, gfxDriverI* driver, const int* keymap)
 {
-    if (gIm) {
+    if (g_Im) {
         assert(false);
         return T_ERR_FAILED;
     }
@@ -155,14 +167,15 @@ int termite::imguiInit(uint16_t viewWidth, uint16_t viewHeight, gfxDriver* drive
     BX_BEGINP("Initializing ImGui Integration");
 
     bx::AllocatorI* alloc = coreGetAlloc();
-    gIm = BX_NEW(alloc, ImGuiImpl);
-    if (!gIm) {
+    g_Im = BX_NEW(alloc, ImGuiImpl);
+    if (!g_Im) {
         BX_END_FATAL();
         return T_ERR_OUTOFMEM;
     }
-    gIm->alloc = alloc;
-    gIm->driver = driver;
-    VertexPosCoordColor::init();
+    g_Im->alloc = alloc;
+    g_Im->driver = driver;
+    g_Im->viewId = viewId;
+    imVertexPosCoordColor::init();
 
     // Create Graphic objects
     gfxShaderHandle fragmentShader = driver->createShader(driver->makeRef(imgui_fso, sizeof(imgui_fso)));
@@ -180,17 +193,17 @@ int termite::imguiInit(uint16_t viewWidth, uint16_t viewHeight, gfxDriver* drive
     }
 
 
-    gIm->progHandle = driver->createProgram(vertexShader, fragmentShader, true);
-    if (!T_ISVALID(gIm->progHandle)) {
+    g_Im->progHandle = driver->createProgram(vertexShader, fragmentShader, true);
+    if (!T_ISVALID(g_Im->progHandle)) {
         BX_END_FATAL();
         T_ERROR("Creating GPU Program failed");
         return T_ERR_FAILED;
     }
-    gIm->uniformTexture = driver->createUniform("u_texture", gfxUniformType::Int1);    
+    g_Im->uniformTexture = driver->createUniform("u_texture", gfxUniformType::Int1);    
 
-    gIm->vertexBuffer = driver->createDynamicVertexBuffer(MAX_VERTICES, VertexPosCoordColor::Decl);
-    gIm->indexBuffer = driver->createDynamicIndexBuffer(MAX_INDICES);
-    if (!T_ISVALID(gIm->vertexBuffer) || !T_ISVALID(gIm->indexBuffer)) {
+    g_Im->vertexBuffer = driver->createDynamicVertexBuffer(MAX_VERTICES, imVertexPosCoordColor::Decl);
+    g_Im->indexBuffer = driver->createDynamicIndexBuffer(MAX_INDICES);
+    if (!T_ISVALID(g_Im->vertexBuffer) || !T_ISVALID(g_Im->indexBuffer)) {
         BX_END_FATAL();
         T_ERROR("Creating GPU VertexBuffer failed");
         return T_ERR_FAILED;
@@ -227,15 +240,15 @@ int termite::imguiInit(uint16_t viewWidth, uint16_t viewHeight, gfxDriver* drive
     int fontWidth, fontHeight, bpp;
     conf.Fonts->GetTexDataAsAlpha8(&fontData, &fontWidth, &fontHeight, &bpp);
 
-    gIm->fontTexHandle = driver->createTexture2D((uint16_t)fontWidth, (uint16_t)fontHeight, 1, gfxTextureFormat::A8, 
+    g_Im->fontTexHandle = driver->createTexture2D((uint16_t)fontWidth, (uint16_t)fontHeight, 1, gfxTextureFormat::A8, 
                                                  gfxTextureFlag::MinPoint|gfxTextureFlag::MagPoint, 
                                                  driver->makeRef(fontData, fontWidth*fontHeight*bpp));
-    if (!T_ISVALID(gIm->fontTexHandle)) {
+    if (!T_ISVALID(g_Im->fontTexHandle)) {
         BX_END_FATAL();
         T_ERROR("ImGui: Could not create font texture");
         return T_ERR_FAILED;
     }
-    conf.Fonts->TexID = (void*)&gIm->fontTexHandle;
+    conf.Fonts->TexID = (void*)&g_Im->fontTexHandle;
 
     ImGui::NewFrame();
 
@@ -245,27 +258,28 @@ int termite::imguiInit(uint16_t viewWidth, uint16_t viewHeight, gfxDriver* drive
 
 void termite::imguiShutdown()
 {
-    if (!gIm)
+    //
+    if (!g_Im)
         return;
 
-    bx::AllocatorI* alloc = gIm->alloc;
-    gfxDriver* driver = gIm->driver;
+    bx::AllocatorI* alloc = g_Im->alloc;
+    gfxDriverI* driver = g_Im->driver;
 
     ImGui::Shutdown();
 
-    if (T_ISVALID(gIm->uniformTexture))
-        driver->destroyUniform(gIm->uniformTexture);
-    if (T_ISVALID(gIm->indexBuffer))
-        driver->destroyDynamicIndexBuffer(gIm->indexBuffer);
-    if (T_ISVALID(gIm->vertexBuffer))
-        driver->destroyDynamicVertexBuffer(gIm->vertexBuffer);
-    if (T_ISVALID(gIm->fontTexHandle))    
-        driver->destroyTexture(gIm->fontTexHandle);
-    if (T_ISVALID(gIm->progHandle))
-        driver->destroyProgram(gIm->progHandle);
+    if (T_ISVALID(g_Im->uniformTexture))
+        driver->destroyUniform(g_Im->uniformTexture);
+    if (T_ISVALID(g_Im->indexBuffer))
+        driver->destroyDynamicIndexBuffer(g_Im->indexBuffer);
+    if (T_ISVALID(g_Im->vertexBuffer))
+        driver->destroyDynamicVertexBuffer(g_Im->vertexBuffer);
+    if (T_ISVALID(g_Im->fontTexHandle))    
+        driver->destroyTexture(g_Im->fontTexHandle);
+    if (T_ISVALID(g_Im->progHandle))
+        driver->destroyProgram(g_Im->progHandle);
 
-    BX_DELETE(alloc, gIm);
-    gIm = nullptr;
+    BX_DELETE(alloc, g_Im);
+    g_Im = nullptr;
 }
 
 void termite::imguiRender()
@@ -276,6 +290,6 @@ void termite::imguiRender()
 void termite::imguiNewFrame()
 {
     ImGui::NewFrame();
-    ImGui::ShowTestWindow();
-    //ImGui::ShowStyleEditor();
+    //ImGui::ShowTestWindow();
+    // ImGui::ShowStyleEditor();
 }

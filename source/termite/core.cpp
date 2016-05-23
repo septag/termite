@@ -11,6 +11,10 @@
 #include "plugins.h"
 #include "gfx_defines.h"
 #include "driver_mgr.h"
+#include "gfx_font.h"
+#include "gfx_texture.h"
+#include "gfx_vg.h"
+#include "gfx_debug.h"
 
 #define STB_LEAKCHECK_IMPLEMENTATION
 #include "bxx/leakcheck_allocator.h"
@@ -20,11 +24,14 @@
 #   define BX_SHARED_LIB
 #endif
 #include "bxx/logger.h"
+#include "bxx/path.h"
 
 #include "gfx_render.h"
 #include "datastore.h"
 #include "datastore_driver.h"
 #include "job_dispatcher.h"
+
+#include <dirent.h>
 
 #define MEM_POOL_BUCKET_SIZE 256
 
@@ -58,14 +65,14 @@ struct Core
 {
     coreFnUpdate updateFn;
     coreConfig conf;
-    gfxRender* renderer;
+    gfxRenderI* renderer;
     FrameData frameData;
     double hpTimerFreq;
     bx::Pool<MemoryBlockImpl> memPool;
     bx::Lock memPoolLock;
     dsDataStore* dataStore;
-    dsDriver* dataDriver;
-    dsDriver* blockingDataDriver;
+    dsDriverI* dataDriver;
+    dsDriverI* blockingDataDriver;
 
     Core()
     {
@@ -121,6 +128,32 @@ void termite::coreFreeConfig(coreConfig* conf)
     assert(conf);
 
     BX_DELETE(g_alloc, conf);
+}
+
+static void loadFontsInDirectory(dsDriverI* driver, const char* rootDir)
+{
+    BX_VERBOSE("Scanning for fonts in directory '%s' ...", rootDir);
+    bx::Path fullDir(driver->getUri());
+    fullDir.join(rootDir);
+
+    DIR* dir = opendir(fullDir.cstr());
+    if (!dir) {
+        BX_WARN("Could not open fonts directory '%s'", rootDir);
+        return;
+    }
+
+    dirent* ent;
+    while ((ent = readdir(dir)) != nullptr) {
+        if (ent->d_type == DT_REG) {
+            bx::Path fntFilepath(rootDir);
+            fntFilepath.join(ent->d_name);
+            if (fntFilepath.getFileExt().isEqualNoCase("fnt"))
+                fntRegister(fntFilepath.cstr(), fntFilepath.getFilename().cstr());
+        }
+    }
+    closedir(dir);
+
+    return;
 }
 
 result_t termite::coreInit(const coreConfig& conf, coreFnUpdate updateFn, const gfxPlatformData* platform)
@@ -213,17 +246,41 @@ result_t termite::coreInit(const coreConfig& conf, coreFnUpdate updateFn, const 
             return T_ERR_FAILED;
         }
         
+        gfxDriverI* gdriver = drvGetGraphicsDriver(graphicsDriver);
         BX_TRACE("Found Graphics Driver: %s v%d.%d", drvGetName(graphicsDriver),
                  T_VERSION_MAJOR(drvGetVersion(graphicsDriver)), T_VERSION_MINOR(drvGetVersion(graphicsDriver)));
-        if (g_core->renderer->init(g_alloc, drvGetGraphicsDriver(graphicsDriver), platform, conf.keymap)) {
+        if (g_core->renderer->init(g_alloc, gdriver, platform, conf.keymap)) {
             T_ERROR("Renderer Init failed");
+            return T_ERR_FAILED;
+        }
+        
+        // Init and Register graphics resource loaders
+        textureInitLoader(gdriver, g_alloc);
+        textureRegisterToDatastore(g_core->dataStore);
+
+        // Font library
+        if (fntInitLibrary(g_alloc, g_core->blockingDataDriver)) {
+            T_ERROR("Initializing font library failed");
+            return T_ERR_FAILED;
+        }
+        loadFontsInDirectory(g_core->blockingDataDriver, "fonts");
+
+        // VectorGraphics
+        if (vgInit(g_alloc, gdriver)) {
+            T_ERROR("Initializing Vector graphics failed");
+            return T_ERR_FAILED;
+        }
+
+        // Debug graphics
+        if (dbgInit(g_alloc, gdriver)) {
+            T_ERROR("Initializing Debug graphics failed");
             return T_ERR_FAILED;
         }
     }
 
     // Initialize job dispatcher
     if (jobInit(g_alloc, 0, 0, 0, 0, false)) {
-        BX_FATAL("Job Dispatcher init failed");
+        T_ERROR("Job Dispatcher init failed");
         return T_ERR_FAILED;
     }
 
@@ -240,6 +297,11 @@ void termite::coreShutdown()
     }
 
     jobShutdown();
+
+    dbgShutdown();
+    vgShutdown();
+    fntShutdownLibrary();
+    textureShutdownLoader();
 
     if (g_core->renderer) {
         g_core->renderer->shutdown();

@@ -1442,7 +1442,7 @@ STBTT_DEF int stbtt_GetGlyphShape(const stbtt_fontinfo *info, int glyph_index, s
                if (comp_verts) STBTT_free(comp_verts, info->userdata);
                return 0;
             }
-            if (num_vertices > 0) STBTT_memcpy(tmp, vertices, num_vertices*sizeof(stbtt_vertex));
+            if (num_vertices > 0) STBTT_memcpy(tmp, vertices, num_vertices*sizeof(stbtt_vertex)); //-V595
             STBTT_memcpy(tmp+num_vertices, comp_verts, comp_num_verts*sizeof(stbtt_vertex));
             if (vertices) STBTT_free(vertices, info->userdata);
             vertices = tmp;
@@ -1696,7 +1696,7 @@ static stbtt__active_edge *stbtt__new_active(stbtt__hheap *hh, stbtt__edge *e, i
    //STBTT_assert(e->y0 <= start_point);
    if (!z) return z;
    z->fdx = dxdy;
-   z->fdy = dxdy != 0.0f ? (1.0f/dxdy) : 0.0f;
+   z->fdy = dxdy != 0.0f ? (1.0f/dxdy) : 0.0f; //-V550
    z->fx = e->x0 + dxdy * (start_point - e->y0);
    z->fx -= off_x;
    z->direction = e->invert ? 1.0f : -1.0f;
@@ -1859,7 +1859,7 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
 // (i.e. it has already been clipped to those)
 static void stbtt__handle_clipped_edge(float *scanline, int x, stbtt__active_edge *e, float x0, float y0, float x1, float y1)
 {
-   if (y0 == y1) return;
+   if (y0 == y1) return; //-V550
    STBTT_assert(y0 < y1);
    STBTT_assert(e->sy <= e->ey);
    if (y0 > e->ey) return;
@@ -1873,9 +1873,9 @@ static void stbtt__handle_clipped_edge(float *scanline, int x, stbtt__active_edg
       y1 = e->ey;
    }
 
-   if (x0 == x)
+   if (x0 == x) //-V550
       STBTT_assert(x1 <= x+1);
-   else if (x0 == x+1)
+   else if (x0 == x+1) //-V550
       STBTT_assert(x1 >= x);
    else if (x0 <= x)
       STBTT_assert(x1 <= x);
@@ -1904,7 +1904,7 @@ static void stbtt__fill_active_edges_new(float *scanline, float *scanline_fill, 
       // compute intersection points with top & bottom
       STBTT_assert(e->ey >= y_top);
 
-      if (e->fdx == 0) {
+      if (e->fdx == 0) { //-V550
          float x0 = e->fx;
          if (x0 < len) {
             if (x0 >= 0) {
@@ -2099,8 +2099,8 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
       }
 
       // insert all edges that start before the bottom of this scanline
-      while (e->y0 <= scan_y_bottom) {
-         if (e->y0 != e->y1) {
+      while (e->y0 <= scan_y_bottom) { //-V574
+         if (e->y0 != e->y1) { //-V550
             stbtt__active_edge *z = stbtt__new_active(&hh, e, off_x, scan_y_top, userdata);
             STBTT_assert(z->ey >= scan_y_top);
             // insert at front
@@ -2272,7 +2272,7 @@ static void stbtt__rasterize(stbtt__bitmap *result, stbtt__point *pts, int *wcou
       for (k=0; k < wcount[i]; j=k++) {
          int a=k,b=j;
          // skip the edge if horizontal
-         if (p[j].y == p[k].y)
+         if (p[j].y == p[k].y) //-V550
             continue;
          // add edge from j to k to the list
          e[n].invert = 0;
@@ -2420,9 +2420,9 @@ STBTT_DEF unsigned char *stbtt_GetGlyphBitmapSubpixel(const stbtt_fontinfo *info
    stbtt_vertex *vertices;   
    int num_verts = stbtt_GetGlyphShape(info, glyph, &vertices);
 
-   if (scale_x == 0) scale_x = scale_y;
-   if (scale_y == 0) {
-      if (scale_x == 0) return NULL;
+   if (scale_x == 0) scale_x = scale_y; //-V550
+   if (scale_y == 0) { //-V550
+      if (scale_x == 0) return NULL; //-V550
       scale_y = scale_x;
    }
 
@@ -2982,7 +2982,7 @@ STBTT_DEF int stbtt_PackFontRanges(stbtt_pack_context *spc, unsigned char *fontd
 
    stbtt_PackFontRangesPackRects(spc, rects, n);
   
-   return_value = stbtt_PackFontRangesRenderIntoRects(spc, &info, ranges, num_ranges, rects);
+   return_value = stbtt_PackFontRangesRenderIntoRects(spc, &info, ranges, num_ranges, rects); //-V519
 
    STBTT_free(rects, spc->user_allocator_context);
    return return_value;

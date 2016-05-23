@@ -26,9 +26,9 @@ namespace bx
 
     private:
         AllocatorI* m_alloc;
-        int m_maxItems;
         Ty* m_buffer;
         Ty** m_ptrs;
+        int m_maxItems;
         int m_index;
     };
 

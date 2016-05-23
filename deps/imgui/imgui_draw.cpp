@@ -415,7 +415,7 @@ void ImDrawList::AddPolyline(const ImVec2* points, const int points_count, ImU32
         PrimReserve(idx_count, vtx_count);
 
         // Temporary buffer
-        ImVec2* temp_normals = (ImVec2*)alloca(points_count * (thick_line ? 5 : 3) * sizeof(ImVec2));
+        ImVec2* temp_normals = (ImVec2*)alloca(points_count * (thick_line ? 5 : 3) * sizeof(ImVec2)); //-V630
         ImVec2* temp_points = temp_normals + points_count;
 
         for (int i1 = 0; i1 < count; i1++)
@@ -596,7 +596,7 @@ void ImDrawList::AddConvexPolyFilled(const ImVec2* points, const int points_coun
         }
 
         // Compute normals
-        ImVec2* temp_normals = (ImVec2*)alloca(points_count * sizeof(ImVec2));
+        ImVec2* temp_normals = (ImVec2*)alloca(points_count * sizeof(ImVec2)); //-V630
         for (int i0 = points_count-1, i1 = 0; i1 < points_count; i0 = i1++)
         {
             const ImVec2& p0 = points[i0];
@@ -671,7 +671,7 @@ void ImDrawList::PathArcToFast(const ImVec2& centre, float radius, int amin, int
     }
 
     if (amin > amax) return;
-    if (radius == 0.0f)
+    if (radius == 0.0f) //-V550
     {
         _Path.push_back(centre);
     }
@@ -688,7 +688,7 @@ void ImDrawList::PathArcToFast(const ImVec2& centre, float radius, int amin, int
 
 void ImDrawList::PathArcTo(const ImVec2& centre, float radius, float amin, float amax, int num_segments)
 {
-    if (radius == 0.0f)
+    if (radius == 0.0f) //-V550
         _Path.push_back(centre);
     _Path.reserve(_Path.Size + (num_segments + 1));
     for (int i = 0; i <= num_segments; i++)
@@ -1893,7 +1893,7 @@ ImVec2 ImFont::CalcTextSizeA(float size, float max_width, float wrap_width, cons
     if (text_size.x < line_width)
         text_size.x = line_width;
 
-    if (line_width > 0 || text_size.y == 0.0f)
+    if (line_width > 0 || text_size.y == 0.0f) //-V550
         text_size.y += line_height;
 
     if (remaining)

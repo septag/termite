@@ -536,7 +536,7 @@ namespace bx
 		const float x2  =  x + x;
 		const float y2  =  y + y;
 		const float z2  =  z + z;
-		const float x2x = x2 * x;
+		const float x2x = x2 * x; //-V525
 		const float x2y = x2 * y;
 		const float x2z = x2 * z;
 		const float x2w = x2 * w;

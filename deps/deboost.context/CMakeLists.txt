@@ -44,7 +44,5 @@ set(ASM_SOURCES "asm/make_${CPU_ARCH}_${ASM_EXT}"
 
 add_library(fcontext STATIC ${SOURCES} ${ASM_SOURCES})
 
-
 install(TARGETS fcontext DESTINATION lib)
 install(FILES ${HEADER} DESTINATION include/fcontext)
-

@@ -34,7 +34,7 @@ namespace termite
         }
     };
 
-    class BX_NO_VTABLE gfxCallbacks
+    class BX_NO_VTABLE gfxCallbacksI
     {
     public:
         virtual void onFatal(gfxFatalType type, const char* str) = 0;
@@ -51,11 +51,11 @@ namespace termite
 
     typedef void (*gfxCallbackReleaseMem)(void* ptr, void* userData);
 
-    class BX_NO_VTABLE gfxDriver
+    class BX_NO_VTABLE gfxDriverI
     {
     public:
         // Init
-        virtual result_t init(uint16_t deviceId, gfxCallbacks* callbacks, bx::AllocatorI* alloc) = 0;
+        virtual result_t init(uint16_t deviceId, gfxCallbacksI* callbacks, bx::AllocatorI* alloc) = 0;
         virtual void shutdown() = 0;
 
         virtual void reset(uint32_t width, uint32_t height, gfxResetFlag flags = gfxResetFlag::None) = 0;
@@ -132,10 +132,11 @@ namespace termite
                                 uint8_t attachment, gfxTextureFlag flags = gfxTextureFlag::FromTexture) = 0;
 
         // Submit
-        virtual uint32_t submit(uint8_t viewId, gfxProgramHandle program, int32_t depth = 0) = 0;
-        virtual uint32_t submit(uint8_t viewId, gfxProgramHandle program, gfxOccQueryHandle occQuery, int32_t depth = 0) = 0;
+        virtual uint32_t submit(uint8_t viewId, gfxProgramHandle program, int32_t depth = 0, bool preserveState = false) = 0;
+        virtual uint32_t submit(uint8_t viewId, gfxProgramHandle program, gfxOccQueryHandle occQuery, int32_t depth = 0,
+                                bool preserveState = false) = 0;
         virtual uint32_t submit(uint8_t viewId, gfxProgramHandle program, gfxIndirectBufferHandle indirectHandle,
-                                uint16_t start, uint16_t num, int32_t depth = 0) = 0;
+                                uint16_t start, uint16_t num, int32_t depth = 0, bool preserveState = false) = 0;
 
         // Compute
         virtual void setBuffer(uint8_t stage, gfxIndexBufferHandle handle, gfxAccess access) = 0;

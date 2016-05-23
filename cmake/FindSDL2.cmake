@@ -65,6 +65,10 @@
 # (To distribute this file outside of CMake, substitute the full
 #  License text for the above reference.)
 
+if (WIN32)
+	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/sdl CACHE PATH "SDL2 root directory")
+endif()
+
 SET(SDL2_SEARCH_PATHS
 	~/Library/Frameworks
 	/Library/Frameworks
@@ -163,19 +167,25 @@ IF(SDL2_LIBRARY_TEMP)
 	ENDIF(MINGW)
 
 	if(SDL2_BIN_DIR)
-		SET(SDL2_DLL ${SDL2_BIN_DIR}/SDL2.dll CACHE STRING "Where the SDL2 DLL can be found")
+		SET(SDL2_DLL ${SDL2_BIN_DIR}/SDL2.dll CACHE PATH "Where the SDL2 DLL can be found")
 		SET(SDL2_BIN_DIR ${SDL2_BIN_DIR} CACHE INTERNAL "")
 	endif()
 
 	# Set the final string here so the GUI reflects the final state.
-	SET(SDL2_LIBRARY ${SDL2_LIBRARY_TEMP} CACHE STRING "Where the SDL2 Library can be found")
-	# Set the temp variable to INTERNAL so it is not seen in the CMake GUI
-	SET(SDL2_LIBRARY_TEMP "${SDL2_LIBRARY_TEMP}" CACHE INTERNAL "")
-	SET(SDL2MAIN_LIBRARY "${SDL2MAIN_LIBRARY}" CACHE INTERNAL "")
+	SET(SDL2_LIBRARY ${SDL2_LIBRARY_TEMP} CACHE PATH "Where the SDL2 Library can be found")
 	
 ENDIF(SDL2_LIBRARY_TEMP)
 
 INCLUDE(FindPackageHandleStandardArgs)
 
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(SDL2 REQUIRED_VARS SDL2_LIBRARY SDL2_INCLUDE_DIR)
+
+if (SDL2_FOUND AND WIN32)
+    function(sdl2_copy_binaries TargetDirectory)
+        add_custom_target(SDL2CopyBinaries
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SDL2_PATH}/bin/SDL2.dll ${TargetDirectory}/SDL2.dll
+        COMMENT "Copying SDL2 binaries to '${TargetDirectory}'"
+        VERBATIM)
+    endfunction()  	
+endif()
 

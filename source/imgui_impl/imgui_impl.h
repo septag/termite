@@ -1,10 +1,10 @@
 #pragma once
 
-#include "imgui/imgui.h"
+#include "imgui.h"
 
 namespace termite
 {
-    int imguiInit(uint16_t viewWidth, uint16_t viewHeight, gfxDriver* driver, const int* keymap = nullptr);
+    int imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, gfxDriverI* driver, const int* keymap = nullptr);
     void imguiShutdown();
 
     void imguiRender();

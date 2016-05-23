@@ -17,14 +17,14 @@ using namespace termite;
 struct ResourceTypeData
 {
     char name[32];
-    dsResourceCallbacks* callbacks;
+    dsResourceCallbacksI* callbacks;
     int userParamsSize;
 };
 
 struct Resource
 {
     dsResourceHandle handle;
-    dsResourceCallbacks* callbacks;
+    dsResourceCallbacksI* callbacks;
     uint8_t userParams[MAX_USERPARAM_SIZE];
     bx::Path uri;
     uint32_t refcount;
@@ -35,6 +35,7 @@ struct Resource
 
 struct AsyncLoadRequest
 {
+    dsDataStore* ds;
     dsResourceHandle handle;
     dsFlag flags;
 };
@@ -45,7 +46,7 @@ namespace termite
     {
     public:
         dsInitFlag flags;
-        dsDriver* driver;
+        dsDriverI* driver;
         dsOperationMode opMode;
         bx::ArrayWithPop<ResourceTypeData> resourceTypes;
         bx::HashTableInt resourceTypesTable;    // hash(name) -> index in resourceTypes
@@ -82,7 +83,7 @@ namespace termite
 }   // namespace st
 
 
-termite::dsDataStore* termite::dsCreate(termite::dsInitFlag flags, termite::dsDriver* driver)
+termite::dsDataStore* termite::dsCreate(termite::dsInitFlag flags, termite::dsDriverI* driver)
 {
     assert(driver);
 
@@ -154,7 +155,7 @@ void termite::dsDestroy(dsDataStore* ds)
     BX_END_OK();
 }
 
-dsResourceTypeHandle termite::dsRegisterResourceType(dsDataStore* ds, const char* name, dsResourceCallbacks* callbacks, 
+dsResourceTypeHandle termite::dsRegisterResourceType(dsDataStore* ds, const char* name, dsResourceCallbacksI* callbacks, 
                                                 int userParamsSize /*= 0*/)
 {
     if (ds == nullptr)
@@ -180,8 +181,6 @@ dsResourceTypeHandle termite::dsRegisterResourceType(dsDataStore* ds, const char
 void termite::dsUnregisterResourceType(dsDataStore* ds, dsResourceTypeHandle handle)
 {
     if (T_ISVALID(handle)) {
-        assert(handle.idx < ds->resourceTypes.getCount());
-
         ResourceTypeData* tdata = ds->resourceTypes.pop(handle.idx);
         
         int index = ds->resourceTypesTable.find(bx::hashMurmur2A(tdata->name, (uint32_t)strlen(tdata->name)));
@@ -200,7 +199,7 @@ inline uint32_t hashResource(const char* uri, const void* userParams, int userPa
     return hash.end();
 }
 
-static dsResourceHandle newResource(dsDataStore* ds, dsResourceCallbacks* callbacks, const char* uri, const void* userParams, 
+static dsResourceHandle newResource(dsDataStore* ds, dsResourceCallbacksI* callbacks, const char* uri, const void* userParams, 
                                     int userParamsSize, uintptr_t obj, uint32_t typeNameHash)
 {
     int index;
@@ -267,7 +266,7 @@ static void deleteResource(dsDataStore* ds, dsResourceHandle handle)
         ds->resourcesTable.remove(tIdx);
 }
 
-static dsResourceHandle addResource(dsDataStore* ds, dsResourceCallbacks* callbacks, const char* uri, const void* userParams,
+static dsResourceHandle addResource(dsDataStore* ds, dsResourceCallbacksI* callbacks, const char* uri, const void* userParams,
                                     int userParamsSize, uintptr_t obj, dsResourceHandle overrideHandle, uint32_t typeNameHash)
 {
     dsResourceHandle handle = overrideHandle;
@@ -289,7 +288,7 @@ static dsResourceHandle addResource(dsDataStore* ds, dsResourceCallbacks* callba
 }
 
 static termite::dsResourceHandle loadResource(dsDataStore* ds, uint32_t nameHash, const char* uri, const void* userParams,
-                                         dsFlag flags)
+                                              dsFlag flags)
 {
     if (ds == nullptr)
         ds = coreGetDefaultDataStore();
@@ -337,6 +336,7 @@ static termite::dsResourceHandle loadResource(dsDataStore* ds, uint32_t nameHash
                 deleteResource(ds, handle);
                 return T_INVALID_HANDLE;
             }
+            req->ds = ds;
             req->handle = handle;
             req->flags = flags;
             ds->asyncLoadsTable.add(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)), reqIdx);
@@ -372,7 +372,7 @@ static termite::dsResourceHandle loadResource(dsDataStore* ds, uint32_t nameHash
 
             // Trigger onReload callback
             if ((uint8_t)(flags & dsFlag::Reload)) {
-                tdata.callbacks->onReload(handle);
+                tdata.callbacks->onReload(ds, handle);
             }
 
             BX_VERBOSE("Loaded (%s): '%s'", tdata.name, uri);
@@ -382,8 +382,8 @@ static termite::dsResourceHandle loadResource(dsDataStore* ds, uint32_t nameHash
     return handle;
 }
 
-termite::dsResourceHandle termite::dsLoadResource(dsDataStore* ds, const char* name, const char* uri, const void* userParams,
-                                        dsFlag flags)
+dsResourceHandle termite::dsLoadResource(dsDataStore* ds, const char* name, const char* uri, const void* userParams,
+                                         dsFlag flags)
 {
     return loadResource(ds, bx::hashMurmur2A(name, (uint32_t)strlen(name)), uri, userParams, flags);
 }
@@ -491,7 +491,7 @@ void termite::dsDataStore::onReadComplete(const char* uri, MemoryBlock* mem)
 
         // Trigger onReload callback
         if ((uint8_t)(areq->flags & dsFlag::Reload)) {
-            rs->callbacks->onReload(rs->handle);
+            rs->callbacks->onReload(areq->ds, rs->handle);
         }
     } else {
         coreReleaseMemory(mem);

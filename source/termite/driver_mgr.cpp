@@ -99,29 +99,29 @@ static void destroyDriver(drvHandle drv)
     gServer->driverPool.deleteInstance(drv);
 }
 
-gfxDriver* termite::drvGetGraphicsDriver(drvHandle drv)
+gfxDriverI* termite::drvGetGraphicsDriver(drvHandle drv)
 {
     if (drv->type != drvType::GraphicsDriver)
         return nullptr;
 
-    return (gfxDriver*)drv->data;
+    return (gfxDriverI*)drv->data;
 }
 
-gfxRender* termite::drvGetRenderer(drvHandle drv)
+gfxRenderI* termite::drvGetRenderer(drvHandle drv)
 {
     if (drv->type != drvType::Renderer)
         return nullptr;
 
-    return (gfxRender*)drv->data;
+    return (gfxRenderI*)drv->data;
 }
 
 
-dsDriver* termite::drvGetDataStoreDriver(drvHandle drv)
+dsDriverI* termite::drvGetDataStoreDriver(drvHandle drv)
 {
     if (drv->type != drvType::DataStoreDriver)
         return nullptr;
 
-    return (dsDriver*)drv->data;
+    return (dsDriverI*)drv->data;
 }
 
 termite::drvHandle termite::drvFindHandleByName(const char* name)

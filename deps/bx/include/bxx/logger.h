@@ -53,7 +53,8 @@ namespace bx
         Fatal,
         Warning,
         Init,
-        Shutdown
+        Shutdown,
+        Debug
     };
 
     enum class LogColor

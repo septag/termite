@@ -92,6 +92,7 @@ struct ThreadData
         stackIdx = 0;
         main = false;
         threadId = 0;
+        memset(stacks, 0x00, sizeof(stacks));
     }
 };
 
@@ -131,6 +132,7 @@ struct JobDispatcher
         dummyCounter = 0;
         numWaits = 0;
         memset(waitList, 0x00, sizeof(waitList));
+        memset(&mainStack, 0x00, sizeof(mainStack));
     }
 };
 

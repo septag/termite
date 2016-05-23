@@ -4,9 +4,9 @@
 
 namespace termite
 {
-    class gfxDriver;
-    class gfxRender;
-    class dsDriver;
+    class gfxDriverI;
+    class gfxRenderI;
+    class dsDriverI;
 
     struct drvDriver;
     typedef struct drvDriver* drvHandle;
@@ -21,9 +21,9 @@ namespace termite
     int drvInit();
     void drvShutdown();
 
-    TERMITE_API gfxDriver* drvGetGraphicsDriver(drvHandle drv);
-    TERMITE_API gfxRender* drvGetRenderer(drvHandle drv);
-    TERMITE_API dsDriver* drvGetDataStoreDriver(drvHandle drv);
+    TERMITE_API gfxDriverI* drvGetGraphicsDriver(drvHandle drv);
+    TERMITE_API gfxRenderI* drvGetRenderer(drvHandle drv);
+    TERMITE_API dsDriverI* drvGetDataStoreDriver(drvHandle drv);
 
     TERMITE_API drvHandle drvRegister(drvType type, const char* name, uint32_t version, void* driver);
     TERMITE_API drvHandle drvFindHandleByName(const char* name);

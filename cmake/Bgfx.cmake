@@ -10,7 +10,7 @@ function(bgfx_get_platform PLATFORM)
     endif()
 endfunction()
 
-function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OUTPUT_C_HEADER SHADER_GEN_FILES)
+function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OUTPUT_C_HEADER NAME_SUFFIX SHADER_GEN_FILES)
     if (WIN32)
         set(SHADERC_EXT ".exe")
     endif()
@@ -47,6 +47,10 @@ function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OU
         get_filename_component(SHADER_FILE_EXT ${SHADER_FILE} EXT)
         get_filename_component(SHADER_FILE_NAME ${SHADER_FILE} NAME_WE)
         get_filename_component(SHADER_FILE_DIR ${SHADER_FILE_ABS} DIRECTORY)
+
+        if (NAME_SUFFIX)
+            set(${SHADER_FILE_NAME} "${SHADER_FILE_NAME}_${NAME_SUFFIX}")
+        endif()
 
         # shader type and output file name
         if (SHADER_FILE_EXT STREQUAL ".vsc")
@@ -102,6 +106,5 @@ function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OU
     endforeach()
 
     set(${SHADER_GEN_FILES} "${GEN_FILES}" PARENT_SCOPE)
-
 endfunction()
 

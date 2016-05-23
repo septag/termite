@@ -49,7 +49,10 @@ BX_STATIC_ASSERT(BX_COUNTOF(gAttribTypeSize) == (int)gfxRendererType::Count + 1)
 
 termite::gfxVertexDecl::gfxVertexDecl()
 {
-
+    hash = 0;
+    stride = 0;
+    memset(offset, 0x00, sizeof(offset));
+    memset(attribs, 0x00, sizeof(attribs));
 }
 
 gfxVertexDecl& termite::gfxVertexDecl::begin(gfxRendererType _type)

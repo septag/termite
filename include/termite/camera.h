@@ -1,40 +1,47 @@
 #pragma once
 
-#include "bx/float4x4_t.h"
+#include "vec_math.h"
 
 namespace termite
 {
-    inline float4x4_t mtxOrthoOffCenterLH(float l, float r, float b, float t, float zn, float zf)
+    struct Camera
     {
-        float4x4_t m;
+        vec3_t forward;
+        vec3_t right;
+        vec3_t up;
+        vec3_t pos;
 
-        m.col[0][0] = 2.0f / (r - l);
-        m.col[0][1] = 0.0f;
-        m.col[0][2] = 0.0f;
-        m.col[0][3] = (l + r) / (l - r);
+        quat_t quat;
+        float ffar;
+        float fnear;
+        float fov;
 
-        m.col[1][0] = 0.0f;
-        m.col[1][1] = 2.0f / (t - b);
-        m.col[1][2] = 0.0f;
-        m.col[1][3] = (t + b) / (b - t);
+        float pitch;
+        float yaw;
+    };
 
-        m.col[2][0] = 0.0f;
-        m.col[2][1] = 0.0f;
-        m.col[2][2] = 1.0f / (zf - zn);
-        m.col[2][3] = zn / (zn - zf);
-
-        m.col[3][0] = 0.0f;
-        m.col[3][1] = 0.0f;
-        m.col[3][2] = 0.0f;
-        m.col[3][3] = 1.0f;
-
-        return m;
-    }
-
-    inline float4x4_t mtxOrthoLH(float w, float h, float zn, float zf)
+    enum class CameraPlane : int
     {
-        float wHalf = w*0.5f;
-        float hHalf = h*0.5f;
-        return mtxOrthoOffCenterLH(-wHalf, wHalf, -hHalf, hHalf, zn, zf);
-    }
-} // namespace st
+        Left = 0,
+        Right,
+        Top,
+        Bottom,
+        Near,
+        Far,
+        Count
+    };
+
+    TERMITE_API void camInit(Camera* cam, float fov = 60.0f, float fnear = 0.1f, float ffar = 100.0f);
+    TERMITE_API void camLookAt(Camera* cam, const vec3_t pos, const vec3_t lookat);
+    TERMITE_API void camCalcFrustumCorners(Camera* cam, vec3_t result[8], float aspectRatio, 
+                                           float nearOverride = 0, float farOverride = 0);
+    TERMITE_API void camCalcFrustumPlanes(plane_t result[int(CameraPlane::Count)], const mtx4x4_t& viewProjMtx);
+    TERMITE_API void camPitch(Camera* cam, float pitch);
+    TERMITE_API void camYaw(Camera* cam, float yaw);
+    TERMITE_API void camPitchYaw(Camera* cam, float pitch, float yaw);
+    TERMITE_API void camRoll(Camera* cam, float roll);
+    TERMITE_API void camForward(Camera* cam, float fwd);
+    TERMITE_API void camStrafe(Camera* cam, float strafe);
+    TERMITE_API mtx4x4_t camViewMtx(Camera* cam);
+    TERMITE_API mtx4x4_t camProjMtx(Camera* cam, float aspectRatio);
+} // namespace termite

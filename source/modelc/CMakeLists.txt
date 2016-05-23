@@ -7,20 +7,9 @@ source_group(source FILES ${SOURCE_FILES})
 set(INCLUDE_FILES ../include_common/t3d_format.h)
 source_group(common FILES ${INCLUDE_FILES})
 
-include_directories(${DEP_ROOT_DIR})
-
-# assimp
-if (CMAKE_BUILD_TYPE)
-    set(ASSIMP_LIBFILE "$<$<CONFIG:Debug>:${ASSIMP_LIBS_DEBUG}>"
-                       "$<$<CONFIG:Release>:${ASSIMP_LIBS}>"
-                       "$<$<CONFIG:Profile>:${ASSIMP_LIBS}>"
-                       "$<$<CONFIG:Development>:${ASSIMP_LIBS}>")
-else()
-    set(ASSIMP_LIBFILE ${ASSIMP_LIBS})
-endif()
-
-include_directories(${ASSIMP_INCLUDE_DIRS})
 add_executable(modelc ${SOURCE_FILES} ${INCLUDE_FILES})
-target_link_libraries(modelc ${ASSIMP_LIBFILE})
+target_link_libraries(modelc ${ASSIMP_LIBRARY} bx)
+target_include_directories(modelc PRIVATE ${ASSIMP_INCLUDE_DIR})
+add_dependencies(modelc AssimpCopyBinaries)
 
 install(TARGETS modelc RUNTIME DESTINATION bin)

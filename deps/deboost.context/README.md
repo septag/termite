@@ -5,9 +5,10 @@
 #### Currently supported platforms 
 - Windows (x86_64, Win32)
 - Linux (x86_64/x86)
+- OSX (x86_64/x86)
 - More will be added soon ...
 
-#### Linux/Unix
+#### Linux/Unix/Mac
 ```
 cd deboost.context
 mkdir .build
@@ -28,6 +29,7 @@ cmake .. -G "Visual Studio 14 2015 Win64"
 Now open the generated solution file and build
 
 ### Usage
+Link your program with fcontext.lib/libfcontext.a and include the file _fcontext.h_.  
 See _include/fcontext/fcontext.h_ for API usage.  
 More info is available at: [boost.context](http://www.boost.org/doc/libs/1_60_0/libs/context/doc/html/index.html)
 

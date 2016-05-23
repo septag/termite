@@ -4,13 +4,13 @@
 
 namespace termite
 {
-    class gfxDriver;
+    class gfxDriverI;
     struct gfxPlatformData;
 
-    class gfxRender
+    class BX_NO_VTABLE gfxRenderI
     {
     public:
-        virtual result_t init(bx::AllocatorI* alloc, gfxDriver* driver, const gfxPlatformData* platformData = nullptr,
+        virtual result_t init(bx::AllocatorI* alloc, gfxDriverI* driver, const gfxPlatformData* platformData = nullptr,
                               const int* uiKeymap = nullptr) = 0;
         virtual void shutdown() = 0;
         virtual void render() = 0;

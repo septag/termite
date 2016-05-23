@@ -67,10 +67,16 @@ namespace bx
 				this->u = 0;
 			}
 
-			Data(Data& data)
-			{
-				this->u = data.u;
-			}
+            Data(const Data& d)
+            {
+                this->u = d.u;
+            }
+            
+            Data& operator=(const Data& d)
+            {
+                this->u = d.u;
+                return *this;
+            }
         };
 
         Data m_data;
@@ -187,11 +193,17 @@ namespace bx
 			{
 				this->u = 0;
 			}
-
-			Data(const Data& data)
-			{
-				this->u = data.u;
-			}
+            
+            Data(const Data& d)
+            {
+                this->u = d.u;
+            }
+            
+            Data& operator=(const Data& d)
+            {
+                this->u = d.u;
+                return *this;
+            }
         };
 
         Data m_data;

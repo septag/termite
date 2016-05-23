@@ -87,6 +87,10 @@ namespace termite
         RG32I,
         RG32U,
         RG32F,
+        RGB8,
+        RGB8I,
+        RGB8U,
+        RGB8S,
         RGB9E5F,
         BGRA8,
         RGBA8,
@@ -112,6 +116,7 @@ namespace termite
         D24S8,
         D32,
         D16F,
+        D24F,
         D32F,
         D0S8,
 
@@ -267,7 +272,7 @@ namespace termite
         uint32_t deviceWidth;
         uint32_t deviceHeight;
         uint8_t flags;
-        gfxEye eye;
+        gfxEye eye[2];
     };
 
     enum class gfxRenderFrameType
@@ -650,7 +655,7 @@ namespace termite
 
     inline gfxState gfxStateBlendLighten()
     {
-        return gfxStateBlendFunc(gfxState::BlendOne, gfxState::BlendOne) | gfxStateBlendEq(gfxState::BlendEqMin);
+        return gfxStateBlendFunc(gfxState::BlendOne, gfxState::BlendOne) | gfxStateBlendEq(gfxState::BlendEqMax);
     }
 
     inline gfxState gfxStateBlendMultiply()
@@ -673,7 +678,7 @@ namespace termite
         return gfxStateBlendFunc(gfxState::BlendDestColor, gfxState::BlendInvDestColor) | gfxStateBlendEq(gfxState::BlendEqSub);
     }
 
-    inline const char* rendererTypeToStr(gfxRendererType type)
+    inline const char* gfxRendererTypeToStr(gfxRendererType type)
     {
         switch (type) {
         case gfxRendererType::Direct3D9:

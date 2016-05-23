@@ -135,7 +135,7 @@ namespace bx
         if (!up)
             up = strrchr(this->text, '\\');
 
-        if (!up)
+        if (up)
             *up = 0;
 
         return *this;

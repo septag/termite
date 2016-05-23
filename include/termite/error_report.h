@@ -17,6 +17,8 @@
 #define T_ERR_ALREADY_INITIALIZED -3
 #define T_ERR_BUSY -4
 #define T_ERR_NOT_INITIALIZED -5
+#define T_ERR_ALREADY_EXISTS -6
+#define T_ERR_IO_FAILED -7
 
 namespace termite
 {

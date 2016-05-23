@@ -115,8 +115,6 @@ struct ModelData
                 BX_FREE(&g_alloc, geo.attribOffsets);
             if (geo.indices)
                 BX_FREE(&g_alloc, geo.indices);
-            if (geo.indices)
-                BX_FREE(&g_alloc, geo.indices);
             if (geo.joints)
                 BX_FREE(&g_alloc, geo.joints);
             if (geo.initPose)
@@ -1116,7 +1114,7 @@ int main(int argc, char** argv)
 
     bx::enableLogToFileHandle(stdout);
     LogFormatProxy logger(jsonLog ? LogProxyOptions::Json : LogProxyOptions::Text);
-    g_logger = &logger;
+    g_logger = &logger; //-V506
 
     // Argument check
     if (conf.inFilepath.isEmpty() || conf.outFilepath.isEmpty()) {

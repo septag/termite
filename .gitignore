@@ -20,6 +20,7 @@ Lib
 *.lnk
 ipch
 __pycache__
+Thumbs.db
 
 # Generated files
 docs/Doxyfile

@@ -41,7 +41,7 @@ namespace termite
     };
 
     // Backend interface for 
-    class BX_NO_VTABLE dsDriver
+    class BX_NO_VTABLE dsDriverI
     {
     public:
         virtual result_t init(bx::AllocatorI* alloc, const char* uri, const void* params, 
@@ -61,6 +61,7 @@ namespace termite
 
         virtual void runAsyncLoop() = 0;
 
-        virtual dsOperationMode getOpMode() = 0;
+        virtual dsOperationMode getOpMode() const = 0;
+        virtual const char* getUri() const = 0;
     };
 } // namespace st

@@ -2,10 +2,94 @@
 
 #include "bx/bx.h"
 #include "bx/fpumath.h"
+#include <float.h>
 
-#if !BX_COMPILER_MSVC
-#  include <float.h>
-#endif
+// Add some 2D transform functions to bx
+namespace bx
+{
+    inline void mtx3x3Translate(float* result, float x, float y)
+    {
+        memset(result, 0x00, sizeof(float) * 9);
+        result[0] = 1.0f;
+        result[4] = 1.0f;
+        result[6] = x;
+        result[7] = y;
+        result[8] = 1.0f;
+    }
+
+    inline void mtx3x3Rotate(float* result, float theta)
+    {
+        memset(result, 0x00, sizeof(float) * 9);
+        float c = fcos(theta);
+        float s = fsin(theta);
+        result[0] = c;     result[1] = -s;
+        result[3] = s;     result[4] = c;
+        result[8] = 1.0f;
+    }
+
+    inline void mtx3x3Scale(float* result, float sx, float sy)
+    {
+        memset(result, 0x00, sizeof(float) * 9);
+        result[0] = sx;
+        result[4] = sy;
+        result[8] = 1.0f;
+    }
+
+    inline void vec2MulMtx3x3(float* __restrict _result, const float* __restrict _vec, const float* __restrict _mat)
+    {
+        _result[0] = _vec[0] * _mat[0] + _vec[1] * _mat[3] + _mat[6];
+        _result[1] = _vec[0] * _mat[1] + _vec[1] * _mat[4] + _mat[7];
+        _result[2] = _vec[0] * _mat[2] + _vec[1] * _mat[5] + _mat[8];
+    }
+
+    inline void vec3MulMtx3x3(float* __restrict _result, const float* __restrict _vec, const float* __restrict _mat)
+    {
+        _result[0] = _vec[0] * _mat[0] + _vec[1] * _mat[3] + _vec[2] * _mat[6];
+        _result[1] = _vec[0] * _mat[1] + _vec[1] * _mat[4] + _vec[2] * _mat[7];
+        _result[2] = _vec[0] * _mat[2] + _vec[1] * _mat[5] + _vec[2] * _mat[8];
+    }
+
+    inline void mtx3x3Mul(float* __restrict _result, const float* __restrict _a, const float* __restrict _b)
+    {
+        vec3MulMtx3x3(&_result[0], &_a[0], _b);
+        vec3MulMtx3x3(&_result[3], &_a[3], _b);
+        vec3MulMtx3x3(&_result[6], &_a[6], _b);
+    }
+
+    // Reference: http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/
+    inline void quatMtx(float* _result, const float* mtx)
+    {
+        float trace = mtx[0] + mtx[5] + mtx[10];
+        if (trace > 0.00001f) {
+            float s = 0.5f / sqrtf(trace + 1.0f);
+            _result[3] = 0.25f / s;
+            _result[0] = (mtx[9] - mtx[6]) * s;
+            _result[1] = (mtx[2] - mtx[8]) * s;
+            _result[2] = (mtx[4] - mtx[1]) * s;
+        } else {
+            if (mtx[0] > mtx[5] && mtx[0] > mtx[10]) {
+                float s = 2.0f * sqrtf(1.0f + mtx[0] - mtx[5] - mtx[10]);
+                _result[3] = (mtx[9] - mtx[6]) / s;
+                _result[0] = 0.25f * s;
+                _result[1] = (mtx[1] + mtx[4]) / s;
+                _result[2] = (mtx[2] + mtx[8]) / s;
+            } else if (mtx[5] > mtx[10]) {
+                float s = 2.0f * sqrtf(1.0f + mtx[5] - mtx[0] - mtx[10]);
+                _result[3] = (mtx[2] - mtx[8]) / s;
+                _result[0] = (mtx[1] + mtx[4]) / s;
+                _result[1] = 0.25f * s;
+                _result[2] = (mtx[6] + mtx[9]) / s;
+            } else {
+                float s = 2.0f * sqrtf(1.0f + mtx[10] - mtx[0] - mtx[5]);
+                _result[3] = (mtx[4] - mtx[1]) / s;
+                _result[0] = (mtx[2] + mtx[8]) / s;
+                _result[1] = (mtx[6] + mtx[9]) / s;
+                _result[2] = 0.25f * s;
+            }
+        }
+    }
+}   // namespace bx
+
 
 namespace termite
 {
@@ -215,6 +299,16 @@ namespace termite
         return m;
     }
 
+    inline mtx4x4_t mtx4x4fv3(const float* _r0, const float* _r1, const float* _r2, const float* _r3)
+    {
+        mtx4x4_t m;
+        m.m11 = _r0[0];     m.m12 = _r0[1];     m.m13 = _r0[2];     m.m14 = 0;
+        m.m21 = _r1[0];     m.m22 = _r1[1];     m.m23 = _r1[2];     m.m24 = 0;
+        m.m31 = _r2[0];     m.m32 = _r2[1];     m.m33 = _r2[2];     m.m34 = 0;
+        m.m41 = _r3[0];     m.m42 = _r3[1];     m.m43 = _r3[2];     m.m44 = 1.0f;
+        return m;
+    }
+
     inline mtx4x4_t mtx4x4v(const vec4_t& _row0, const vec4_t& _row1, const vec4_t& _row2, const vec4_t& _row3)
     {
         mtx4x4_t m;
@@ -340,6 +434,7 @@ namespace termite
         aabb_t a;
         a.fmin[0] = _min[0];  a.fmin[1] = _min[1];  a.fmin[2] = _min[2];
         a.fmax[0] = _max[0];  a.fmax[1] = _max[1];  a.fmax[2] = _max[2];
+        return a;
     }
 
     inline aabb_t aabbf(float _xmin, float _ymin, float _zmin, float _xmax, float _ymax, float _zmax)
@@ -378,6 +473,14 @@ namespace termite
         rect_t r;
         r.xmin = _xmin;   r.ymin = _ymin;
         r.xmax = _xmax;   r.ymax = _ymax;
+        return r;
+    }
+
+    inline rect_t rectfwh(float _x, float _y, float _width, float _height)
+    {
+        rect_t r;
+        r.xmin = _x;                     r.ymin = _y;
+        r.xmax = _x + _width;            r.ymax = _y + _height;
         return r;
     }
 
@@ -617,5 +720,100 @@ namespace termite
         bx::vec3Max(rb->fmax, rb->fmax, pt.f);
     }    
 
+    inline uint32_t rgbaUint(float rgba[4])
+    {
+        uint8_t r = uint8_t(rgba[0]*255.0f);
+        uint8_t g = uint8_t(rgba[1]*255.0f);
+        uint8_t b = uint8_t(rgba[2]*255.0f);
+        uint8_t a = uint8_t(rgba[3]*255.0f);
+        return (uint32_t(r) << 24) | (uint32_t(g) << 16) | (uint32_t(b) << 8) | uint32_t(a);
+    }
 
+    typedef uint32_t color_t;
+
+    inline void mtxProjPlane(mtx4x4_t* r, const vec3_t planeNorm)
+    {
+        memset(r, 0x00, sizeof(mtx4x4_t));
+
+        r->m11 = 1.0f - planeNorm.x*planeNorm.x;
+        r->m22 = 1.0f - planeNorm.y*planeNorm.y;
+        r->m33 = 1.0f - planeNorm.z*planeNorm.z;
+
+        r->m12 = r->m21 = -planeNorm.x*planeNorm.y;
+        r->m13 = r->m31 = -planeNorm.x*planeNorm.z;
+        r->m23 = r->m32 = -planeNorm.y*planeNorm.z;
+
+        r->m44 = 1.0f;
+    }
+
+    // Color
+    inline color_t rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255)
+    {
+        return (uint32_t(a) << 24) | (uint32_t(b) << 16) | (uint32_t(g) << 8) | uint32_t(r);
+    }
+
+    inline color_t rgbaf(float r, float g, float b, float a = 1.0f)
+    {
+        uint8_t _r = uint8_t(r * 255.0f);
+        uint8_t _g = uint8_t(g * 255.0f);
+        uint8_t _b = uint8_t(b * 255.0f);
+        uint8_t _a = uint8_t(a * 255.0f);
+        return (uint32_t(_a) << 24) | (uint32_t(_b) << 16) | (uint32_t(_g) << 8) | uint32_t(_r);
+    }
+
+    inline color_t premultiplyAlpha(color_t color, float alpha)
+    {
+        float _alpha = float((color >> 24) & 0xff);
+        float premulAlpha = alpha * (_alpha / 255.0f);
+        return ((uint32_t(premulAlpha * 255.0f) & 0xff) << 24) | (color & 0xffffff);
+    }
+
+    // Operators
+    inline vec2_t operator+(const vec2_t& a, const vec2_t& b)
+    {
+        return vec2f(a.x + b.x, a.y + b.y);       
+    }
+
+    inline vec2_t operator-(const vec2_t& a, const vec2_t& b)
+    {
+        return vec2f(a.x - b.x, a.x - b.y);
+    }
+
+    inline vec2_t operator*(const vec2_t& v, float k)
+    {
+        return vec2f(v.x*k, v.y*k);
+    }
+
+    inline vec2_t operator*(float k, const vec2_t& v)
+    {
+        return vec2f(v.x*k, v.y*k);
+    }
+
+    inline vec3_t operator+(const vec3_t& v1, const vec3_t& v2)
+    {
+        vec3_t r;
+        bx::vec3Add(r.f, v1.f, v2.f);
+        return r;
+    }
+
+    inline vec3_t operator-(const vec3_t& v1, const vec3_t& v2)
+    {
+        vec3_t r;
+        bx::vec3Sub(r.f, v1.f, v2.f);
+        return r;
+    }
+
+    inline vec3_t operator*(const vec3_t& v, float k)
+    {
+        vec3_t r;
+        bx::vec3Mul(r.f, v.f, k);
+        return r;
+    }
+
+    inline vec3_t operator*(float k, const vec3_t& v)
+    {
+        vec3_t r;
+        bx::vec3Mul(r.f, v.f, k);
+        return r;
+    }
 } // namespace st

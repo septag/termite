@@ -16,10 +16,16 @@ source_group(ImGui FILES ${IMGUI_SOURCES})
 set(SHADER_SOURCES imgui.vsc imgui.fsc)
 source_group(shaders FILES ${SHADER_SOURCES})
 
-bgfx_add_shaders("${SHADER_SOURCES}" IGNORE IGNORE "shaders_h" TRUE SHADER_GEN_FILES)
+bgfx_add_shaders("${SHADER_SOURCES}" IGNORE IGNORE "shaders_h" TRUE IGNORE SHADER_GEN_FILES)
 source_group(shaders\\compiled FILES ${SHADER_GEN_FILES})
 
-include_directories(${DEP_ROOT_DIR})
+# ImGui itself
+add_library(imgui STATIC ${IMGUI_SOURCES})
+target_include_directories(imgui PUBLIC ${DEP_ROOT_DIR}/imgui)
 
-add_library(imgui_impl STATIC ${SOURCE_FILES} ${IMGUI_SOURCES} ${SHADER_SOURCES} ${SHADER_GEN_FILES})
+# ImGui Drawing for termite
+add_library(imgui_impl STATIC ${SOURCE_FILES} ${SHADER_SOURCES} ${SHADER_GEN_FILES})
+target_link_libraries(imgui_impl 
+    PRIVATE bx
+    PUBLIC imgui)
 
