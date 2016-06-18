@@ -24,16 +24,17 @@ namespace termite
     TERMITE_API void dbgTextf(dbgContext* ctx, const vec3_t pos, const char* fmt, ...);
     TERMITE_API void dbgImage(dbgContext* ctx, const vec3_t pos, gfxTexture* image);
     TERMITE_API void dbgSnapGridXZ(dbgContext* ctx, float spacing, float maxDepth);
-    TERMITE_API void dbgBoundingBox(dbgContext* ctx, const aabb_t aabb, bool showInfo = false);
+    TERMITE_API void dbgBoundingBox(dbgContext* ctx, const aabb_t bb, bool showInfo = false);
     TERMITE_API void dbgBoundingSphere(dbgContext* ctx, const sphere_t sphere, bool showInfo = false);
     TERMITE_API void dbgBox(dbgContext* ctx, const aabb_t aabb, const mtx4x4_t* modelMtx = nullptr);
     TERMITE_API void dbgSphere(dbgContext* ctx, const sphere_t sphere, const mtx4x4_t* modelMtx = nullptr);
     TERMITE_API void dbgAxis(dbgContext* ctx, const vec3_t axis, const mtx4x4_t* modelMtx = nullptr);
+    TERMITE_API void dbgRect(dbgContext* ctx, const vec3_t& vmin, const vec3_t& vmax);
 
     // State
     TERMITE_API void dbgSetFont(dbgContext* ctx, fntFont* font);
     TERMITE_API void dbgAlpha(dbgContext* ctx, float alpha);
-    TERMITE_API void dbgColor(dbgContext* ctx, color_t color);
+    TERMITE_API void dbgColor(dbgContext* ctx, const vec4_t& color);
     TERMITE_API void dbgTransform(dbgContext* ctx, const mtx4x4_t& mtx);
 
     TERMITE_API void dbgPushState(dbgContext* ctx);

@@ -8,8 +8,6 @@ else()
     enable_language(CXX ASM)
 endif()
 
-include_directories(include/fcontext)
-
 if(MSVC)
   add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
   add_definitions(-D_HAS_EXCEPTIONS=0)
@@ -43,6 +41,9 @@ set(ASM_SOURCES "asm/make_${CPU_ARCH}_${ASM_EXT}"
                 "asm/ontop_${CPU_ARCH}_${ASM_EXT}")
 
 add_library(fcontext STATIC ${SOURCES} ${ASM_SOURCES})
+target_include_directories(fcontext 
+    PRIVATE include/fcontext
+    INTERFACE include)
 
 install(TARGETS fcontext DESTINATION lib)
 install(FILES ${HEADER} DESTINATION include/fcontext)

@@ -80,12 +80,12 @@ public:
         m_driver->frame();
     }
 
-    void frame()
+    void frame() override
     {
         imguiNewFrame();
     }
 
-    void sendImInputMouse(float mousePos[2], int mouseButtons[3], float mouseWheel)
+    void sendImInputMouse(float mousePos[2], int mouseButtons[3], float mouseWheel) override
     {
         ImGuiIO& io = ImGui::GetIO();
         io.MousePos = ImVec2(mousePos[0], mousePos[1]);
@@ -101,7 +101,7 @@ public:
         io.AddInputCharactersUTF8(chars);
     }
 
-    void sendImInputKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl)
+    void sendImInputKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl) override
     {
         ImGuiIO& io = ImGui::GetIO();
         memcpy(io.KeysDown, keysDown, sizeof(io.KeysDown));

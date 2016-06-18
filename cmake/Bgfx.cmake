@@ -20,8 +20,10 @@ function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OU
     set(BGFX_SHADERC_PATH ${DEP_ROOT_DIR}/bgfx/bin/shaderc${SHADERC_EXT})
 
     # make output directory
-    if (NOT IS_DIRECTORY ${OUTPUT_DIR})
-        file(MAKE_DIRECTORY ${OUTPUT_DIR})
+    if (OUTPUT_DIR)
+        if (NOT IS_DIRECTORY ${OUTPUT_DIR})
+            file(MAKE_DIRECTORY ${OUTPUT_DIR})
+        endif()
     endif()
 
     # make include dirs string

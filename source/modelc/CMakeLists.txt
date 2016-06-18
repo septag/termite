@@ -10,6 +10,9 @@ source_group(common FILES ${INCLUDE_FILES})
 add_executable(modelc ${SOURCE_FILES} ${INCLUDE_FILES})
 target_link_libraries(modelc ${ASSIMP_LIBRARY} bx)
 target_include_directories(modelc PRIVATE ${ASSIMP_INCLUDE_DIR})
-add_dependencies(modelc AssimpCopyBinaries)
+
+if (WIN32)
+    add_dependencies(modelc AssimpCopyBinaries)
+endif()
 
 install(TARGETS modelc RUNTIME DESTINATION bin)

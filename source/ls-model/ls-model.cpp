@@ -68,20 +68,21 @@ int main(int argc, char **argv)
 
     // Output result
     bx::JsonNodeAllocator alloc(&g_alloc);
-    bx::JsonNode* jroot = bx::createJsonNode(&alloc);
+    bx::JsonNode* jroot = bx::createJsonNode(&alloc, nullptr, bx::JsonType::Object);
     bx::JsonNode* jchilds;
 
     if (node->mNumMeshes) {
         jroot->addChild(bx::createJsonNode(&alloc, "mesh")->setString(node->mName.C_Str()));
-        if (node->mNumChildren) {
-            jchilds = bx::createJsonNode(&alloc, "children", bx::JsonType::Array);
-            jroot->addChild(jchilds);
-        }
     }
 
-    for (uint32_t i = 0; i < node->mNumChildren; i++) {
-        if (node->mChildren[i]->mNumMeshes)
-            jchilds->addChild(bx::createJsonNode(&alloc)->setString(node->mChildren[i]->mName.C_Str()));
+    if (node->mNumChildren) {
+        jchilds = bx::createJsonNode(&alloc, "children", bx::JsonType::Array);
+        jroot->addChild(jchilds);
+
+        for (uint32_t i = 0; i < node->mNumChildren; i++) {
+            if (node->mChildren[i]->mNumMeshes)
+                jchilds->addChild(bx::createJsonNode(&alloc)->setString(node->mChildren[i]->mName.C_Str()));
+        }
     }
 
     char* result = bx::makeJson(jroot, &g_alloc, false);

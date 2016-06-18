@@ -20,9 +20,8 @@
 #include "assimp/postprocess.h"
 
 #include "../include_common/t3d_format.h"
+#include "../include_common/coord_convert.h"
 #include "../tools_common/log_format_proxy.h"
-
-#include "termite/vec_math.h"
 
 #define MODELC_VERSION "0.1"
 
@@ -31,14 +30,7 @@ using namespace termite;
 static bx::CrtAllocator g_alloc;
 static LogFormatProxy* g_logger = nullptr;
 
-enum class ZAxis
-{
-    Unknown = 0,
-    Up, // Z is Up
-    GL  // Z is inverted
-};
-
-struct Config
+struct Args
 {
     bx::Path inFilepath;
     bx::Path outFilepath;
@@ -49,7 +41,7 @@ struct Config
     bx::Path outputMtl;
     char modelName[32];
 
-    Config()
+    Args()
     {
         verbose = false;
         buildTangents = false;
@@ -146,58 +138,6 @@ struct ModelData
     }
 };
 
-static mtx4x4_t convertMtx(const aiMatrix4x4& m, ZAxis zaxis)
-{
-    switch (zaxis) {
-    case ZAxis::Unknown:
-        return mtx4x4f3(m.a1, m.b1, m.c1,
-                       m.a2, m.b2, m.c2,
-                       m.a3, m.b3, m.c3,
-                       m.a4, m.b4, m.c4);
-    case ZAxis::GL:
-        return mtx4x4f3(m.a1, m.b1, -m.c1,
-                       m.a2, m.b2, -m.c2,
-                       -m.a3, -m.b3, m.c3,
-                       m.a4, m.b4, -m.c4);
-    case ZAxis::Up:
-    {
-        mtx4x4_t zup = mtx4x4f3(1.0f, 0, 0,
-                                0, 0, 1.0f,
-                                0, 1.0f, 0,
-                                0, 0, 0);
-        mtx4x4_t r = mtx4x4f3(m.a1, m.b1, -m.c1,
-                              m.a2, m.b2, -m.c2,
-                              -m.a3, -m.b3, m.c3,
-                              m.a4, m.b4, -m.c4);
-        mtx4x4_t res;
-        bx::mtxMul(res.f, r.f, zup.f);
-        return res;
-    }
-    }
-    return mtx4x4_t();
-}
-
-static void saveMtx(const mtx4x4_t& m, float f[12])
-{
-    f[0] = m.f[0];    f[1] = m.f[1];    f[2] = m.f[2];
-    f[3] = m.f[4];    f[4] = m.f[5];    f[5] = m.f[6];
-    f[6] = m.f[8];    f[7] = m.f[9];    f[8] = m.f[10];
-    f[9] = m.f[12];   f[10] = m.f[13];  f[11] = m.f[14];
-}
-
-static vec3_t convertVec3(const aiVector3D& v, ZAxis zaxis)
-{
-    switch (zaxis) {
-    case ZAxis::Unknown:
-        return vec3f(v.x, v.y, v.z);
-    case ZAxis::Up:
-        return vec3f(v.x, v.z, v.y);
-    case ZAxis::GL:
-        return vec3f(v.x, v.y, -v.z);
-    }
-    return vec3_t();
-}
-
 static aiNode* findNodeRecursive(aiNode* anode, const char* name)
 {
     if (bx::stricmp(anode->mName.C_Str(), name) == 0)
@@ -278,7 +218,7 @@ static int findGeoBoneIndex(const bx::Array<aiNode*>& bones, const char *name)
 }
 
 static void setupGeoJoints(const aiScene* scene, const bx::Array<aiNode*>& bones,
-                           const bx::Array<aiBone*>& skinBones, const Config& conf,
+                           const bx::Array<aiBone*>& skinBones, const Args& conf,
                            const mtx4x4_t& rootMtx, t3dJoint* joints, float* initPose)
 {
     mtx4x4_t offsetMtx;
@@ -307,8 +247,7 @@ static void setupGeoJoints(const aiScene* scene, const bx::Array<aiNode*>& bones
                 findGeoBoneIndex(bones, ajointNode->mParent->mName.C_Str()) : -1;
             mtx4x4_t jointMtx = convertMtx(ajointNode->mTransformation, conf.zaxis);
             if (ajointNode->mParent == scene->mRootNode) {
-                bx::mtxMul(jointMtx.f, jointMtx.f, rootMtx.f);
-                bx::mtxMul(jointMtx.f, jointMtx.f, scaleMtx.f);
+                jointMtx = (jointMtx * rootMtx) * scaleMtx;
             }
             saveMtx(jointMtx, &initPose[i * 12]);
         }
@@ -326,7 +265,7 @@ static int findAttrib(const t3dVertexAttrib* attribs, int numAttribs, t3dVertexA
 
 static int importGeo(const aiScene* scene, ModelData* model, unsigned int* ameshIds,
                      uint32_t numMeshes, bool mainNode, t3dSubmesh* submeshes,
-                     const Config& conf, const mtx4x4_t& rootMtx)
+                     const Args& conf, const mtx4x4_t& rootMtx)
 {
     ModelData::Geometry* geo = model->geos.push();
     memset(geo, 0x00, sizeof(ModelData::Geometry));
@@ -428,7 +367,7 @@ static int importGeo(const aiScene* scene, ModelData* model, unsigned int* amesh
         }
         if (asubmesh->mNumBones && findAttrib(attribs, numAttribs, t3dVertexAttrib::Indices) == -1) {
             attribOffsets[numAttribs] = vertStride;
-            vertStride += sizeof(int) * 4;
+            vertStride += sizeof(uint8_t) * 4;
             attribs[numAttribs++] = t3dVertexAttrib::Indices;
         }
         if (asubmesh->mNumBones && findAttrib(attribs, numAttribs, t3dVertexAttrib::Weight) == -1) {
@@ -447,7 +386,7 @@ static int importGeo(const aiScene* scene, ModelData* model, unsigned int* amesh
 
     // Skeleton, and joints
     uint8_t* vertIwIndices = nullptr;   // Counters for skin indices (per vertex)
-    if (findAttrib(attribs, numAttribs, t3dVertexAttrib::Indices)) {
+    if (findAttrib(attribs, numAttribs, t3dVertexAttrib::Indices) != -1) {
         vertIwIndices = (uint8_t*)alloca(sizeof(uint8_t)*numVerts);
         memset(vertIwIndices, 0x00, sizeof(uint8_t)*numVerts);
 
@@ -568,14 +507,15 @@ static int importGeo(const aiScene* scene, ModelData* model, unsigned int* amesh
                 aiBone* bone = submesh->mBones[k];
                 int boneIndex = findGeoBoneIndex(bones, bone->mName.C_Str());
                 assert(boneIndex != -1);
+                assert(boneIndex < UINT8_MAX);
 
                 for (uint32_t c = 0; c < bone->mNumWeights; c++) {
                     int idx = (int)bone->mWeights[c].mVertexId + vertOffset;
                     int attribIndices = attribOffsets[findAttrib(attribs, numAttribs, t3dVertexAttrib::Indices)];
                     int attribWeight = attribOffsets[findAttrib(attribs, numAttribs, t3dVertexAttrib::Weight)];
-                    int* indices = (int*)(verts + vertStride*idx + attribIndices);
+                    uint8_t* indices = (uint8_t*)(verts + vertStride*idx + attribIndices);
                     float* weights = (float*)(verts + vertStride*idx + attribWeight);
-                    indices[vertIwIndices[idx]] = boneIndex;
+                    indices[vertIwIndices[idx]] = uint8_t(boneIndex);
                     weights[vertIwIndices[idx]] = bone->mWeights[c].mWeight;
                     vertIwIndices[idx]++;
                 }
@@ -691,7 +631,7 @@ static int importMaterial(const aiScene* scene, ModelData* model, aiMaterial* am
 }
 
 static int importMesh(const aiScene* scene, ModelData* model, unsigned int* ameshIds,
-                      unsigned int numMeshes, bool mainNode, const Config& conf,
+                      unsigned int numMeshes, bool mainNode, const Args& conf,
                       const mtx4x4_t& rootMtx)
 {
     ModelData::Mesh* mesh = model->meshes.push();
@@ -722,7 +662,7 @@ static aabb_t calcGeoBoundsNoSkin(const ModelData::Geometry& geo)
     aabb_t bb = aabb();
     for (int i = 0; i < geo.g.numVerts; i++) {
         const float* poss = (const float*)((uint8_t*)geo.verts + i*geo.g.vertStride);
-        aabbPushPoint(&bb, vec3f(poss[i * 3], poss[i * 3 + 1], poss[i * 3 + 2]));
+        aabbPushPoint(&bb, vec3f(poss[0], poss[1], poss[2]));
     }
     return bb;
 }
@@ -742,7 +682,7 @@ static aabb_t calcGeoBoundsSkin(const ModelData::Geometry& geo)
         skinMtxs[i] = initPose[i];
 
         while (joint->parent != -1) {
-            bx::mtxMul(skinMtxs[i].f, skinMtxs[i].f, initPose[joint->parent].f);
+            skinMtxs[i] = skinMtxs[i] * initPose[joint->parent];
             joint = &geo.joints[joint->parent];
         }
 
@@ -755,7 +695,7 @@ static aabb_t calcGeoBoundsSkin(const ModelData::Geometry& geo)
                                       off[9], off[10], off[11]);
 
         // Final skin mtx
-        bx::mtxMul(skinMtxs[i].f, offsetMtx.f, skinMtxs[i].f);
+        skinMtxs[i] = offsetMtx * skinMtxs[i];
     }
 
     // Apply skinning to each vertex and add it to aabb
@@ -766,12 +706,12 @@ static aabb_t calcGeoBoundsSkin(const ModelData::Geometry& geo)
         const int* indices = (const int*)((uint8_t*)geo.verts + i*geo.g.vertStride + indicesOffset);
         const float* weights = (const float*)((uint8_t*)geo.verts + i*geo.g.vertStride + weightOffset);
 
-        vec3_t pos = vec3f(poss[i * 3], poss[i * 3 + 1], poss[i * 3 + 2]);
+        vec3_t pos = vec3f(poss[0], poss[1], poss[2]);
         vec3_t skinned = vec3f(0, 0, 0);
 
         for (int c = 0; c < 4; c++) {
-            const mtx4x4_t& mtx = skinMtxs[indices[i * 4 + c]];
-            float w = weights[i * 4 + c];
+            const mtx4x4_t& mtx = skinMtxs[indices[c]];
+            float w = weights[c];
 
             vec3_t sp;
             bx::vec3MulMtx(sp.f, pos.f, mtx.f);
@@ -785,7 +725,7 @@ static aabb_t calcGeoBoundsSkin(const ModelData::Geometry& geo)
     return bb;
 }
 
-static int importNodeRecursive(const aiScene* scene, aiNode* anode, ModelData* model, const Config& conf, int parent, 
+static int importNodeRecursive(const aiScene* scene, aiNode* anode, ModelData* model, const Args& conf, int parent, 
                                mtx4x4_t& rootMtx)
 {
     ModelData::Node* node = model->nodes.push();
@@ -803,16 +743,16 @@ static int importNodeRecursive(const aiScene* scene, aiNode* anode, ModelData* m
 
         mtx4x4_t sceneRoot = convertMtx(scene->mRootNode->mTransformation, conf.zaxis);
         rootMtx = convertMtx(anode->mTransformation, conf.zaxis);
-        bx::mtxMul(rootMtx.f, rootMtx.f, sceneRoot.f);
-        bx::mtxMul(rootMtx.f, rootMtx.f, resizeMtx.f);
+        rootMtx = (rootMtx * sceneRoot) * resizeMtx;
 
         // Assign rootMtx to localMtx, because we are on the first node
         localMtx = rootMtx;
     } else {
         // For childs nodes, only the first level child nodes are transformed by rootMtx
         localMtx = convertMtx(anode->mTransformation, conf.zaxis);
-        if (model->nodes.itemPtr(parent)->n.parent == -1)
-            bx::mtxMul(localMtx.f, localMtx.f, rootMtx.f);
+        if (model->nodes.itemPtr(parent)->n.parent == -1) {
+            localMtx = localMtx * rootMtx;
+        }
     }
 
     saveMtx(localMtx, node->n.xformMtx);
@@ -867,8 +807,10 @@ static bool exportT3d(const char* t3dFilepath, const ModelData& model)
 
     bx::CrtFileWriter file;
     bx::Error err;
-    if (!file.open(t3dFilepath, false, &err))
+    if (!file.open(t3dFilepath, false, &err)) {
+        g_logger->fatal("Could not open file '%s' for writing", t3dFilepath);
         return false;
+    }
 
     // skip header, we will fill it later
     file.write(&hdr, sizeof(hdr), &err);
@@ -877,7 +819,8 @@ static bool exportT3d(const char* t3dFilepath, const ModelData& model)
     for (int i = 0; i < model.nodes.getCount(); i++) {
         const ModelData::Node& node = model.nodes[i];
         file.write(&node.n, sizeof(node.n), &err);
-        file.write(node.childs, sizeof(int)*node.n.numChilds, &err);
+        if (node.n.numChilds)
+            file.write(node.childs, sizeof(int)*node.n.numChilds, &err);
     }
 
     // Meshes
@@ -1001,7 +944,7 @@ static bool exportMeta(const char* metaJsonFilepath, const ModelData& model)
     return true;
 }
 
-static bool importModel(const Config& conf)
+static bool importModel(const Args& conf)
 {
     Assimp::Importer importer;
 
@@ -1056,9 +999,11 @@ static bool importModel(const Config& conf)
     }
 
     // Output material props (stdout or JSON file)
-    if (!exportMeta(conf.outputMtl.cstr(), model)) {
-        g_logger->fatal("Exporting JSON meta data failed");
-        return false;
+    if (!conf.outputMtl.isEmpty()) {
+        if (!exportMeta(conf.outputMtl.cstr(), model)) {
+            g_logger->fatal("Exporting JSON meta data failed");
+            return false;
+        }
     }
 
     return true;
@@ -1068,7 +1013,7 @@ static void showHelp()
 {
     const char* help =
         "modelc v" MODELC_VERSION " - Model compiler for T3D file format\n"
-        "arguments:\n"
+        "Arguments:\n"
         "  -i --input <filepath> Input model file (*.dae, *.fbx, *.obj, etc.)\n"
         "  -o --output <filepath> Output T3D file\n"
         "  -v --verbose Verbose mode\n"
@@ -1084,7 +1029,7 @@ static void showHelp()
 int main(int argc, char** argv)
 {
     // Read arguments (config)
-    Config conf;
+    Args conf;
     bx::CommandLine cmd(argc, argv);
     conf.verbose = cmd.hasArg('v', "verbose");
     conf.buildTangents = cmd.hasArg('T', "maketangents");
@@ -1114,7 +1059,7 @@ int main(int argc, char** argv)
 
     bx::enableLogToFileHandle(stdout);
     LogFormatProxy logger(jsonLog ? LogProxyOptions::Json : LogProxyOptions::Text);
-    g_logger = &logger; //-V506
+    g_logger = &logger;
 
     // Argument check
     if (conf.inFilepath.isEmpty() || conf.outFilepath.isEmpty()) {

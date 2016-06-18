@@ -312,7 +312,7 @@ static void drawBatches(vgContext* ctx)
                            uint16_t(batch.scissorRect.xmax - batch.scissorRect.xmin),
                            uint16_t(batch.scissorRect.ymax - batch.scissorRect.ymin));
         driver->setIndexBuffer(&tib, batch.firstIdx, batch.numIndices);
-        driver->setVertexBuffer(&tvb, 0, batch.numVerts);        
+        driver->setVertexBuffer(&tvb, 0, batch.numVerts);       
         driver->submit(viewId, ctx->program); 
     }
 }

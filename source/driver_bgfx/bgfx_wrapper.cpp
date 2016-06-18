@@ -938,12 +938,12 @@ public:
         bgfx::destroyOcclusionQuery(h);
     }
 
-    void dbgTextClear(uint8_t attr, bool small)
+    void dbgTextClear(uint8_t attr, bool small) override
     {
         bgfx::dbgTextClear(attr, small);
     }
 
-    void dbgTextPrintf(uint16_t x, uint16_t y, uint8_t attr, const char* format, ...)
+    void dbgTextPrintf(uint16_t x, uint16_t y, uint8_t attr, const char* format, ...) override
     {
         char text[256];
 
@@ -955,7 +955,7 @@ public:
         bgfx::dbgTextPrintf(x, y, attr, text);
     }
 
-    void dbgTextImage(uint16_t x, uint16_t y, uint16_t width, uint16_t height, const void* data, uint16_t pitch)
+    void dbgTextImage(uint16_t x, uint16_t y, uint16_t width, uint16_t height, const void* data, uint16_t pitch) override
     {
         bgfx::dbgTextImage(x, y, width, height, data, pitch);
     }

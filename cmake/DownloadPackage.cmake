@@ -15,9 +15,5 @@ function(download_package URL TARGET)
     endif()
     
     execute_process(COMMAND ${CMAKE_COMMAND} -E tar xf ${DEST_FILEPATH}
-                    WORKING_DIRECTORY ${TARGET}
-                    RESULT_VARIABLE rv)
-    if (NOT rv OR NOT ${rv} EQUAL 0)
-        message(FATAL_ERROR "Installing dependency '${FILE_NAME}' failed")
-    endif()    
+                    WORKING_DIRECTORY ${TARGET})
 endfunction()

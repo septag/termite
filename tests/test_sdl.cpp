@@ -1,5 +1,7 @@
 #include <cstddef>
-#define HAVE_STDINT_H
+#ifdef _WIN32
+#  define HAVE_STDINT_H 1
+#endif
 #include <SDL.h>
 #undef main
 #include <SDL_syswm.h>
@@ -16,6 +18,8 @@
 #include "termite/gfx_texture.h"
 #include "termite/gfx_debug.h"
 #include "termite/camera.h"
+#include "termite/gfx_model.h"
+#include "termite/datastore_driver.h"
 
 #include <conio.h>
 
@@ -48,6 +52,9 @@ static vgContext* g_vg = nullptr;
 static dbgContext* g_debug = nullptr;
 static dsResourceHandle g_logo = T_INVALID_HANDLE;
 static Camera g_cam;
+static dsResourceHandle g_model = T_INVALID_HANDLE;
+static gfxProgramHandle g_modelProg = T_INVALID_HANDLE;
+static gfxUniformHandle g_modelColor = T_INVALID_HANDLE;
 
 static bool sdlPollEvents()
 {
@@ -151,9 +158,54 @@ static void update(float dt)
     vgEnd(g_vg);
 
     dbgBegin(g_debug, WINDOW_WIDTH, WINDOW_HEIGHT, &g_cam, g_vg);
-    dbgText(g_debug, vec3f(0, 1.0f, 5.0f), "testing");
+    //dbgText(g_debug, vec3f(0, 1.0f, 5.0f), "testing");
+    dbgColor(g_debug, vec4f(0, 0.5f, 0, 1.0f));
     dbgSnapGridXZ(g_debug, 5.0f, 70.0f);
+    dbgColor(g_debug, vec4f(1.0f, 0, 0, 1.0f));
+    dbgBoundingBox(g_debug, aabbf(-1.0f, -0.5f, -0.5f, 0.5f, 1.5f, 2.5f), true);
+    dbgBoundingSphere(g_debug, spheref(0, 0, 5.0f, 1.5f), true);
     dbgEnd(g_debug);
+
+#if 0
+    const vec4_t colors[] = {
+        vec4f(1.0f, 1.0f, 1.0f, 1.0f),
+        vec4f(1.0f, 0, 0, 1.0f),
+        vec4f(0, 0, 1.0f, 1.0f)
+    };
+
+    gfxModel* model = dsGetObjPtr<gfxModel*>(nullptr, g_model);
+    if (model) {
+        gfxDriverI* driver = coreGetGfxDriver();
+        mtx4x4_t viewMtx = camViewMtx(&g_cam);
+        mtx4x4_t projMtx = camProjMtx(&g_cam, float(WINDOW_WIDTH) / float(WINDOW_HEIGHT));
+
+        driver->touch(6);
+        driver->setViewRect(6, 0, 0, gfxBackbufferRatio::Equal);
+        driver->setViewTransform(6, &viewMtx, &projMtx);
+
+        for (int i = 0; i < model->numNodes; i++) {
+            const gfxModel::Node& node = model->nodes[i];
+            const gfxModel::Mesh& mesh = model->meshes[node.mesh];
+            const gfxModel::Geometry& geo = model->geos[mesh.geo];
+
+            mtx4x4_t localmtx = node.localMtx;
+            if (node.parent != -1) {
+                const gfxModel::Node& parentNode = model->nodes[node.parent];
+                localmtx = localmtx * parentNode.localMtx;
+            }
+
+            for (int c = 0; c < mesh.numSubmeshes; c++) {
+                const gfxModel::Submesh& submesh = mesh.submeshes[c];
+                driver->setTransform(&localmtx, 1);
+                driver->setUniform(g_modelColor, &colors[submesh.mtl % 3]);
+                driver->setVertexBuffer(mdlGetVertexBuffer(model, mesh.geo));
+                driver->setIndexBuffer(mdlGetIndexBuffer(model, mesh.geo), submesh.startIndex, submesh.numIndices);
+
+                driver->submit(6, g_modelProg);
+            }
+        }
+    }
+#endif
 }
 
 static termite::gfxPlatformData* getSDLWindowData(SDL_Window* window)
@@ -243,11 +295,27 @@ int main(int argc, char* argv[])
 
     gfxTextureLoadParams texParams;
     g_logo = dsLoadResource(nullptr, "texture", "textures/logo.dds", &texParams);
+
+    gfxModelLoadParams modelParams;
+    g_model = dsLoadResource(nullptr, "model", "models/torus.t3d", &modelParams);
+    assert(T_ISVALID(g_model));
+
+    MemoryBlock* vso = coreGetDiskDriver()->read("shaders/test_model.vso");
+    MemoryBlock* fso = coreGetDiskDriver()->read("shaders/test_model.fso");
+    gfxDriverI* driver = coreGetGfxDriver();
+    gfxShaderHandle vs = driver->createShader(driver->copy(vso->data, vso->size));
+    gfxShaderHandle fs = driver->createShader(driver->copy(fso->data, fso->size));
+    g_modelProg = driver->createProgram(vs, fs, true);
+    assert(T_ISVALID(g_modelProg));
+    g_modelColor = driver->createUniform("u_color", gfxUniformType::Vec4);
         
     while (sdlPollEvents()) {
         termite::coreFrame();
     }
 
+    driver->destroyUniform(g_modelColor);
+    driver->destroyProgram(g_modelProg);
+    dsUnloadResource(nullptr, g_model);
     dbgDestroyContext(g_debug);
     vgDestroyContext(g_vg);
     termite::coreShutdown();

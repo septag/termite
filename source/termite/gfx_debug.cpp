@@ -7,6 +7,7 @@
 #include "gfx_vg.h"
 #include "camera.h"
 
+#include "bx/uint32_t.h"
 #include "bxx/pool.h"
 #include "bxx/stack.h"
 
@@ -24,14 +25,22 @@ struct dbgVertexPosCoordColor
 {
     float x, y, z;
     float tx, ty;
-    color_t color;
+
+    void setPos(float _x, float _y, float _z)
+    {
+        x = _x;     y = _y;     z = _z;
+    }
+
+    void setPos(const vec3_t& p)
+    {
+        x = p.x;    y = p.y;    z = p.z;
+    }
 
     static void init()
     {
         Decl.begin()
             .add(gfxAttrib::Position, 3, gfxAttribType::Float)
             .add(gfxAttrib::TexCoord0, 2, gfxAttribType::Float)
-            .add(gfxAttrib::Color0, 4, gfxAttribType::Uint8, true)
             .end();
     }
 
@@ -49,51 +58,10 @@ public:
     virtual gfxState setStates(vgContext* ctx, gfxDriverI* driver, const void* params) = 0;
 };
 
-class GridHandler : public DrawHandler
-{
-public:
-    GridHandler();
-    
-    result_t init(bx::AllocatorI* alloc, gfxDriverI* driver) override;
-    void shutdown() override;
-
-    uint32_t getHash(const void* params) override;
-    gfxState setStates(vgContext* ctx, gfxDriverI* driver, const void* params) override;
-
-private:
-    dbgVertexPosCoordColor* m_verts;
-
-};
-
-GridHandler::GridHandler()
-{
-    m_verts = nullptr;
-}
-
-result_t GridHandler::init(bx::AllocatorI* alloc, gfxDriverI* driver)
-{
-    return T_ERR_FAILED;
-}
-
-void GridHandler::shutdown()
-{
-
-}
-
-uint32_t GridHandler::getHash(const void* params)
-{
-    return 0;
-}
-
-gfxState GridHandler::setStates(vgContext* ctx, gfxDriverI* driver, const void* params)
-{
-    return gfxState::None;
-}
-
 struct State
 {
     mtx4x4_t mtx;
-    color_t color;
+    vec4_t color;
     float alpha;
     rect_t scissor;
     const fntFont* font;
@@ -116,10 +84,8 @@ namespace termite
         bool readyToDraw;
         vgContext* vgCtx;
         Camera* cam;
+        mtx4x4_t billboardMtx;
         mtx4x4_t viewProjMtx;
-
-        gfxProgramHandle program;
-        gfxUniformHandle uTexture;
 
         dbgContext(bx::AllocatorI* _alloc) : alloc(_alloc)
         {
@@ -129,14 +95,31 @@ namespace termite
             viewport = rectf(0, 0, 0, 0);
             defaultFont = nullptr;
             readyToDraw = false;
-            program = T_INVALID_HANDLE;
-            uTexture = T_INVALID_HANDLE;
             vgCtx = nullptr;
             cam = nullptr;
             viewProjMtx = mtx4x4Ident();
+            billboardMtx = mtx4x4Ident();
         }
     };
 } // namespace termite
+
+struct Shape
+{
+    gfxVertexBufferHandle vb;
+    uint32_t numVerts;
+
+    Shape()
+    {
+        vb = T_INVALID_HANDLE;
+        numVerts = 0;
+    }
+
+    Shape(gfxVertexBufferHandle _vb, uint32_t _numVerts)
+    {
+        vb = _vb;
+        numVerts = _numVerts;
+    }
+};
 
 struct dbgMgr
 {
@@ -146,6 +129,11 @@ struct dbgMgr
     gfxTextureHandle whiteTexture;
 
     gfxUniformHandle uTexture;
+    gfxUniformHandle uColor;
+
+    Shape bbShape;
+    Shape bsphereShape;
+    Shape sphereShape;
 
     dbgMgr(bx::AllocatorI* _alloc) : alloc(_alloc)
     {
@@ -153,12 +141,13 @@ struct dbgMgr
         program = T_INVALID_HANDLE;
         whiteTexture = T_INVALID_HANDLE;
         uTexture = T_INVALID_HANDLE;
+        uColor = T_INVALID_HANDLE;
     }
 };
 
 static dbgMgr* g_dbg = nullptr;
 
-static vec2_t projectToScreen(const vec3_t point, const rect_t& rect, const mtx4x4_t& viewProjMtx)
+static bool projectToScreen(vec2_t* result, const vec3_t point, const rect_t& rect, const mtx4x4_t& viewProjMtx)
 {
     float w = rect.xmax - rect.xmin;
     float h = rect.ymax - rect.ymin;
@@ -174,8 +163,209 @@ static vec2_t projectToScreen(const vec3_t point, const rect_t& rect, const mtx4
 
     // ZCull
     if (proj.z < 0.0f || proj.z > 1.0f)
-        return vec2f(FLT_MAX, FLT_MAX);
-    return vec2f(x, y);
+        return false;
+
+    *result = vec2f(x, y);
+    return true;
+}
+
+static Shape createSolidAABB()
+{
+    aabb_t box = aabb();
+    vec3_t pts[8];
+
+    const int numVerts = 36;
+    aabbPushPoint(&box, vec3f(-0.5f, -0.5f, -0.5f));
+    aabbPushPoint(&box, vec3f(0.5f, 0.5f, 0.5f));
+    for (int i = 0; i < 8; i++)
+        pts[i] = aabbGetCorner(box, i);
+
+    dbgVertexPosCoordColor* verts = (dbgVertexPosCoordColor*)alloca(sizeof(dbgVertexPosCoordColor) * numVerts);
+    memset(verts, 0x00, sizeof(dbgVertexPosCoordColor)*numVerts);
+
+    // Z-
+    verts[0].setPos(pts[0]); verts[1].setPos(pts[2]); verts[2].setPos(pts[3]);
+    verts[3].setPos(pts[3]); verts[4].setPos(pts[1]); verts[5].setPos(pts[0]);
+    // Z+
+    verts[6].setPos(pts[5]); verts[7].setPos(pts[7]); verts[8].setPos(pts[6]);
+    verts[9].setPos(pts[6]); verts[10].setPos(pts[4]); verts[11].setPos(pts[5]);
+    // X+
+    verts[12].setPos(pts[1]); verts[13].setPos(pts[3]); verts[14].setPos(pts[7]);
+    verts[15].setPos(pts[7]); verts[16].setPos(pts[5]); verts[17].setPos(pts[1]);
+    // X-
+    verts[18].setPos(pts[6]); verts[19].setPos(pts[2]); verts[20].setPos(pts[0]);
+    verts[21].setPos(pts[0]); verts[22].setPos(pts[4]); verts[23].setPos(pts[6]);
+    // Y-
+    verts[24].setPos(pts[1]); verts[25].setPos(pts[5]); verts[26].setPos(pts[4]);
+    verts[27].setPos(pts[4]); verts[28].setPos(pts[0]); verts[29].setPos(pts[1]);
+    // Y+
+    verts[30].setPos(pts[3]); verts[31].setPos(pts[2]); verts[32].setPos(pts[6]);
+    verts[33].setPos(pts[6]); verts[34].setPos(pts[7]); verts[35].setPos(pts[3]);
+
+    return Shape(g_dbg->driver->createVertexBuffer(g_dbg->driver->copy(verts, sizeof(dbgVertexPosCoordColor) * numVerts),
+                                                   dbgVertexPosCoordColor::Decl), numVerts);
+}
+
+static Shape createAABB()
+{
+    aabb_t box = aabb();
+    vec3_t pts[8];
+
+    const int numVerts = 24;
+    aabbPushPoint(&box, vec3f(-0.5f, -0.5f, -0.5f));
+    aabbPushPoint(&box, vec3f(0.5f, 0.5f, 0.5f));
+    for (int i = 0; i < 8; i++)
+        pts[i] = aabbGetCorner(box, i);
+
+    dbgVertexPosCoordColor* verts = (dbgVertexPosCoordColor*)alloca(sizeof(dbgVertexPosCoordColor) * numVerts);
+    memset(verts, 0x00, sizeof(dbgVertexPosCoordColor)*numVerts);
+
+    // Bottom edges
+    verts[0].setPos(pts[0]);    verts[1].setPos(pts[1]);
+    verts[2].setPos(pts[1]);    verts[3].setPos(pts[5]);
+    verts[4].setPos(pts[5]);    verts[5].setPos(pts[4]);
+    verts[6].setPos(pts[4]);    verts[7].setPos(pts[0]);
+
+    // Middle edges
+    verts[8].setPos(pts[0]);    verts[9].setPos(pts[2]);
+    verts[10].setPos(pts[1]);   verts[11].setPos(pts[3]);
+    verts[12].setPos(pts[5]);   verts[13].setPos(pts[7]);
+    verts[14].setPos(pts[4]);   verts[15].setPos(pts[6]);
+
+    // Top edges
+    verts[16].setPos(pts[2]);   verts[17].setPos(pts[3]);
+    verts[18].setPos(pts[3]);   verts[19].setPos(pts[7]);
+    verts[20].setPos(pts[7]);   verts[21].setPos(pts[6]);
+    verts[22].setPos(pts[6]);   verts[23].setPos(pts[2]);
+
+    return Shape(g_dbg->driver->createVertexBuffer(g_dbg->driver->copy(verts, sizeof(dbgVertexPosCoordColor) * numVerts),
+        dbgVertexPosCoordColor::Decl), numVerts);
+}
+
+
+static Shape createBoundingSphere(int numSegs)
+{
+    numSegs = bx::uint32_iclamp(numSegs, 4, 35);
+    const int numVerts = numSegs * 2;
+
+    // Create buffer and fill it with data
+    int size = numVerts * sizeof(dbgVertexPosCoordColor);
+    dbgVertexPosCoordColor* verts = (dbgVertexPosCoordColor*)alloca(size);
+    assert(verts);
+    memset(verts, 0x00, size);
+
+    const float dt = bx::pi * 2.0f / float(numSegs);
+    float theta = 0.0f;
+    int idx = 0;
+
+    // Circle on the XY plane (center = (0, 0, 0), radius = 1)
+    for (int i = 0; i < numSegs; i++) {
+        verts[idx].setPos(bx::fcos(theta), bx::fsin(theta), 0);
+        verts[idx + 1].setPos(bx::fcos(theta + dt), bx::fsin(theta + dt), 0);
+        idx += 2;
+        theta += dt;
+    }
+
+    return Shape(g_dbg->driver->createVertexBuffer(g_dbg->driver->copy(verts, size), dbgVertexPosCoordColor::Decl),
+                 numVerts);
+}
+
+static Shape createSphere(int numSegsX, int numSegsY)
+{
+    // in solid sphere we have horozontal segments and vertical segments horizontal
+    numSegsX = bx::uint32_iclamp(numSegsX, 4, 30);
+    numSegsY = bx::uint32_iclamp(numSegsY, 3, 30);
+    if (numSegsX % 2 != 0)
+        numSegsX++;        // horozontal must be even number 
+    if (numSegsY % 2 == 0)
+        numSegsY++;        // vertical must be odd number
+    const int numVerts = numSegsX * 3 * 2 + (numSegsY - 3) * 3 * 2 * numSegsX;
+
+    /* set extreme points (radius = 1.0f) */
+    vec3_t y_max = vec3f(0.0f, 1.0f, 0.0f);
+    vec3_t y_min = vec3f(0.0f, -1.0f, 0.0f);
+
+    // start from lower extreme point and draw slice of circles
+    // connect them to the lower level
+    // if we are on the last level (i == numIter-1) connect to upper extreme
+    // else just make triangles connected to lower level
+    int numIter = numSegsY - 1;
+    int idx = 0;
+    int lower_idx = idx;
+    int delta_idx;
+    float r;
+
+    // Phi: vertical angle 
+    float delta_phi = bx::pi / (float)numIter;
+    float phi = -bx::piHalf + delta_phi;
+
+    // Theta: horizontal angle 
+    float delta_theta = (bx::pi*2.0f) / (float)numSegsX;
+    float theta = 0.0f;
+    float y;
+
+    /* create buffer and fill it with data */
+    int size = numVerts * sizeof(dbgVertexPosCoordColor);
+    dbgVertexPosCoordColor *verts = (dbgVertexPosCoordColor*)alloca(size);
+    if (verts == nullptr)
+        return Shape();
+    memset(verts, 0x00, size);
+
+    for (int i = 0; i < numIter; i++) {
+        /* calculate z and slice radius */
+        r = bx::fcos(phi);
+        y = bx::fsin(phi);
+        phi += delta_phi;
+
+        /* normal drawing (quad between upper level and lower level) */
+        if (i != 0 && i != numIter - 1) {
+            theta = 0.0f;
+            for (int k = 0; k < numSegsX; k++) {
+                /* current level verts */
+                verts[idx].setPos(r*bx::fcos(theta), y, r*bx::fsin(theta));
+                verts[idx + 1].setPos(r*bx::fcos(theta + delta_theta), y, r*bx::fsin(theta + delta_theta));
+                verts[idx + 2].setPos(verts[lower_idx].x, verts[lower_idx].y, verts[lower_idx].z);
+                verts[idx + 3].setPos(verts[idx + 1].x, verts[idx + 1].y, verts[idx + 1].z);
+                verts[idx + 4].setPos(verts[lower_idx + 1].x, verts[lower_idx + 1].y, verts[lower_idx + 1].z);
+                verts[idx + 5].setPos(verts[lower_idx].x, verts[lower_idx].y, verts[lower_idx].z);
+
+                idx += 6;
+                theta += delta_theta;
+                lower_idx += delta_idx;
+            }
+            delta_idx = 6;
+            continue;
+        }
+
+        /* lower cap */
+        if (i == 0) {
+            theta = 0.0f;
+            lower_idx = idx;
+            delta_idx = 3;
+            for (int k = 0; k < numSegsX; k++) {
+                verts[idx].setPos(r*bx::fcos(theta), y, r*bx::fsin(theta));
+                verts[idx + 1].setPos(r*bx::fcos(theta + delta_theta), y, r*bx::fsin(theta + delta_theta));
+                verts[idx + 2].setPos(y_min);
+                idx += delta_idx;
+                theta += delta_theta;
+            }
+        }
+
+        /* higher cap */
+        if (i == numIter - 1) {
+            for (int k = 0; k < numSegsX; k++) {
+                verts[idx].setPos(y_max);
+                verts[idx + 1].setPos(verts[lower_idx + 1].x, verts[lower_idx + 1].y, verts[lower_idx + 1].z);
+                verts[idx + 2].setPos(verts[lower_idx].x, verts[lower_idx].y, verts[lower_idx].z);
+                idx += 3;
+                theta += delta_theta;
+                lower_idx += delta_idx;
+            }
+        }
+    }
+
+    return Shape(g_dbg->driver->createVertexBuffer(g_dbg->driver->copy(verts, size), dbgVertexPosCoordColor::Decl),
+                 numVerts);
 }
 
 result_t termite::dbgInit(bx::AllocatorI* alloc, gfxDriverI* driver)
@@ -213,10 +403,16 @@ result_t termite::dbgInit(bx::AllocatorI* alloc, gfxDriverI* driver)
 
     g_dbg->uTexture = driver->createUniform("u_texture", gfxUniformType::Int1);
     assert(T_ISVALID(g_dbg->uTexture));
+    g_dbg->uColor = driver->createUniform("u_color", gfxUniformType::Vec4);
+    assert(T_ISVALID(g_dbg->uColor));
 
     // Create a 1x1 white texture 
     g_dbg->whiteTexture = textureGetWhite1x1();
     assert(T_ISVALID(g_dbg->whiteTexture));
+
+    g_dbg->bbShape = createAABB();
+    g_dbg->bsphereShape = createBoundingSphere(30);
+    g_dbg->sphereShape = createSphere(12, 9);
 
     return T_OK;
 }
@@ -225,6 +421,17 @@ void termite::dbgShutdown()
 {
     if (!g_dbg)
         return;
+    gfxDriverI* driver = g_dbg->driver;
+
+    if (T_ISVALID(g_dbg->bbShape.vb))
+        driver->destroyVertexBuffer(g_dbg->bbShape.vb);
+    if (T_ISVALID(g_dbg->sphereShape.vb))
+        driver->destroyVertexBuffer(g_dbg->sphereShape.vb);
+    if (T_ISVALID(g_dbg->bsphereShape.vb))
+        driver->destroyVertexBuffer(g_dbg->bsphereShape.vb);
+
+    if (T_ISVALID(g_dbg->uColor))
+        g_dbg->driver->destroyUniform(g_dbg->uColor);
     if (T_ISVALID(g_dbg->program))
         g_dbg->driver->destroyProgram(g_dbg->program);
     if (T_ISVALID(g_dbg->uTexture))
@@ -257,9 +464,6 @@ dbgContext* termite::dbgCreateContext(uint8_t viewId)
     State* state = ctx->statePool.newInstance();
     bx::pushStackNode<State*>(&ctx->stateStack, &state->snode, state);
 
-    ctx->program = g_dbg->program;
-    ctx->uTexture = g_dbg->uTexture;
-
     return ctx;
 }
 
@@ -288,6 +492,10 @@ void termite::dbgBegin(dbgContext* ctx, float viewWidth, float viewHeight, Camer
     mtx4x4_t viewMtx = camViewMtx(cam);
     bx::mtxMul(ctx->viewProjMtx.f, viewMtx.f, projMtx.f);
     ctx->cam = cam;    
+    ctx->billboardMtx = mtx4x4f3(viewMtx.m11, viewMtx.m21, viewMtx.m31,
+                                 viewMtx.m12, viewMtx.m22, viewMtx.m32,
+                                 viewMtx.m13, viewMtx.m23, viewMtx.m33,
+                                 0.0f, 0.0f, 0.0f);
 
     if (vg)
         vgBegin(ctx->vgCtx, viewWidth, viewHeight);
@@ -310,12 +518,14 @@ void termite::dbgEnd(dbgContext* ctx)
 void termite::dbgText(dbgContext* ctx, const vec3_t pos, const char* text)
 {
     if (ctx->vgCtx) {
-        vec2_t screenPt = projectToScreen(pos, ctx->viewport, ctx->viewProjMtx);
-
-        State* state = ctx->stateStack->data;
-        vgSetFont(ctx->vgCtx, state->font);
-        vgTextColor(ctx->vgCtx, state->color);
-        vgText(ctx->vgCtx, screenPt.x, screenPt.y, text);
+        vec2_t screenPt;
+        if (projectToScreen(&screenPt, pos, ctx->viewport, ctx->viewProjMtx)) {
+            State* state = ctx->stateStack->data;
+            vgSetFont(ctx->vgCtx, state->font);
+            vec4_t c = state->color;
+            vgTextColor(ctx->vgCtx, rgbaf(c.x, c.y, c.z, c.w));
+            vgText(ctx->vgCtx, screenPt.x, screenPt.y, text);
+        }
     }
 }
 
@@ -336,8 +546,28 @@ void termite::dbgTextf(dbgContext* ctx, const vec3_t pos, const char* fmt, ...)
 void termite::dbgImage(dbgContext* ctx, const vec3_t pos, gfxTexture* image)
 {
     if (ctx->vgCtx) {
-        vec2_t screenPt = projectToScreen(pos, ctx->viewport, ctx->viewProjMtx);
-        vgImage(ctx->vgCtx, screenPt.x, screenPt.y, image);
+        vec2_t screenPt;
+        if (projectToScreen(&screenPt, pos, ctx->viewport, ctx->viewProjMtx)) {
+            State* state = ctx->stateStack->data;
+            vec4_t c = state->color;
+            vgFillColor(ctx->vgCtx, rgbaf(c.x, c.y, c.z, c.w));
+            vgImage(ctx->vgCtx, screenPt.x, screenPt.y, image);
+        }
+    }
+}
+
+void termite::dbgRect(dbgContext* ctx, const vec3_t& vmin, const vec3_t& vmax)
+{
+    if (ctx->vgCtx) {
+        vec2_t minPt, maxPt;
+        if (projectToScreen(&minPt, vmin, ctx->viewport, ctx->viewProjMtx) &&
+            projectToScreen(&maxPt, vmax, ctx->viewport, ctx->viewProjMtx)) 
+        {
+            State* state = ctx->stateStack->data;
+            vec4_t c = state->color;
+            vgFillColor(ctx->vgCtx, rgbaf(c.x, c.y, c.z, c.w));
+            vgRect(ctx->vgCtx, rectv(minPt, maxPt));
+        }
     }
 }
 
@@ -389,8 +619,6 @@ void termite::dbgSnapGridXZ(dbgContext* ctx, float spacing, float maxDepth)
     dbgVertexPosCoordColor* verts = (dbgVertexPosCoordColor*)tvb.data;
     
     int i = 0;
-    State* state = ctx->stateStack->data;
-    color_t color = premultiplyAlpha(state->color, state->alpha);
     for (float zoffset = snapbox.zmin; zoffset <= snapbox.zmax; zoffset += spacing, i += 2) {
         verts[i].x = snapbox.xmin;
         verts[i].y = 0;
@@ -400,8 +628,6 @@ void termite::dbgSnapGridXZ(dbgContext* ctx, float spacing, float maxDepth)
         verts[ni].x = snapbox.xmax;
         verts[ni].y = 0;
         verts[ni].z = zoffset;
-
-        verts[i].color = verts[ni].color = color;
     }
 
     for (float xoffset = snapbox.xmin; xoffset <= snapbox.xmax; xoffset += spacing, i += 2) {
@@ -413,26 +639,91 @@ void termite::dbgSnapGridXZ(dbgContext* ctx, float spacing, float maxDepth)
         verts[ni].x = xoffset;
         verts[ni].y = 0;
         verts[ni].z = snapbox.zmax;
-
-        verts[i].color = verts[ni].color = color;
     }
 
+    State* state = ctx->stateStack->data;
     mtx4x4_t ident = mtx4x4Ident();
+
     driver->setVertexBuffer(&tvb);
     driver->setTransform(ident.f, 1);
     driver->setState(gfxState::RGBWrite | gfxState::DepthTestLess | gfxState::PrimitiveLines);
-    driver->setTexture(0, ctx->uTexture, g_dbg->whiteTexture);
-    driver->submit(ctx->viewId, ctx->program);
+    driver->setUniform(g_dbg->uColor, state->color.f);
+    driver->setTexture(0, g_dbg->uTexture, g_dbg->whiteTexture);
+    driver->submit(ctx->viewId, g_dbg->program);
 }
 
-void termite::dbgBoundingBox(dbgContext* ctx, const aabb_t aabb, bool showInfo /*= false*/)
+void termite::dbgBoundingBox(dbgContext* ctx, const aabb_t bb, bool showInfo /*= false*/)
 {
+    vec3_t center = (bb.vmin + bb.vmax)*0.5f;
+    float w = bb.vmax.x - bb.vmin.x;
+    float h = bb.vmax.y - bb.vmin.y;
+    float d = bb.vmax.z - bb.vmin.z;
 
+    mtx4x4_t mtx;
+    bx::mtxSRT(mtx.f,
+               w, h, d,
+               0, 0, 0,
+               center.x, center.y, center.z);
+
+    Shape shape = g_dbg->bbShape;
+    State* state = ctx->stateStack->data;
+    gfxDriverI* driver = g_dbg->driver;
+    driver->setVertexBuffer(shape.vb, 0, shape.numVerts);
+    driver->setTransform(mtx.f, 1);
+    driver->setUniform(g_dbg->uColor, state->color.f);
+    driver->setState(gfxState::RGBWrite | gfxState::DepthTestLess | gfxState::PrimitiveLines);
+    driver->setTexture(0, g_dbg->uTexture, g_dbg->whiteTexture);
+    driver->submit(ctx->viewId, g_dbg->program);
+
+    if (showInfo) {
+        vec2_t center2d;
+        if (projectToScreen(&center2d, center, ctx->viewport, ctx->viewProjMtx)) {
+            State* state = ctx->stateStack->data;
+            vgSetFont(ctx->vgCtx, state->font);
+            vec4_t c = state->color;
+            color_t color = rgbaf(c.x, c.y, c.z, c.w);
+            vgTextColor(ctx->vgCtx, color);
+            vgFillColor(ctx->vgCtx, color);
+            vgRect(ctx->vgCtx, rectfwh(center2d.x - 5, center2d.y - 5, 10, 10));
+            vgTextf(ctx->vgCtx, center2d.x, center2d.y, "aabb(%.1f, %.1f, %.1f)", w, h, d);
+        }
+    }
 }
 
 void termite::dbgBoundingSphere(dbgContext* ctx, const sphere_t sphere, bool showInfo /*= false*/)
 {
+    // translate by sphere center, and resize by sphere radius
+    // combine with billboard mtx to face the camera
+    mtx4x4_t mtx;
+    bx::mtxSRT(mtx.f,
+        sphere.r, sphere.r, sphere.r,
+        0, 0, 0,
+        sphere.x, sphere.y, sphere.z);
+    mtx = ctx->billboardMtx * mtx;
 
+    State* state = ctx->stateStack->data;
+    gfxDriverI* driver = g_dbg->driver;
+    Shape shape = g_dbg->bsphereShape;
+    driver->setVertexBuffer(shape.vb, 0, shape.numVerts);
+    driver->setTransform(mtx.f, 1);
+    driver->setUniform(g_dbg->uColor, state->color.f);
+    driver->setState(gfxState::RGBWrite | gfxState::DepthTestLess | gfxState::PrimitiveLines);
+    driver->setTexture(0, g_dbg->uTexture, g_dbg->whiteTexture);
+    driver->submit(ctx->viewId, g_dbg->program);
+
+    if (showInfo) {
+        vec2_t center2d;
+        if (projectToScreen(&center2d, sphere.cp, ctx->viewport, ctx->viewProjMtx)) {
+            State* state = ctx->stateStack->data;
+            vgSetFont(ctx->vgCtx, state->font);
+            vec4_t c = state->color;
+            color_t color = rgbaf(c.x, c.y, c.z, c.w);
+            vgTextColor(ctx->vgCtx, color);
+            vgFillColor(ctx->vgCtx, color);
+            vgRect(ctx->vgCtx, rectfwh(center2d.x - 5, center2d.y - 5, 10, 10));
+            vgTextf(ctx->vgCtx, center2d.x, center2d.y, "sphere(%.1f, %.1f, %.1f, %.1f)", sphere.x, sphere.y, sphere.z, sphere.r);
+        }
+    }
 }
 
 void termite::dbgBox(dbgContext* ctx, const aabb_t aabb, const mtx4x4_t* modelMtx /*= nullptr*/)
@@ -462,7 +753,7 @@ void termite::dbgAlpha(dbgContext* ctx, float alpha)
     state->alpha = alpha;
 }
 
-void termite::dbgColor(dbgContext* ctx, color_t color)
+void termite::dbgColor(dbgContext* ctx, const vec4_t& color)
 {
     State* state = ctx->stateStack->data;
     state->color = color;
@@ -495,7 +786,7 @@ void termite::dbgPopState(dbgContext* ctx)
 static void setDefaultState(dbgContext* ctx, State* state)
 {
     state->mtx = mtx4x4Ident();
-    state->color = rgba(255, 255, 255);
+    state->color = vec4f(1.0f, 1.0f, 1.0f, 1.0f);
     state->alpha = 1.0f;
     state->scissor = ctx->viewport;
     state->font = ctx->defaultFont;

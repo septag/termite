@@ -16,17 +16,15 @@ add_library(termite SHARED ${SOURCE_FILES} ${INCLUDE_FILES} ${SHADER_SOURCES} ${
 
 # libraries for unix/posix
 if (UNIX)
-    target_link_libraries(termite pthread dl)
+    set(POSIX_LIBS pthread dl)
 endif()
-
-get_filename_component(FCONTEXT_INCLUDE_DIR ../../deps/deboost.context/include ABSOLUTE)
 
 target_link_libraries(termite 
     PRIVATE fcontext
-    PUBLIC bx)
+    PUBLIC bx ${POSIX_LIBS})
 
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)
-target_include_directories(termite PUBLIC ${TERMITE_INCLUDE_DIR} ${FCONTEXT_INCLUDE_DIR} ${DEP_ROOT_DIR})
+target_include_directories(termite PUBLIC ${TERMITE_INCLUDE_DIR} ${DEP_ROOT_DIR})
 
 # PCH
 add_precompiled_header(termite pch.h)

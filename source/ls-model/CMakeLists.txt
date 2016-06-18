@@ -8,6 +8,9 @@ add_executable(ls-model ${SOURCE_FILES})
 
 target_link_libraries(ls-model ${ASSIMP_LIBRARY} bx)
 target_include_directories(ls-model PRIVATE ${ASSIMP_INCLUDE_DIR})
-add_dependencies(ls-model AssimpCopyBinaries)
+
+if (WIN32)
+    add_dependencies(ls-model AssimpCopyBinaries)
+endif()
 
 install(TARGETS ls-model RUNTIME DESTINATION bin)

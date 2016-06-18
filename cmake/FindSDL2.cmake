@@ -73,6 +73,7 @@ SET(SDL2_SEARCH_PATHS
 	~/Library/Frameworks
 	/Library/Frameworks
 	/usr/local
+	/usr/lib/x86_64-linux-gnu
 	/usr
 	/sw # Fink
 	/opt/local # DarwinPorts
@@ -176,9 +177,9 @@ IF(SDL2_LIBRARY_TEMP)
 	
 ENDIF(SDL2_LIBRARY_TEMP)
 
-INCLUDE(FindPackageHandleStandardArgs)
-
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(SDL2 REQUIRED_VARS SDL2_LIBRARY SDL2_INCLUDE_DIR)
+if (SDL2_LIBRARY AND SDL2_INCLUDE_DIR)
+	set(SDL2_FOUND TRUE)
+endif()
 
 if (SDL2_FOUND AND WIN32)
     function(sdl2_copy_binaries TargetDirectory)

@@ -32,8 +32,7 @@ include(DownloadPackage)
 include(Bgfx)
 
 ########################################################
-# Download dependencies
-message("Downloading external dependencies ...")
+# Check dependencies
 
 # Run find package scripts
 include(FindSDL2)
@@ -125,7 +124,7 @@ if(MSVC)
     remove_cxx_flag("/GR")
     add_compile_options(/GR-)
 else()
-    add_compile_options(-std=c++11 -fPIC -fno-rtti -fno-exceptions)
+    add_compile_options(-std=c++11 -fPIC -fno-rtti -fno-exceptions -Wno-switch)
 endif()
 
 add_definitions(-Dtermite_SHARED_LIB)
@@ -166,8 +165,10 @@ set_target_properties(trender_default PROPERTIES FOLDER Plugins)
 # tools
 add_subdirectory(source/ls-model)
 add_subdirectory(source/modelc)
+add_subdirectory(source/animc)
 set_target_properties(ls-model PROPERTIES FOLDER Tools)
 set_target_properties(modelc PROPERTIES FOLDER Tools)
+set_target_properties(animc PROPERTIES FOLDER Tools)
 
 # tests
 add_subdirectory(tests)

@@ -28,7 +28,7 @@ public:
     uintptr_t getDefaultAsyncObj() override;
 };
 
-// KTX texture files may contain 
+// KTX/DDS loader
 class TextureLoaderKTX : public dsResourceCallbacksI
 {
 public:
@@ -40,12 +40,6 @@ public:
     uintptr_t getDefaultAsyncObj() override;
 };
 
-struct RegisteredResourceType
-{
-    dsDataStore* ds;
-    dsResourceTypeHandle handle;
-};
-
 struct TextureLoader
 {
     bx::Pool<gfxTexture> texturePool;
@@ -55,7 +49,6 @@ struct TextureLoader
     gfxTexture* whiteTexture;
     gfxTexture* asyncBlankTexture;
     gfxDriverI* driver;
-    bx::Array<RegisteredResourceType> registeredTypes;
 
     TextureLoader(bx::AllocatorI* _alloc)
     {
@@ -73,15 +66,14 @@ result_t termite::textureInitLoader(gfxDriverI* driver, bx::AllocatorI* alloc, i
     assert(driver);
     if (g_texLoader) {
         assert(false);
-        return T_ERR_FAILED;
+        return T_ERR_ALREADY_INITIALIZED;
     }
 
     TextureLoader* loader = BX_NEW(alloc, TextureLoader)(alloc);
     g_texLoader = loader;
     loader->driver = driver;
 
-    if (!loader->texturePool.create(texturePoolSize, alloc) ||
-        !loader->registeredTypes.create(8, 8, alloc)) {
+    if (!loader->texturePool.create(texturePoolSize, alloc)) {
         return T_ERR_OUTOFMEM;
     }
 
@@ -108,15 +100,12 @@ result_t termite::textureInitLoader(gfxDriverI* driver, bx::AllocatorI* alloc, i
 
 void termite::textureRegisterToDatastore(dsDataStore* ds)
 {
-    RegisteredResourceType* r = g_texLoader->registeredTypes.push();
-    r->handle = dsRegisterResourceType(ds, "image", &g_texLoader->rawLoader, sizeof(gfxTextureLoadParams));
-    assert(T_ISVALID(r->handle));
-    r->ds = ds;
+    dsResourceTypeHandle handle;
+    handle = dsRegisterResourceType(ds, "image", &g_texLoader->rawLoader, sizeof(gfxTextureLoadParams));
+    assert(T_ISVALID(handle));
 
-    r = g_texLoader->registeredTypes.push();
-    r->handle = dsRegisterResourceType(ds, "texture", &g_texLoader->loader, sizeof(gfxTextureLoadParams));
-    assert(T_ISVALID(r->handle));
-    r->ds = ds;
+    handle = dsRegisterResourceType(ds, "texture", &g_texLoader->loader, sizeof(gfxTextureLoadParams));
+    assert(T_ISVALID(handle));
 }
 
 void termite::textureShutdownLoader()
@@ -124,12 +113,6 @@ void termite::textureShutdownLoader()
     if (!g_texLoader)
         return;
     
-    for (int i = 0; i < g_texLoader->registeredTypes.getCount(); i++) {
-        RegisteredResourceType* r = g_texLoader->registeredTypes.itemPtr(i);
-        dsUnregisterResourceType(r->ds, r->handle);
-    }
-    g_texLoader->registeredTypes.destroy();
-
     if (g_texLoader->whiteTexture) {
         if (T_ISVALID(g_texLoader->whiteTexture->handle))
             g_texLoader->driver->destroyTexture(g_texLoader->whiteTexture->handle);

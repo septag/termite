@@ -15,6 +15,7 @@
 #include "gfx_texture.h"
 #include "gfx_vg.h"
 #include "gfx_debug.h"
+#include "gfx_model.h"
 
 #define STB_LEAKCHECK_IMPLEMENTATION
 #include "bxx/leakcheck_allocator.h"
@@ -30,6 +31,7 @@
 #include "datastore.h"
 #include "datastore_driver.h"
 #include "job_dispatcher.h"
+#include "memory_pool.h"
 
 #include <dirent.h>
 
@@ -73,9 +75,11 @@ struct Core
     dsDataStore* dataStore;
     dsDriverI* dataDriver;
     dsDriverI* blockingDataDriver;
+    gfxDriverI* gfxDriver;
 
     Core()
     {
+        gfxDriver = nullptr;
         updateFn = nullptr;
         renderer = nullptr;
         hpTimerFreq = 0;
@@ -180,6 +184,9 @@ result_t termite::coreInit(const coreConfig& conf, coreFnUpdate updateFn, const 
     if (!g_core->memPool.create(MEM_POOL_BUCKET_SIZE, g_alloc))
         return T_ERR_OUTOFMEM;
 
+    if (memInit(g_alloc))
+        return T_ERR_OUTOFMEM;
+
     // Initialize Driver server
     if (drvInit()) {
         T_ERROR("Core init failed: Driver Manager failed");
@@ -253,10 +260,14 @@ result_t termite::coreInit(const coreConfig& conf, coreFnUpdate updateFn, const 
             T_ERROR("Renderer Init failed");
             return T_ERR_FAILED;
         }
+        g_core->gfxDriver = gdriver;
         
         // Init and Register graphics resource loaders
         textureInitLoader(gdriver, g_alloc);
         textureRegisterToDatastore(g_core->dataStore);
+
+        mdlInitLoader(gdriver, g_alloc);
+        mdlRegisterToDatastore(g_core->dataStore);
 
         // Font library
         if (fntInitLibrary(g_alloc, g_core->blockingDataDriver)) {
@@ -301,6 +312,7 @@ void termite::coreShutdown()
     dbgShutdown();
     vgShutdown();
     fntShutdownLibrary();
+    mdlShutdownLoader();
     textureShutdownLoader();
 
     if (g_core->renderer) {
@@ -327,6 +339,7 @@ void termite::coreShutdown()
     drvShutdown();
 
     g_core->memPool.destroy();
+    memShutdown();
 
     errShutdown();
     BX_DELETE(g_alloc, g_core);
@@ -481,6 +494,16 @@ void termite::coreSendInputKeys(const bool keysDown[512], bool shift, bool alt, 
 {
     if (g_core->renderer)
         g_core->renderer->sendImInputKeys(keysDown, shift, alt, ctrl);
+}
+
+gfxDriverI* termite::coreGetGfxDriver()
+{
+    return g_core->gfxDriver;
+}
+
+dsDriverI* termite::coreGetDiskDriver()
+{
+    return g_core->blockingDataDriver;
 }
 
 void termite::coreSendInputMouse(float mousePos[2], int mouseButtons[3], float mouseWheel)

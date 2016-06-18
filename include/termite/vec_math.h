@@ -720,6 +720,45 @@ namespace termite
         bx::vec3Max(rb->fmax, rb->fmax, pt.f);
     }    
 
+    /*
+    *            6                                7
+    *              ------------------------------
+    *             /|                           /|
+    *            / |                          / |
+    *           /  |                         /  |
+    *          /   |                        /   |
+    *         /    |                       /    |
+    *        /     |                      /     |
+    *       /      |                     /      |
+    *      /       |                    /       |
+    *     /        |                   /        |
+    *  2 /         |                3 /         |
+    *   /----------------------------/          |
+    *   |          |                 |          |
+    *   |          |                 |          |      +Y
+    *   |        4 |                 |          |
+    *   |          |-----------------|----------|      |
+    *   |         /                  |         /  5    |
+    *   |        /                   |        /        |       +Z
+    *   |       /                    |       /         |
+    *   |      /                     |      /          |     /
+    *   |     /                      |     /           |    /
+    *   |    /                       |    /            |   /
+    *   |   /                        |   /             |  /
+    *   |  /                         |  /              | /
+    *   | /                          | /               |/
+    *   |/                           |/                ----------------- +X
+    *   ------------------------------
+    *  0                              1
+    */
+    inline vec3_t aabbGetCorner(const aabb_t& box, int index)
+    {
+        assert(index < 8);
+        return vec3f((index & 1) ? box.vmax.x : box.vmin.x,
+                     (index & 2) ? box.vmax.y : box.vmin.y,
+                     (index & 4) ? box.vmax.z : box.vmin.z);
+    }
+
     inline uint32_t rgbaUint(float rgba[4])
     {
         uint8_t r = uint8_t(rgba[0]*255.0f);
@@ -814,6 +853,27 @@ namespace termite
     {
         vec3_t r;
         bx::vec3Mul(r.f, v.f, k);
+        return r;
+    }
+
+    inline mtx4x4_t operator*(const mtx4x4_t& a, const mtx4x4_t& b)
+    {
+        mtx4x4_t r;
+        bx::mtxMul(r.f, a.f, b.f);
+        return r;
+    }
+
+    inline mtx3x3_t operator*(const mtx3x3_t& a, const mtx3x3_t& b)
+    {
+        mtx3x3_t r;
+        bx::mtx3x3Mul(r.f, a.f, b.f);
+        return r;
+    }
+
+    inline quat_t operator*(const quat_t& a, const quat_t& b)
+    {
+        quat_t r;
+        bx::quatMul(r.f, a.f, b.f);
         return r;
     }
 } // namespace st

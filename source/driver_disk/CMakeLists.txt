@@ -10,7 +10,10 @@ target_include_directories(tdriver_disk PRIVATE ${LIBUV_INCLUDE_DIR})
 target_link_libraries(tdriver_disk 
     PRIVATE ${LIBUV_LIBRARY}
     PUBLIC termite)
-add_dependencies(termite LibuvCopyBinaries)
+
+if (WIN32)
+    add_dependencies(termite LibuvCopyBinaries)
+endif()
 
 install(TARGETS tdriver_disk 
         LIBRARY DESTINATION bin/plugins

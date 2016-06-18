@@ -53,6 +53,8 @@ namespace termite
 {
     struct gfxPlatformData;
     class dsDataStore;
+    class gfxDriverI;
+    class dsDriverI;
 
     struct coreConfig
     {
@@ -96,7 +98,7 @@ namespace termite
     TERMITE_API uint32_t coreGetVersion();
 
     TERMITE_API bx::AllocatorI* coreGetAlloc() T_THREAD_SAFE;
-    TERMITE_API const coreConfig& coreGetConfig();
+    TERMITE_API const coreConfig& coreGetConfig() T_THREAD_SAFE;
     TERMITE_API dsDataStore* coreGetDefaultDataStore();
 
     TERMITE_API double coreGetFrameTime();
@@ -114,6 +116,10 @@ namespace termite
     TERMITE_API void coreSendInputMouse(float mousePos[2], int mouseButtons[3], float mouseWheel);
     TERMITE_API void coreSendInputChars(const char* chars);
     TERMITE_API void coreSendInputKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl);
+
+    // Development
+    TERMITE_API gfxDriverI* coreGetGfxDriver();
+    TERMITE_API dsDriverI* coreGetDiskDriver();
 
 } // namespace st
 

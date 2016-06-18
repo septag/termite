@@ -140,6 +140,8 @@ namespace termite
         int numNodes;
         int numMeshes;
         int numGeos;
+        int reserved1;
+        int reserved2;
         int64_t metaOffset;
 
 #if 0
