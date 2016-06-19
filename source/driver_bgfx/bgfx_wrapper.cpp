@@ -436,7 +436,7 @@ public:
     void setVertexBuffer(gfxVertexBufferHandle handle, uint32_t vertexIndex, uint32_t numVertices) override
     {
         BGFX_DECLARE_HANDLE(VertexBufferHandle, h, handle);
-        bgfx::setVertexBuffer(h);
+        bgfx::setVertexBuffer(h, vertexIndex, numVertices);
     }
 
     void setVertexBuffer(gfxDynamicVertexBufferHandle handle, uint32_t startVertex, uint32_t numVertices) override
