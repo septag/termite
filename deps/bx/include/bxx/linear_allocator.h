@@ -4,14 +4,14 @@
 
 namespace bx
 {
-    class StackAllocator : public AllocatorI
+    class LinearAllocator : public AllocatorI
     {
-        BX_CLASS(StackAllocator
+        BX_CLASS(LinearAllocator
                  , NO_COPY
                  , NO_ASSIGNMENT
                  );
     public:
-        StackAllocator(void* _ptr, size_t _size)
+        LinearAllocator(void* _ptr, size_t _size)
         {
             m_offset = 0;
             m_size = _size;
@@ -25,7 +25,7 @@ namespace bx
             m_ptr = (uint8_t*)_ptr;
         }
 
-        virtual ~StackAllocator()
+        virtual ~LinearAllocator()
         {
         }
 

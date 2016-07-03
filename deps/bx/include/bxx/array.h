@@ -55,9 +55,9 @@ namespace bx
         Ty* getBuffer() const { return m_buff; }
         void clear() { m_numItems = 0; }
 
-        Ty* itemPtr(int _index) { assert(_index < m_numItems); return &m_buff[_index]; }
+        Ty* itemPtr(int _index) { return &m_buff[_index]; }
         const Ty& operator[](int _index) const { assert(_index < m_numItems);  return m_buff[_index]; }
-        Ty& operator[](int _index) { assert(_index < m_numItems);  return m_buff[_index]; }
+        Ty& operator[](int _index) { return m_buff[_index]; }
 
     private:
         AllocatorI* m_alloc;

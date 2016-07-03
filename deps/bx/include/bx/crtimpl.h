@@ -101,7 +101,6 @@ namespace bx
 			m_file = fopen(_filePath, "rb");
 			if (NULL == m_file)
 			{
-				BX_ERROR_SET(_err, BX_ERROR_READERWRITER_OPEN, "CrtFileReader: Failed to open file.");
 				return false;
 			}
 
@@ -126,7 +125,6 @@ namespace bx
 			int32_t size = (int32_t)fread(_data, 1, _size, m_file);
 			if (size != _size)
 			{
-				BX_ERROR_SET(_err, BX_ERROR_READERWRITER_READ, "CrtFileReader: read failed.");
 				return size >= 0 ? size : 0;
 			}
 
@@ -155,7 +153,6 @@ namespace bx
 
 			if (NULL == m_file)
 			{
-				BX_ERROR_SET(_err, BX_ERROR_READERWRITER_OPEN, "CrtFileWriter: Failed to open file.");
 				return false;
 			}
 
@@ -180,7 +177,6 @@ namespace bx
 			int32_t size = (int32_t)fwrite(_data, 1, _size, m_file);
 			if (size != _size)
 			{
-				BX_ERROR_SET(_err, BX_ERROR_READERWRITER_WRITE, "CrtFileWriter: write failed.");
 				return size >= 0 ? size : 0;
 			}
 
@@ -219,7 +215,7 @@ namespace bx
 			m_file = popen(_command, "r");
 			if (NULL == m_file)
 			{
-				BX_ERROR_SET(_err, BX_ERROR_READERWRITER_OPEN, "ProcessReader: Failed to open process.");
+				//BX_ERROR_SET(_err, BX_ERROR_READERWRITER_OPEN, "ProcessReader: Failed to open process.");
 				return false;
 			}
 
@@ -270,7 +266,7 @@ namespace bx
 			m_file = popen(_command, "w");
 			if (NULL == m_file)
 			{
-				BX_ERROR_SET(_err, BX_ERROR_READERWRITER_OPEN, "ProcessWriter: Failed to open process.");
+				//BX_ERROR_SET(_err, BX_ERROR_READERWRITER_OPEN, "ProcessWriter: Failed to open process.");
 				return false;
 			}
 
