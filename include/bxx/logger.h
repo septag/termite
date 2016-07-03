@@ -5,8 +5,6 @@
 #include <atomic>
 #include <cstdio>
 
-#define BX_LOG(_Type, _Fmt, ...) bx::logPrintf(__FILE__, __LINE__, _Type, ##__VA_ARGS__)
-
 #ifdef BX_TRACE
 #   undef BX_TRACE
 #endif
