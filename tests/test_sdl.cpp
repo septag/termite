@@ -50,7 +50,7 @@ struct InputData
 static SDL_Window* g_window = nullptr;
 static InputData g_input;
 static VectorGfxContext* g_vg = nullptr;
-static EditorDrawContext* g_debug = nullptr;
+static DebugDrawContext* g_debug = nullptr;
 static Camera g_cam;
 static ResourceHandle g_model;
 static ProgramHandle g_modelProg;

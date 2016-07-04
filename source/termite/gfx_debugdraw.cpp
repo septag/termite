@@ -13,8 +13,8 @@
 
 #include <cstdarg>
 
-#include "shaders_h/editordraw.vso"
-#include "shaders_h/editordraw.fso"
+#include "shaders_h/ddraw.vso"
+#include "shaders_h/ddraw.fso"
 
 #define STATE_POOL_SIZE 8
 #define MAX_TEXT_SIZE 256
@@ -395,8 +395,8 @@ result_t termite::initDebugDraw(bx::AllocatorI* alloc, GfxDriverI* driver)
     
     // Load program
     {
-        ShaderHandle vertexShader = driver->createShader(driver->makeRef(dbg_vso, sizeof(dbg_vso)));
-        ShaderHandle fragmentShader = driver->createShader(driver->makeRef(dbg_fso, sizeof(dbg_fso)));
+        ShaderHandle vertexShader = driver->createShader(driver->makeRef(ddraw_vso, sizeof(ddraw_vso)));
+        ShaderHandle fragmentShader = driver->createShader(driver->makeRef(ddraw_fso, sizeof(ddraw_fso)));
         if (!vertexShader.isValid() || !fragmentShader.isValid()) {
             T_ERROR("Creating shaders failed");
             return T_ERR_FAILED;

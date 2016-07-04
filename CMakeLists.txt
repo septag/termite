@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.3)
-project(kashmir)
+project(termite)
 
 set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/install CACHE PATH "Install path" FORCE)
 
@@ -31,7 +31,9 @@ include(Utility)
 include(DownloadPackage)
 include(Bgfx)
 
-########################################################
+# options
+option(BUILD_BOX2D "Build Box2D Physics engine" OFF)
+
 # Check dependencies
 
 # Run find package scripts
@@ -144,9 +146,12 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 # dependencies
 add_subdirectory(deps/deboost.context)
 add_subdirectory(deps/bx)
-add_subdirectory(deps/Box2D)
 set_target_properties(fcontext PROPERTIES FOLDER Deps)
-set_target_properties(Box2D PROPERTIES FOLDER Deps)
+
+if (BUILD_BOX2D)
+    add_subdirectory(deps/Box2D)
+    set_target_properties(Box2D PROPERTIES FOLDER Deps)
+endif()
 
 # common
 add_subdirectory(source/imgui_impl)
@@ -176,7 +181,6 @@ set_target_properties(animc PROPERTIES FOLDER Tools)
 add_subdirectory(tests)
 set_target_properties(test_init PROPERTIES FOLDER Tests)
 set_target_properties(test_sdl PROPERTIES FOLDER Tests)
-set_target_properties(test_gfx PROPERTIES FOLDER Tests)
 
 # copy binaries
 if (WIN32)

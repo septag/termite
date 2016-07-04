@@ -28,14 +28,6 @@ add_dependencies(test_init tdriver_disk)
 
 add_dependencies(test_sdl trender_stock tdriver_disk tdriver_bgfx ${WIN_DEPS})
 
-# test_gfx
-
-add_executable(test_gfx "test_gfx.cpp")
-target_include_directories(test_gfx PUBLIC ${SDL2_INCLUDE_DIR})
-target_link_libraries(test_gfx termite ${SDL2_LIBRARY} imgui_impl)
-add_dependencies(test_gfx trender_kashmir tdriver_disk tdriver_bgfx ${WIN_DEPS})
-
 ##########
 install(TARGETS test_init RUNTIME DESTINATION bin)
 install(TARGETS test_sdl RUNTIME DESTINATION bin)
-install(TARGETS test_gfx RUNTIME DESTINATION bin)
