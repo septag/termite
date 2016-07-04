@@ -185,5 +185,4 @@ if (WIN32)
     set_target_properties(SDL2CopyBinaries PROPERTIES FOLDER Deps/CopyBinaries) 
 endif()
 
-# kashmir
-add_subdirectory(source/kashmir)
+
