@@ -1,31 +1,33 @@
 #pragma once
 
+#include "types.h"
 #include "gfx_defines.h"
 
 #define MAX_MATERIAL_VARS 32
 
 namespace termite
 {
-    struct mtlLibrary;
-    class gfxDriverI;
+    struct MaterialLib;
+    class GfxDriverI;
 
-    T_HANDLE(mtlHandle);
+    struct MaterialT {};
+    typedef PhantomType<uint16_t, MaterialT, UINT16_MAX> MaterialHandle;
 
-    class mtlDecl
+    class MaterialDecl
     {
     public:
         struct Var
         {
             char name[32];
-            gfxUniformType type;
+            UniformType type;
             int num;
         };
 
     public:
-        mtlDecl();
+        MaterialDecl();
         
-        mtlDecl& begin();
-        mtlDecl& add(const char* name, gfxUniformType type, int num = 1);
+        MaterialDecl& begin();
+        MaterialDecl& add(const char* name, UniformType type, int num = 1);
         void end();
 
     private:
@@ -33,9 +35,9 @@ namespace termite
         int m_count;
     };
 
-    TERMITE_API mtlLibrary* mtlCreateLibrary(bx::AllocatorI* alloc, gfxDriverI* driver);
-    TERMITE_API void mtlDestroyLibrary(mtlLibrary* lib);
+    TERMITE_API MaterialLib* createMaterialLib(bx::AllocatorI* alloc, GfxDriverI* driver);
+    TERMITE_API void destroyMaterialLib(MaterialLib* lib);
 
-    TERMITE_API mtlHandle mtlCreate(mtlLibrary* lib);
-    TERMITE_API void mtlDestroy(mtlLibrary* lib, mtlHandle handle);
+    TERMITE_API MaterialHandle createMaterial(MaterialLib* lib);
+    TERMITE_API void destroyMaterial(MaterialLib* lib, MaterialHandle handle);
 } // namespace termite

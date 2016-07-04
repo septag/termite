@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "datastore_driver.h"
+#include "io_driver.h"
 #include "gfx_font.h"
 #include "gfx_texture.h"
 
@@ -84,8 +84,8 @@ struct FontItem
 {
     char name[32];
     uint16_t size;
-    fntFlags flags;
-    fntFont* font;
+    FontFlags flags;
+    Font* font;
     
     typedef bx::ListNode<FontItem*> LNode;
     LNode lnode;
@@ -93,7 +93,7 @@ struct FontItem
 
 struct FontLibrary
 {
-    dsDriverI* datastoreDriver;
+    IoDriverI* ioDriver;
     bx::AllocatorI* alloc;
     bx::HashTable<FontItem*> fontTable;
     FontItem::LNode* fontList;
@@ -101,7 +101,7 @@ struct FontLibrary
 
     FontLibrary() : fontTable(bx::HashTableType::Mutable)
     {
-        datastoreDriver = nullptr;
+        ioDriver = nullptr;
         alloc = nullptr;
         fontList = nullptr;
     }
@@ -109,27 +109,26 @@ struct FontLibrary
 
 static FontLibrary* g_fontLib = nullptr;
 
-termite::fntFont::fntFont(bx::AllocatorI* alloc) :
+termite::Font::Font(bx::AllocatorI* alloc) :
     m_charTable(bx::HashTableType::Immutable),
     m_alloc(alloc)
 {
     m_name[0] = 0;
-    m_textureHandle = T_INVALID_HANDLE;
     m_numChars = m_numKerns = m_lineHeight = m_baseValue = m_fsize = m_charWidth = 0;
     m_kerns = nullptr;
     m_glyphs = nullptr;
-    m_ds = nullptr;
+    m_resLib = nullptr;
 }
 
-fntFont* termite::fntFont::create(const MemoryBlock* mem, const char* fntFilepath, bx::AllocatorI* alloc, dsDataStore* ds)
+Font* termite::Font::create(const MemoryBlock* mem, const char* fntFilepath, bx::AllocatorI* alloc, ResourceLib* resLib)
 {
     bx::Error err;
     bx::MemoryReader ms(mem->data, mem->size);
 
-    fntFont* font = BX_NEW(alloc, fntFont)(alloc);
+    Font* font = BX_NEW(alloc, Font)(alloc);
     if (!font)
         return nullptr;
-    font->m_ds = ds;    
+    font->m_resLib = resLib;    
 
     // Sign
     char sign[4];
@@ -180,14 +179,14 @@ fntFont* termite::fntFont::create(const MemoryBlock* mem, const char* fntFilepat
     ms.read(page.path, block.size, &err);
     bx::Path texFilepath = bx::Path(fntFilepath).getDirectory();
     texFilepath.join(page.path).toUnix();
-    gfxTextureLoadParams texParams;
+    LoadTextureParams texParams;
 
     if (texFilepath.getFileExt().isEqualNoCase("dds"))
-        font->m_textureHandle = dsLoadResource(ds, "texture", texFilepath.cstr(), &texParams);
+        font->m_textureHandle = loadResource(resLib, "texture", texFilepath.cstr(), &texParams);
     else
-        font->m_textureHandle = dsLoadResource(ds, "image", texFilepath.cstr(), &texParams);
+        font->m_textureHandle = loadResource(resLib, "image", texFilepath.cstr(), &texParams);
 
-    if (!T_ISVALID(font->m_textureHandle)) {
+    if (!font->m_textureHandle.isValid()) {
         T_ERROR("Loading font '%s' failed: Loading texture '%s' failed", fntFilepath, texFilepath.cstr());
         BX_DELETE(alloc, font);
         return nullptr;
@@ -205,9 +204,9 @@ fntFont* termite::fntFont::create(const MemoryBlock* mem, const char* fntFilepat
         return nullptr;
     }
 
-    font->m_glyphs = (fntGlyph*)BX_ALLOC(alloc, sizeof(fntGlyph)*numChars);
+    font->m_glyphs = (FontGlyph*)BX_ALLOC(alloc, sizeof(FontGlyph)*numChars);
     assert(font->m_glyphs);
-    memset(font->m_glyphs, 0x00, sizeof(fntGlyph)*numChars);
+    memset(font->m_glyphs, 0x00, sizeof(FontGlyph)*numChars);
 
     uint32_t charWidth = 0;
     for (int i = 0; i < (int)numChars; i++) {
@@ -232,9 +231,9 @@ fntFont* termite::fntFont::create(const MemoryBlock* mem, const char* fntFilepat
     int last_r = ms.read(&block, sizeof(block), &err);
     uint32_t numKerns = block.size / sizeof(kern);
     if (numKerns > 0 && last_r > 0) {
-        font->m_kerns = (fntKerning*)BX_ALLOC(alloc, sizeof(fntKerning)*numKerns);
+        font->m_kerns = (FontKerning*)BX_ALLOC(alloc, sizeof(FontKerning)*numKerns);
         assert(font->m_kerns);
-        memset(font->m_kerns, 0x00, sizeof(fntKerning)*numKerns);
+        memset(font->m_kerns, 0x00, sizeof(FontKerning)*numKerns);
 
         for (uint32_t i = 0; i < numKerns; i++) {
             ms.read(&kern, sizeof(kern), &err);
@@ -258,13 +257,13 @@ fntFont* termite::fntFont::create(const MemoryBlock* mem, const char* fntFilepat
     return font;
 }
 
-termite::fntFont::~fntFont()
+termite::Font::~Font()
 {
     if (m_alloc) {
         bx::AllocatorI* alloc = m_alloc;
 
-        if (T_ISVALID(m_textureHandle))
-            dsUnloadResource(m_ds, m_textureHandle);
+        if (m_textureHandle.isValid())
+            unloadResource(m_resLib, m_textureHandle);
 
         m_charTable.destroy();
 
@@ -276,7 +275,7 @@ termite::fntFont::~fntFont()
     }
 }
 
-float termite::fntFont::getTextWidth(const char* text, int len, float* firstcharWidth)
+float termite::Font::getTextWidth(const char* text, int len, float* firstcharWidth)
 {
     if (len <= 0)
         len = (int)strlen(text);
@@ -302,10 +301,10 @@ float termite::fntFont::getTextWidth(const char* text, int len, float* firstchar
     return width;
 }
 
-float termite::fntFont::applyKern(int glyphIdx, int nextGlyphIdx) const
+float termite::Font::applyKern(int glyphIdx, int nextGlyphIdx) const
 {
-    const fntGlyph& ch = m_glyphs[glyphIdx];
-    const fntGlyph& nextCh = m_glyphs[nextGlyphIdx];
+    const FontGlyph& ch = m_glyphs[glyphIdx];
+    const FontGlyph& nextCh = m_glyphs[nextGlyphIdx];
 
     for (uint32_t i = 0, c = ch.numKerns; i < c; i++) {
         if (m_kerns[ch.kernIdx + i].secondGlyph == nextCh.glyphId)
@@ -314,9 +313,9 @@ float termite::fntFont::applyKern(int glyphIdx, int nextGlyphIdx) const
     return 0;
 }
 
-result_t termite::fntInitLibrary(bx::AllocatorI* alloc, dsDriverI* datastoreDriver)
+result_t termite::initFontLib(bx::AllocatorI* alloc, IoDriverI* ioDriver)
 {
-    assert(datastoreDriver);
+    assert(ioDriver);
     assert(alloc);
 
     if (g_fontLib) {
@@ -329,7 +328,7 @@ result_t termite::fntInitLibrary(bx::AllocatorI* alloc, dsDriverI* datastoreDriv
         return T_ERR_OUTOFMEM;
 
     lib->alloc = alloc;
-    lib->datastoreDriver = datastoreDriver;
+    lib->ioDriver = ioDriver;
 
     if (!lib->fontItemPool.create(32, alloc) ||
         !lib->fontTable.create(32, alloc)) {
@@ -338,10 +337,10 @@ result_t termite::fntInitLibrary(bx::AllocatorI* alloc, dsDriverI* datastoreDriv
 
     g_fontLib = lib;
 
-    return T_OK;
+    return 0;
 }
  
-void termite::fntShutdownLibrary()
+void termite::shutdownFontLib()
 {
     if (!g_fontLib)
         return;
@@ -364,7 +363,7 @@ void termite::fntShutdownLibrary()
     g_fontLib = nullptr;
 }
 
-static uint32_t hashFontItem(const char* name, uint16_t size, fntFlags flags)
+static uint32_t hashFontItem(const char* name, uint16_t size, FontFlags flags)
 {
     bx::HashMurmur2A hasher;
     uint32_t flags_ = uint32_t(flags);
@@ -375,7 +374,7 @@ static uint32_t hashFontItem(const char* name, uint16_t size, fntFlags flags)
     return hasher.end();
 }
 
-result_t termite::fntRegister(const char* fntFilepath, const char* name, uint16_t size, fntFlags flags)
+result_t termite::registerFont(const char* fntFilepath, const char* name, uint16_t size, FontFlags flags)
 {
     assert(fntFilepath);
     assert(g_fontLib);
@@ -389,13 +388,13 @@ result_t termite::fntRegister(const char* fntFilepath, const char* name, uint16_
         return T_ERR_ALREADY_EXISTS;
 
     // Load the file into memory
-    MemoryBlock* mem = g_fontLib->datastoreDriver->read(fntFilepath);
+    MemoryBlock* mem = g_fontLib->ioDriver->read(fntFilepath);
     if (!mem) {
         T_ERROR("Could not open font file '%s'", fntFilepath);
         return T_ERR_IO_FAILED;
     }
-    fntFont* font = fntFont::create(mem, fntFilepath, g_fontLib->alloc);
-    coreReleaseMemory(mem);
+    Font* font = Font::create(mem, fntFilepath, g_fontLib->alloc);
+    releaseMemoryBlock(mem);
 
     if (!font) {
         T_ERROR("Loading font '%s' failed", fntFilepath);
@@ -415,10 +414,10 @@ result_t termite::fntRegister(const char* fntFilepath, const char* name, uint16_
 
     bx::addListNode<FontItem*>(&g_fontLib->fontList, &item->lnode, item);
     g_fontLib->fontTable.add(hash, item);    
-    return T_OK;
+    return 0;
 }
 
-void termite::fntUnregister(const char* name, uint16_t size /*= 0*/, fntFlags flags /*= fntFlags::Normal*/)
+void termite::unregisterFont(const char* name, uint16_t size /*= 0*/, FontFlags flags /*= fntFlags::Normal*/)
 {
     uint32_t hash = hashFontItem(name, size, flags);
     int fontIndex = g_fontLib->fontTable.find(hash);
@@ -435,7 +434,7 @@ void termite::fntUnregister(const char* name, uint16_t size /*= 0*/, fntFlags fl
     }
 }
 
-const fntFont* termite::fntGet(const char* name, uint16_t size /*= 0*/, fntFlags flags /*= fntFlags::Normal*/)
+const Font* termite::getFont(const char* name, uint16_t size /*= 0*/, FontFlags flags /*= fntFlags::Normal*/)
 {
     uint32_t hash = hashFontItem(name, size, flags);
     int fontIndex = g_fontLib->fontTable.find(hash);

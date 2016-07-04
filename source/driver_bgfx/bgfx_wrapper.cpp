@@ -1,6 +1,10 @@
 #include "termite/core.h"
-#include "termite/plugins.h"
+
+#define T_CORE_API
+#include "termite/plugin_api.h"
+
 #include "termite/gfx_driver.h"
+
 #include "bgfx/bgfx.h"
 #include "bgfx/bgfxplatform.h"
 
@@ -9,15 +13,15 @@
 
 using namespace termite;
 
-#define BGFX_DECLARE_HANDLE(_Type, _Name, _Handle) bgfx::_Type _Name; _Name.idx = _Handle.idx
+#define BGFX_DECLARE_HANDLE(_Type, _Name, _Handle) bgfx::_Type _Name; _Name.idx = _Handle.value
 
 class BgfxCallbacks : public bgfx::CallbackI
 {
 private:
-    gfxCallbacksI* m_callbacks;
+    GfxDriverEventsI* m_callbacks;
 
 public:
-    BgfxCallbacks(gfxCallbacksI* callbacks)
+    BgfxCallbacks(GfxDriverEventsI* callbacks)
     {
         assert(callbacks);
         m_callbacks = callbacks;
@@ -38,7 +42,7 @@ public:
     ///   Not thread safe and it can be called from any thread.
     void fatal(bgfx::Fatal::Enum _code, const char* _str) override
     {
-        m_callbacks->onFatal((gfxFatalType)_code, _str);
+        m_callbacks->onFatal((GfxFatalType)_code, _str);
     }
 
     /// Print debug message.
@@ -103,7 +107,7 @@ public:
     /// Called when capture begins.
     void captureBegin(uint32_t _width, uint32_t _height, uint32_t _pitch, bgfx::TextureFormat::Enum _format, bool _yflip) override
     {
-        m_callbacks->onCaptureBegin(_width, _height, _pitch, (gfxTextureFormat)_format, _yflip);
+        m_callbacks->onCaptureBegin(_width, _height, _pitch, (TextureFormat)_format, _yflip);
     }
 
     /// Called when capture ends.
@@ -122,15 +126,15 @@ public:
     }
 };
 
-class BgfxWrapper : public gfxDriverI
+class BgfxWrapper : public GfxDriverI
 {
 private:
     BgfxCallbacks* m_callbacks;
     bx::AllocatorI* m_alloc;
-    gfxCaps m_caps;
-    gfxStats m_stats;
-    gfxHMD m_hmd;
-    gfxInternalData m_internal;
+    GfxCaps m_caps;
+    GfxStats m_stats;
+    HMDDesc m_hmd;
+    GfxInternalData m_internal;
 
 public:
     BgfxWrapper()
@@ -147,7 +151,7 @@ public:
     {
     }
 
-    result_t init(uint16_t deviceId, gfxCallbacksI* callbacks, bx::AllocatorI* alloc) override
+    result_t init(uint16_t deviceId, GfxDriverEventsI* callbacks, bx::AllocatorI* alloc) override
     {
         m_alloc = alloc;
         if (callbacks) {
@@ -156,7 +160,7 @@ public:
                 return T_ERR_OUTOFMEM;
         }
 
-        return bgfx::init(bgfx::RendererType::Count, 0, deviceId, m_callbacks, alloc) ? T_OK : T_ERR_FAILED;
+        return bgfx::init(bgfx::RendererType::Count, 0, deviceId, m_callbacks, alloc) ? 0 : T_ERR_FAILED;
     }
 
     void shutdown() override
@@ -167,7 +171,7 @@ public:
         }
     }
 
-    void reset(uint32_t width, uint32_t height, gfxResetFlag flags) override
+    void reset(uint32_t width, uint32_t height, GfxResetFlag flags) override
     {
         bgfx::reset(width, height, (uint32_t)flags);
     }
@@ -177,27 +181,27 @@ public:
         return bgfx::frame();
     }
 
-    void setDebug(gfxDebugFlag debugFlags) override
+    void setDebug(GfxDebugFlag debugFlags) override
     {
         bgfx::setDebug((uint32_t)debugFlags);
     }
 
-    gfxRendererType getRendererType() const override
+    RendererType getRendererType() const override
     {
-        return (gfxRendererType)bgfx::getRendererType();
+        return (RendererType)bgfx::getRendererType();
     }
 
-    const gfxCaps& getCaps() override
+    const GfxCaps& getCaps() override
     {
         const bgfx::Caps* caps = bgfx::getCaps();
         m_caps.deviceId = caps->deviceId;
-        m_caps.supported = (gfxCapsFlag)caps->supported;
+        m_caps.supported = (GpuCapsFlag)caps->supported;
         m_caps.maxDrawCalls = caps->maxDrawCalls;
         m_caps.maxFBAttachments = caps->maxFBAttachments;
         m_caps.maxTextureSize = caps->maxTextureSize;
         m_caps.maxViews = caps->maxViews;
         m_caps.numGPUs = caps->numGPUs;
-        m_caps.type = (gfxRendererType)caps->rendererType;
+        m_caps.type = (RendererType)caps->rendererType;
         m_caps.vendorId = caps->vendorId;
         
         for (int i = 0; i < 4; i++) {
@@ -208,7 +212,7 @@ public:
         return m_caps;
     }
 
-    const gfxStats& getStats() override
+    const GfxStats& getStats() override
     {
         const bgfx::Stats* stats = bgfx::getStats();
         m_stats.cpuTimeBegin = stats->cpuTimeBegin;
@@ -220,7 +224,7 @@ public:
         return m_stats;
     }
 
-    const gfxHMD& getHMD() override
+    const HMDDesc& getHMD() override
     {
         const bgfx::HMD* hmd = bgfx::getHMD();
         m_hmd.deviceWidth = hmd->deviceWidth;
@@ -238,12 +242,12 @@ public:
         return m_hmd;
     }
 
-    gfxRenderFrameType renderFrame() override
+    RenderFrameType renderFrame() override
     {
-        return (gfxRenderFrameType)bgfx::renderFrame();
+        return (RenderFrameType)bgfx::renderFrame();
     }
 
-    void setPlatformData(const gfxPlatformData& data) override
+    void setPlatformData(const GfxPlatformData& data) override
     {
         bgfx::PlatformData p;
         p.backBuffer = data.backBuffer;
@@ -254,7 +258,7 @@ public:
         bgfx::setPlatformData(p);
     }
 
-    const gfxInternalData& getInternalData() override
+    const GfxInternalData& getInternalData() override
     {
         const bgfx::InternalData* d = bgfx::getInternalData();
         m_internal.caps = &getCaps();
@@ -262,14 +266,14 @@ public:
         return m_internal;
     }
 
-    void overrideInternal(gfxTextureHandle handle, uintptr_t ptr) override
+    void overrideInternal(TextureHandle handle, uintptr_t ptr) override
     {
         BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
         bgfx::overrideInternal(h, ptr);
     }
 
-    void overrideInternal(gfxTextureHandle handle, uint16_t width, uint16_t height, uint8_t numMips,
-                          gfxTextureFormat fmt, gfxTextureFlag flags) override
+    void overrideInternal(TextureHandle handle, uint16_t width, uint16_t height, uint8_t numMips,
+                          TextureFormat fmt, TextureFlag flags) override
     {
         BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
         bgfx::overrideInternal(h, width, height, numMips, (bgfx::TextureFormat::Enum)fmt, (uint32_t)flags);
@@ -315,7 +319,7 @@ public:
         bgfx::setViewRect(id, x, y, width, height);
     }
 
-    void setViewRect(uint8_t id, uint16_t x, uint16_t y, gfxBackbufferRatio ratio) override
+    void setViewRect(uint8_t id, uint16_t x, uint16_t y, BackbufferRatio ratio) override
     {
         bgfx::setViewRect(id, x, y, (bgfx::BackbufferRatio::Enum)ratio);
     }
@@ -325,12 +329,12 @@ public:
         bgfx::setViewScissor(id, x, y, width, height);
     }
 
-    void setViewClear(uint8_t id, gfxClearFlag flags, uint32_t rgba, float depth, uint8_t stencil) override
+    void setViewClear(uint8_t id, GfxClearFlag flags, uint32_t rgba, float depth, uint8_t stencil) override
     {
         bgfx::setViewClear(id, (uint16_t)flags, rgba, depth, stencil);
     }
         
-    void setViewClear(uint8_t id, gfxClearFlag flags, float depth, uint8_t stencil,
+    void setViewClear(uint8_t id, GfxClearFlag flags, float depth, uint8_t stencil,
                       uint8_t color0, uint8_t color1, uint8_t color2, uint8_t color3,
                       uint8_t color4, uint8_t color5, uint8_t color6, uint8_t color7) override
     {
@@ -343,7 +347,7 @@ public:
         bgfx::setViewSeq(id, enabled);
     }
 
-    void setViewTransform(uint8_t id, const void* view, const void* projLeft, gfxViewFlag flags, 
+    void setViewTransform(uint8_t id, const void* view, const void* projLeft, GfxViewFlag flags, 
                           const void* projRight) override
     {
         bgfx::setViewTransform(id, view, projLeft, (uint8_t)flags, projRight);
@@ -354,7 +358,7 @@ public:
         bgfx::setViewRemap(id, num, remap);
     }
 
-    void setViewFrameBuffer(uint8_t id, gfxFrameBufferHandle handle) override
+    void setViewFrameBuffer(uint8_t id, FrameBufferHandle handle) override
     {
         BGFX_DECLARE_HANDLE(FrameBufferHandle, h, handle);
         bgfx::setViewFrameBuffer(id, h);
@@ -365,12 +369,12 @@ public:
         bgfx::setMarker(marker);
     }
 
-    void setState(gfxState state, uint32_t rgba) override
+    void setState(GfxState state, uint32_t rgba) override
     {
         bgfx::setState((uint64_t)state, rgba);
     }
 
-    void setStencil(gfxStencil frontStencil, gfxStencil backStencil) override
+    void setStencil(GfxStencilState frontStencil, GfxStencilState backStencil) override
     {
         bgfx::setStencil((uint32_t)frontStencil, (uint32_t)backStencil);
     }
@@ -385,7 +389,7 @@ public:
         bgfx::setScissor(cache);
     }
 
-    uint32_t allocTransform(gfxTransform* transform, uint16_t num) override
+    uint32_t allocTransform(GpuTransform* transform, uint16_t num) override
     {
         bgfx::Transform t;
         uint32_t r = bgfx::allocTransform(&t, num);
@@ -399,80 +403,80 @@ public:
         return bgfx::setTransform(mtx, num);
     }
 
-    void setCondition(gfxOccQueryHandle handle, bool visible) override
+    void setCondition(OcclusionQueryHandle handle, bool visible) override
     {
         BGFX_DECLARE_HANDLE(OcclusionQueryHandle, h, handle);
         bgfx::setCondition(h, visible);
     }
 
-    void setIndexBuffer(gfxIndexBufferHandle handle, uint32_t firstIndex, uint32_t numIndices) override
+    void setIndexBuffer(IndexBufferHandle handle, uint32_t firstIndex, uint32_t numIndices) override
     {
         BGFX_DECLARE_HANDLE(IndexBufferHandle, h, handle);
         bgfx::setIndexBuffer(h, firstIndex, numIndices);
     }
 
-    void setIndexBuffer(gfxDynamicIndexBufferHandle handle, uint32_t firstIndex, uint32_t numIndices) override
+    void setIndexBuffer(DynamicIndexBufferHandle handle, uint32_t firstIndex, uint32_t numIndices) override
     {
         BGFX_DECLARE_HANDLE(DynamicIndexBufferHandle, h, handle);
         bgfx::setIndexBuffer(h, firstIndex, numIndices);
     }
 
-    void setIndexBuffer(const gfxTransientIndexBuffer* tib, uint32_t firstIndex, uint32_t numIndices) override
+    void setIndexBuffer(const TransientIndexBuffer* tib, uint32_t firstIndex, uint32_t numIndices) override
     {
         bgfx::setIndexBuffer((const bgfx::TransientIndexBuffer*)tib, firstIndex, numIndices);
     }
 
-    void setIndexBuffer(const gfxTransientIndexBuffer* tib) override
+    void setIndexBuffer(const TransientIndexBuffer* tib) override
     {
         bgfx::setIndexBuffer((const bgfx::TransientIndexBuffer*)tib);
     }
 
-    void setVertexBuffer(gfxVertexBufferHandle handle) override
+    void setVertexBuffer(VertexBufferHandle handle) override
     {
         BGFX_DECLARE_HANDLE(VertexBufferHandle, h, handle);
         bgfx::setVertexBuffer(h);
     }
 
-    void setVertexBuffer(gfxVertexBufferHandle handle, uint32_t vertexIndex, uint32_t numVertices) override
+    void setVertexBuffer(VertexBufferHandle handle, uint32_t vertexIndex, uint32_t numVertices) override
     {
         BGFX_DECLARE_HANDLE(VertexBufferHandle, h, handle);
         bgfx::setVertexBuffer(h, vertexIndex, numVertices);
     }
 
-    void setVertexBuffer(gfxDynamicVertexBufferHandle handle, uint32_t startVertex, uint32_t numVertices) override
+    void setVertexBuffer(DynamicVertexBufferHandle handle, uint32_t startVertex, uint32_t numVertices) override
     {
         BGFX_DECLARE_HANDLE(DynamicVertexBufferHandle, h, handle);
         bgfx::setVertexBuffer(h, startVertex, numVertices);
     }
 
-    void setVertexBuffer(const gfxTransientVertexBuffer* tvb) override
+    void setVertexBuffer(const TransientVertexBuffer* tvb) override
     {
         bgfx::setVertexBuffer((const bgfx::TransientVertexBuffer*)tvb);
     }
 
-    void setVertexBuffer(const gfxTransientVertexBuffer* tvb, uint32_t startVertex, uint32_t numVertices) override
+    void setVertexBuffer(const TransientVertexBuffer* tvb, uint32_t startVertex, uint32_t numVertices) override
     {
         bgfx::setVertexBuffer((const bgfx::TransientVertexBuffer*)tvb, startVertex, numVertices);
     }
 
-    void setInstanceDataBuffer(const gfxInstanceDataBuffer* idb, uint32_t num) override
+    void setInstanceDataBuffer(const InstanceDataBuffer* idb, uint32_t num) override
     {
         bgfx::setInstanceDataBuffer((const bgfx::InstanceDataBuffer*)idb, num);
     }
 
-    void setInstanceDataBuffer(gfxVertexBufferHandle handle, uint32_t startVertex, uint32_t num) override
+    void setInstanceDataBuffer(VertexBufferHandle handle, uint32_t startVertex, uint32_t num) override
     {
         BGFX_DECLARE_HANDLE(VertexBufferHandle, h, handle);
         bgfx::setInstanceDataBuffer(h, startVertex, num);
     }
 
-    void setInstanceDataBuffer(gfxDynamicVertexBufferHandle handle, uint32_t startVertex, uint32_t num) override
+    void setInstanceDataBuffer(DynamicVertexBufferHandle handle, uint32_t startVertex, uint32_t num) override
     {
         BGFX_DECLARE_HANDLE(DynamicVertexBufferHandle, h, handle);
         bgfx::setInstanceDataBuffer(h, startVertex, num);
     }
 
-    void setTexture(uint8_t stage, gfxUniformHandle sampler, gfxTextureHandle handle, gfxTextureFlag flags) override
+    void setTexture(uint8_t stage, UniformHandle sampler, TextureHandle handle, TextureFlag flags) override
     {
         BGFX_DECLARE_HANDLE(UniformHandle, s, sampler);
         BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
@@ -480,8 +484,8 @@ public:
         bgfx::setTexture(stage, s, h, (uint32_t)flags);
     }
 
-    void setTexture(uint8_t stage, gfxUniformHandle sampler, gfxFrameBufferHandle handle, uint8_t attachment,
-                    gfxTextureFlag flags) override
+    void setTexture(uint8_t stage, UniformHandle sampler, FrameBufferHandle handle, uint8_t attachment,
+                    TextureFlag flags) override
     {
         BGFX_DECLARE_HANDLE(UniformHandle, s, sampler);
         BGFX_DECLARE_HANDLE(FrameBufferHandle, h, handle);
@@ -489,20 +493,20 @@ public:
         bgfx::setTexture(stage, s, h, attachment, (uint32_t)flags);
     }
 
-    uint32_t submit(uint8_t viewId, gfxProgramHandle program, int32_t depth, bool preserveState) override
+    uint32_t submit(uint8_t viewId, ProgramHandle program, int32_t depth, bool preserveState) override
     {
         BGFX_DECLARE_HANDLE(ProgramHandle, p, program);
         return bgfx::submit(viewId, p, depth, preserveState);
     }
 
-    uint32_t submit(uint8_t viewId, gfxProgramHandle program, gfxOccQueryHandle occQuery, int32_t depth, bool preserveState) override
+    uint32_t submit(uint8_t viewId, ProgramHandle program, OcclusionQueryHandle occQuery, int32_t depth, bool preserveState) override
     {
         BGFX_DECLARE_HANDLE(ProgramHandle, p, program);
         BGFX_DECLARE_HANDLE(OcclusionQueryHandle, o, occQuery);
         return bgfx::submit(viewId, p, o, depth, preserveState);
     }
 
-    uint32_t submit(uint8_t viewId, gfxProgramHandle program, gfxIndirectBufferHandle indirectHandle, uint16_t start,
+    uint32_t submit(uint8_t viewId, ProgramHandle program, IndirectBufferHandle indirectHandle, uint16_t start,
                     uint16_t num, int32_t depth, bool preserveState) override
     {
         BGFX_DECLARE_HANDLE(ProgramHandle, p, program);
@@ -510,68 +514,68 @@ public:
         return bgfx::submit(viewId, p, i, start, num, depth, preserveState);
     }
 
-    void setBuffer(uint8_t stage, gfxIndexBufferHandle handle, gfxAccess access) override
+    void setBuffer(uint8_t stage, IndexBufferHandle handle, GpuAccessFlag access) override
     {
         BGFX_DECLARE_HANDLE(IndexBufferHandle, h, handle);
         bgfx::setBuffer(stage, h, (bgfx::Access::Enum)access);
     }
 
-    void setBuffer(uint8_t stage, gfxVertexBufferHandle handle, gfxAccess access) override
+    void setBuffer(uint8_t stage, VertexBufferHandle handle, GpuAccessFlag access) override
     {
         BGFX_DECLARE_HANDLE(VertexBufferHandle, h, handle);
         bgfx::setBuffer(stage, h, (bgfx::Access::Enum)access);
     }
 
-    void setBuffer(uint8_t stage, gfxDynamicIndexBufferHandle handle, gfxAccess access) override
+    void setBuffer(uint8_t stage, DynamicIndexBufferHandle handle, GpuAccessFlag access) override
     {
         BGFX_DECLARE_HANDLE(DynamicIndexBufferHandle, h, handle);
         bgfx::setBuffer(stage, h, (bgfx::Access::Enum)access);
     }
 
-    void setBuffer(uint8_t stage, gfxDynamicVertexBufferHandle handle, gfxAccess access) override
+    void setBuffer(uint8_t stage, DynamicVertexBufferHandle handle, GpuAccessFlag access) override
     {
         BGFX_DECLARE_HANDLE(DynamicVertexBufferHandle, h, handle);
         bgfx::setBuffer(stage, h, (bgfx::Access::Enum)access);
     }
 
-    void setBuffer(uint8_t stage, gfxIndirectBufferHandle handle, gfxAccess access) override
+    void setBuffer(uint8_t stage, IndirectBufferHandle handle, GpuAccessFlag access) override
     {
         BGFX_DECLARE_HANDLE(IndirectBufferHandle, h, handle);
         bgfx::setBuffer(stage, h, (bgfx::Access::Enum)access);
     }
 
-    void setImage(uint8_t stage, gfxUniformHandle sampler, gfxTextureHandle handle, uint8_t mip, gfxAccess access,
-                  gfxTextureFormat fmt) override
+    void setImage(uint8_t stage, UniformHandle sampler, TextureHandle handle, uint8_t mip, GpuAccessFlag access,
+                  TextureFormat fmt) override
     {
         BGFX_DECLARE_HANDLE(UniformHandle, s, sampler);
         BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
         bgfx::setImage(stage, s, h, mip, (bgfx::Access::Enum)access, (bgfx::TextureFormat::Enum)fmt);
     }
 
-    void setImage(uint8_t stage, gfxUniformHandle sampler, gfxFrameBufferHandle handle, uint8_t attachment,
-                  gfxAccess access, gfxTextureFormat fmt) override
+    void setImage(uint8_t stage, UniformHandle sampler, FrameBufferHandle handle, uint8_t attachment,
+                  GpuAccessFlag access, TextureFormat fmt) override
     {
         BGFX_DECLARE_HANDLE(UniformHandle, s, sampler);
         BGFX_DECLARE_HANDLE(FrameBufferHandle, h, handle);
         bgfx::setImage(stage, s, h, attachment, (bgfx::Access::Enum)access, (bgfx::TextureFormat::Enum)fmt);
     }
 
-    uint32_t dispatch(uint8_t viewId, gfxProgramHandle handle, uint16_t numX, uint16_t numY, uint16_t numZ,
-                      gfxSubmitFlag flags) override
+    uint32_t dispatch(uint8_t viewId, ProgramHandle handle, uint16_t numX, uint16_t numY, uint16_t numZ,
+                      GfxSubmitFlag flags) override
     {
         BGFX_DECLARE_HANDLE(ProgramHandle, h, handle);
         return bgfx::dispatch(viewId, h, numX, numY, numZ, (uint8_t)flags);
     }
 
-    uint32_t dispatch(uint8_t viewId, gfxProgramHandle handle, gfxIndirectBufferHandle indirectHandle,
-                      uint16_t start, uint16_t num, gfxSubmitFlag flags) override
+    uint32_t dispatch(uint8_t viewId, ProgramHandle handle, IndirectBufferHandle indirectHandle,
+                      uint16_t start, uint16_t num, GfxSubmitFlag flags) override
     {
         BGFX_DECLARE_HANDLE(ProgramHandle, h, handle);
         BGFX_DECLARE_HANDLE(IndirectBufferHandle, i, indirectHandle);
         return bgfx::dispatch(viewId, h, i, start, num, (uint8_t)flags);
     }
 
-    void blit(uint8_t viewId, gfxTextureHandle dest, uint16_t destX, uint16_t destY, gfxTextureHandle src,
+    void blit(uint8_t viewId, TextureHandle dest, uint16_t destX, uint16_t destY, TextureHandle src,
               uint16_t srcX, uint16_t srcY, uint16_t width, uint16_t height) override
     {
         BGFX_DECLARE_HANDLE(TextureHandle, d, dest);
@@ -579,7 +583,7 @@ public:
         bgfx::blit(viewId, d, destX, destY, s, srcX, srcY, width, height);
     }
 
-    void blit(uint8_t viewId, gfxTextureHandle dest, uint16_t destX, uint16_t destY, gfxFrameBufferHandle src,
+    void blit(uint8_t viewId, TextureHandle dest, uint16_t destX, uint16_t destY, FrameBufferHandle src,
               uint8_t attachment, uint16_t srcX, uint16_t srcY, uint16_t width, uint16_t height) override
     {
         BGFX_DECLARE_HANDLE(TextureHandle, d, dest);
@@ -587,8 +591,8 @@ public:
         bgfx::blit(viewId, d, destX, destY, s, attachment, srcX, srcY, width, height);
     }
 
-    void blit(uint8_t viewId, gfxTextureHandle dest, uint8_t destMip, uint16_t destX, uint16_t destY,
-              uint16_t destZ, gfxTextureHandle src, uint8_t srcMip, uint16_t srcX, uint16_t srcY,
+    void blit(uint8_t viewId, TextureHandle dest, uint8_t destMip, uint16_t destX, uint16_t destY,
+              uint16_t destZ, TextureHandle src, uint8_t srcMip, uint16_t srcX, uint16_t srcY,
               uint16_t srcZ, uint16_t width, uint16_t height, uint16_t depth) override
     {
         BGFX_DECLARE_HANDLE(TextureHandle, d, dest);
@@ -596,8 +600,8 @@ public:
         bgfx::blit(viewId, d, destMip, destX, destY, destZ, s, srcMip, srcX, srcY, srcZ, width, height, depth);
     }
 
-    void blit(uint8_t viewId, gfxTextureHandle dest, uint8_t destMip, uint16_t destX, uint16_t destY,
-              uint16_t destZ, gfxFrameBufferHandle src, uint8_t attachment, uint8_t srcMip, uint16_t srcX,
+    void blit(uint8_t viewId, TextureHandle dest, uint8_t destMip, uint16_t destX, uint16_t destY,
+              uint16_t destZ, FrameBufferHandle src, uint8_t attachment, uint8_t srcMip, uint16_t srcX,
               uint16_t srcY, uint16_t srcZ, uint16_t width, uint16_t height, uint16_t depth) override
     {
         BGFX_DECLARE_HANDLE(TextureHandle, d, dest);
@@ -605,158 +609,158 @@ public:
         bgfx::blit(viewId, d, destMip, destX, destY, destZ, s, attachment, srcMip, srcX, srcY, srcZ, width, height, depth);
     }
 
-    const gfxMemory* alloc(uint32_t size) override
+    const GfxMemory* alloc(uint32_t size) override
     {
-        return (const gfxMemory*)bgfx::alloc(size);
+        return (const GfxMemory*)bgfx::alloc(size);
     }
 
-    const gfxMemory* copy(const void* data, uint32_t size) override
+    const GfxMemory* copy(const void* data, uint32_t size) override
     {
-        return (const gfxMemory*)bgfx::copy(data, size);
+        return (const GfxMemory*)bgfx::copy(data, size);
     }
 
-    const gfxMemory* makeRef(const void* data, uint32_t size, gfxCallbackReleaseMem releaseFn, void* userData) override
+    const GfxMemory* makeRef(const void* data, uint32_t size, gfxReleaseMemCallback releaseFn, void* userData) override
     {
-        return (const gfxMemory*)bgfx::makeRef(data, size, releaseFn, userData);
+        return (const GfxMemory*)bgfx::makeRef(data, size, releaseFn, userData);
     }
 
-    gfxShaderHandle createShader(const gfxMemory* mem) override
+    ShaderHandle createShader(const GfxMemory* mem) override
     {
-        gfxShaderHandle handle;
-        handle.idx = bgfx::createShader((const bgfx::Memory*)mem).idx;
+        ShaderHandle handle;
+        handle.value = bgfx::createShader((const bgfx::Memory*)mem).idx;
         return handle;
     }
 
-    uint16_t getShaderUniforms(gfxShaderHandle handle, gfxUniformHandle* uniforms, uint16_t _max) override
+    uint16_t getShaderUniforms(ShaderHandle handle, UniformHandle* uniforms, uint16_t _max) override
     {
         BGFX_DECLARE_HANDLE(ShaderHandle, h, handle);
         return bgfx::getShaderUniforms(h, (bgfx::UniformHandle*)uniforms, _max);
     }
 
-    void destroyShader(gfxShaderHandle handle) override
+    void destroyShader(ShaderHandle handle) override
     {
         BGFX_DECLARE_HANDLE(ShaderHandle, h, handle);
         bgfx::destroyShader(h);
     }
 
-    void destroyUniform(gfxUniformHandle handle) override
+    void destroyUniform(UniformHandle handle) override
     {
         BGFX_DECLARE_HANDLE(UniformHandle, h, handle);
         bgfx::destroyUniform(h);
     }
 
-    gfxProgramHandle createProgram(gfxShaderHandle vsh, gfxShaderHandle fsh, bool destroyShaders) override
+    ProgramHandle createProgram(ShaderHandle vsh, ShaderHandle fsh, bool destroyShaders) override
     {
         BGFX_DECLARE_HANDLE(ShaderHandle, v, vsh);
         BGFX_DECLARE_HANDLE(ShaderHandle, f, fsh);
-        gfxProgramHandle h;
-        h.idx = bgfx::createProgram(v, f, destroyShaders).idx;
+        ProgramHandle h;
+        h.value = bgfx::createProgram(v, f, destroyShaders).idx;
         return h;
     }
 
-    void destroyProgram(gfxProgramHandle handle) override
+    void destroyProgram(ProgramHandle handle) override
     {
         BGFX_DECLARE_HANDLE(ProgramHandle, h, handle);
         bgfx::destroyProgram(h);
     }
 
-    gfxUniformHandle createUniform(const char* name, gfxUniformType type, uint16_t num) override
+    UniformHandle createUniform(const char* name, UniformType type, uint16_t num) override
     {
-        gfxUniformHandle handle;
-        handle.idx = bgfx::createUniform(name, (bgfx::UniformType::Enum)type, num).idx;
+        UniformHandle handle;
+        handle.value = bgfx::createUniform(name, (bgfx::UniformType::Enum)type, num).idx;
         return handle;
     }
 
-    void setUniform(gfxUniformHandle handle, const void* value, uint16_t num) override
+    void setUniform(UniformHandle handle, const void* value, uint16_t num) override
     {
         BGFX_DECLARE_HANDLE(UniformHandle, h, handle);
         bgfx::setUniform(h, value, num);
     }
 
-    gfxVertexBufferHandle createVertexBuffer(const gfxMemory* mem, const gfxVertexDecl& decl, gfxBufferFlag flags) override
+    VertexBufferHandle createVertexBuffer(const GfxMemory* mem, const VertexDecl& decl, GpuBufferFlag flags) override
     {
-        gfxVertexBufferHandle handle;
-        handle.idx = bgfx::createVertexBuffer((const bgfx::Memory*)mem, (const bgfx::VertexDecl&)decl, (uint16_t)flags).idx;
+        VertexBufferHandle handle;
+        handle.value = bgfx::createVertexBuffer((const bgfx::Memory*)mem, (const bgfx::VertexDecl&)decl, (uint16_t)flags).idx;
         return handle;
     }
 
-    gfxDynamicVertexBufferHandle createDynamicVertexBuffer(uint32_t numVertices, const gfxVertexDecl& decl, gfxBufferFlag flags) override
+    DynamicVertexBufferHandle createDynamicVertexBuffer(uint32_t numVertices, const VertexDecl& decl, GpuBufferFlag flags) override
     {
-        gfxDynamicVertexBufferHandle handle;
-        handle.idx = bgfx::createDynamicVertexBuffer(numVertices, (const bgfx::VertexDecl&)decl, (uint16_t)flags).idx;
+        DynamicVertexBufferHandle handle;
+        handle.value = bgfx::createDynamicVertexBuffer(numVertices, (const bgfx::VertexDecl&)decl, (uint16_t)flags).idx;
         return handle;
     }
 
-    gfxDynamicVertexBufferHandle createDynamicVertexBuffer(const gfxMemory* mem, const gfxVertexDecl& decl,
-                                                           gfxBufferFlag flags = gfxBufferFlag::None) override
+    DynamicVertexBufferHandle createDynamicVertexBuffer(const GfxMemory* mem, const VertexDecl& decl,
+                                                           GpuBufferFlag flags = GpuBufferFlag::None) override
     {
-        gfxDynamicVertexBufferHandle handle;
-        handle.idx = bgfx::createDynamicVertexBuffer((const bgfx::Memory*)mem, (const bgfx::VertexDecl&)decl, (uint16_t)flags).idx;
+        DynamicVertexBufferHandle handle;
+        handle.value = bgfx::createDynamicVertexBuffer((const bgfx::Memory*)mem, (const bgfx::VertexDecl&)decl, (uint16_t)flags).idx;
         return handle;
     }
 
-    void updateDynamicVertexBuffer(gfxDynamicVertexBufferHandle handle, uint32_t startVertex, const gfxMemory* mem) override
+    void updateDynamicVertexBuffer(DynamicVertexBufferHandle handle, uint32_t startVertex, const GfxMemory* mem) override
     {
         BGFX_DECLARE_HANDLE(DynamicVertexBufferHandle, h, handle);
         bgfx::updateDynamicVertexBuffer(h, startVertex, (const bgfx::Memory*)mem);
     }
 
-    void destroyVertexBuffer(gfxVertexBufferHandle handle) override
+    void destroyVertexBuffer(VertexBufferHandle handle) override
     {
         BGFX_DECLARE_HANDLE(VertexBufferHandle, h, handle);
         bgfx::destroyVertexBuffer(h);
     }
 
-    void destroyDynamicVertexBuffer(gfxDynamicVertexBufferHandle handle) override
+    void destroyDynamicVertexBuffer(DynamicVertexBufferHandle handle) override
     {
         BGFX_DECLARE_HANDLE(DynamicVertexBufferHandle, h, handle);
         bgfx::destroyDynamicVertexBuffer(h);
     }
 
-    bool checkAvailTransientVertexBuffer(uint32_t num, const gfxVertexDecl& decl) override
+    bool checkAvailTransientVertexBuffer(uint32_t num, const VertexDecl& decl) override
     {
         return bgfx::checkAvailTransientVertexBuffer(num, (const bgfx::VertexDecl&)decl);
     }
 
-    void allocTransientVertexBuffer(gfxTransientVertexBuffer* tvb, uint32_t num, const gfxVertexDecl& decl) override
+    void allocTransientVertexBuffer(TransientVertexBuffer* tvb, uint32_t num, const VertexDecl& decl) override
     {
         bgfx::allocTransientVertexBuffer((bgfx::TransientVertexBuffer*)tvb, num, (const bgfx::VertexDecl&)decl);
     }
 
-    gfxIndexBufferHandle createIndexBuffer(const gfxMemory* mem, gfxBufferFlag flags) override
+    IndexBufferHandle createIndexBuffer(const GfxMemory* mem, GpuBufferFlag flags) override
     {
-        gfxIndexBufferHandle handle;
-        handle.idx = bgfx::createIndexBuffer((const bgfx::Memory*)mem, (uint16_t)flags).idx;
+        IndexBufferHandle handle;
+        handle.value = bgfx::createIndexBuffer((const bgfx::Memory*)mem, (uint16_t)flags).idx;
         return handle;
     }
 
-    gfxDynamicIndexBufferHandle createDynamicIndexBuffer(uint32_t num, gfxBufferFlag flags) override
+    DynamicIndexBufferHandle createDynamicIndexBuffer(uint32_t num, GpuBufferFlag flags) override
     {
-        gfxDynamicIndexBufferHandle handle;
-        handle.idx = bgfx::createDynamicIndexBuffer(num, (uint16_t)flags).idx;
+        DynamicIndexBufferHandle handle;
+        handle.value = bgfx::createDynamicIndexBuffer(num, (uint16_t)flags).idx;
         return handle;
     }
 
-    gfxDynamicIndexBufferHandle createDynamicIndexBuffer(const gfxMemory* mem, gfxBufferFlag flags) override
+    DynamicIndexBufferHandle createDynamicIndexBuffer(const GfxMemory* mem, GpuBufferFlag flags) override
     {
-        gfxDynamicIndexBufferHandle handle;
-        handle.idx = bgfx::createDynamicIndexBuffer((const bgfx::Memory*)mem, (uint16_t)flags).idx;
+        DynamicIndexBufferHandle handle;
+        handle.value = bgfx::createDynamicIndexBuffer((const bgfx::Memory*)mem, (uint16_t)flags).idx;
         return handle;
     }
 
-    void updateDynamicIndexBuffer(gfxDynamicIndexBufferHandle handle, uint32_t startIndex, const gfxMemory* mem) override
+    void updateDynamicIndexBuffer(DynamicIndexBufferHandle handle, uint32_t startIndex, const GfxMemory* mem) override
     {
         BGFX_DECLARE_HANDLE(DynamicIndexBufferHandle, h, handle);
         bgfx::updateDynamicIndexBuffer(h, startIndex, (const bgfx::Memory*)mem);
     }
 
-    void destroyIndexBuffer(gfxIndexBufferHandle handle) override
+    void destroyIndexBuffer(IndexBufferHandle handle) override
     {
         BGFX_DECLARE_HANDLE(IndexBufferHandle, h, handle);
         bgfx::destroyIndexBuffer(h);
     }
 
-    void destroyDynamicIndexBuffer(gfxDynamicIndexBufferHandle handle) override
+    void destroyDynamicIndexBuffer(DynamicIndexBufferHandle handle) override
     {
         BGFX_DECLARE_HANDLE(DynamicIndexBufferHandle, h, handle);
         bgfx::destroyDynamicIndexBuffer(h);
@@ -767,130 +771,130 @@ public:
         return bgfx::checkAvailTransientIndexBuffer(num);
     }
 
-    void allocTransientIndexBuffer(gfxTransientIndexBuffer* tib, uint32_t num) override
+    void allocTransientIndexBuffer(TransientIndexBuffer* tib, uint32_t num) override
     {
         bgfx::allocTransientIndexBuffer((bgfx::TransientIndexBuffer*)tib, num);
     }
 
-    void calcTextureSize(gfxTextureInfo* info, uint16_t width, uint16_t height, uint16_t depth, bool cubemap,
-                         uint8_t numMips, gfxTextureFormat fmt) override
+    void calcTextureSize(TextureInfo* info, uint16_t width, uint16_t height, uint16_t depth, bool cubemap,
+                         uint8_t numMips, TextureFormat fmt) override
     {
         bgfx::calcTextureSize((bgfx::TextureInfo&)(*info), width, height, depth, cubemap, numMips, 
                               (bgfx::TextureFormat::Enum)fmt);
     }
 
-    gfxTextureHandle createTexture(const gfxMemory* mem, gfxTextureFlag flags, uint8_t skipMips, gfxTextureInfo* info) override
+    TextureHandle createTexture(const GfxMemory* mem, TextureFlag flags, uint8_t skipMips, TextureInfo* info) override
     {
-        gfxTextureHandle r;
-        r.idx = bgfx::createTexture((const bgfx::Memory*)mem, (uint32_t)flags, skipMips, (bgfx::TextureInfo*)info).idx;
+        TextureHandle r;
+        r.value = bgfx::createTexture((const bgfx::Memory*)mem, (uint32_t)flags, skipMips, (bgfx::TextureInfo*)info).idx;
         return r;
     }
 
-    gfxTextureHandle createTexture2D(uint16_t width, uint16_t height, uint8_t numMips, gfxTextureFormat fmt,
-                                     gfxTextureFlag flags, const gfxMemory* mem) override
+    TextureHandle createTexture2D(uint16_t width, uint16_t height, uint8_t numMips, TextureFormat fmt,
+                                     TextureFlag flags, const GfxMemory* mem) override
     {
-        gfxTextureHandle r;
-        r.idx = bgfx::createTexture2D(width, height, numMips, (bgfx::TextureFormat::Enum)fmt, (uint32_t)flags,
+        TextureHandle r;
+        r.value = bgfx::createTexture2D(width, height, numMips, (bgfx::TextureFormat::Enum)fmt, (uint32_t)flags,
                                       (const bgfx::Memory*)mem).idx;
         return r;
     }
 
-    gfxTextureHandle createTexture2D(gfxBackbufferRatio ratio, uint8_t numMips, gfxTextureFormat fmt,
-                                     gfxTextureFlag flags) override
+    TextureHandle createTexture2D(BackbufferRatio ratio, uint8_t numMips, TextureFormat fmt,
+                                     TextureFlag flags) override
     {
-        gfxTextureHandle r;
-        r.idx = bgfx::createTexture2D((bgfx::BackbufferRatio::Enum)ratio, numMips, (bgfx::TextureFormat::Enum)fmt,
+        TextureHandle r;
+        r.value = bgfx::createTexture2D((bgfx::BackbufferRatio::Enum)ratio, numMips, (bgfx::TextureFormat::Enum)fmt,
                                       (uint32_t)flags).idx;
         return r;
     }
 
-    void updateTexture2D(gfxTextureHandle handle, uint8_t mip, uint16_t x, uint16_t y, uint16_t width,
-                         uint16_t height, const gfxMemory* mem, uint16_t pitch) override
+    void updateTexture2D(TextureHandle handle, uint8_t mip, uint16_t x, uint16_t y, uint16_t width,
+                         uint16_t height, const GfxMemory* mem, uint16_t pitch) override
     {
         BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
         bgfx::updateTexture2D(h, mip, x, y, width, height, (const bgfx::Memory*)mem, pitch);
     }
 
-    gfxTextureHandle createTexture3D(uint16_t width, uint16_t height, uint16_t depth, uint8_t numMips,
-                                     gfxTextureFormat fmt, gfxTextureFlag flags, const gfxMemory* mem) override
+    TextureHandle createTexture3D(uint16_t width, uint16_t height, uint16_t depth, uint8_t numMips,
+                                     TextureFormat fmt, TextureFlag flags, const GfxMemory* mem) override
     {
-        gfxTextureHandle r;
-        r.idx = bgfx::createTexture3D(width, height, depth, numMips, (bgfx::TextureFormat::Enum)fmt,
+        TextureHandle r;
+        r.value = bgfx::createTexture3D(width, height, depth, numMips, (bgfx::TextureFormat::Enum)fmt,
                                       (uint32_t)flags, (const bgfx::Memory*)mem).idx;
         return r;
     }
 
-    void updateTexture3D(gfxTextureHandle handle, uint8_t mip, uint16_t x, uint16_t y, uint16_t z,
-                         uint16_t width, uint16_t height, uint16_t depth, const gfxMemory* mem) override
+    void updateTexture3D(TextureHandle handle, uint8_t mip, uint16_t x, uint16_t y, uint16_t z,
+                         uint16_t width, uint16_t height, uint16_t depth, const GfxMemory* mem) override
     {
         BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
         bgfx::updateTexture3D(h, mip, x, y, z, width, height, depth, (const bgfx::Memory*)mem);
     }
 
-    gfxTextureHandle createTextureCube(uint16_t size, uint8_t numMips, gfxTextureFormat fmt, gfxTextureFlag flags,
-                                       const gfxMemory* mem) override
+    TextureHandle createTextureCube(uint16_t size, uint8_t numMips, TextureFormat fmt, TextureFlag flags,
+                                       const GfxMemory* mem) override
     {
-        gfxTextureHandle r;
-        r.idx = bgfx::createTextureCube(size, numMips, (bgfx::TextureFormat::Enum)fmt, (uint32_t)flags, 
+        TextureHandle r;
+        r.value = bgfx::createTextureCube(size, numMips, (bgfx::TextureFormat::Enum)fmt, (uint32_t)flags, 
                                         (const bgfx::Memory*)mem).idx;
         return r;
     }
 
-    void updateTextureCube(gfxTextureHandle handle, gfxCubeSide side, uint8_t mip, uint16_t x, uint16_t y,
-                           uint16_t width, uint16_t height, const gfxMemory* mem, uint16_t pitch) override
+    void updateTextureCube(TextureHandle handle, CubeSide side, uint8_t mip, uint16_t x, uint16_t y,
+                           uint16_t width, uint16_t height, const GfxMemory* mem, uint16_t pitch) override
     {
         BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
         bgfx::updateTextureCube(h, (uint8_t)side, mip, x, y, width, height, (const bgfx::Memory*)mem, pitch);
     }
 
-    void readTexture(gfxTextureHandle handle, void* data) override
+    void readTexture(TextureHandle handle, void* data) override
     {
         BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
         bgfx::readTexture(h, data);
     }
 
-    void readTexture(gfxFrameBufferHandle handle, uint8_t attachment, void* data) override
+    void readTexture(FrameBufferHandle handle, uint8_t attachment, void* data) override
     {
         BGFX_DECLARE_HANDLE(FrameBufferHandle, h, handle);
         bgfx::readTexture(h, attachment, data);
     }
 
-    void destroyTexture(gfxTextureHandle handle) override
+    void destroyTexture(TextureHandle handle) override
     {
         BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
         bgfx::destroyTexture(h);
     }
 
-    gfxFrameBufferHandle createFrameBuffer(uint16_t width, uint16_t height, gfxTextureFormat fmt, gfxTextureFlag flags) override
+    FrameBufferHandle createFrameBuffer(uint16_t width, uint16_t height, TextureFormat fmt, TextureFlag flags) override
     {
-        gfxFrameBufferHandle r;
-        r.idx = bgfx::createFrameBuffer(width, height, (bgfx::TextureFormat::Enum)fmt, (uint32_t)flags).idx;
+        FrameBufferHandle r;
+        r.value = bgfx::createFrameBuffer(width, height, (bgfx::TextureFormat::Enum)fmt, (uint32_t)flags).idx;
         return r;
     }
 
-    gfxFrameBufferHandle createFrameBuffer(gfxBackbufferRatio ratio, gfxTextureFormat fmt, gfxTextureFlag flags) override
+    FrameBufferHandle createFrameBuffer(BackbufferRatio ratio, TextureFormat fmt, TextureFlag flags) override
     {
-        gfxFrameBufferHandle r;
-        r.idx = bgfx::createFrameBuffer((bgfx::BackbufferRatio::Enum)ratio, (bgfx::TextureFormat::Enum)fmt, 
+        FrameBufferHandle r;
+        r.value = bgfx::createFrameBuffer((bgfx::BackbufferRatio::Enum)ratio, (bgfx::TextureFormat::Enum)fmt, 
                                         (uint32_t)flags).idx;
         return r;
     }
 
-    gfxFrameBufferHandle createFrameBuffer(uint8_t num, const gfxTextureHandle* handles, bool destroyTextures) override
+    FrameBufferHandle createFrameBuffer(uint8_t num, const TextureHandle* handles, bool destroyTextures) override
     {
-        gfxFrameBufferHandle r;
-        r.idx = bgfx::createFrameBuffer(num, (const bgfx::TextureHandle*)handles, destroyTextures).idx;
+        FrameBufferHandle r;
+        r.value = bgfx::createFrameBuffer(num, (const bgfx::TextureHandle*)handles, destroyTextures).idx;
         return r;
     }
 
-    gfxFrameBufferHandle createFrameBuffer(void* nwh, uint16_t width, uint16_t height, gfxTextureFormat depthFmt) override
+    FrameBufferHandle createFrameBuffer(void* nwh, uint16_t width, uint16_t height, TextureFormat depthFmt) override
     {
-        gfxFrameBufferHandle r;
-        r.idx = bgfx::createFrameBuffer(nwh, width, height, (bgfx::TextureFormat::Enum)depthFmt).idx;
+        FrameBufferHandle r;
+        r.value = bgfx::createFrameBuffer(nwh, width, height, (bgfx::TextureFormat::Enum)depthFmt).idx;
         return r;
     }
 
-    void destroyFrameBuffer(gfxFrameBufferHandle handle) override
+    void destroyFrameBuffer(FrameBufferHandle handle) override
     {
         BGFX_DECLARE_HANDLE(FrameBufferHandle, h, handle);
         bgfx::destroyFrameBuffer(h);
@@ -901,38 +905,38 @@ public:
         return bgfx::checkAvailInstanceDataBuffer(num, stride);
     }
 
-    const gfxInstanceDataBuffer* allocInstanceDataBuffer(uint32_t num, uint16_t stride) override
+    const InstanceDataBuffer* allocInstanceDataBuffer(uint32_t num, uint16_t stride) override
     {
-        return (const gfxInstanceDataBuffer*)bgfx::allocInstanceDataBuffer(num, stride);
+        return (const InstanceDataBuffer*)bgfx::allocInstanceDataBuffer(num, stride);
     }
 
-    gfxIndirectBufferHandle createIndirectBuffer(uint32_t num) override
+    IndirectBufferHandle createIndirectBuffer(uint32_t num) override
     {
-        gfxIndirectBufferHandle r;
-        r.idx = bgfx::createIndirectBuffer(num).idx;
+        IndirectBufferHandle r;
+        r.value = bgfx::createIndirectBuffer(num).idx;
         return r;
     }
 
-    void destroyIndirectBuffer(gfxIndirectBufferHandle handle) override
+    void destroyIndirectBuffer(IndirectBufferHandle handle) override
     {
         BGFX_DECLARE_HANDLE(IndirectBufferHandle, h, handle);
         bgfx::destroyIndirectBuffer(h);
     }
 
-    gfxOccQueryHandle createOccQuery() override
+    OcclusionQueryHandle createOccQuery() override
     {
-        gfxOccQueryHandle r;
-        r.idx = bgfx::createOcclusionQuery().idx;
+        OcclusionQueryHandle r;
+        r.value = bgfx::createOcclusionQuery().idx;
         return r;
     }
 
-    gfxOccQueryResult getResult(gfxOccQueryHandle handle) override
+    OcclusionQueryResult getResult(OcclusionQueryHandle handle) override
     {
         BGFX_DECLARE_HANDLE(OcclusionQueryHandle, h, handle);
-        return (gfxOccQueryResult)bgfx::getResult(h);
+        return (OcclusionQueryResult)bgfx::getResult(h);
     }
 
-    void destroyOccQuery(gfxOccQueryHandle handle) override
+    void destroyOccQuery(OcclusionQueryHandle handle) override
     {
         BGFX_DECLARE_HANDLE(OcclusionQueryHandle, h, handle);
         bgfx::destroyOcclusionQuery(h);
@@ -962,49 +966,40 @@ public:
 };
 
 #ifdef termite_SHARED_LIB
-#define MY_NAME "Bgfx"
-#define MY_VERSION T_MAKE_VERSION(1, 0)
-static bx::AllocatorI* g_alloc = nullptr;
-static termite::drvHandle g_driver = nullptr;
+static BgfxWrapper g_bgfx;
 
-TERMITE_PLUGIN_API pluginDesc* stPluginGetDesc()
+static PluginDesc* getBgfxDriverDesc()
 {
-    static pluginDesc desc;
-    desc.name = MY_NAME;
-    desc.description = "Bgfx wrapper driver";
-    desc.engineVersion = T_MAKE_VERSION(0, 1);
-    desc.type = drvType::GraphicsDriver;
-    desc.version = MY_VERSION;
+    static PluginDesc desc;
+    strcpy(desc.name, "Bgfx");
+    strcpy(desc.description, "Bgfx Driver");
+    desc.type = PluginType::GraphicsDriver;
+    desc.version = T_MAKE_VERSION(0, 9);
     return &desc;
 }
 
-TERMITE_PLUGIN_API result_t stPluginInit(bx::AllocatorI* alloc)
+static void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 {
-    assert(alloc);
-
-    g_alloc = alloc;
-    BgfxWrapper* driver = BX_NEW(alloc, BgfxWrapper)();
-    if (driver) {
-        g_driver = drvRegister(drvType::GraphicsDriver, MY_NAME, MY_VERSION, driver);
-        if (g_driver == nullptr) {
-            BX_DELETE(alloc, driver);
-            g_alloc = nullptr;
-            return T_ERR_FAILED;
-        }
-    }
-
-    return T_OK;
+    return &g_bgfx;
 }
 
-TERMITE_PLUGIN_API void stPluginShutdown()
+static void shutdownBgfxDriver()
 {
-    assert(g_alloc);
-
-    if (g_driver != nullptr) {
-        BX_DELETE(g_alloc, drvGetGraphicsDriver(g_driver));
-        drvUnregister(g_driver);
-    }
-    g_alloc = nullptr;
-    g_driver = nullptr;
 }
+
+T_PLUGIN_EXPORT void* termiteGetPluginApi(uint16_t apiId, uint32_t version)
+{
+    static PluginApi_v0 v0;
+
+    if (version == 0) {
+        v0.init = initBgfxDriver;
+        v0.shutdown = shutdownBgfxDriver;
+        v0.getDesc = getBgfxDriverDesc;
+        return &v0;
+    } else {
+        return nullptr;
+    }
+}
+
+
 #endif

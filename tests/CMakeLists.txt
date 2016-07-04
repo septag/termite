@@ -5,16 +5,18 @@ if (WIN32)
     set(${WIN_DEPS} SDL2CopyBinaries)
 endif()
 
+set(SHADER_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../assets/shaders)
+
 # test_init
 add_executable(test_init "test_init.cpp")
 target_link_libraries(test_init termite)
 
 # test_sdl
 set(SHADER_SOURCES 
-    ${CMAKE_CURRENT_SOURCE_DIR}/../assets/shaders/test_model.vsc 
-    ${CMAKE_CURRENT_SOURCE_DIR}/../assets/shaders/test_model.fsc)
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/test_model.vsc 
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/test_model.fsc)
 source_group(shaders FILES ${SHADER_SOURCES})
-bgfx_add_shaders("${SHADER_SOURCES}" IGNORE IGNORE ${CMAKE_CURRENT_SOURCE_DIR}/../assets/shaders FALSE IGNORE SHADER_GEN_FILES)
+bgfx_add_shaders("${SHADER_SOURCES}" IGNORE IGNORE ${SHADER_OUTPUT_DIR} FALSE IGNORE SHADER_GEN_FILES)
 source_group(shaders\\compiled FILES ${SHADER_GEN_FILES})
 
 add_executable(test_sdl "test_sdl.cpp" ${SHADER_SOURCES} ${SHADER_GEN_FILES})
@@ -24,7 +26,16 @@ target_link_libraries(test_sdl termite ${SDL2_LIBRARY})
 # Require plugins to be built
 add_dependencies(test_init tdriver_disk)
 
-add_dependencies(test_sdl trender_default tdriver_disk tdriver_bgfx ${WIN_DEPS})
+add_dependencies(test_sdl trender_stock tdriver_disk tdriver_bgfx ${WIN_DEPS})
 
+# test_gfx
+
+add_executable(test_gfx "test_gfx.cpp")
+target_include_directories(test_gfx PUBLIC ${SDL2_INCLUDE_DIR})
+target_link_libraries(test_gfx termite ${SDL2_LIBRARY} imgui_impl)
+add_dependencies(test_gfx trender_kashmir tdriver_disk tdriver_bgfx ${WIN_DEPS})
+
+##########
 install(TARGETS test_init RUNTIME DESTINATION bin)
 install(TARGETS test_sdl RUNTIME DESTINATION bin)
+install(TARGETS test_gfx RUNTIME DESTINATION bin)

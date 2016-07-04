@@ -23,12 +23,14 @@ target_link_libraries(termite
     PRIVATE fcontext
     PUBLIC bx ${POSIX_LIBS})
 
+#
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)
 target_include_directories(termite PUBLIC ${TERMITE_INCLUDE_DIR} ${DEP_ROOT_DIR})
 
 # PCH
 add_precompiled_header(termite pch.h)
 
+# Install
 install(TARGETS termite
         RUNTIME DESTINATION bin
         ARCHIVE DESTINATION lib

@@ -1,21 +1,36 @@
 #pragma once
 
+#include "types.h"
+
 namespace termite
 {
-    T_HANDLE(gfxTextureHandle);
-    T_HANDLE(gfxFrameBufferHandle);
-    T_HANDLE(gfxOccQueryHandle);
-    T_HANDLE(gfxIndexBufferHandle);
-    T_HANDLE(gfxDynamicIndexBufferHandle);
-    T_HANDLE(gfxVertexBufferHandle);
-    T_HANDLE(gfxDynamicVertexBufferHandle);
-    T_HANDLE(gfxVertexDeclHandle);
-    T_HANDLE(gfxUniformHandle);
-    T_HANDLE(gfxProgramHandle);
-    T_HANDLE(gfxIndirectBufferHandle);
-    T_HANDLE(gfxShaderHandle);
+    struct TextureT {};
+    struct FrameBufferT {};
+    struct OcclusionQueryT {};
+    struct IndexBufferT {};
+    struct DynamicIndexBufferT {};
+    struct VertexBufferT {};
+    struct DynamicVertexBufferT {};
+    struct UniformT {};
+    struct ProgramT {};
+    struct IndirectBufferT {};
+    struct ShaderT {};
+    struct VertexDeclT {};
 
-    enum class gfxFatalType
+    typedef PhantomType<uint16_t, TextureT, UINT16_MAX> TextureHandle;
+    typedef PhantomType<uint16_t, FrameBufferT, UINT16_MAX> FrameBufferHandle;
+    typedef PhantomType<uint16_t, OcclusionQueryT, UINT16_MAX> OcclusionQueryHandle;
+    typedef PhantomType<uint16_t, IndexBufferT, UINT16_MAX> IndexBufferHandle;
+    typedef PhantomType<uint16_t, DynamicIndexBufferT, UINT16_MAX> DynamicIndexBufferHandle;
+    typedef PhantomType<uint16_t, VertexBufferT, UINT16_MAX> VertexBufferHandle;
+    typedef PhantomType<uint16_t, DynamicVertexBufferT, UINT16_MAX> DynamicVertexBufferHandle;
+    typedef PhantomType<uint16_t, UniformT, UINT16_MAX> UniformHandle;
+    typedef PhantomType<uint16_t, ProgramT, UINT16_MAX> ProgramHandle;
+    typedef PhantomType<uint16_t, IndirectBufferT, UINT16_MAX> IndirectBufferHandle;
+    typedef PhantomType<uint16_t, ShaderT, UINT16_MAX> ShaderHandle;
+    typedef PhantomType<uint16_t, VertexDeclT, UINT16_MAX> VertexDeclHandle;
+    
+    enum class GfxFatalType
     {
         DebugCheck,
         MinimumRequiredSpecs,
@@ -41,7 +56,7 @@ namespace termite
     ///       |   +---- Number of bits per component
     ///       +-------- Components
     ///
-    enum class gfxTextureFormat
+    enum class TextureFormat
     {
         BC1,    // dxt1
         BC2,    // dxt3
@@ -123,7 +138,7 @@ namespace termite
         Count
     };
 
-    enum class gfxResetFlag : uint32_t
+    enum class GfxResetFlag : uint32_t
     {
         None = 0,
         Fullscreen = 0x00000001,
@@ -144,7 +159,7 @@ namespace termite
         DepthClamp = 0x00020000
     };
 
-    enum class gfxDebugFlag : uint32_t
+    enum class GfxDebugFlag : uint32_t
     {
         None = 0x00000000,
         Wireframe = 0x00000001,
@@ -153,9 +168,9 @@ namespace termite
         Text = 0x00000008
     };
 
-    enum class gfxRendererType : uint32_t
+    enum class RendererType : uint32_t
     {
-        Null,
+        Null = 0,
         Direct3D9,
         Direct3D11,
         Direct3D12,
@@ -167,13 +182,13 @@ namespace termite
         Count
     };
 
-    struct gfxGPU
+    struct GPUDesc
     {
         uint16_t deviceId;
         uint16_t vendorId;
     };
 
-    enum class gfxCapsFlag : uint64_t
+    enum class GpuCapsFlag : uint64_t
     {
         TextureCompareLequal = 0x0000000000000001,
         TextureCompareAll = 0x0000000000000003,
@@ -198,44 +213,44 @@ namespace termite
         TextureFormatNone
     };
 
-    struct gfxTransform
+    struct GpuTransform
     {
         float* data;    // Pointer to first matrix
         uint16_t num;   // number of matrices
     };
 
-    struct gfxTransientIndexBuffer
+    struct TransientIndexBuffer
     {
         uint8_t* data;
         uint32_t size;
         uint32_t startIndex;
-        gfxIndexBufferHandle handle;
+        IndexBufferHandle handle;
     };
 
-    struct gfxTransientVertexBuffer
+    struct TransientVertexBuffer
     {
         uint8_t* data;             // Pointer to data.
         uint32_t size;             // Data size.
         uint32_t startVertex;      // First vertex.
         uint16_t stride;           // Vertex stride.
-        gfxVertexBufferHandle handle; // Vertex buffer handle.
-        gfxVertexDeclHandle decl;     // Vertex declaration handle.
+        VertexBufferHandle handle; // Vertex buffer handle.
+        VertexDeclHandle decl;     // Vertex declaration handle.
     };
 
-    struct gfxInstanceDataBuffer
+    struct InstanceDataBuffer
     {
         uint8_t* data;             // Pointer to data.
         uint32_t size;             // Data size.
         uint32_t offset;           // Offset in vertex buffer.
         uint32_t num;              // Number of instances.
         uint16_t stride;           // Vertex buffer stride.
-        gfxVertexBufferHandle handle; // Vertex buffer object handle.
+        VertexBufferHandle handle; // Vertex buffer object handle.
     };
 
-    struct gfxCaps
+    struct GfxCaps
     {
-        gfxRendererType type;
-        gfxCapsFlag supported;
+        RendererType type;
+        GpuCapsFlag supported;
         uint32_t maxDrawCalls;
         uint16_t maxTextureSize;
         uint16_t maxViews;
@@ -243,11 +258,11 @@ namespace termite
         uint8_t numGPUs;
         uint16_t vendorId;
         uint16_t deviceId;
-        uint16_t formats[int(gfxTextureFormat::Count)];
-        gfxGPU gpu[4];
+        uint16_t formats[int(TextureFormat::Count)];
+        GPUDesc gpu[4];
     };
 
-    struct gfxStats
+    struct GfxStats
     {
         uint64_t cpuTimeBegin;
         uint64_t cpuTimeEnd;
@@ -257,7 +272,7 @@ namespace termite
         uint64_t gpuTimerFreq;
     };
 
-    struct gfxEye
+    struct GpuEyeDesc
     {
         float rotation[4];
         float translation[3];
@@ -265,17 +280,17 @@ namespace termite
         float viewOffset[3];
     };
 
-    struct gfxHMD
+    struct HMDDesc
     {
         uint16_t width;
         uint16_t height;
         uint32_t deviceWidth;
         uint32_t deviceHeight;
         uint8_t flags;
-        gfxEye eye[2];
+        GpuEyeDesc eye[2];
     };
 
-    enum class gfxRenderFrameType
+    enum class RenderFrameType
     {
         NoContext,
         Render,
@@ -284,7 +299,7 @@ namespace termite
         Count
     };
 
-    struct gfxPlatformData
+    struct GfxPlatformData
     {
         void* ndt;  // Native display type
         void* nwh;  // Native window handle
@@ -293,13 +308,13 @@ namespace termite
         void* backBufferDS; // Backbuffer depth/stencil
     };
 
-    struct gfxInternalData
+    struct GfxInternalData
     {
-        const gfxCaps* caps;
+        const GfxCaps* caps;
         void* context;
     };
 
-    enum class gfxTextureFlag : uint32_t
+    enum class TextureFlag : uint32_t
     {
         None = 0x00000000,
         U_Mirror = 0x00000001,
@@ -337,7 +352,7 @@ namespace termite
         FromTexture = 0xffffffff
     };
 
-    enum class gfxBackbufferRatio
+    enum class BackbufferRatio
     {
         Equal,
         Half,
@@ -349,20 +364,20 @@ namespace termite
         Count
     };
 
-    enum class gfxViewFlag : uint8_t
+    enum class GfxViewFlag : uint8_t
     {
         None = 0x00,
         Stereo = 0x01
     };
 
-    enum class gfxSubmitFlag : uint8_t
+    enum class GfxSubmitFlag : uint8_t
     {
         Left = 0x01,
         Right = 0x02,
         Both = 0x03
     };
 
-    enum class gfxState : uint64_t
+    enum class GfxState : uint64_t
     {
         RGBWrite = 0x0000000000000001,
         AlphaWrite = 0x0000000000000002,
@@ -405,7 +420,7 @@ namespace termite
         Mask = 0xffffffffffffffff,
     };
 
-    enum class gfxStencil : uint32_t
+    enum class GfxStencilState : uint32_t
     {
         None = 0x00000000,
         TestLess = 0x00010000,
@@ -442,7 +457,7 @@ namespace termite
         OpDepthPassInvert = 0x70000000
     };
 
-    enum class gfxClearFlag : uint16_t
+    enum class GfxClearFlag : uint16_t
     {
         None = 0x0000,
         Color = 0x0001,
@@ -460,7 +475,7 @@ namespace termite
         DiscardStencil = 0x1000
     };
 
-    enum class gfxAccess
+    enum class GpuAccessFlag
     {
         Read,
         Write,
@@ -469,13 +484,13 @@ namespace termite
         Count
     };
 
-    struct gfxMemory
+    struct GfxMemory
     {
         uint8_t* data;
         uint32_t size;
     };
 
-    enum class gfxUniformType
+    enum class UniformType
     {
         Int1,
         End,
@@ -486,7 +501,7 @@ namespace termite
         Count
     };
 
-    enum class gfxBufferFlag : uint16_t
+    enum class GpuBufferFlag : uint16_t
     {
         None = 0x0000,
         ComputeRead = 0x0100,
@@ -495,7 +510,7 @@ namespace termite
         Index32 = 0x1000
     };
 
-    enum class gfxAttrib : uint16_t
+    enum class VertexAttrib : uint16_t
     {
         Position,  // a_position
         Normal,    // a_normal
@@ -517,7 +532,7 @@ namespace termite
         Count
     };
 
-    enum class gfxAttribType
+    enum class VertexAttribType
     {
         Uint8,  // Uint8
         Uint10, // Uint10, availability depends on: `BGFX_CAPS_VERTEX_ATTRIB_UINT10`.
@@ -527,9 +542,9 @@ namespace termite
         Count
     };
 
-    struct gfxTextureInfo
+    struct TextureInfo
     {
-        gfxTextureFormat format;    // Texture format.
+        TextureFormat format;    // Texture format.
         uint32_t storageSize;       // Total amount of bytes required to store texture.
         uint16_t width;             // Texture width.
         uint16_t height;            // Texture height.
@@ -539,7 +554,7 @@ namespace termite
         bool    cubeMap;            // Texture is cubemap.
     };
 
-    enum class gfxCubeSide : uint8_t
+    enum class CubeSide : uint8_t
     {
         XPos = 0,
         XNeg = 1,
@@ -549,7 +564,7 @@ namespace termite
         ZNeg = 5
     };
 
-    enum class gfxOccQueryResult
+    enum class OcclusionQueryResult
     {
         Invisible,
         Visible,
@@ -558,7 +573,7 @@ namespace termite
         Count
     };
 
-    enum class gfxGuiKeyMap : int
+    enum class GuiKeyMap : int
     {
         Tab,       // for tabbing through fields
         LeftArrow, // for text edit
@@ -582,120 +597,129 @@ namespace termite
 
         Count
     };
-} // namespace st
 
-C11_DEFINE_FLAG_TYPE(termite::gfxResetFlag);
-C11_DEFINE_FLAG_TYPE(termite::gfxDebugFlag);
-C11_DEFINE_FLAG_TYPE(termite::gfxCapsFlag);
-C11_DEFINE_FLAG_TYPE(termite::gfxTextureFlag);
-C11_DEFINE_FLAG_TYPE(termite::gfxViewFlag);
-C11_DEFINE_FLAG_TYPE(termite::gfxSubmitFlag);
-C11_DEFINE_FLAG_TYPE(termite::gfxState);
-C11_DEFINE_FLAG_TYPE(termite::gfxStencil);
-C11_DEFINE_FLAG_TYPE(termite::gfxClearFlag);
-C11_DEFINE_FLAG_TYPE(termite::gfxBufferFlag);
+    struct VertexDecl
+    {
+        uint32_t hash;
+        uint16_t stride;
+        uint16_t offset[int(VertexAttrib::Count)];
+        uint16_t attribs[int(VertexAttrib::Count)];
+    };
+
+} // namespace termite
+
+C11_DEFINE_FLAG_TYPE(termite::GfxResetFlag);
+C11_DEFINE_FLAG_TYPE(termite::GfxDebugFlag);
+C11_DEFINE_FLAG_TYPE(termite::GpuCapsFlag);
+C11_DEFINE_FLAG_TYPE(termite::TextureFlag);
+C11_DEFINE_FLAG_TYPE(termite::GfxViewFlag);
+C11_DEFINE_FLAG_TYPE(termite::GfxSubmitFlag);
+C11_DEFINE_FLAG_TYPE(termite::GfxState);
+C11_DEFINE_FLAG_TYPE(termite::GfxStencilState);
+C11_DEFINE_FLAG_TYPE(termite::GfxClearFlag);
+C11_DEFINE_FLAG_TYPE(termite::GpuBufferFlag);
 
 namespace termite
 {
-    inline gfxStencil gfxStencilFuncRef(uint8_t _ref)
+    inline GfxStencilState gfxStencilFuncRef(uint8_t _ref)
     {
-        return (gfxStencil)((uint32_t)_ref & 0x000000ff);
+        return (GfxStencilState)((uint32_t)_ref & 0x000000ff);
     }
 
-    inline gfxStencil gfxStencilRMask(uint8_t mask)
+    inline GfxStencilState gfxStencilRMask(uint8_t mask)
     {
-        return (gfxStencil)(((uint32_t)mask << 8) & 0x0000ff00);
+        return (GfxStencilState)(((uint32_t)mask << 8) & 0x0000ff00);
     }
 
-    inline gfxState gfxStateDefault()
+    inline GfxState gfxStateDefault()
     {
-        return gfxState::RGBWrite | gfxState::AlphaWrite | gfxState::DepthTestLess | gfxState::DepthWrite |
-               gfxState::CullCW | gfxState::MSAA;
+        return GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::DepthTestLess | GfxState::DepthWrite |
+               GfxState::CullCW | GfxState::MSAA;
     }
 
-    inline gfxState gfxStateAlphaRef(uint8_t _ref)
+    inline GfxState gfxStateAlphaRef(uint8_t _ref)
     {
-        return (gfxState)(((uint64_t)(_ref) << 40) & 0x0000ff0000000000);
+        return (GfxState)(((uint64_t)(_ref) << 40) & 0x0000ff0000000000);
     }
 
-    inline gfxState gfxStateBlendFuncSeparate(gfxState srcRGB, gfxState dstRGB, gfxState srcA, gfxState dstA)
+    inline GfxState gfxStateBlendFuncSeparate(GfxState srcRGB, GfxState dstRGB, GfxState srcA, GfxState dstA)
     {
-        return (gfxState)(((uint64_t)srcRGB | ((uint64_t)dstRGB << 4)) | (((uint64_t)srcA | ((uint64_t)dstA << 4)) << 8));
+        return (GfxState)(((uint64_t)srcRGB | ((uint64_t)dstRGB << 4)) | (((uint64_t)srcA | ((uint64_t)dstA << 4)) << 8));
     }
 
-    inline gfxState gfxStateBlendEqSeparate(gfxState rgb, gfxState a)
+    inline GfxState gfxStateBlendEqSeparate(GfxState rgb, GfxState a)
     {
-        return (gfxState)((uint64_t)rgb | ((uint64_t)a << 3));
+        return (GfxState)((uint64_t)rgb | ((uint64_t)a << 3));
     }
 
-    inline gfxState gfxStateBlendFunc(gfxState src, gfxState dst)
+    inline GfxState gfxStateBlendFunc(GfxState src, GfxState dst)
     {
         return gfxStateBlendFuncSeparate(src, dst, src, dst);
     }
 
-    inline gfxState gfxStateBlendEq(gfxState eq)
+    inline GfxState gfxStateBlendEq(GfxState eq)
     {
         return gfxStateBlendEqSeparate(eq, eq);
     }
 
-    inline gfxState gfxStateBlendAdd()
+    inline GfxState gfxStateBlendAdd()
     {
-        return gfxStateBlendFunc(gfxState::BlendOne, gfxState::BlendOne);
+        return gfxStateBlendFunc(GfxState::BlendOne, GfxState::BlendOne);
     }
 
-    inline gfxState gfxStateBlendAlpha()
+    inline GfxState gfxStateBlendAlpha()
     {
-        return gfxStateBlendFunc(gfxState::BlendSrcAlpha, gfxState::BlendInvSrcAlpha);
+        return gfxStateBlendFunc(GfxState::BlendSrcAlpha, GfxState::BlendInvSrcAlpha);
     }
 
-    inline gfxState gfxStateBlendDarken()
+    inline GfxState gfxStateBlendDarken()
     {
-        return gfxStateBlendFunc(gfxState::BlendOne, gfxState::BlendOne) | gfxStateBlendEq(gfxState::BlendEqMin);
+        return gfxStateBlendFunc(GfxState::BlendOne, GfxState::BlendOne) | gfxStateBlendEq(GfxState::BlendEqMin);
     }
 
-    inline gfxState gfxStateBlendLighten()
+    inline GfxState gfxStateBlendLighten()
     {
-        return gfxStateBlendFunc(gfxState::BlendOne, gfxState::BlendOne) | gfxStateBlendEq(gfxState::BlendEqMax);
+        return gfxStateBlendFunc(GfxState::BlendOne, GfxState::BlendOne) | gfxStateBlendEq(GfxState::BlendEqMax);
     }
 
-    inline gfxState gfxStateBlendMultiply()
+    inline GfxState gfxStateBlendMultiply()
     {
-        return gfxStateBlendFunc(gfxState::BlendDestColor, gfxState::BlendZero);
+        return gfxStateBlendFunc(GfxState::BlendDestColor, GfxState::BlendZero);
     }
 
-    inline gfxState gfxStateBlendNormal()
+    inline GfxState gfxStateBlendNormal()
     {
-        return gfxStateBlendFunc(gfxState::BlendOne, gfxState::BlendInvSrcAlpha);
+        return gfxStateBlendFunc(GfxState::BlendOne, GfxState::BlendInvSrcAlpha);
     }
 
-    inline gfxState gfxStateBlendScreen()
+    inline GfxState gfxStateBlendScreen()
     {
-        return gfxStateBlendFunc(gfxState::BlendOne, gfxState::BlendInvSrcColor);
+        return gfxStateBlendFunc(GfxState::BlendOne, GfxState::BlendInvSrcColor);
     }
 
-    inline gfxState gfxStateBlendLinearBurn()
+    inline GfxState gfxStateBlendLinearBurn()
     {
-        return gfxStateBlendFunc(gfxState::BlendDestColor, gfxState::BlendInvDestColor) | gfxStateBlendEq(gfxState::BlendEqSub);
+        return gfxStateBlendFunc(GfxState::BlendDestColor, GfxState::BlendInvDestColor) | gfxStateBlendEq(GfxState::BlendEqSub);
     }
 
-    inline const char* gfxRendererTypeToStr(gfxRendererType type)
+    inline const char* gfxRendererTypeToStr(RendererType type)
     {
         switch (type) {
-        case gfxRendererType::Direct3D9:
+        case RendererType::Direct3D9:
             return "Direct3D9";
-        case gfxRendererType::Direct3D11:
+        case RendererType::Direct3D11:
             return "Direct3D11";
-        case gfxRendererType::Direct3D12:
+        case RendererType::Direct3D12:
             return "Direct3D12";
-        case gfxRendererType::Metal:
+        case RendererType::Metal:
             return "Metal";
-        case gfxRendererType::OpenGLES:
+        case RendererType::OpenGLES:
             return "OpenGLES";
-        case gfxRendererType::OpenGL:
+        case RendererType::OpenGL:
             return "OpenGL";
-        case gfxRendererType::Vulkan:
+        case RendererType::Vulkan:
             return "Vulcan";
-        case gfxRendererType::Null:
+        case RendererType::Null:
             return "Null";
         }
         return "Unknown";

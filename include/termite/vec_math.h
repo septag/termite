@@ -807,6 +807,15 @@ namespace termite
         return ((uint32_t(premulAlpha * 255.0f) & 0xff) << 24) | (color & 0xffffff);
     }
 
+    inline vec4_t colorToVec4(color_t c)
+    {
+        return vec4f(
+            float(c & 0xff) / 255.0f,
+            float((c >> 8) & 0xff) / 255.0f,
+            float((c >> 16) & 0xff) / 255.0f,
+            float((c >> 24) & 0xff) / 255.0f);
+    }
+
     // Operators
     inline vec2_t operator+(const vec2_t& a, const vec2_t& b)
     {
@@ -876,4 +885,12 @@ namespace termite
         bx::quatMul(r.f, a.f, b.f);
         return r;
     }
-} // namespace st
+
+    inline vec4_t colorToLinear(const vec4_t& c)
+    {
+        return vec4f(bx::fpow(c.x, 2.2f),
+                     bx::fpow(c.y, 2.2f),
+                     bx::fpow(c.z, 2.2f),
+                     c.w);
+    }
+} // namespace termite

@@ -1,7 +1,8 @@
 #include "termite/core.h"
-#include "termite/datastore_driver.h"
-#include "termite/driver_mgr.h"
-#include "termite/plugins.h"
+#include "termite/io_driver.h"
+
+#define T_CORE_API
+#include "termite/plugin_api.h"
 
 #include "bx/crtimpl.h"
 #include "bxx/path.h"
@@ -15,6 +16,8 @@
 #define MAX_FILE_SIZE 1073741824    // 1GB
 
 using namespace termite;
+
+static CoreApi_v0* g_core = nullptr;
 
 class AsyncDiskDriver;
 
@@ -42,17 +45,17 @@ struct DiskFileRequest
     ~DiskFileRequest()
     {
         if (mem)
-            coreReleaseMemory(mem);
+            g_core->releaseMemoryBlock(mem);
         uv_fs_req_cleanup(&openReq);
         uv_fs_req_cleanup(&rwReq);
         uv_fs_req_cleanup(&statReq);
     }
 };
 
-class AsyncDiskDriver : public dsDriverI
+class AsyncDiskDriver : public IoDriverI
 {
 private:
-    dsDriverCallbacks* m_callbacks;
+    IoDriverEventsI* m_callbacks;
     bx::Path m_rootDir;
     bx::AllocatorI* m_alloc;
     uv_loop_t m_loop;
@@ -84,7 +87,7 @@ public:
 
             if (filepath.getType() == bx::PathType::File) {
                 // Ignore file changes less than 0.1 second
-                double curTime = coreGetElapsedTime();
+                double curTime = g_core->getElapsedTime();
                 if (lastModFile.isEqual(filename) && (curTime - lastModTime) < 0.1)
                     return;
                 driver->m_callbacks->onModified(filename);
@@ -94,9 +97,8 @@ public:
         }
     }
 
-    result_t init(bx::AllocatorI* alloc, const char* uri, const void* params, dsDriverCallbacks* callbacks) override
+    result_t init(bx::AllocatorI* alloc, const char* uri, const void* params, IoDriverEventsI* callbacks) override
     {
-        BX_BEGINP("Initializing DataStore Async disk driver");
         m_alloc = alloc;
 
         m_rootDir = uri;
@@ -106,15 +108,13 @@ public:
         uv_fs_event_init(&m_loop, &m_dirChange);
 
         if (m_rootDir.getType() != bx::PathType::Directory) {
-            BX_END_FATAL();
-            T_ERROR("Root Directory '%s' does not exist", m_rootDir.cstr());
+            T_ERROR_API(g_core, "Root Directory '%s' does not exist", m_rootDir.cstr());
             return T_ERR_FAILED;
         }
 
         m_callbacks = callbacks;
 
         if (!m_fsReqPool.create(20, alloc)) {
-            BX_END_FATAL();
             return T_ERR_OUTOFMEM;
         }
 
@@ -122,13 +122,11 @@ public:
         // Note: Recursive flag does not work under linux, according to documentation
         m_dirChange.data = this;
         if (uv_fs_event_start(&m_dirChange, uvCallbackFsEvent, m_rootDir.cstr(), UV_FS_EVENT_RECURSIVE)) {
-            BX_END_FATAL();
-            T_ERROR("Could not monitor root directory '%s' for changes", m_rootDir.cstr());
+            T_ERROR_API(g_core, "Could not monitor root directory '%s' for changes", m_rootDir.cstr());
             return T_ERR_FAILED;
         }
 
-        BX_END_OK();
-        return T_OK;
+        return 0;
     }
 
     static void uvWalk(uv_handle_t* handle, void* arg)
@@ -138,7 +136,6 @@ public:
 
     void shutdown() override
     {
-        BX_BEGINP("Shutting down DataStore disk backend");
         uv_fs_event_stop(&m_dirChange);
 
         m_fsReqPool.destroy();
@@ -147,16 +144,14 @@ public:
         uv_walk(&m_loop, uvWalk, this);
         uv_run(&m_loop, UV_RUN_DEFAULT);
         uv_loop_close(&m_loop);
-
-        BX_END_OK();
     }
 
-    void setCallbacks(dsDriverCallbacks* callbacks) override
+    void setCallbacks(IoDriverEventsI* callbacks) override
     {
         m_callbacks = callbacks;
     }
 
-    dsDriverCallbacks* getCallbacks() override
+    IoDriverEventsI* getCallbacks() override
     {
         return m_callbacks;
     }
@@ -179,7 +174,7 @@ public:
                 rr->driver->m_callbacks->onReadError(rr->uri.cstr());
         } else if (req->result > 0) {
             if (rr->driver->m_callbacks)
-                rr->driver->m_callbacks->onReadComplete(rr->uri.cstr(), coreRefMemory(rr->mem));
+                rr->driver->m_callbacks->onReadComplete(rr->uri.cstr(), g_core->refMemoryBlock(rr->mem));
         } else {
             assert(false);
         }
@@ -192,7 +187,7 @@ public:
         DiskFileRequest* rr = (DiskFileRequest*)req->data;
         if (req->result >= 0) {
             if (req->statbuf.st_size > 0) {
-                rr->mem = coreCreateMemory((uint32_t)req->statbuf.st_size, rr->driver->m_alloc);
+                rr->mem = g_core->createMemoryBlock((uint32_t)req->statbuf.st_size, rr->driver->m_alloc);
                 if (!rr->mem) {
                     if (rr->driver->m_callbacks)
                         rr->driver->m_callbacks->onOpenError(rr->uri.cstr());
@@ -299,7 +294,7 @@ public:
         req->driver = this;
         req->uri = uri;
         req->openReq.data = req;
-        req->mem = coreRefMemory(const_cast<MemoryBlock*>(mem));
+        req->mem = g_core->refMemoryBlock(const_cast<MemoryBlock*>(mem));
 
         // Start Open for write
         if (uv_fs_open(&m_loop, &req->openReq, filepath.cstr(), 0, O_CREAT | O_WRONLY | O_TRUNC, uvCallbackOpenForWrite)) {
@@ -311,28 +306,28 @@ public:
         return 0;
     }
 
-    dsStream* openStream(const char* uri, dsStreamFlag flags) override
+    IoStream* openStream(const char* uri, IoStreamFlag flags) override
     {
         return nullptr;
     }
 
-    size_t writeStream(dsStream* stream, const MemoryBlock* mem) override
+    size_t writeStream(IoStream* stream, const MemoryBlock* mem) override
     {
         return 0;
     }
 
-    MemoryBlock* readStream(dsStream* stream) override
+    MemoryBlock* readStream(IoStream* stream) override
     {
         return nullptr;
     }
 
-    void closeStream(dsStream* stream) override
+    void closeStream(IoStream* stream) override
     {
     }
 
-    dsOperationMode getOpMode() const override
+    IoOperationMode getOpMode() const override
     {
-        return dsOperationMode::Async;
+        return IoOperationMode::Async;
     }
 
     const char* getUri() const override
@@ -341,7 +336,7 @@ public:
     }
 };
 
-class BlockingDiskDriver : public dsDriverI
+class BlockingDiskDriver : public IoDriverI
 {
 private:
     bx::Path m_rootDir;
@@ -353,33 +348,30 @@ public:
         m_alloc = nullptr;
     }
 
-    int init(bx::AllocatorI* alloc, const char* uri, const void* params, dsDriverCallbacks* callbacks) override
+    int init(bx::AllocatorI* alloc, const char* uri, const void* params, IoDriverEventsI* callbacks) override
     {
-        BX_BEGINP("Initializing DataStore Blocking disk driver");
         m_alloc = alloc;
 
         m_rootDir = uri;
         m_rootDir.normalizeSelf();
 
         if (m_rootDir.getType() != bx::PathType::Directory) {
-            BX_END_FATAL();
-            T_ERROR("Root Directory '%s' does not exist", m_rootDir.cstr());
+            T_ERROR_API(g_core, "Root Directory '%s' does not exist", m_rootDir.cstr());
             return T_ERR_FAILED;
         }
-        BX_END_OK();
 
-        return T_OK;
+        return 0;
     }
 
     void shutdown() override
     {
     }
 
-    void setCallbacks(dsDriverCallbacks* callbacks) override
+    void setCallbacks(IoDriverEventsI* callbacks) override
     {
     }
 
-    dsDriverCallbacks* getCallbacks() override
+    IoDriverEventsI* getCallbacks() override
     {
         return nullptr;
     }
@@ -392,7 +384,7 @@ public:
         bx::CrtFileReader file;
         bx::Error err;
         if (!file.open(filepath.cstr(), &err)) {
-            T_ERROR("Unable to open file '%s' for reading", uri);
+            T_ERROR_API(g_core, "Unable to open file '%s' for reading", uri);
             return nullptr;
         }
 
@@ -403,7 +395,7 @@ public:
         // Read Contents
         MemoryBlock* mem = nullptr;
         if (size) {
-            mem = coreCreateMemory((uint32_t)size, m_alloc);
+            mem = g_core->createMemoryBlock((uint32_t)size, m_alloc);
             if (mem)
                 file.read(mem->data, mem->size, &err);
         }
@@ -420,7 +412,7 @@ public:
         bx::CrtFileWriter file;
         bx::Error err;
         if (file.open(filepath.cstr(), false, &err)) {
-            T_ERROR("Unable to open file '%s' for writing", filepath.cstr());
+            T_ERROR_API(g_core, "Unable to open file '%s' for writing", filepath.cstr());
             return 0;
         }
 
@@ -430,22 +422,22 @@ public:
         return size;
     }
 
-    dsStream* openStream(const char* uri, dsStreamFlag flags) override
+    IoStream* openStream(const char* uri, IoStreamFlag flags) override
     {
         return nullptr;
     }
 
-    size_t writeStream(dsStream* stream, const MemoryBlock* mem) override
+    size_t writeStream(IoStream* stream, const MemoryBlock* mem) override
     {
         return 0;
     }
 
-    MemoryBlock* readStream(dsStream* stream) override
+    MemoryBlock* readStream(IoStream* stream) override
     {
         return nullptr;
     }
 
-    void closeStream(dsStream* stream) override
+    void closeStream(IoStream* stream) override
     {
     }
 
@@ -453,9 +445,9 @@ public:
     {
     }
 
-    dsOperationMode getOpMode() const override
+    IoOperationMode getOpMode() const override
     {
-        return dsOperationMode::Blocking;
+        return IoOperationMode::Blocking;
     }
 
     const char* getUri() const override
@@ -466,66 +458,47 @@ public:
 
 
 #ifdef termite_SHARED_LIB
-#define MY_VERSION T_MAKE_VERSION(1, 0)
-static bx::AllocatorI* g_alloc = nullptr;
-static termite::drvHandle gAsyncDriver = nullptr;
-static termite::drvHandle gBlockingDriver = nullptr;
+static BlockingDiskDriver g_blockingDiskDriver;
+static AsyncDiskDriver g_asyncDiskDriver;
+static IoDriverDual g_diskDriver = {
+    &g_blockingDiskDriver,
+    &g_asyncDiskDriver
+};
 
-TERMITE_PLUGIN_API pluginDesc* stPluginGetDesc()
+static PluginDesc* getDiskDriverDesc()
 {
-    static pluginDesc desc;
-    desc.name = "DiskDriver";
-    desc.description = "Disk Driver, Async and Blocking";
-    desc.engineVersion = T_MAKE_VERSION(0, 1);
-    desc.type = drvType::DataStoreDriver;
-    desc.version = MY_VERSION;
+    static PluginDesc desc;
+    strcpy(desc.name, "DiskIO");
+    strcpy(desc.description, "DiskIO Driver (Blocking and Async)");
+    desc.type = PluginType::IoDriver;
+    desc.version = T_MAKE_VERSION(0, 9);
     return &desc;
 }
 
-TERMITE_PLUGIN_API result_t stPluginInit(bx::AllocatorI* alloc)
+static void* initDiskDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 {
-    assert(alloc);
+    g_core = (CoreApi_v0*)getApi(uint16_t(ApiId::Core), 0);
+    if (!g_core)
+        return nullptr;
 
-    g_alloc = alloc;
-    AsyncDiskDriver* asyncDriver = BX_NEW(alloc, AsyncDiskDriver);
-    if (asyncDriver) {
-        gAsyncDriver = drvRegister(drvType::DataStoreDriver, "AsyncDiskDriver", MY_VERSION, asyncDriver);
-        if (gAsyncDriver == nullptr) {
-            BX_DELETE(alloc, asyncDriver);
-            g_alloc = nullptr;
-            return T_ERR_FAILED;
-        }
-    }
-
-    BlockingDiskDriver* blockingDriver = BX_NEW(alloc, BlockingDiskDriver);
-    if (blockingDriver) {
-        gBlockingDriver = drvRegister(drvType::DataStoreDriver, "BlockingDiskDriver", MY_VERSION, blockingDriver);
-        if (blockingDriver == nullptr) {
-            BX_DELETE(alloc, blockingDriver);
-            g_alloc = nullptr;
-            return T_ERR_FAILED;
-        }
-    }
-
-    return T_OK;
+    return &g_diskDriver;
 }
 
-TERMITE_PLUGIN_API void stPluginShutdown()
+static void shutdownDiskDriver()
 {
-    assert(g_alloc);
+}
 
-    if (gAsyncDriver) {
-        BX_DELETE(g_alloc, drvGetDataStoreDriver(gAsyncDriver));
-        drvUnregister(gAsyncDriver);
+T_PLUGIN_EXPORT void* termiteGetPluginApi(uint16_t apiId, uint32_t version)
+{
+    static PluginApi_v0 v0;
+
+    if (T_VERSION_MAJOR(version) == 0) {
+        v0.init = initDiskDriver;
+        v0.shutdown = shutdownDiskDriver;
+        v0.getDesc = getDiskDriverDesc;
+        return &v0;
+    } else {
+        return nullptr;
     }
-
-    if (gBlockingDriver) {
-        BX_DELETE(g_alloc, drvGetDataStoreDriver(gBlockingDriver));
-        drvUnregister(gBlockingDriver);
-    }
-
-    g_alloc = nullptr;
-    gAsyncDriver = nullptr;
-    gBlockingDriver = nullptr;
 }
 #endif

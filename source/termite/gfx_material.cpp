@@ -9,7 +9,7 @@ using namespace termite;
 struct MaterialUniform
 {
     char name[32];
-    gfxUniformHandle handle;
+    UniformHandle handle;
 };
 
 struct Material
@@ -19,24 +19,24 @@ struct Material
 
 namespace termite
 {
-    struct mtlLibrary
+    struct MaterialLib
     {
         bx::ArrayWithPop<Material> mtls;
     };
 
-    mtlDecl::mtlDecl()
+    MaterialDecl::MaterialDecl()
     {
         memset(m_vars, 0x00, sizeof(m_vars));
         m_count = 0;
     }
 
-    mtlDecl& mtlDecl::begin()
+    MaterialDecl& MaterialDecl::begin()
     {
         m_count = 0;
         return *this;
     }
 
-    mtlDecl& mtlDecl::add(const char* name, gfxUniformType type, int num)
+    MaterialDecl& MaterialDecl::add(const char* name, UniformType type, int num)
     {
         assert(num >= 1);
 
@@ -50,28 +50,28 @@ namespace termite
         return *this;
     }
 
-    void mtlDecl::end()
+    void MaterialDecl::end()
     {
     }
 
 } // namespace termite
 
-mtlLibrary* termite::mtlCreateLibrary(bx::AllocatorI* alloc, gfxDriverI* driver)
+MaterialLib* termite::createMaterialLib(bx::AllocatorI* alloc, GfxDriverI* driver)
 {
     return nullptr;
 }
 
-void termite::mtlDestroyLibrary(mtlLibrary* lib)
+void termite::destroyMaterialLib(MaterialLib* lib)
 {
 
 }
 
-mtlHandle termite::mtlCreate(mtlLibrary* lib)
+MaterialHandle termite::createMaterial(MaterialLib* lib)
 {
-    return T_INVALID_HANDLE;
+    return MaterialHandle();
 }
 
-void termite::mtlDestroy(mtlLibrary* lib, mtlHandle handle)
+void termite::destroyMaterial(MaterialLib* lib, MaterialHandle handle)
 {
 
 }

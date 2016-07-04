@@ -1,9 +1,7 @@
 #pragma once
 
 #include <cassert>
-#include "bx/bx.h"
 #include "bx/allocator.h"
-#include "bxx/stack_allocator.h"
 #include "bxx/bitmask_operators.hpp"
 
 // Windows
@@ -12,54 +10,32 @@
 #   include <Windows.h>
 #endif
 
-// Export/Import API Def
-#ifdef termite_SHARED_LIB
-#ifdef termite_EXPORTS
-#   if BX_COMPILER_MSVC
-#       define TERMITE_API __declspec(dllexport) 
-#   else
-#       define TERMITE_API __attribute__ ((visibility("default")))
-#   endif
-#else
-#   if BX_COMPILER_MSVC
-#       define TERMITE_API __declspec(dllimport)
-#   else
-#       define TERMITE_API __attribute__ ((visibility("default")))
-#   endif
-#endif
-#else
-#   define TERMITE_API 
-#endif
-
+#include "types.h"
 #include "error_report.h"
-
-// Versioning Macros
-#define T_MAKE_VERSION(_Major, _Minor)  (uint32_t)(((_Major & 0xffff)<<16) | (_Minor & 0xffff))
-#define T_VERSION_MAJOR(_Ver) (uint16_t)((_Ver >> 16) & 0xffff)
-#define T_VERSION_MINOR(_Ver) (uint16_t)(_Ver & 0xffff)
-
-// Handles
-#define T_HANDLE(_Name) struct _Name { uint16_t idx; }
-namespace termite { 
-    static const uint16_t sInvalidHandle = UINT16_MAX; 
-}
-#define T_INVALID_HANDLE  {termite::sInvalidHandle}
-#define T_ISVALID(_Handle) (_Handle.idx != termite::sInvalidHandle)
 
 // For self-documenting code
 #define T_THREAD_SAFE
 
+#define T_MID_TEMP 0x01
+
 namespace termite
 {
-    struct gfxPlatformData;
-    class dsDataStore;
-    class gfxDriverI;
-    class dsDriverI;
+    struct GfxPlatformData;
+    class ResourceLib;
+    class GfxDriverI;
+    class IoDriverI;
+    class RendererI;
+    struct IoDriverDual;
 
-    struct coreConfig
+    struct Config
     {
         // Plugins
         char pluginPath[128];
+        char dataUri[128];
+
+        char ioName[32];
+        char rendererName[32];
+        char gfxName[32];
 
         // Graphics
         uint16_t gfxDeviceId;
@@ -68,9 +44,14 @@ namespace termite
         uint32_t gfxDriverFlags;    // see gfxResetFlag
         int keymap[19];
 
-        coreConfig()
+        Config()
         {
             strcpy(pluginPath, "");
+            strcpy(rendererName, "");
+            strcpy(ioName, "");
+            strcpy(dataUri, "");
+            strcpy(gfxName, "");
+
             gfxWidth = 0;
             gfxHeight = 0;
             gfxDeviceId = 0;
@@ -84,42 +65,46 @@ namespace termite
         uint8_t* data;
         uint32_t size;
     };
-
-    typedef void(*coreFnUpdate)(float dt);
+    
+    typedef void(*UpdateCallback)(float dt);
 
     // Public
-    TERMITE_API coreConfig* coreLoadConfig(const char* confFilepath);
-    TERMITE_API void coreFreeConfig(coreConfig* conf);
+    TERMITE_API Config* loadConfig(const char* confFilepath);
+    TERMITE_API void freeConfig(Config* conf);
 
-    TERMITE_API result_t coreInit(const coreConfig& conf, coreFnUpdate updateFn = nullptr, 
-                                  const gfxPlatformData* platformData = nullptr);
-    TERMITE_API void coreShutdown();
-    TERMITE_API void coreFrame();
-    TERMITE_API uint32_t coreGetVersion();
+    TERMITE_API result_t initialize(const Config& conf, UpdateCallback updateFn = nullptr, 
+                                    const GfxPlatformData* platformData = nullptr);
+    TERMITE_API void shutdown();
+    TERMITE_API void doFrame();
 
-    TERMITE_API bx::AllocatorI* coreGetAlloc() T_THREAD_SAFE;
-    TERMITE_API const coreConfig& coreGetConfig() T_THREAD_SAFE;
-    TERMITE_API dsDataStore* coreGetDefaultDataStore();
+    TERMITE_API double getFrameTime();
+    TERMITE_API double getElapsedTime();
+    TERMITE_API double getFps();
 
-    TERMITE_API double coreGetFrameTime();
-    TERMITE_API double coreGetElapsedTime();
-    TERMITE_API double coreGetFps();
+    TERMITE_API MemoryBlock* createMemoryBlock(uint32_t size, bx::AllocatorI* alloc = nullptr);
+    TERMITE_API MemoryBlock* refMemoryBlockPtr(void* data, uint32_t size);
+    TERMITE_API MemoryBlock* refMemoryBlock(MemoryBlock* mem);
+    TERMITE_API MemoryBlock* copyMemoryBlock(const void* data, uint32_t size, bx::AllocatorI* alloc = nullptr);
+    TERMITE_API void releaseMemoryBlock(MemoryBlock* mem);
+    TERMITE_API MemoryBlock* readTextFile(const char* filepath);
 
-    TERMITE_API MemoryBlock* coreCreateMemory(uint32_t size, bx::AllocatorI* alloc = nullptr);
-    TERMITE_API MemoryBlock* coreRefMemoryPtr(void* data, uint32_t size);
-    TERMITE_API MemoryBlock* coreRefMemory(MemoryBlock* mem);
-    TERMITE_API MemoryBlock* coreCopyMemory(const void* data, uint32_t size, bx::AllocatorI* alloc = nullptr);
-    TERMITE_API void coreReleaseMemory(MemoryBlock* mem);
-    TERMITE_API MemoryBlock* coreReadFile(const char* filepath);
+    TERMITE_API float getRandomFloatUniform(float a, float b);
+    TERMITE_API int getRandomIntUniform(int a, int b);    
 
     // UI Input
-    TERMITE_API void coreSendInputMouse(float mousePos[2], int mouseButtons[3], float mouseWheel);
-    TERMITE_API void coreSendInputChars(const char* chars);
-    TERMITE_API void coreSendInputKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl);
+    TERMITE_API void inputSendMouse(float mousePos[2], int mouseButtons[3], float mouseWheel);
+    TERMITE_API void inputSendChars(const char* chars);
+    TERMITE_API void inputSendKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl);
 
     // Development
-    TERMITE_API gfxDriverI* coreGetGfxDriver();
-    TERMITE_API dsDriverI* coreGetDiskDriver();
+    TERMITE_API GfxDriverI* getGfxDriver() T_THREAD_SAFE;
+    TERMITE_API IoDriverDual* getIoDriver() T_THREAD_SAFE;
+    TERMITE_API RendererI* getRenderer() T_THREAD_SAFE;
+    TERMITE_API uint32_t getEngineVersion() T_THREAD_SAFE;
+    TERMITE_API bx::AllocatorI* getHeapAlloc() T_THREAD_SAFE;
+    TERMITE_API bx::AllocatorI* getTempAlloc() T_THREAD_SAFE;
+    TERMITE_API const Config& getConfig() T_THREAD_SAFE;
+    TERMITE_API ResourceLib* getDefaultResourceLib() T_THREAD_SAFE;
 
-} // namespace st
+} // namespace termite
 

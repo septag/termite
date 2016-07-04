@@ -29,7 +29,7 @@ struct ErrorReport
 
 static ErrorReport* gErr = nullptr;
 
-int termite::errInit(bx::AllocatorI* alloc)
+int termite::initErrorReport(bx::AllocatorI* alloc)
 {
     if (gErr) {
         assert(false);
@@ -40,10 +40,10 @@ int termite::errInit(bx::AllocatorI* alloc)
     if (!gErr)
         return T_ERR_OUTOFMEM;
 
-    return T_OK;
+    return 0;
 }
 
-void termite::errShutdown()
+void termite::shutdownErrorReport()
 {
     if (!gErr) {
         assert(false);
@@ -65,7 +65,7 @@ void termite::errShutdown()
     gErr = nullptr;
 }
 
-void termite::errReport(const char* source, int line, const char* desc)
+void termite::reportError(const char* source, int line, const char* desc)
 {
     if (!gErr || gErr->numReports == T_ERROR_MAX_STACK_SIZE)
         return;
@@ -100,7 +100,7 @@ void termite::errReport(const char* source, int line, const char* desc)
     }
 }
 
-void termite::errReportf(const char* source, int line, const char* fmt, ...)
+void termite::reportErrorf(const char* source, int line, const char* fmt, ...)
 {
     if (fmt) {
         char text[4096];
@@ -110,13 +110,13 @@ void termite::errReportf(const char* source, int line, const char* fmt, ...)
         vsnprintf(text, sizeof(text), fmt, args);
         va_end(args);
 
-        errReport(source, line, text);
+        reportError(source, line, text);
     } else {
-        errReport(source, line, nullptr);
+        reportError(source, line, nullptr);
     }
 }
 
-const char* termite::errGetCallstack()
+const char* termite::getErrorCallstack()
 {
     if (!gErr || !gErr->numReports)
         return "";
@@ -145,7 +145,7 @@ const char* termite::errGetCallstack()
     return gErr->fullString;
 }
 
-const char* termite::errGetString()
+const char* termite::getErrorString()
 {
     if (!gErr || !gErr->numReports)
         return "";
@@ -172,7 +172,7 @@ const char* termite::errGetString()
     return gErr->fullString;
 }
 
-const char* termite::errGetLastString()
+const char* termite::getLastErrorString()
 {
     if (gErr && gErr->numReports) {
         return gErr->reports[gErr->numReports - 1]->desc ? gErr->reports[gErr->numReports - 1]->desc : "";
@@ -181,7 +181,7 @@ const char* termite::errGetLastString()
     }
 }
 
-void termite::errClear()
+void termite::clearErrors()
 {
     if (!gErr)
         return;

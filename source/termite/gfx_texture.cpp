@@ -17,38 +17,38 @@
 using namespace termite;
 
 // JPG, PNG, TGA, ...
-class TextureLoaderRaw : public dsResourceCallbacksI
+class TextureLoaderRaw : public ResourceCallbacksI
 {
 public:
     TextureLoaderRaw();
 
-    bool loadObj(const MemoryBlock* mem, const dsResourceTypeParams& params, uintptr_t* obj) override;
+    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) override;
     void unloadObj(uintptr_t obj) override;
-    void onReload(dsDataStore* ds, dsResourceHandle handle) override;
+    void onReload(ResourceLib* ds, ResourceHandle handle) override;
     uintptr_t getDefaultAsyncObj() override;
 };
 
 // KTX/DDS loader
-class TextureLoaderKTX : public dsResourceCallbacksI
+class TextureLoaderKTX : public ResourceCallbacksI
 {
 public:
     TextureLoaderKTX();
 
-    bool loadObj(const MemoryBlock* mem, const dsResourceTypeParams& params, uintptr_t* obj) override;
+    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) override;
     void unloadObj(uintptr_t obj) override;
-    void onReload(dsDataStore* ds, dsResourceHandle handle) override;
+    void onReload(ResourceLib* ds, ResourceHandle handle) override;
     uintptr_t getDefaultAsyncObj() override;
 };
 
 struct TextureLoader
 {
-    bx::Pool<gfxTexture> texturePool;
+    bx::Pool<Texture> texturePool;
     TextureLoaderRaw rawLoader;
     TextureLoaderKTX loader;
     bx::AllocatorI* alloc;
-    gfxTexture* whiteTexture;
-    gfxTexture* asyncBlankTexture;
-    gfxDriverI* driver;
+    Texture* whiteTexture;
+    Texture* asyncBlankTexture;
+    GfxDriverI* driver;
 
     TextureLoader(bx::AllocatorI* _alloc)
     {
@@ -61,7 +61,7 @@ struct TextureLoader
 
 static TextureLoader* g_texLoader = nullptr;
 
-result_t termite::textureInitLoader(gfxDriverI* driver, bx::AllocatorI* alloc, int texturePoolSize)
+result_t termite::initTextureLoader(GfxDriverI* driver, bx::AllocatorI* alloc, int texturePoolSize)
 {
     assert(driver);
     if (g_texLoader) {
@@ -83,38 +83,38 @@ result_t termite::textureInitLoader(gfxDriverI* driver, bx::AllocatorI* alloc, i
         return T_ERR_OUTOFMEM;
 
     static uint32_t whitePixel = 0xffffffff;
-    g_texLoader->whiteTexture->handle = driver->createTexture2D(1, 1, 1, gfxTextureFormat::RGBA8,
-        gfxTextureFlag::U_Clamp|gfxTextureFlag::V_Clamp|gfxTextureFlag::MinPoint|gfxTextureFlag::MagPoint,
+    g_texLoader->whiteTexture->handle = driver->createTexture2D(1, 1, 1, TextureFormat::RGBA8,
+        TextureFlag::U_Clamp|TextureFlag::V_Clamp|TextureFlag::MinPoint|TextureFlag::MagPoint,
         driver->makeRef(&whitePixel, sizeof(uint32_t)));
     g_texLoader->whiteTexture->info.width = 1;
     g_texLoader->whiteTexture->info.height = 1;
-    g_texLoader->whiteTexture->info.format = gfxTextureFormat::RGBA8;
-    if (!T_ISVALID(g_texLoader->whiteTexture->handle)) {
+    g_texLoader->whiteTexture->info.format = TextureFormat::RGBA8;
+    if (!g_texLoader->whiteTexture->handle.isValid()) {
         T_ERROR("Creating blank 1x1 texture failed");
         return T_ERR_FAILED;
     }
     g_texLoader->asyncBlankTexture = g_texLoader->whiteTexture;
 
-    return T_OK;
+    return 0;
 }
 
-void termite::textureRegisterToDatastore(dsDataStore* ds)
+void termite::registerTextureToResourceLib(ResourceLib* resLib)
 {
-    dsResourceTypeHandle handle;
-    handle = dsRegisterResourceType(ds, "image", &g_texLoader->rawLoader, sizeof(gfxTextureLoadParams));
-    assert(T_ISVALID(handle));
+    ResourceTypeHandle handle;
+    handle = registerResourceType(resLib, "image", &g_texLoader->rawLoader, sizeof(LoadTextureParams));
+    assert(handle.isValid());
 
-    handle = dsRegisterResourceType(ds, "texture", &g_texLoader->loader, sizeof(gfxTextureLoadParams));
-    assert(T_ISVALID(handle));
+    handle = registerResourceType(resLib, "texture", &g_texLoader->loader, sizeof(LoadTextureParams));
+    assert(handle.isValid());
 }
 
-void termite::textureShutdownLoader()
+void termite::shutdownTextureLoader()
 {
     if (!g_texLoader)
         return;
     
     if (g_texLoader->whiteTexture) {
-        if (T_ISVALID(g_texLoader->whiteTexture->handle))
+        if (g_texLoader->whiteTexture->handle.isValid())
             g_texLoader->driver->destroyTexture(g_texLoader->whiteTexture->handle);
     }
 
@@ -124,7 +124,7 @@ void termite::textureShutdownLoader()
     g_texLoader = nullptr;
 }
 
-gfxTextureHandle termite::textureGetWhite1x1()
+TextureHandle termite::getWhiteTexture1x1()
 {
     return g_texLoader->whiteTexture->handle;
 }
@@ -139,10 +139,10 @@ static void stbCallbackFreeImage(void* ptr, void* userData)
     stbi_image_free(ptr);
 }
 
-bool TextureLoaderRaw::loadObj(const MemoryBlock* mem, const dsResourceTypeParams& params, uintptr_t* obj)
+bool TextureLoaderRaw::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
 {
     assert(g_texLoader);
-    gfxDriverI* driver = g_texLoader->driver;
+    GfxDriverI* driver = g_texLoader->driver;
 
     // Note: Currently we always load RGBA8 format for non-compressed textures
     int width, height, comp;
@@ -150,7 +150,7 @@ bool TextureLoaderRaw::loadObj(const MemoryBlock* mem, const dsResourceTypeParam
     if (!pixels)
         return false;
     
-    gfxTexture* texture = g_texLoader->texturePool.newInstance();
+    Texture* texture = g_texLoader->texturePool.newInstance();
     if (!texture) {
         stbi_image_free(pixels);
         return false;
@@ -158,8 +158,8 @@ bool TextureLoaderRaw::loadObj(const MemoryBlock* mem, const dsResourceTypeParam
 
     // Generate mips
     int numMips = 1;    // default
-    const gfxTextureLoadParams* texParams = (const gfxTextureLoadParams*)params.userParams;
-    const gfxMemory* gmem = nullptr;
+    const LoadTextureParams* texParams = (const LoadTextureParams*)params.userParams;
+    const GfxMemory* gmem = nullptr;
     if (texParams->generateMips) {
         numMips = 1 + (int)bx::ffloor(bx::flog2((float)bx::uint32_max(width, height)));
         int skipMips = bx::uint32_min(numMips - 1, texParams->skipMips);
@@ -216,14 +216,14 @@ bool TextureLoaderRaw::loadObj(const MemoryBlock* mem, const dsResourceTypeParam
         gmem = driver->makeRef(pixels, width*height * 4, stbCallbackFreeImage, nullptr);
     }
 
-    texture->handle = driver->createTexture2D(width, height, numMips, gfxTextureFormat::RGBA8, texParams->flags, gmem);
-    if (!T_ISVALID(texture->handle))
+    texture->handle = driver->createTexture2D(width, height, numMips, TextureFormat::RGBA8, texParams->flags, gmem);
+    if (!texture->handle.isValid())
         return false;
 
-    gfxTextureInfo* info = &texture->info;
+    TextureInfo* info = &texture->info;
     info->width = width;
     info->height = height;
-    info->format = gfxTextureFormat::RGBA8;
+    info->format = TextureFormat::RGBA8;
     info->numMips = 1;
     info->storageSize = width * height * 4;
     info->bitsPerPixel = 32;
@@ -237,17 +237,17 @@ void TextureLoaderRaw::unloadObj(uintptr_t obj)
     assert(g_texLoader);
     assert(obj);
 
-    gfxTexture* texture = (gfxTexture*)obj;
+    Texture* texture = (Texture*)obj;
     if (texture == g_texLoader->asyncBlankTexture)
         return;
 
-    if (T_ISVALID(texture->handle))
+    if (texture->handle.isValid())
         g_texLoader->driver->destroyTexture(texture->handle);
 
     g_texLoader->texturePool.deleteInstance(texture);
 }
 
-void TextureLoaderRaw::onReload(dsDataStore* ds, dsResourceHandle handle)
+void TextureLoaderRaw::onReload(ResourceLib* ds, ResourceHandle handle)
 {
 }
 
@@ -262,18 +262,18 @@ TextureLoaderKTX::TextureLoaderKTX()
 
 }
 
-bool TextureLoaderKTX::loadObj(const MemoryBlock* mem, const dsResourceTypeParams& params, uintptr_t* obj)
+bool TextureLoaderKTX::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
 {
-    const gfxTextureLoadParams* texParams = (const gfxTextureLoadParams*)params.userParams;
+    const LoadTextureParams* texParams = (const LoadTextureParams*)params.userParams;
     
-    gfxTexture* texture = g_texLoader->texturePool.newInstance();
+    Texture* texture = g_texLoader->texturePool.newInstance();
     if (!texture)
         return false;
 
-    gfxDriverI* driver = g_texLoader->driver;
+    GfxDriverI* driver = g_texLoader->driver;
     texture->handle = driver->createTexture(driver->copy(mem->data, mem->size), texParams->flags, texParams->skipMips,
                                             &texture->info);
-    if (!T_ISVALID(texture->handle))
+    if (!texture->handle.isValid())
         return false;
 
     *obj = uintptr_t(texture);
@@ -285,17 +285,17 @@ void TextureLoaderKTX::unloadObj(uintptr_t obj)
     assert(g_texLoader);
     assert(obj);
 
-    gfxTexture* texture = (gfxTexture*)obj;
+    Texture* texture = (Texture*)obj;
     if (texture == g_texLoader->asyncBlankTexture)
         return;
 
-    if (T_ISVALID(texture->handle))
+    if (texture->handle.isValid())
         g_texLoader->driver->destroyTexture(texture->handle);
 
     g_texLoader->texturePool.deleteInstance(texture);
 }
 
-void TextureLoaderKTX::onReload(dsDataStore* ds, dsResourceHandle handle)
+void TextureLoaderKTX::onReload(ResourceLib* ds, ResourceHandle handle)
 {
 }
 

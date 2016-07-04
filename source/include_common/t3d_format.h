@@ -153,4 +153,4 @@ namespace termite
 
 #pragma pack(pop)
 
-} // namespace st
+} // namespace termite

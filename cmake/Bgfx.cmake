@@ -51,16 +51,18 @@ function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OU
         get_filename_component(SHADER_FILE_DIR ${SHADER_FILE_ABS} DIRECTORY)
 
         if (NAME_SUFFIX)
-            set(${SHADER_FILE_NAME} "${SHADER_FILE_NAME}_${NAME_SUFFIX}")
+            set(SHADER_FILE_NAME_FINAL "${SHADER_FILE_NAME}_${NAME_SUFFIX}")
+        else()
+            set(SHADER_FILE_NAME_FINAL ${SHADER_FILE_NAME})
         endif()
 
         # shader type and output file name
         if (SHADER_FILE_EXT STREQUAL ".vsc")
             set(SHADER_TYPE "vertex")
-            set(OUTPUT_FILEPATH ${OUTPUT_DIR}/${SHADER_FILE_NAME}.vso)
+            set(OUTPUT_FILEPATH ${OUTPUT_DIR}/${SHADER_FILE_NAME_FINAL}.vso)
         elseif (SHADER_FILE_EXT STREQUAL ".fsc")
             set(SHADER_TYPE "fragment")
-            set(OUTPUT_FILEPATH ${OUTPUT_DIR}/${SHADER_FILE_NAME}.fso)
+            set(OUTPUT_FILEPATH ${OUTPUT_DIR}/${SHADER_FILE_NAME_FINAL}.fso)
         endif()
 
         # Build only if SHADER_TYPE is determined

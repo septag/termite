@@ -2,16 +2,16 @@
 
 #include "bx/allocator.h"
 #include "bxx/hash_table.h"
-#include "datastore.h"
+#include "resource_lib.h"
 
 namespace termite
 {
     struct MemoryBlock;
-    class fntFont;
-    class dsDriverI;
-    struct gfxTexture;
+    class Font;
+    class IoDriverI;
+    struct Texture;
 
-    enum class fntFlags : uint8_t
+    enum class FontFlags : uint8_t
     {
         Normal = 0x0,
         Bold = 0x1,
@@ -20,20 +20,20 @@ namespace termite
     };
 
     // Font Library
-    result_t fntInitLibrary(bx::AllocatorI* alloc, dsDriverI* datastoreDriver);
-    void fntShutdownLibrary();
+    result_t initFontLib(bx::AllocatorI* alloc, IoDriverI* ioDriver);
+    void shutdownFontLib();
 
-    TERMITE_API result_t fntRegister(const char* fntFilepath, const char* name, uint16_t size = 0, fntFlags flags = fntFlags::Normal);
-    TERMITE_API void fntUnregister(const char* name, uint16_t size = 0, fntFlags flags = fntFlags::Normal);
-    TERMITE_API const fntFont* fntGet(const char* name, uint16_t size = 0, fntFlags flags = fntFlags::Normal);
+    TERMITE_API result_t registerFont(const char* fntFilepath, const char* name, uint16_t size = 0, FontFlags flags = FontFlags::Normal);
+    TERMITE_API void unregisterFont(const char* name, uint16_t size = 0, FontFlags flags = FontFlags::Normal);
+    TERMITE_API const Font* getFont(const char* name, uint16_t size = 0, FontFlags flags = FontFlags::Normal);
 
-    struct fntKerning
+    struct FontKerning
     {
         uint32_t secondGlyph;
         float amount;
     };
 
-    struct fntGlyph
+    struct FontGlyph
     {
         uint32_t glyphId;
         float x;
@@ -47,31 +47,31 @@ namespace termite
         uint32_t kernIdx;
     };
 
-    class fntFont
+    class Font
     {
-        friend result_t termite::fntRegister(const char*, const char*, uint16_t, fntFlags);
+        friend result_t termite::registerFont(const char*, const char*, uint16_t, FontFlags);
 
     private:
         bx::AllocatorI* m_alloc;
         char m_name[32];
-        dsResourceHandle m_textureHandle;
+        ResourceHandle m_textureHandle;
         uint32_t m_numChars;
         uint32_t m_numKerns;
         uint16_t m_lineHeight;
         uint16_t m_baseValue;
         uint32_t m_fsize;
         uint32_t m_charWidth;    // fixed width fonts
-        fntGlyph* m_glyphs;
-        fntKerning* m_kerns;
+        FontGlyph* m_glyphs;
+        FontKerning* m_kerns;
         bx::HashTableInt m_charTable;
-        dsDataStore* m_ds;
+        ResourceLib* m_resLib;
 
     public:
-        fntFont(bx::AllocatorI* alloc);
-        static fntFont* create(const MemoryBlock* mem, const char* fntFilepath, bx::AllocatorI* alloc, dsDataStore* ds = nullptr);
+        Font(bx::AllocatorI* alloc);
+        static Font* create(const MemoryBlock* mem, const char* fntFilepath, bx::AllocatorI* alloc, ResourceLib* ds = nullptr);
 
     public:
-        ~fntFont();
+        ~Font();
 
         const char* getInternalName() const
         {
@@ -93,9 +93,9 @@ namespace termite
             return m_charWidth;
         }
 
-        gfxTexture* getTexture() const
+        Texture* getTexture() const
         {
-            return dsGetObjPtr<gfxTexture*>(m_ds, m_textureHandle);
+            return (Texture*)getResourceObj(m_resLib, m_textureHandle);
         }
 
         int findGlyph(uint32_t glyphId) const
@@ -104,7 +104,7 @@ namespace termite
             return index != -1 ? m_charTable.getValue(index) : -1;
         }
 
-        const fntGlyph& getGlyph(int glyphIdx) const
+        const FontGlyph& getGlyph(int glyphIdx) const
         {
             assert(glyphIdx != -1);
             return m_glyphs[glyphIdx];
@@ -115,4 +115,4 @@ namespace termite
     };
 } // namespace termite
 
-C11_DEFINE_FLAG_TYPE(termite::fntFlags);
+C11_DEFINE_FLAG_TYPE(termite::FontFlags);

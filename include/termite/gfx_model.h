@@ -3,7 +3,7 @@
 #include "bx/bx.h"
 
 #include "gfx_driver.h"
-#include "datastore.h"
+#include "resource_lib.h"
 #include "vec_math.h"
 #include "gfx_material.h"
 
@@ -11,17 +11,17 @@
 
 namespace termite
 {
-    struct gfxModelLoadParams
+    struct LoadModelParams
     {
         float resize;
     };
 
-    struct gfxModelInstance
+    struct ModelInstance
     {
-        dsResourceHandle modelHandle;
+        ResourceHandle modelHandle;
     };
 
-    struct gfxModel
+    struct Model
     {
         struct Node
         {
@@ -36,7 +36,7 @@ namespace termite
 
         struct Material
         {
-            mtlHandle handle;
+            MaterialHandle handle;
         };
 
         struct Submesh
@@ -72,7 +72,7 @@ namespace termite
         {
             int numVerts;
             int numIndices;
-            gfxVertexDecl vdecl;
+            VertexDecl vdecl;
             void* verts;
             uint16_t* indices;
             Skeleton* skel;
@@ -91,15 +91,15 @@ namespace termite
         Mesh* meshes;
     };
 
-    result_t mdlInitLoader(gfxDriverI* driver, bx::AllocatorI* alloc);
-    void mdlShutdownLoader();
+    result_t initModelLoader(GfxDriverI* driver, bx::AllocatorI* alloc);
+    void shutdownModelLoader();
 
-    void mdlRegisterToDatastore(dsDataStore* ds);
+    void registerModelToResourceLib(ResourceLib* resLib);
 
-    gfxModelInstance* mdlCreateInstance(gfxModel* model);
+    ModelInstance* createModelInstance(Model* model);
 
-    TERMITE_API gfxVertexBufferHandle mdlGetVertexBuffer(gfxModel* model, int index);
-    TERMITE_API gfxIndexBufferHandle mdlGetIndexBuffer(gfxModel* model, int index);
+    TERMITE_API VertexBufferHandle getModelVertexBuffer(Model* model, int index);
+    TERMITE_API IndexBufferHandle getModelIndexBuffer(Model* model, int index);
 
 } // namespace termite
 

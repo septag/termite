@@ -3,44 +3,42 @@
 #include "bx/bx.h"
 
 #include "gfx_defines.h"
-#include "datastore.h"
+#include "resource_lib.h"
 
 namespace termite
 {
-    class gfxDriverI;
+    class GfxDriverI;
 
     // Use this structure to load texture with params
-    struct gfxTextureLoadParams
+    struct LoadTextureParams
     {
         bool generateMips;
         uint8_t skipMips;
-        gfxTextureFlag flags;
+        TextureFlag flags;
 
-        gfxTextureLoadParams()
+        LoadTextureParams()
         {
             generateMips = false;
             skipMips = 0;
-            flags = gfxTextureFlag::U_Clamp | gfxTextureFlag::V_Clamp | 
-                    gfxTextureFlag::MinPoint | gfxTextureFlag::MagPoint;
+            flags = TextureFlag::U_Clamp | TextureFlag::V_Clamp | 
+                    TextureFlag::MinPoint | TextureFlag::MagPoint;
         }
     };
 
-    struct gfxTexture
+    struct Texture
     {
-        gfxTextureHandle handle;
-        gfxTextureInfo info;
+        TextureHandle handle;
+        TextureInfo info;
 
-        gfxTexture()
+        Texture()
         {
-            handle = T_INVALID_HANDLE;
             memset(&info, 0x00, sizeof(info));
         }
     };
 
-    result_t textureInitLoader(gfxDriverI* driver, bx::AllocatorI* alloc, int texturePoolSize = 128);
-    void textureRegisterToDatastore(dsDataStore* ds);
-
-    void textureShutdownLoader();
-    gfxTextureHandle textureGetWhite1x1();
+    result_t initTextureLoader(GfxDriverI* driver, bx::AllocatorI* alloc, int texturePoolSize = 128);
+    void shutdownTextureLoader();
+    void registerTextureToResourceLib(ResourceLib* resLib);
+    TextureHandle getWhiteTexture1x1();
 
 } // namespace termite

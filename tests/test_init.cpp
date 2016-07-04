@@ -5,6 +5,7 @@
 #include <conio.h>
 #include "termite/job_dispatcher.h"
 #include "bx/thread.h"
+#include "bxx/hash_table.h"
 
 using namespace termite;
 
@@ -23,8 +24,8 @@ static void jobCallback2(int jobIndex, void* userParam)
         jobDesc(subJobCallback1),
         jobDesc(subJobCallback1)
     };
-    jobHandle handle = jobDispatchSmall(jobs, 2);
-    jobWait(handle);
+    JobHandle handle = dispatchSmallJobs(jobs, 2);
+    waitJobs(handle);
     printf("JOB2_END - %d (Thread: %u)\n", jobIndex, bx::getTid());
 }
 
@@ -39,15 +40,16 @@ int main(int argc, char* argv[])
 {
     bx::enableLogToFileHandle(stdout, stderr);
     
-    termite::coreConfig conf;
+    termite::Config conf;
     bx::Path pluginPath(argv[0]);
+    strcpy(conf.rendererName, "[none]");
 
     strcpy(conf.pluginPath, pluginPath.getDirectory().cstr());
 
-    if (termite::coreInit(conf, nullptr)) {
-        BX_FATAL(termite::errGetString());
-        BX_VERBOSE(termite::errGetCallstack());
-        termite::coreShutdown();
+    if (termite::initialize(conf, nullptr)) {
+        BX_FATAL(termite::getErrorString());
+        BX_VERBOSE(termite::getErrorCallstack());
+        termite::shutdown();
         return -1;
     }
 
@@ -61,8 +63,8 @@ int main(int argc, char* argv[])
         jobDesc(jobCallback2)
     };
 
-    jobHandle handle = jobDispatchSmall(jobs, 3);
-    jobWait(handle);
+    JobHandle handle = dispatchSmallJobs(jobs, 3);
+    waitJobs(handle);
 
     while (true) {
         if (_kbhit()) {
@@ -70,10 +72,10 @@ int main(int argc, char* argv[])
                 break;
         }
 
-        termite::coreFrame();
+        termite::doFrame();
     }
 
-    termite::coreShutdown();
+    termite::shutdown();
 
     return 0;
 }

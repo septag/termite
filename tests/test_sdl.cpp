@@ -14,12 +14,13 @@
 #include "termite/gfx_defines.h"
 #include "termite/gfx_font.h"
 #include "termite/gfx_vg.h"
-#include "termite/datastore.h"
+#include "termite/resource_lib.h"
 #include "termite/gfx_texture.h"
-#include "termite/gfx_debug.h"
+#include "termite/gfx_debugdraw.h"
 #include "termite/camera.h"
 #include "termite/gfx_model.h"
-#include "termite/datastore_driver.h"
+#include "termite/io_driver.h"
+#include "termite/gfx_utils.h"
 
 #include <conio.h>
 
@@ -48,13 +49,12 @@ struct InputData
 
 static SDL_Window* g_window = nullptr;
 static InputData g_input;
-static vgContext* g_vg = nullptr;
-static dbgContext* g_debug = nullptr;
-static dsResourceHandle g_logo = T_INVALID_HANDLE;
+static VectorGfxContext* g_vg = nullptr;
+static EditorDrawContext* g_debug = nullptr;
 static Camera g_cam;
-static dsResourceHandle g_model = T_INVALID_HANDLE;
-static gfxProgramHandle g_modelProg = T_INVALID_HANDLE;
-static gfxUniformHandle g_modelColor = T_INVALID_HANDLE;
+static ResourceHandle g_model;
+static ProgramHandle g_modelProg;
+static UniformHandle g_modelColor;
 
 static bool sdlPollEvents()
 {
@@ -82,7 +82,7 @@ static bool sdlPollEvents()
     }
 
     case SDL_TEXTINPUT:
-        coreSendInputChars(e.text.text);
+        inputSendChars(e.text.text);
         break;
 
     case SDL_KEYDOWN:
@@ -93,7 +93,7 @@ static bool sdlPollEvents()
         g_input.keyShift = (SDL_GetModState() & KMOD_SHIFT) != 0;
         g_input.keyCtrl = (SDL_GetModState() & KMOD_CTRL) != 0;
         g_input.keyAlt = (SDL_GetModState() & KMOD_ALT) != 0;
-        coreSendInputKeys(g_input.keysDown, g_input.keyShift, g_input.keyAlt, g_input.keyCtrl);
+        inputSendKeys(g_input.keysDown, g_input.keyShift, g_input.keyAlt, g_input.keyCtrl);
         break;
     }
 
@@ -122,20 +122,12 @@ static void update(float dt)
     g_input.mouseButtons[1] = (mouseMask & SDL_BUTTON(SDL_BUTTON_RIGHT)) ? 1 : 0;
     g_input.mouseButtons[2] = (mouseMask & SDL_BUTTON(SDL_BUTTON_MIDDLE)) ? 1 : 0;
 
-    coreSendInputMouse(mousePos, g_input.mouseButtons, g_input.mouseWheel);
+    inputSendMouse(mousePos, g_input.mouseButtons, g_input.mouseWheel);
 
     g_input.mouseButtons[0] = g_input.mouseButtons[1] = g_input.mouseButtons[2] = 0;
     g_input.mouseWheel = 0.0f;
 
     vgBegin(g_vg, WINDOW_WIDTH, WINDOW_HEIGHT);
-/*
-    vgTextf(g_vg, 10, 10, "Hello from %s", "sepehr");
-    vgRotate(g_vg, bx::toRad(90.0f));
-    vgTranslate(g_vg, 100.0f, 100.0f);
-    vgRect(g_vg, rectf(0.0f, 0.0f, 100.0, 100.0f));
-    vgTranslate(g_vg, 100.0f, 100.0f);
-    vgImageRect(g_vg, rectf(0, 0, 100, 100), dsGetObjPtr<gfxTexture*>(nullptr, g_logo));
-*/
     // Camera look/movement
     const float moveSpeed = 5.0f;
     const float lookSpeed = 3.0f;
@@ -157,14 +149,13 @@ static void update(float dt)
     vgTextf(g_vg, 10.0f, 10.0f, "pitch=%.4f", g_cam.pitch);
     vgEnd(g_vg);
 
-    dbgBegin(g_debug, WINDOW_WIDTH, WINDOW_HEIGHT, &g_cam, g_vg);
-    //dbgText(g_debug, vec3f(0, 1.0f, 5.0f), "testing");
-    dbgColor(g_debug, vec4f(0, 0.5f, 0, 1.0f));
-    dbgSnapGridXZ(g_debug, 5.0f, 70.0f);
-    dbgColor(g_debug, vec4f(1.0f, 0, 0, 1.0f));
-    dbgBoundingBox(g_debug, aabbf(-1.0f, -0.5f, -0.5f, 0.5f, 1.5f, 2.5f), true);
-    dbgBoundingSphere(g_debug, spheref(0, 0, 5.0f, 1.5f), true);
-    dbgEnd(g_debug);
+    ddBegin(g_debug, WINDOW_WIDTH, WINDOW_HEIGHT, &g_cam, g_vg);
+    ddColor(g_debug, vec4f(0, 0.5f, 0, 1.0f));
+    ddSnapGridXZ(g_debug, 1.0f, 5.0f, 50.0f);
+    ddColor(g_debug, vec4f(1.0f, 0, 0, 1.0f));
+    ddBoundingBox(g_debug, aabbf(-1.0f, -0.5f, -0.5f, 0.5f, 1.5f, 2.5f), true);
+    ddBoundingSphere(g_debug, spheref(0, 0, 5.0f, 1.5f), true);
+    ddEnd(g_debug);
 
 #if 0
     const vec4_t colors[] = {
@@ -208,9 +199,9 @@ static void update(float dt)
 #endif
 }
 
-static termite::gfxPlatformData* getSDLWindowData(SDL_Window* window)
+static termite::GfxPlatformData* getSDLWindowData(SDL_Window* window)
 {
-    static termite::gfxPlatformData platform;
+    static termite::GfxPlatformData platform;
     memset(&platform, 0x00, sizeof(platform));
 
     SDL_SysWMinfo wmi;
@@ -243,7 +234,7 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    termite::coreConfig conf;
+    termite::Config conf;
     bx::Path pluginPath(argv[0]);
     strcpy(conf.pluginPath, pluginPath.getDirectory().cstr());
 
@@ -251,7 +242,7 @@ int main(int argc, char* argv[])
                                WINDOW_WIDTH, WINDOW_HEIGHT, 0);
     if (!g_window) {
         BX_FATAL("SDL window creation failed");
-        termite::coreShutdown();
+        termite::shutdown();
         return -1;
     }
 
@@ -259,66 +250,60 @@ int main(int argc, char* argv[])
     conf.gfxHeight = WINDOW_HEIGHT;
 
     // Set Keymap
-    conf.keymap[int(gfxGuiKeyMap::Tab)] = SDLK_TAB;
-    conf.keymap[int(gfxGuiKeyMap::LeftArrow)] = SDL_SCANCODE_LEFT;
-    conf.keymap[int(gfxGuiKeyMap::DownArrow)] = SDL_SCANCODE_DOWN;
-    conf.keymap[int(gfxGuiKeyMap::UpArrow)] = SDL_SCANCODE_UP;
-    conf.keymap[int(gfxGuiKeyMap::DownArrow)] = SDL_SCANCODE_DOWN;
-    conf.keymap[int(gfxGuiKeyMap::PageUp)] = SDL_SCANCODE_PAGEUP;
-    conf.keymap[int(gfxGuiKeyMap::PageDown)] = SDL_SCANCODE_PAGEDOWN;
-    conf.keymap[int(gfxGuiKeyMap::Home)] = SDL_SCANCODE_HOME;
-    conf.keymap[int(gfxGuiKeyMap::End)] = SDL_SCANCODE_END;
-    conf.keymap[int(gfxGuiKeyMap::Delete)] = SDLK_DELETE;
-    conf.keymap[int(gfxGuiKeyMap::Backspace)] = SDLK_BACKSPACE;
-    conf.keymap[int(gfxGuiKeyMap::Enter)] = SDLK_RETURN;
-    conf.keymap[int(gfxGuiKeyMap::Escape)] = SDLK_ESCAPE;
-    conf.keymap[int(gfxGuiKeyMap::A)] = SDLK_a;
-    conf.keymap[int(gfxGuiKeyMap::C)] = SDLK_c;
-    conf.keymap[int(gfxGuiKeyMap::V)] = SDLK_v;
-    conf.keymap[int(gfxGuiKeyMap::X)] = SDLK_x;
-    conf.keymap[int(gfxGuiKeyMap::Y)] = SDLK_y;
-    conf.keymap[int(gfxGuiKeyMap::Z)] = SDLK_z;
+    conf.keymap[int(GuiKeyMap::Tab)] = SDLK_TAB;
+    conf.keymap[int(GuiKeyMap::LeftArrow)] = SDL_SCANCODE_LEFT;
+    conf.keymap[int(GuiKeyMap::DownArrow)] = SDL_SCANCODE_DOWN;
+    conf.keymap[int(GuiKeyMap::UpArrow)] = SDL_SCANCODE_UP;
+    conf.keymap[int(GuiKeyMap::DownArrow)] = SDL_SCANCODE_DOWN;
+    conf.keymap[int(GuiKeyMap::PageUp)] = SDL_SCANCODE_PAGEUP;
+    conf.keymap[int(GuiKeyMap::PageDown)] = SDL_SCANCODE_PAGEDOWN;
+    conf.keymap[int(GuiKeyMap::Home)] = SDL_SCANCODE_HOME;
+    conf.keymap[int(GuiKeyMap::End)] = SDL_SCANCODE_END;
+    conf.keymap[int(GuiKeyMap::Delete)] = SDLK_DELETE;
+    conf.keymap[int(GuiKeyMap::Backspace)] = SDLK_BACKSPACE;
+    conf.keymap[int(GuiKeyMap::Enter)] = SDLK_RETURN;
+    conf.keymap[int(GuiKeyMap::Escape)] = SDLK_ESCAPE;
+    conf.keymap[int(GuiKeyMap::A)] = SDLK_a;
+    conf.keymap[int(GuiKeyMap::C)] = SDLK_c;
+    conf.keymap[int(GuiKeyMap::V)] = SDLK_v;
+    conf.keymap[int(GuiKeyMap::X)] = SDLK_x;
+    conf.keymap[int(GuiKeyMap::Y)] = SDLK_y;
+    conf.keymap[int(GuiKeyMap::Z)] = SDLK_z;
 
-    if (termite::coreInit(conf, update, getSDLWindowData(g_window))) {
-        BX_FATAL(termite::errGetString());
-        BX_VERBOSE(termite::errGetCallstack());
-        termite::coreShutdown();
+    if (termite::initialize(conf, update, getSDLWindowData(g_window))) {
+        BX_FATAL(termite::getErrorString());
+        BX_VERBOSE(termite::getErrorCallstack());
+        termite::shutdown();
         SDL_DestroyWindow(g_window);
         SDL_Quit();
         return -1;
     }
 
-    g_vg = vgCreateContext(100);
-    g_debug = dbgCreateContext(101);
+    g_vg = createVectorGfxContext(100);
+    g_debug = createDebugDrawContext(101);
     camInit(&g_cam);
     camLookAt(&g_cam, vec3f(0, 1.0f, -12.0f), vec3f(0, 0, 0));
 
-    gfxTextureLoadParams texParams;
-    g_logo = dsLoadResource(nullptr, "texture", "textures/logo.dds", &texParams);
+    LoadModelParams modelParams;
+    g_model = loadResource(nullptr, "model", "models/torus.t3d", &modelParams);
+    assert(g_model.isValid());
 
-    gfxModelLoadParams modelParams;
-    g_model = dsLoadResource(nullptr, "model", "models/torus.t3d", &modelParams);
-    assert(T_ISVALID(g_model));
-
-    MemoryBlock* vso = coreGetDiskDriver()->read("shaders/test_model.vso");
-    MemoryBlock* fso = coreGetDiskDriver()->read("shaders/test_model.fso");
-    gfxDriverI* driver = coreGetGfxDriver();
-    gfxShaderHandle vs = driver->createShader(driver->copy(vso->data, vso->size));
-    gfxShaderHandle fs = driver->createShader(driver->copy(fso->data, fso->size));
-    g_modelProg = driver->createProgram(vs, fs, true);
-    assert(T_ISVALID(g_modelProg));
-    g_modelColor = driver->createUniform("u_color", gfxUniformType::Vec4);
+    GfxDriverI* driver = getGfxDriver();
+    g_modelProg = loadShaderProgram(driver, getIoDriver()->blocking, "shaders/test_model.vso", "shaders/test_model.fso");
+    assert(g_modelProg.isValid());
+    g_modelColor = driver->createUniform("u_color", UniformType::Vec4);
         
     while (sdlPollEvents()) {
-        termite::coreFrame();
+        termite::doFrame();
     }
 
     driver->destroyUniform(g_modelColor);
     driver->destroyProgram(g_modelProg);
-    dsUnloadResource(nullptr, g_model);
-    dbgDestroyContext(g_debug);
-    vgDestroyContext(g_vg);
-    termite::coreShutdown();
+    unloadResource(nullptr, g_model);
+
+    destroyDebugDrawContext(g_debug);
+    destroyVectorGfxContext(g_vg);
+    termite::shutdown();
     SDL_DestroyWindow(g_window);
     SDL_Quit();
 

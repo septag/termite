@@ -22,15 +22,15 @@ struct ModelInstanceImpl
 
     struct Material
     {
-        gfxProgramHandle program;
+        ProgramHandle program;
     };
 };
 
 struct ModelImpl
 {
-    gfxModel m;
-    gfxVertexBufferHandle* vertexBuffers;     // 1 for each geometry
-    gfxIndexBufferHandle* indexBuffers;       // 1 for each geometry
+    Model m;
+    VertexBufferHandle* vertexBuffers;     // 1 for each geometry
+    IndexBufferHandle* indexBuffers;       // 1 for each geometry
 
     ModelImpl()
     {
@@ -40,22 +40,22 @@ struct ModelImpl
     }
 };
 
-class ModelLoader : public dsResourceCallbacksI
+class ModelLoader : public ResourceCallbacksI
 {
 public:
-    bool loadObj(const MemoryBlock* mem, const dsResourceTypeParams& params, uintptr_t* obj) override;
+    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) override;
     void unloadObj(uintptr_t obj) override;
-    void onReload(dsDataStore* ds, dsResourceHandle handle) override;
+    void onReload(ResourceLib* ds, ResourceHandle handle) override;
     uintptr_t getDefaultAsyncObj() override;
 };
 
 struct ModelManager
 {
     bx::AllocatorI* alloc;
-    gfxDriverI* driver;
+    GfxDriverI* driver;
     ModelLoader loader;
 
-    memPageAllocator allocStub;
+    PageAllocator allocStub;
 
     ModelManager(bx::AllocatorI* _alloc) :
         allocStub(MODELS_MEMORY_TAG)
@@ -67,7 +67,7 @@ struct ModelManager
 
 static ModelManager* g_modelMgr = nullptr;
 
-result_t termite::mdlInitLoader(gfxDriverI* driver, bx::AllocatorI* alloc)
+result_t termite::initModelLoader(GfxDriverI* driver, bx::AllocatorI* alloc)
 {
     if (g_modelMgr) {
         assert(false);
@@ -80,10 +80,10 @@ result_t termite::mdlInitLoader(gfxDriverI* driver, bx::AllocatorI* alloc)
 
     g_modelMgr->driver = driver;
 
-    return T_OK;
+    return 0;
 }
 
-void termite::mdlShutdownLoader()
+void termite::shutdownModelLoader()
 {
     if (!g_modelMgr)
         return;
@@ -92,26 +92,26 @@ void termite::mdlShutdownLoader()
     g_modelMgr = nullptr;
 }
 
-void termite::mdlRegisterToDatastore(dsDataStore* ds)
+void termite::registerModelToResourceLib(ResourceLib* resLib)
 {
-    dsResourceTypeHandle handle;
-    handle = dsRegisterResourceType(ds, "model", &g_modelMgr->loader, sizeof(gfxModelLoadParams));
-    assert(T_ISVALID(handle));
+    ResourceTypeHandle handle;
+    handle = registerResourceType(resLib, "model", &g_modelMgr->loader, sizeof(LoadModelParams));
+    assert(handle.isValid());
 }
 
-gfxModelInstance* termite::mdlCreateInstance(gfxModel* model)
+ModelInstance* termite::createModelInstance(Model* model)
 {
     assert(g_modelMgr);
 
     return nullptr;
 }
 
-gfxVertexBufferHandle termite::mdlGetVertexBuffer(gfxModel* model, int index)
+VertexBufferHandle termite::getModelVertexBuffer(Model* model, int index)
 {
     return ((ModelImpl*)model)->vertexBuffers[index];
 }
 
-gfxIndexBufferHandle termite::mdlGetIndexBuffer(gfxModel* model, int index)
+IndexBufferHandle termite::getModelIndexBuffer(Model* model, int index)
 {
     return ((ModelImpl*)model)->indexBuffers[index];
 }
@@ -119,37 +119,41 @@ gfxIndexBufferHandle termite::mdlGetIndexBuffer(gfxModel* model, int index)
 static void unloadModel(ModelImpl* model)
 {
     assert(g_modelMgr);
-    gfxDriverI* driver = g_modelMgr->driver;
+
+    if (!model)
+        return;
+
+    GfxDriverI* driver = g_modelMgr->driver;
 
     if (model->indexBuffers) {
         for (int i = 0, c = model->m.numGeos; i < c; i++) {
-            if (T_ISVALID(model->indexBuffers[i]))
+            if (model->indexBuffers[i].isValid())
                 driver->destroyIndexBuffer(model->indexBuffers[i]);
         }
     }
 
     if (model->vertexBuffers) {
         for (int i = 0, c = model->m.numGeos; i < c; i++) {
-            if (T_ISVALID(model->vertexBuffers[i]))
+            if (model->vertexBuffers[i].isValid())
                 driver->destroyVertexBuffer(model->vertexBuffers[i]);
         }
     }
 }
 
-static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const dsResourceTypeParams& params, uintptr_t* obj)
+static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const ResourceTypeParams& params, uintptr_t* obj)
 {
     assert(g_modelMgr);
 
     bx::Error err;
 
-    gfxDriverI* driver = g_modelMgr->driver;
+    GfxDriverI* driver = g_modelMgr->driver;
     bx::AllocatorI* alloc = &g_modelMgr->allocStub;
 
     // Create model
     ModelImpl* model = BX_NEW(alloc, ModelImpl);
-    model->m.nodes = (gfxModel::Node*)BX_ALLOC(alloc, sizeof(gfxModel::Node)*header.numNodes);
-    model->m.geos = (gfxModel::Geometry*)BX_ALLOC(alloc, sizeof(gfxModel::Geometry)*header.numGeos);
-    model->m.meshes = (gfxModel::Mesh*)BX_ALLOC(alloc, sizeof(gfxModel::Mesh)*header.numMeshes);
+    model->m.nodes = (Model::Node*)BX_ALLOC(alloc, sizeof(Model::Node)*header.numNodes);
+    model->m.geos = (Model::Geometry*)BX_ALLOC(alloc, sizeof(Model::Geometry)*header.numGeos);
+    model->m.meshes = (Model::Mesh*)BX_ALLOC(alloc, sizeof(Model::Mesh)*header.numMeshes);
     
     model->m.numGeos = header.numGeos;
     model->m.numMeshes = header.numMeshes;
@@ -161,7 +165,7 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const d
         t3dNode tnode;
         data->read(&tnode, sizeof(tnode), &err);
 
-        gfxModel::Node& node = model->m.nodes[i];
+        Model::Node& node = model->m.nodes[i];
         strcpy(node.name, tnode.name);
         node.mesh = tnode.mesh;
         node.parent = tnode.parent;
@@ -181,17 +185,17 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const d
         t3dMesh tmesh;
         data->read(&tmesh, sizeof(tmesh), &err);
 
-        gfxModel::Mesh& mesh = model->m.meshes[i];
+        Model::Mesh& mesh = model->m.meshes[i];
         mesh.numSubmeshes = tmesh.numSubmeshes;
         mesh.geo = tmesh.geo;
 
-        mesh.submeshes = (gfxModel::Submesh*)BX_ALLOC(alloc, sizeof(gfxModel::Submesh)*tmesh.numSubmeshes);
+        mesh.submeshes = (Model::Submesh*)BX_ALLOC(alloc, sizeof(Model::Submesh)*tmesh.numSubmeshes);
         
         for (int c = 0; c < mesh.numSubmeshes; c++) {
             t3dSubmesh tsubmesh;
             data->read(&tsubmesh, sizeof(tsubmesh), &err);
 
-            gfxModel::Submesh& submesh = mesh.submeshes[c];
+            Model::Submesh& submesh = mesh.submeshes[c];
             submesh.mtl = tsubmesh.mtl;
             submesh.numIndices = tsubmesh.numIndices;
             submesh.startIndex = tsubmesh.startIndex;
@@ -203,14 +207,14 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const d
         t3dGeometry tgeo;
         data->read(&tgeo, sizeof(tgeo), &err);
 
-        gfxModel::Geometry& geo = model->m.geos[i];
+        Model::Geometry& geo = model->m.geos[i];
         geo.numIndices = tgeo.numTris * 3;
         geo.numVerts = tgeo.numVerts;
         
         if (tgeo.skel.numJoints) {
-            geo.skel = (gfxModel::Skeleton*)BX_ALLOC(alloc, sizeof(gfxModel::Skeleton));
+            geo.skel = (Model::Skeleton*)BX_ALLOC(alloc, sizeof(Model::Skeleton));
 
-            geo.skel->joints = (gfxModel::Joint*)BX_ALLOC(alloc, sizeof(gfxModel::Joint)*tgeo.skel.numJoints);
+            geo.skel->joints = (Model::Joint*)BX_ALLOC(alloc, sizeof(Model::Joint)*tgeo.skel.numJoints);
             geo.skel->initPose = (mtx4x4_t*)BX_ALLOC(alloc, sizeof(mtx4x4_t)*tgeo.skel.numJoints);
 
             geo.skel->numJoints = tgeo.skel.numJoints;
@@ -220,7 +224,7 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const d
             for (int c = 0; c < tgeo.skel.numJoints; c++) {
                 t3dJoint tjoint;
                 data->read(&tjoint, sizeof(tjoint), &err);
-                gfxModel::Joint& joint = geo.skel->joints[c];
+                Model::Joint& joint = geo.skel->joints[c];
                 strcpy(joint.name, tjoint.name);
                 joint.parent = tjoint.parent;
                 joint.offsetMtx = mtx4x4fv3(&tjoint.offsetMtx[0], &tjoint.offsetMtx[3], &tjoint.offsetMtx[6],
@@ -235,53 +239,54 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const d
         } // skeleton
 
         // Vertex Decl
-        geo.vdecl.begin();
+        vdeclBegin(&geo.vdecl);
         for (int c = 0; c < tgeo.numAttribs; c++) {
             t3dVertexAttrib tatt;
             data->read(&tatt, sizeof(tatt), &err);
-            gfxAttrib att = (gfxAttrib)tatt;
+            VertexAttrib att = (VertexAttrib)tatt;
             int num;
-            gfxAttribType type;
+            VertexAttribType type;
             bool normalized = false;
 
             switch (att) {
-            case gfxAttrib::Position:
-            case gfxAttrib::Normal:
-            case gfxAttrib::Tangent:
-            case gfxAttrib::Bitangent:
+            case VertexAttrib::Position:
+            case VertexAttrib::Normal:
+            case VertexAttrib::Tangent:
+            case VertexAttrib::Bitangent:
                 num = 3;
-                type = gfxAttribType::Float;
+                type = VertexAttribType::Float;
                 break;
-            case gfxAttrib::Color0:
+            case VertexAttrib::Color0:
                 num = 4;
-                type = gfxAttribType::Uint8;
+                type = VertexAttribType::Uint8;
                 normalized = true;
                 break;
-            case gfxAttrib::TexCoord1:
-            case gfxAttrib::TexCoord0:
-            case gfxAttrib::TexCoord2:
-            case gfxAttrib::TexCoord3:
+            case VertexAttrib::TexCoord1:
+            case VertexAttrib::TexCoord0:
+            case VertexAttrib::TexCoord2:
+            case VertexAttrib::TexCoord3:
                 num = 2;
-                type = gfxAttribType::Float;
+                type = VertexAttribType::Float;
                 break;
-            case gfxAttrib::Indices:
+            case VertexAttrib::Indices:
                 num = 4;
-                type = gfxAttribType::Uint8;
+                type = VertexAttribType::Uint8;
                 break;
-            case gfxAttrib::Weight:
+            case VertexAttrib::Weight:
                 num = 4;
-                type = gfxAttribType::Float;
+                type = VertexAttribType::Float;
                 break;
             default:
                 num = 0;
-                type = gfxAttribType::Count;
+                type = VertexAttribType::Count;
                 break;
             }
 
-            if (num)
-                geo.vdecl.add(att, num, type, normalized);
+            if (num) {
+                vdeclAdd(&geo.vdecl, att, num, type, normalized);
+            }
         }
-        geo.vdecl.end();
+        vdeclEnd(&geo.vdecl);
 
         // Indices
         geo.indices = (uint16_t*)BX_ALLOC(alloc, sizeof(uint16_t)*geo.numIndices);
@@ -293,20 +298,20 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const d
     }
 
     // Create Gfx buffers
-    model->vertexBuffers = (gfxVertexBufferHandle*)BX_ALLOC(alloc, sizeof(gfxVertexBufferHandle)*header.numGeos);
-    model->indexBuffers = (gfxIndexBufferHandle*)BX_ALLOC(alloc, sizeof(gfxIndexBufferHandle)*header.numGeos);
+    model->vertexBuffers = (VertexBufferHandle*)BX_ALLOC(alloc, sizeof(VertexBufferHandle)*header.numGeos);
+    model->indexBuffers = (IndexBufferHandle*)BX_ALLOC(alloc, sizeof(IndexBufferHandle)*header.numGeos);
 
     for (int i = 0; i < header.numGeos; i++) {
-        model->vertexBuffers[i] = T_INVALID_HANDLE;
-        model->indexBuffers[i] = T_INVALID_HANDLE;
+        model->vertexBuffers[i].reset();
+        model->indexBuffers[i].reset();
     }
 
     for (int i = 0; i < header.numGeos; i++) {
-        const gfxModel::Geometry& geo = model->m.geos[i];
+        const Model::Geometry& geo = model->m.geos[i];
         model->vertexBuffers[i] = driver->createVertexBuffer(driver->makeRef(geo.verts, geo.numVerts*geo.vdecl.stride),
                                                              geo.vdecl);
         model->indexBuffers[i] = driver->createIndexBuffer(driver->makeRef(geo.indices, sizeof(uint16_t)*geo.numIndices));
-        if (!T_ISVALID(model->vertexBuffers[i]) || !T_ISVALID(model->indexBuffers[i])) {
+        if (!model->vertexBuffers[i].isValid() || !model->indexBuffers[i].isValid()) {
             unloadModel(model);
             return false;
         }
@@ -316,7 +321,7 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const d
     return true;
 }
 
-bool ModelLoader::loadObj(const MemoryBlock* mem, const dsResourceTypeParams& params, uintptr_t* obj)
+bool ModelLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
 {
     bx::Error err;
     bx::MemoryReader reader(mem->data, mem->size);
@@ -346,7 +351,7 @@ void ModelLoader::unloadObj(uintptr_t obj)
     unloadModel((ModelImpl*)obj);
 }
 
-void ModelLoader::onReload(dsDataStore* ds, dsResourceHandle handle)
+void ModelLoader::onReload(ResourceLib* ds, ResourceHandle handle)
 {
 
 }

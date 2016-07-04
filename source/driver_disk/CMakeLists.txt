@@ -7,12 +7,10 @@ source_group(source FILES ${SOURCE_FILES})
 add_library(tdriver_disk SHARED ${SOURCE_FILES})
 
 target_include_directories(tdriver_disk PRIVATE ${LIBUV_INCLUDE_DIR})
-target_link_libraries(tdriver_disk 
-    PRIVATE ${LIBUV_LIBRARY}
-    PUBLIC termite)
+target_link_libraries(tdriver_disk PRIVATE ${LIBUV_LIBRARY} bx)
 
 if (WIN32)
-    add_dependencies(termite LibuvCopyBinaries)
+    add_dependencies(tdriver_disk LibuvCopyBinaries)
 endif()
 
 install(TARGETS tdriver_disk 

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.3)
-project(termite)
+project(kashmir)
 
 set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/install CACHE PATH "Install path" FORCE)
 
@@ -144,7 +144,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 # dependencies
 add_subdirectory(deps/deboost.context)
 add_subdirectory(deps/bx)
+add_subdirectory(deps/Box2D)
 set_target_properties(fcontext PROPERTIES FOLDER Deps)
+set_target_properties(Box2D PROPERTIES FOLDER Deps)
 
 # common
 add_subdirectory(source/imgui_impl)
@@ -157,10 +159,10 @@ add_subdirectory(source/termite)
 # plugins
 add_subdirectory(source/driver_bgfx)
 add_subdirectory(source/driver_disk)
-add_subdirectory(source/render_default)
+add_subdirectory(source/render_stock)
 set_target_properties(tdriver_bgfx PROPERTIES FOLDER Plugins)
 set_target_properties(tdriver_disk PROPERTIES FOLDER Plugins)
-set_target_properties(trender_default PROPERTIES FOLDER Plugins)
+set_target_properties(trender_stock PROPERTIES FOLDER Plugins)
 
 # tools
 add_subdirectory(source/ls-model)
@@ -174,6 +176,7 @@ set_target_properties(animc PROPERTIES FOLDER Tools)
 add_subdirectory(tests)
 set_target_properties(test_init PROPERTIES FOLDER Tests)
 set_target_properties(test_sdl PROPERTIES FOLDER Tests)
+set_target_properties(test_gfx PROPERTIES FOLDER Tests)
 
 # copy binaries
 if (WIN32)
@@ -181,3 +184,6 @@ if (WIN32)
     set_target_properties(LibuvCopyBinaries PROPERTIES FOLDER Deps/CopyBinaries) 
     set_target_properties(SDL2CopyBinaries PROPERTIES FOLDER Deps/CopyBinaries) 
 endif()
+
+# kashmir
+add_subdirectory(source/kashmir)
