@@ -75,7 +75,7 @@ struct Core
     bx::Pool<HeapMemoryImpl> memPool;
     bx::Lock memPoolLock;
     ResourceLib* resLib;
-    GfxDriverI* gfxDriver;
+    GfxApi* gfxDriver;
     IoDriverDual* ioDriver;
     PageAllocator tempAlloc;
 
@@ -264,7 +264,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     if (g_core->renderer) {
         r = findPluginByName(conf.gfxName[0] ? conf.gfxName : "Bgfx", 0, &pluginHandle, 1, PluginType::GraphicsDriver);
         if (r > 0) {
-            g_core->gfxDriver = (GfxDriverI*)initPlugin(pluginHandle, g_alloc);
+            g_core->gfxDriver = (GfxApi*)initPlugin(pluginHandle, g_alloc);
         }
 
         if (!g_core->gfxDriver) {
@@ -552,7 +552,7 @@ void termite::inputSendMouse(float mousePos[2], int mouseButtons[3], float mouse
 {
 }
 
-GfxDriverI* termite::getGfxDriver()
+GfxApi* termite::getGfxDriver()
 {
     return g_core->gfxDriver;
 }

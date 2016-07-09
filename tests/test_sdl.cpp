@@ -279,8 +279,8 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    g_vg = createVectorGfxContext(100);
-    g_debug = createDebugDrawContext(101);
+    g_vg = createVectorGfxContext(101);
+    g_debug = createDebugDrawContext(100);
     camInit(&g_cam);
     camLookAt(&g_cam, vec3f(0, 1.0f, -12.0f), vec3f(0, 0, 0));
 
@@ -288,10 +288,10 @@ int main(int argc, char* argv[])
     g_model = loadResource(nullptr, "model", "models/torus.t3d", &modelParams);
     assert(g_model.isValid());
 
-    GfxDriverI* driver = getGfxDriver();
+    GfxApi* driver = getGfxDriver();
     g_modelProg = loadShaderProgram(driver, getIoDriver()->blocking, "shaders/test_model.vso", "shaders/test_model.fso");
     assert(g_modelProg.isValid());
-    g_modelColor = driver->createUniform("u_color", UniformType::Vec4);
+    g_modelColor = driver->createUniform("u_color", UniformType::Vec4, 1);
         
     while (sdlPollEvents()) {
         termite::doFrame();

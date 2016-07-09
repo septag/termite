@@ -25,9 +25,9 @@ VertexDecl VertexFs::Decl;
 
 static VertexBufferHandle g_fsVb;
 static IndexBufferHandle g_fsIb;
-static GfxDriverI* g_driver = nullptr;
+static GfxApi* g_driver = nullptr;
 
-result_t termite::initGfxUtils(GfxDriverI* driver)
+result_t termite::initGfxUtils(GfxApi* driver)
 {
     VertexFs::init();
     static VertexFs fsQuad[] = {
@@ -44,13 +44,15 @@ result_t termite::initGfxUtils(GfxDriverI* driver)
 
 
     if (!g_fsVb.isValid()) {
-        g_fsVb = driver->createVertexBuffer(driver->makeRef(fsQuad, sizeof(VertexFs) * 4), VertexFs::Decl);
+        g_fsVb = driver->createVertexBuffer(driver->makeRef(fsQuad, sizeof(VertexFs) * 4, nullptr, nullptr), 
+            VertexFs::Decl, GpuBufferFlag::None);
         if (!g_fsVb.isValid())
             return T_ERR_FAILED;
     }
 
     if (!g_fsIb.isValid()) {
-        g_fsIb = driver->createIndexBuffer(driver->makeRef(indices, sizeof(uint16_t) * 6));
+        g_fsIb = driver->createIndexBuffer(driver->makeRef(indices, sizeof(uint16_t) * 6, nullptr, nullptr), 
+            GpuBufferFlag::None);
         if (!g_fsIb.isValid())
             return T_ERR_FAILED;
     }
@@ -111,10 +113,10 @@ static void releaseMemoryBlockCallback(void* ptr, void* userData)
     releaseMemoryBlock((MemoryBlock*)userData);
 }
 
-ProgramHandle termite::loadShaderProgram(GfxDriverI* gfxDriver, IoDriverI* ioDriver, const char* vsFilepath, 
+ProgramHandle termite::loadShaderProgram(GfxApi* gfxDriver, IoDriverI* ioDriver, const char* vsFilepath, 
                                          const char* fsFilepath)
 {
-    GfxDriverI* driver = gfxDriver;
+    GfxApi* driver = gfxDriver;
     MemoryBlock* vso = ioDriver->read(vsFilepath);
     if (!vso) {
         T_ERROR("Opening file '%s' failed", vsFilepath);
@@ -141,9 +143,9 @@ void termite::drawFullscreenQuad(uint8_t viewId, ProgramHandle prog)
     assert(g_fsIb.isValid());
     assert(g_fsVb.isValid());
 
-    GfxDriverI* driver = g_driver;
+    GfxApi* driver = g_driver;
 
     driver->setVertexBuffer(g_fsVb);
     driver->setIndexBuffer(g_fsIb, 0, 6);
-    driver->submit(viewId, prog);
+    driver->submit(viewId, prog, 0, false);
 }

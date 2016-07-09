@@ -91,7 +91,7 @@ namespace termite
         Mesh* meshes;
     };
 
-    result_t initModelLoader(GfxDriverI* driver, bx::AllocatorI* alloc);
+    result_t initModelLoader(GfxApi* driver, bx::AllocatorI* alloc);
     void shutdownModelLoader();
 
     void registerModelToResourceLib(ResourceLib* resLib);

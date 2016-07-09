@@ -7,7 +7,7 @@
 
 namespace termite
 {
-    class GfxDriverI;
+    struct GfxApi;
 
     // Use this structure to load texture with params
     struct LoadTextureParams
@@ -36,7 +36,7 @@ namespace termite
         }
     };
 
-    result_t initTextureLoader(GfxDriverI* driver, bx::AllocatorI* alloc, int texturePoolSize = 128);
+    result_t initTextureLoader(GfxApi* driver, bx::AllocatorI* alloc, int texturePoolSize = 128);
     void shutdownTextureLoader();
     void registerTextureToResourceLib(ResourceLib* resLib);
     TextureHandle getWhiteTexture1x1();

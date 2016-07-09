@@ -49,7 +49,7 @@ public:
     virtual void writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, int maxVerts,
                                  uint16_t* indices, int firstVertIdx, int maxIndices, 
                                  int* numVertsWritten, int* numIndicesWritten) = 0;
-    virtual GfxState setStates(VectorGfxContext* ctx, GfxDriverI* driver, const void* params) = 0;
+    virtual GfxState setStates(VectorGfxContext* ctx, GfxApi* driver, const void* params) = 0;
 };
 
 struct Batch
@@ -84,7 +84,7 @@ namespace termite
     struct VectorGfxContext
     {
         bx::AllocatorI* alloc;
-        GfxDriverI* driver;
+        GfxApi* driver;
         uint8_t viewId;
 
         vgVertexPosCoordColor* vertexBuff;
@@ -147,7 +147,7 @@ public:
     void writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, int maxVerts,
                          uint16_t* indices, int firstVertIdx, int maxIndices, 
                          int* numVertsWritten, int* numIndicesWritten) override;
-    GfxState setStates(VectorGfxContext* ctx, GfxDriverI* driver, const void* params) override;
+    GfxState setStates(VectorGfxContext* ctx, GfxApi* driver, const void* params) override;
 };
 
 struct RectParams : public BatchParams
@@ -164,12 +164,12 @@ public:
     void writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, int maxVerts,
         uint16_t* indices, int firstVertIdx, int maxIndices,
         int* numVertsWritten, int* numIndicesWritten) override;
-    GfxState setStates(VectorGfxContext* ctx, GfxDriverI* driver, const void* params) override;
+    GfxState setStates(VectorGfxContext* ctx, GfxApi* driver, const void* params) override;
 };
 
 struct VgMgr
 {
-    GfxDriverI* driver;
+    GfxApi* driver;
     bx::AllocatorI* alloc;
     ProgramHandle program;
     TextureHandle whiteTexture;
@@ -257,7 +257,7 @@ static void setDefaultState(VectorGfxContext* ctx, State* state)
 
 static void drawBatches(VectorGfxContext* ctx)
 {
-    GfxDriverI* driver = ctx->driver;
+    GfxApi* driver = ctx->driver;
     GfxState baseState = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::CullCCW;
 
     uint8_t viewId = ctx->viewId;
@@ -287,7 +287,7 @@ static void drawBatches(VectorGfxContext* ctx)
     driver->allocTransientIndexBuffer(&tib, numIndices);
     memcpy(tib.data, ctx->indexBuff, sizeof(uint16_t)*numIndices);
 
-    driver->setViewTransform(viewId, nullptr, &projMtx);
+    driver->setViewTransform(viewId, nullptr, &projMtx, GfxViewFlag::Stereo, nullptr);
 
     for (int i = 0, c = ctx->numBatches; i < c; i++) {
         const Batch& batch = ctx->batches[i];
@@ -300,18 +300,18 @@ static void drawBatches(VectorGfxContext* ctx)
                                      0.0f,   0.0f,   1.0f,
                                      xf.m31, xf.m32, 0.0f);
         driver->setTransform(&worldMtx, 1);
-        driver->setState(state);
+        driver->setState(state, 0);
         driver->setScissor(uint16_t(batch.scissorRect.xmin),
                            uint16_t(batch.scissorRect.ymin),
                            uint16_t(batch.scissorRect.xmax - batch.scissorRect.xmin),
                            uint16_t(batch.scissorRect.ymax - batch.scissorRect.ymin));
-        driver->setIndexBuffer(&tib, batch.firstIdx, batch.numIndices);
-        driver->setVertexBuffer(&tvb, 0, batch.numVerts);       
-        driver->submit(viewId, ctx->program); 
+        driver->setTransientIndexBufferI(&tib, batch.firstIdx, batch.numIndices);
+        driver->setTransientVertexBufferI(&tvb, 0, batch.numVerts);       
+        driver->submit(viewId, ctx->program, 0, false); 
     }
 }
 
-result_t termite::initVectorGfx(bx::AllocatorI* alloc, GfxDriverI* driver)
+result_t termite::initVectorGfx(bx::AllocatorI* alloc, GfxApi* driver)
 {
     assert(driver);
     if (g_vg) {
@@ -327,8 +327,8 @@ result_t termite::initVectorGfx(bx::AllocatorI* alloc, GfxDriverI* driver)
     
     // Load program
     {
-        ShaderHandle vertexShader = driver->createShader(driver->makeRef(vg_vso, sizeof(vg_vso)));
-        ShaderHandle fragmentShader = driver->createShader(driver->makeRef(vg_fso, sizeof(vg_fso)));
+        ShaderHandle vertexShader = driver->createShader(driver->makeRef(vg_vso, sizeof(vg_vso), nullptr, nullptr));
+        ShaderHandle fragmentShader = driver->createShader(driver->makeRef(vg_fso, sizeof(vg_fso), nullptr, nullptr));
         if (!vertexShader.isValid() || !fragmentShader.isValid()) {
             T_ERROR("Creating shaders failed");
             return T_ERR_FAILED;
@@ -342,7 +342,7 @@ result_t termite::initVectorGfx(bx::AllocatorI* alloc, GfxDriverI* driver)
 
     vgVertexPosCoordColor::init();
 
-    g_vg->uTexture = driver->createUniform("u_texture", UniformType::Int1);
+    g_vg->uTexture = driver->createUniform("u_texture", UniformType::Int1, 1);
     assert(g_vg->uTexture.isValid());
 
     // Create a 1x1 white texture 
@@ -741,11 +741,11 @@ void TextHandler::writePrimitives(VectorGfxContext* ctx, const void* params, vgV
     *numIndicesWritten = indexIdx;
 }
 
-GfxState TextHandler::setStates(VectorGfxContext* ctx, GfxDriverI* driver, const void* params)
+GfxState TextHandler::setStates(VectorGfxContext* ctx, GfxApi* driver, const void* params)
 {
     const TextParams* textParams = (const TextParams*)params;
     Texture* texture = textParams->font->getTexture();
-    driver->setTexture(0, ctx->uTexture, texture->handle);
+    driver->setTexture(0, ctx->uTexture, texture->handle, TextureFlag::FromTexture);
     return GfxState::None;
 }
 
@@ -810,10 +810,10 @@ void RectHandler::writePrimitives(VectorGfxContext* ctx, const void* params, vgV
     *numIndicesWritten = indexIdx;
 }
 
-GfxState RectHandler::setStates(VectorGfxContext* ctx, GfxDriverI* driver, const void* params)
+GfxState RectHandler::setStates(VectorGfxContext* ctx, GfxApi* driver, const void* params)
 {
     const RectParams* rectParams = (const RectParams*)params;
     Texture* texture = rectParams->image;
-    driver->setTexture(0, ctx->uTexture, texture ? texture->handle : g_vg->whiteTexture);
+    driver->setTexture(0, ctx->uTexture, texture ? texture->handle : g_vg->whiteTexture, TextureFlag::FromTexture);
     return GfxState::None;
 }

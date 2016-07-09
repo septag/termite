@@ -48,7 +48,7 @@ struct TextureLoader
     bx::AllocatorI* alloc;
     Texture* whiteTexture;
     Texture* asyncBlankTexture;
-    GfxDriverI* driver;
+    GfxApi* driver;
 
     TextureLoader(bx::AllocatorI* _alloc)
     {
@@ -61,7 +61,7 @@ struct TextureLoader
 
 static TextureLoader* g_texLoader = nullptr;
 
-result_t termite::initTextureLoader(GfxDriverI* driver, bx::AllocatorI* alloc, int texturePoolSize)
+result_t termite::initTextureLoader(GfxApi* driver, bx::AllocatorI* alloc, int texturePoolSize)
 {
     assert(driver);
     if (g_texLoader) {
@@ -85,7 +85,7 @@ result_t termite::initTextureLoader(GfxDriverI* driver, bx::AllocatorI* alloc, i
     static uint32_t whitePixel = 0xffffffff;
     g_texLoader->whiteTexture->handle = driver->createTexture2D(1, 1, 1, TextureFormat::RGBA8,
         TextureFlag::U_Clamp|TextureFlag::V_Clamp|TextureFlag::MinPoint|TextureFlag::MagPoint,
-        driver->makeRef(&whitePixel, sizeof(uint32_t)));
+        driver->makeRef(&whitePixel, sizeof(uint32_t), nullptr, nullptr));
     g_texLoader->whiteTexture->info.width = 1;
     g_texLoader->whiteTexture->info.height = 1;
     g_texLoader->whiteTexture->info.format = TextureFormat::RGBA8;
@@ -142,7 +142,7 @@ static void stbCallbackFreeImage(void* ptr, void* userData)
 bool TextureLoaderRaw::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
 {
     assert(g_texLoader);
-    GfxDriverI* driver = g_texLoader->driver;
+    GfxApi* driver = g_texLoader->driver;
 
     // Note: Currently we always load RGBA8 format for non-compressed textures
     int width, height, comp;
@@ -270,7 +270,7 @@ bool TextureLoaderKTX::loadObj(const MemoryBlock* mem, const ResourceTypeParams&
     if (!texture)
         return false;
 
-    GfxDriverI* driver = g_texLoader->driver;
+    GfxApi* driver = g_texLoader->driver;
     texture->handle = driver->createTexture(driver->copy(mem->data, mem->size), texParams->flags, texParams->skipMips,
                                             &texture->info);
     if (!texture->handle.isValid())

@@ -52,7 +52,7 @@ public:
 struct ModelManager
 {
     bx::AllocatorI* alloc;
-    GfxDriverI* driver;
+    GfxApi* driver;
     ModelLoader loader;
 
     PageAllocator allocStub;
@@ -67,7 +67,7 @@ struct ModelManager
 
 static ModelManager* g_modelMgr = nullptr;
 
-result_t termite::initModelLoader(GfxDriverI* driver, bx::AllocatorI* alloc)
+result_t termite::initModelLoader(GfxApi* driver, bx::AllocatorI* alloc)
 {
     if (g_modelMgr) {
         assert(false);
@@ -123,7 +123,7 @@ static void unloadModel(ModelImpl* model)
     if (!model)
         return;
 
-    GfxDriverI* driver = g_modelMgr->driver;
+    GfxApi* driver = g_modelMgr->driver;
 
     if (model->indexBuffers) {
         for (int i = 0, c = model->m.numGeos; i < c; i++) {
@@ -146,7 +146,7 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const R
 
     bx::Error err;
 
-    GfxDriverI* driver = g_modelMgr->driver;
+    GfxApi* driver = g_modelMgr->driver;
     bx::AllocatorI* alloc = &g_modelMgr->allocStub;
 
     // Create model
@@ -308,9 +308,10 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const R
 
     for (int i = 0; i < header.numGeos; i++) {
         const Model::Geometry& geo = model->m.geos[i];
-        model->vertexBuffers[i] = driver->createVertexBuffer(driver->makeRef(geo.verts, geo.numVerts*geo.vdecl.stride),
-                                                             geo.vdecl);
-        model->indexBuffers[i] = driver->createIndexBuffer(driver->makeRef(geo.indices, sizeof(uint16_t)*geo.numIndices));
+        model->vertexBuffers[i] = driver->createVertexBuffer(
+            driver->makeRef(geo.verts, geo.numVerts*geo.vdecl.stride, nullptr, nullptr), geo.vdecl, GpuBufferFlag::None);
+        model->indexBuffers[i] = driver->createIndexBuffer(
+            driver->makeRef(geo.indices, sizeof(uint16_t)*geo.numIndices, nullptr, nullptr), GpuBufferFlag::None);
         if (!model->vertexBuffers[i].isValid() || !model->indexBuffers[i].isValid()) {
             unloadModel(model);
             return false;

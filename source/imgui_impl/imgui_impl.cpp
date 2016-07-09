@@ -17,7 +17,7 @@ using namespace termite;
 struct ImGuiImpl
 {
     bx::AllocatorI* alloc;
-    GfxDriverI* driver;
+    GfxApi* driver;
     ProgramHandle progHandle;
     
     TextureHandle fontTexHandle;
@@ -70,7 +70,7 @@ static void imguiDrawLists(ImDrawData* data)
 {
     assert(g_Im);
 
-    GfxDriverI* driver = g_Im->driver;
+    GfxApi* driver = g_Im->driver;
 
     float proj[16];
     float width = ImGui::GetIO().DisplaySize.x;
@@ -81,9 +81,9 @@ static void imguiDrawLists(ImDrawData* data)
     GfxState state = gfxStateBlendAlpha() |
         GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::CullCCW;
     driver->touch(viewId);
-    driver->setViewRect(viewId, 0, 0, BackbufferRatio::Equal);
+    driver->setViewRectRatio(viewId, 0, 0, BackbufferRatio::Equal);
     driver->setViewSeq(viewId, true);
-    driver->setViewTransform(viewId, nullptr, proj);
+    driver->setViewTransform(viewId, nullptr, proj, GfxViewFlag::Stereo, nullptr);
 
     for (int n = 0; n < data->CmdListsCount; n++) {
         const ImDrawList* cmdList = data->CmdLists[n];
@@ -134,12 +134,12 @@ static void imguiDrawLists(ImDrawData* data)
                                    uint16_t(cmd.ClipRect.w - cmd.ClipRect.y));
                 TextureHandle* handle = (TextureHandle*)cmd.TextureId;
                 if (handle)
-                    driver->setTexture(0, g_Im->uniformTexture, *handle);
-                driver->setIndexBuffer(&tib, indexOffset, cmd.ElemCount);
-                driver->setVertexBuffer(&tvb, 0, numVertices);
-                driver->setState(state);
+                    driver->setTexture(0, g_Im->uniformTexture, *handle, TextureFlag::FromTexture);
+                driver->setTransientIndexBufferI(&tib, indexOffset, cmd.ElemCount);
+                driver->setTransientVertexBufferI(&tvb, 0, numVertices);
+                driver->setState(state, 0);
 
-                driver->submit(viewId, g_Im->progHandle);
+                driver->submit(viewId, g_Im->progHandle, 0, false);
             }
 
             indexOffset += cmd.ElemCount;
@@ -147,7 +147,7 @@ static void imguiDrawLists(ImDrawData* data)
     }
 }
 
-int termite::imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, GfxDriverI* driver, const int* keymap)
+int termite::imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, GfxApi* driver, const int* keymap)
 {
     if (g_Im) {
         assert(false);
@@ -168,14 +168,14 @@ int termite::imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, 
     imVertexPosCoordColor::init();
 
     // Create Graphic objects
-    ShaderHandle fragmentShader = driver->createShader(driver->makeRef(imgui_fso, sizeof(imgui_fso)));
+    ShaderHandle fragmentShader = driver->createShader(driver->makeRef(imgui_fso, sizeof(imgui_fso), nullptr, nullptr));
     if (!fragmentShader.isValid()) {
         BX_END_FATAL();
         T_ERROR("Creating fragment-shader failed");
         return T_ERR_FAILED;
     }
 
-    ShaderHandle vertexShader = driver->createShader(driver->makeRef(imgui_vso, sizeof(imgui_vso)));
+    ShaderHandle vertexShader = driver->createShader(driver->makeRef(imgui_vso, sizeof(imgui_vso), nullptr, nullptr));
     if (!vertexShader.isValid()) {
         BX_END_FATAL();
         T_ERROR("Creating vertex-shader failed");
@@ -189,7 +189,7 @@ int termite::imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, 
         T_ERROR("Creating GPU Program failed");
         return T_ERR_FAILED;
     }
-    g_Im->uniformTexture = driver->createUniform("u_texture", UniformType::Int1);    
+    g_Im->uniformTexture = driver->createUniform("u_texture", UniformType::Int1, 1);    
 
     // Setup ImGui
     ImGuiIO& conf = ImGui::GetIO();
@@ -224,7 +224,7 @@ int termite::imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, 
 
     g_Im->fontTexHandle = driver->createTexture2D((uint16_t)fontWidth, (uint16_t)fontHeight, 1, TextureFormat::A8, 
                                                  TextureFlag::MinPoint|TextureFlag::MagPoint, 
-                                                 driver->makeRef(fontData, fontWidth*fontHeight*bpp));
+                                                 driver->makeRef(fontData, fontWidth*fontHeight*bpp, nullptr, nullptr));
     if (!g_Im->fontTexHandle.isValid()) {
         BX_END_FATAL();
         T_ERROR("ImGui: Could not create font texture");
@@ -245,7 +245,7 @@ void termite::imguiShutdown()
         return;
 
     bx::AllocatorI* alloc = g_Im->alloc;
-    GfxDriverI* driver = g_Im->driver;
+    GfxApi* driver = g_Im->driver;
 
     ImGui::Shutdown();
 

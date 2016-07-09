@@ -56,7 +56,7 @@ namespace termite
 
 } // namespace termite
 
-MaterialLib* termite::createMaterialLib(bx::AllocatorI* alloc, GfxDriverI* driver)
+MaterialLib* termite::createMaterialLib(bx::AllocatorI* alloc, GfxApi* driver)
 {
     return nullptr;
 }

@@ -5,12 +5,12 @@
 
 namespace termite
 {
-    class GfxDriverI;
+    struct GfxApi;
     struct DebugDrawContext;
     struct VectorGfxContext;
     struct Camera;
 
-    result_t initDebugDraw(bx::AllocatorI* alloc, GfxDriverI* driver);
+    result_t initDebugDraw(bx::AllocatorI* alloc, GfxApi* driver);
     void shutdownDebugDraw();
 
     TERMITE_API DebugDrawContext* createDebugDrawContext(uint8_t viewId);

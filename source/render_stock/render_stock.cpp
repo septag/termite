@@ -16,7 +16,7 @@ class StockRenderer : public RendererI
 {
 private:
     bx::AllocatorI* m_alloc;
-    GfxDriverI* m_driver;
+    GfxApi* m_driver;
 
 public:
     StockRenderer()
@@ -25,7 +25,7 @@ public:
         m_driver = nullptr;
     }
 
-    result_t init(bx::AllocatorI* alloc, GfxDriverI* driver) override
+    result_t init(bx::AllocatorI* alloc, GfxApi* driver) override
     {
         m_alloc = alloc;
         m_driver = driver;
@@ -44,7 +44,7 @@ public:
     {
         m_driver->touch(0);
         m_driver->setViewClear(0, GfxClearFlag::Color | GfxClearFlag::Depth, 0x303030ff, 1.0f, 0);
-        m_driver->setViewRect(0, 0, 0, BackbufferRatio::Equal);
+        m_driver->setViewRectRatio(0, 0, 0, BackbufferRatio::Equal);
     }
 };
 

@@ -22,7 +22,7 @@ namespace termite
 {
     struct GfxPlatformData;
     class ResourceLib;
-    class GfxDriverI;
+    struct GfxApi;
     class IoDriverI;
     class RendererI;
     struct IoDriverDual;
@@ -97,7 +97,7 @@ namespace termite
     TERMITE_API void inputSendKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl);
 
     // Development
-    TERMITE_API GfxDriverI* getGfxDriver() T_THREAD_SAFE;
+    TERMITE_API GfxApi* getGfxDriver() T_THREAD_SAFE;
     TERMITE_API IoDriverDual* getIoDriver() T_THREAD_SAFE;
     TERMITE_API RendererI* getRenderer() T_THREAD_SAFE;
     TERMITE_API uint32_t getEngineVersion() T_THREAD_SAFE;

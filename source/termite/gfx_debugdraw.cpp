@@ -53,11 +53,11 @@ VertexDecl eddVertexPosCoordColor::Decl;
 class BX_NO_VTABLE DrawHandler
 {
 public:
-    virtual result_t init(bx::AllocatorI* alloc, GfxDriverI* driver) = 0;
+    virtual result_t init(bx::AllocatorI* alloc, GfxApi* driver) = 0;
     virtual void shutdown() = 0;
 
     virtual uint32_t getHash(const void* params) = 0;
-    virtual GfxState setStates(VectorGfxContext* ctx, GfxDriverI* driver, const void* params) = 0;
+    virtual GfxState setStates(VectorGfxContext* ctx, GfxApi* driver, const void* params) = 0;
 };
 
 struct State
@@ -77,7 +77,7 @@ namespace termite
     struct DebugDrawContext
     {
         bx::AllocatorI* alloc;
-        GfxDriverI* driver;
+        GfxApi* driver;
         uint8_t viewId;
         bx::FixedPool<State> statePool;
         State::SNode* stateStack;
@@ -124,7 +124,7 @@ struct Shape
 
 struct dbgMgr
 {
-    GfxDriverI* driver;
+    GfxApi* driver;
     bx::AllocatorI* alloc;
     ProgramHandle program;
     TextureHandle whiteTexture;
@@ -203,7 +203,7 @@ static Shape createSolidAABB()
         verts[i].color = 0xffffffff;
 
     return Shape(g_dbg->driver->createVertexBuffer(g_dbg->driver->copy(verts, sizeof(eddVertexPosCoordColor) * numVerts),
-                                                   eddVertexPosCoordColor::Decl), numVerts);
+                                                   eddVertexPosCoordColor::Decl, GpuBufferFlag::None), numVerts);
 }
 
 static Shape createAABB()
@@ -242,7 +242,7 @@ static Shape createAABB()
         verts[i].color = 0xffffffff;
 
     return Shape(g_dbg->driver->createVertexBuffer(g_dbg->driver->copy(verts, sizeof(eddVertexPosCoordColor) * numVerts),
-        eddVertexPosCoordColor::Decl), numVerts);
+        eddVertexPosCoordColor::Decl, GpuBufferFlag::None), numVerts);
 }
 
 
@@ -272,8 +272,9 @@ static Shape createBoundingSphere(int numSegs)
     for (int i = 0; i < numVerts; i++)
         verts[i].color = 0xffffffff;
 
-    return Shape(g_dbg->driver->createVertexBuffer(g_dbg->driver->copy(verts, size), eddVertexPosCoordColor::Decl),
-                 numVerts);
+    return Shape(g_dbg->driver->createVertexBuffer(
+        g_dbg->driver->copy(verts, size), eddVertexPosCoordColor::Decl, GpuBufferFlag::None),
+        numVerts);
 }
 
 static Shape createSphere(int numSegsX, int numSegsY)
@@ -373,11 +374,12 @@ static Shape createSphere(int numSegsX, int numSegsY)
     for (int i = 0; i < numVerts; i++)
         verts[i].color = 0xffffffff;
 
-    return Shape(g_dbg->driver->createVertexBuffer(g_dbg->driver->copy(verts, size), eddVertexPosCoordColor::Decl),
-                 numVerts);
+    return Shape(g_dbg->driver->createVertexBuffer(
+        g_dbg->driver->copy(verts, size), eddVertexPosCoordColor::Decl, GpuBufferFlag::None),
+        numVerts);
 }
 
-result_t termite::initDebugDraw(bx::AllocatorI* alloc, GfxDriverI* driver)
+result_t termite::initDebugDraw(bx::AllocatorI* alloc, GfxApi* driver)
 {
     if (g_dbg) {
         assert(false);
@@ -395,8 +397,8 @@ result_t termite::initDebugDraw(bx::AllocatorI* alloc, GfxDriverI* driver)
     
     // Load program
     {
-        ShaderHandle vertexShader = driver->createShader(driver->makeRef(ddraw_vso, sizeof(ddraw_vso)));
-        ShaderHandle fragmentShader = driver->createShader(driver->makeRef(ddraw_fso, sizeof(ddraw_fso)));
+        ShaderHandle vertexShader = driver->createShader(driver->makeRef(ddraw_vso, sizeof(ddraw_vso), nullptr, nullptr));
+        ShaderHandle fragmentShader = driver->createShader(driver->makeRef(ddraw_fso, sizeof(ddraw_fso), nullptr, nullptr));
         if (!vertexShader.isValid() || !fragmentShader.isValid()) {
             T_ERROR("Creating shaders failed");
             return T_ERR_FAILED;
@@ -410,9 +412,9 @@ result_t termite::initDebugDraw(bx::AllocatorI* alloc, GfxDriverI* driver)
 
     eddVertexPosCoordColor::init();
 
-    g_dbg->uTexture = driver->createUniform("u_texture", UniformType::Int1);
+    g_dbg->uTexture = driver->createUniform("u_texture", UniformType::Int1, 1);
     assert(g_dbg->uTexture.isValid());
-    g_dbg->uColor = driver->createUniform("u_color", UniformType::Vec4);
+    g_dbg->uColor = driver->createUniform("u_color", UniformType::Vec4, 1);
     assert(g_dbg->uColor.isValid());
 
     // Create a 1x1 white texture 
@@ -430,7 +432,7 @@ void termite::shutdownDebugDraw()
 {
     if (!g_dbg)
         return;
-    GfxDriverI* driver = g_dbg->driver;
+    GfxApi* driver = g_dbg->driver;
 
     if (g_dbg->bbShape.vb.isValid())
         driver->destroyVertexBuffer(g_dbg->bbShape.vb);
@@ -509,12 +511,12 @@ void termite::ddBegin(DebugDrawContext* ctx, float viewWidth, float viewHeight, 
     if (vg)
         vgBegin(ctx->vgCtx, viewWidth, viewHeight);
 
-    GfxDriverI* driver = ctx->driver;
+    GfxApi* driver = ctx->driver;
     uint8_t viewId = ctx->viewId;
     driver->touch(viewId);
     driver->setViewRect(viewId, 0, 0, uint16_t(viewWidth), uint16_t(viewHeight));
     driver->setViewSeq(viewId, false);
-    driver->setViewTransform(viewId, viewMtx.f, projMtx.f);
+    driver->setViewTransform(viewId, viewMtx.f, projMtx.f, GfxViewFlag::Stereo, nullptr);
 }
 
 void termite::ddEnd(DebugDrawContext* ctx)
@@ -620,7 +622,7 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, float spacing, float boldSpaci
     int numVerts = (xlines + ylines) * 2;
 
     // Draw
-    GfxDriverI* driver = ctx->driver;
+    GfxApi* driver = ctx->driver;
     if (!driver->checkAvailTransientVertexBuffer(numVerts, eddVertexPosCoordColor::Decl))
         return;
     TransientVertexBuffer tvb;
@@ -660,12 +662,12 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, float spacing, float boldSpaci
 
     mtx4x4_t ident = mtx4x4Ident();
 
-    driver->setVertexBuffer(&tvb);
+    driver->setTransientVertexBuffer(&tvb);
     driver->setTransform(ident.f, 1);
-    driver->setState(GfxState::RGBWrite | GfxState::DepthTestLess | GfxState::PrimitiveLines);
-    driver->setUniform(g_dbg->uColor, state->color.f);
-    driver->setTexture(0, g_dbg->uTexture, g_dbg->whiteTexture);
-    driver->submit(ctx->viewId, g_dbg->program);
+    driver->setState(GfxState::RGBWrite | GfxState::DepthTestLess | GfxState::PrimitiveLines, 0);
+    driver->setUniform(g_dbg->uColor, state->color.f, 1);
+    driver->setTexture(0, g_dbg->uTexture, g_dbg->whiteTexture, TextureFlag::FromTexture);
+    driver->submit(ctx->viewId, g_dbg->program, 0, false);
 }
 
 void termite::ddBoundingBox(DebugDrawContext* ctx, const aabb_t bb, bool showInfo /*= false*/)
@@ -683,13 +685,13 @@ void termite::ddBoundingBox(DebugDrawContext* ctx, const aabb_t bb, bool showInf
 
     Shape shape = g_dbg->bbShape;
     State* state = ctx->stateStack->data;
-    GfxDriverI* driver = g_dbg->driver;
-    driver->setVertexBuffer(shape.vb, 0, shape.numVerts);
+    GfxApi* driver = g_dbg->driver;
+    driver->setVertexBuffer(shape.vb);
     driver->setTransform(mtx.f, 1);
-    driver->setUniform(g_dbg->uColor, state->color.f);
-    driver->setState(GfxState::RGBWrite | GfxState::DepthTestLess | GfxState::PrimitiveLines);
-    driver->setTexture(0, g_dbg->uTexture, g_dbg->whiteTexture);
-    driver->submit(ctx->viewId, g_dbg->program);
+    driver->setUniform(g_dbg->uColor, state->color.f, 1);
+    driver->setState(GfxState::RGBWrite | GfxState::DepthTestLess | GfxState::PrimitiveLines, 0);
+    driver->setTexture(0, g_dbg->uTexture, g_dbg->whiteTexture, TextureFlag::FromTexture);
+    driver->submit(ctx->viewId, g_dbg->program, 0, false);
 
     if (showInfo) {
         vec2_t center2d;
@@ -718,14 +720,14 @@ void termite::ddBoundingSphere(DebugDrawContext* ctx, const sphere_t sphere, boo
     mtx = ctx->billboardMtx * mtx;
 
     State* state = ctx->stateStack->data;
-    GfxDriverI* driver = g_dbg->driver;
+    GfxApi* driver = g_dbg->driver;
     Shape shape = g_dbg->bsphereShape;
-    driver->setVertexBuffer(shape.vb, 0, shape.numVerts);
+    driver->setVertexBuffer(shape.vb);
     driver->setTransform(mtx.f, 1);
-    driver->setUniform(g_dbg->uColor, state->color.f);
-    driver->setState(GfxState::RGBWrite | GfxState::DepthTestLess | GfxState::PrimitiveLines);
-    driver->setTexture(0, g_dbg->uTexture, g_dbg->whiteTexture);
-    driver->submit(ctx->viewId, g_dbg->program);
+    driver->setUniform(g_dbg->uColor, state->color.f, 1);
+    driver->setState(GfxState::RGBWrite | GfxState::DepthTestLess | GfxState::PrimitiveLines, 0);
+    driver->setTexture(0, g_dbg->uTexture, g_dbg->whiteTexture, TextureFlag::FromTexture);
+    driver->submit(ctx->viewId, g_dbg->program, 0, false);
 
     if (showInfo) {
         vec2_t center2d;
