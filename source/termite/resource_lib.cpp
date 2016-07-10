@@ -45,7 +45,7 @@ namespace termite
     {
     public:
         ResourceLibInitFlag flags;
-        IoDriverI* driver;
+        IoDriverApi* driver;
         IoOperationMode opMode;
         bx::ArrayWithPop<ResourceTypeData> resourceTypes;
         bx::HashTableInt resourceTypesTable;    // hash(name) -> index in resourceTypes
@@ -84,7 +84,7 @@ namespace termite
 }   // namespace termite
 
 
-termite::ResourceLib* termite::createResourceLib(ResourceLibInitFlag flags, IoDriverI* driver, bx::AllocatorI* alloc)
+termite::ResourceLib* termite::createResourceLib(ResourceLibInitFlag flags, IoDriverApi* driver, bx::AllocatorI* alloc)
 {
     assert(driver);
 

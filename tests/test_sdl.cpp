@@ -288,7 +288,7 @@ int main(int argc, char* argv[])
     g_model = loadResource(nullptr, "model", "models/torus.t3d", &modelParams);
     assert(g_model.isValid());
 
-    GfxApi* driver = getGfxDriver();
+    GfxDriverApi* driver = getGfxDriver();
     g_modelProg = loadShaderProgram(driver, getIoDriver()->blocking, "shaders/test_model.vso", "shaders/test_model.fso");
     assert(g_modelProg.isValid());
     g_modelColor = driver->createUniform("u_color", UniformType::Vec4, 1);

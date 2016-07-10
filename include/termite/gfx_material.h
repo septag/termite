@@ -8,7 +8,7 @@
 namespace termite
 {
     struct MaterialLib;
-    struct GfxApi;
+    struct GfxDriverApi;
 
     struct MaterialT {};
     typedef PhantomType<uint16_t, MaterialT, UINT16_MAX> MaterialHandle;
@@ -35,7 +35,7 @@ namespace termite
         int m_count;
     };
 
-    TERMITE_API MaterialLib* createMaterialLib(bx::AllocatorI* alloc, GfxApi* driver);
+    TERMITE_API MaterialLib* createMaterialLib(bx::AllocatorI* alloc, GfxDriverApi* driver);
     TERMITE_API void destroyMaterialLib(MaterialLib* lib);
 
     TERMITE_API MaterialHandle createMaterial(MaterialLib* lib);

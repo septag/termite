@@ -28,6 +28,10 @@ add_dependencies(test_init tdriver_disk)
 
 add_dependencies(test_sdl trender_stock tdriver_disk tdriver_bgfx ${WIN_DEPS})
 
+if (WIN32)
+    add_dependencies(test_sdl SDL2CopyBinaries)
+endif()
+
 ##########
 install(TARGETS test_init RUNTIME DESTINATION bin)
 install(TARGETS test_sdl RUNTIME DESTINATION bin)

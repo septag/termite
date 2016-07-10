@@ -69,13 +69,13 @@ struct Core
 {
     UpdateCallback updateFn;
     Config conf;
-    RendererI* renderer;
+    RendererApi* renderer;
     FrameData frameData;
     double hpTimerFreq;
     bx::Pool<HeapMemoryImpl> memPool;
     bx::Lock memPoolLock;
     ResourceLib* resLib;
-    GfxApi* gfxDriver;
+    GfxDriverApi* gfxDriver;
     IoDriverDual* ioDriver;
     PageAllocator tempAlloc;
 
@@ -226,8 +226,8 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
 
         const PluginDesc& desc = getPluginDesc(pluginHandle);
         BX_BEGINP("Initializing IO Driver: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version), T_VERSION_MINOR(desc.version));
-        if (T_FAILED(g_core->ioDriver->blocking->init(g_alloc, uri, nullptr)) ||
-            T_FAILED(g_core->ioDriver->async->init(g_alloc, uri, nullptr))) 
+        if (T_FAILED(g_core->ioDriver->blocking->init(g_alloc, uri, nullptr, nullptr)) ||
+            T_FAILED(g_core->ioDriver->async->init(g_alloc, uri, nullptr, nullptr))) 
         {
             BX_END_FATAL();
             T_ERROR("Engine init failed: Initializing Async IoDriver failed");
@@ -236,6 +236,11 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
         BX_END_OK();
     }
 
+
+    if (!g_core->ioDriver) {
+        T_ERROR("Engine init failed: No IoDriver is detected");
+        return T_ERR_FAILED;
+    }
 
     BX_BEGINP("Initializing Resource Library");
     g_core->resLib = createResourceLib(ResourceLibInitFlag::HotLoading, g_core->ioDriver->async, g_alloc);
@@ -248,7 +253,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     // Graphics
     r = findPluginByName(conf.rendererName[0] ? conf.rendererName : "StockRenderer", 0, &pluginHandle, 1, PluginType::Renderer);
     if (r > 0) {
-        g_core->renderer = (RendererI*)initPlugin(pluginHandle, g_alloc);
+        g_core->renderer = (RendererApi*)initPlugin(pluginHandle, g_alloc);
         const PluginDesc& desc = getPluginDesc(pluginHandle);
         BX_TRACE("Found Renderer: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version), T_VERSION_MINOR(desc.version));
 
@@ -264,7 +269,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     if (g_core->renderer) {
         r = findPluginByName(conf.gfxName[0] ? conf.gfxName : "Bgfx", 0, &pluginHandle, 1, PluginType::GraphicsDriver);
         if (r > 0) {
-            g_core->gfxDriver = (GfxApi*)initPlugin(pluginHandle, g_alloc);
+            g_core->gfxDriver = (GfxDriverApi*)initPlugin(pluginHandle, g_alloc);
         }
 
         if (!g_core->gfxDriver) {
@@ -552,7 +557,7 @@ void termite::inputSendMouse(float mousePos[2], int mouseButtons[3], float mouse
 {
 }
 
-GfxApi* termite::getGfxDriver()
+GfxDriverApi* termite::getGfxDriver()
 {
     return g_core->gfxDriver;
 }
@@ -562,7 +567,7 @@ IoDriverDual* termite::getIoDriver()
     return g_core->ioDriver;
 }
 
-RendererI* termite::getRenderer()
+RendererApi* termite::getRenderer()
 {
     return g_core->renderer;
 }

@@ -8,7 +8,7 @@ namespace termite
 {
     struct MemoryBlock;
     class Font;
-    class IoDriverI;
+    struct IoDriverApi;
     struct Texture;
 
     enum class FontFlags : uint8_t
@@ -20,7 +20,7 @@ namespace termite
     };
 
     // Font Library
-    result_t initFontLib(bx::AllocatorI* alloc, IoDriverI* ioDriver);
+    result_t initFontLib(bx::AllocatorI* alloc, IoDriverApi* ioDriver);
     void shutdownFontLib();
 
     TERMITE_API result_t registerFont(const char* fntFilepath, const char* name, uint16_t size = 0, FontFlags flags = FontFlags::Normal);

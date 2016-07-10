@@ -17,7 +17,7 @@ using namespace termite;
 struct ImGuiImpl
 {
     bx::AllocatorI* alloc;
-    GfxApi* driver;
+    GfxDriverApi* driver;
     ProgramHandle progHandle;
     
     TextureHandle fontTexHandle;
@@ -70,7 +70,7 @@ static void imguiDrawLists(ImDrawData* data)
 {
     assert(g_Im);
 
-    GfxApi* driver = g_Im->driver;
+    GfxDriverApi* driver = g_Im->driver;
 
     float proj[16];
     float width = ImGui::GetIO().DisplaySize.x;
@@ -147,7 +147,7 @@ static void imguiDrawLists(ImDrawData* data)
     }
 }
 
-int termite::imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, GfxApi* driver, const int* keymap)
+int termite::imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, GfxDriverApi* driver, const int* keymap)
 {
     if (g_Im) {
         assert(false);
@@ -245,7 +245,7 @@ void termite::imguiShutdown()
         return;
 
     bx::AllocatorI* alloc = g_Im->alloc;
-    GfxApi* driver = g_Im->driver;
+    GfxDriverApi* driver = g_Im->driver;
 
     ImGui::Shutdown();
 

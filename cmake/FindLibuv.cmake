@@ -22,20 +22,15 @@ if(WIN32)
         )
 
         find_library(LIBUV_LIBRARY_RELEASE uv.lib PATHS ${LIBUV_LIBRARY_DIR})
-        find_library(LIBUV_LIBRARY_DEBUG uv_d.lib PATHS ${LIBUV_LIBRARY_DIR})
 
-        set(LIBUV_LIBRARY 
-            optimized   ${LIBUV_LIBRARY_RELEASE}
-            debug       ${LIBUV_LIBRARY_DEBUG}
-        )
+        set(LIBUV_LIBRARY ${LIBUV_LIBRARY_RELEASE})
 
-        if (LIBUV_LIBRARY_RELEASE AND LIBUV_LIBRARY_DEBUG AND LIBUV_INCLUDE_DIR)
+        if (LIBUV_LIBRARY_RELEASE AND LIBUV_INCLUDE_DIR)
             set(LIBUV_FOUND TRUE)
         endif()
 
         function(libuv_copy_binaries TargetDirectory)
             add_custom_target(LibuvCopyBinaries
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different ${LIBUV_ROOT_DIR}/bin/uv_d.dll  ${TargetDirectory}/uv_d.dll
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different ${LIBUV_ROOT_DIR}/bin/uv.dll    ${TargetDirectory}/uv.dll
             COMMENT "Copying Libuv binaries to '${TargetDirectory}'"
             VERBATIM)

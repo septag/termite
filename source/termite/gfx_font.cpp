@@ -93,7 +93,7 @@ struct FontItem
 
 struct FontLibrary
 {
-    IoDriverI* ioDriver;
+    IoDriverApi* ioDriver;
     bx::AllocatorI* alloc;
     bx::HashTable<FontItem*> fontTable;
     FontItem::LNode* fontList;
@@ -313,7 +313,7 @@ float termite::Font::applyKern(int glyphIdx, int nextGlyphIdx) const
     return 0;
 }
 
-result_t termite::initFontLib(bx::AllocatorI* alloc, IoDriverI* ioDriver)
+result_t termite::initFontLib(bx::AllocatorI* alloc, IoDriverApi* ioDriver)
 {
     assert(ioDriver);
     assert(alloc);

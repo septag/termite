@@ -41,34 +41,33 @@ namespace termite
     };
 
     // Backend interface for 
-    class BX_NO_VTABLE IoDriverI
+    struct IoDriverApi
     {
     public:
-        virtual result_t init(bx::AllocatorI* alloc, const char* uri, const void* params, 
-                              IoDriverEventsI* callbacks = nullptr) = 0;
-        virtual void shutdown() = 0;
+        result_t(*init)(bx::AllocatorI* alloc, const char* uri, const void* params, IoDriverEventsI* callbacks/* = nullptr*/);
+        void(*shutdown)();
 
-        virtual void setCallbacks(IoDriverEventsI* callbacks) = 0;
-        virtual IoDriverEventsI* getCallbacks() = 0;
+        void(*setCallbacks)(IoDriverEventsI* callbacks);
+        IoDriverEventsI* (*getCallbacks)();
 
-        virtual MemoryBlock* read(const char* uri) = 0;
-        virtual size_t write(const char* uri, const MemoryBlock* mem) = 0;
+        MemoryBlock* (*read)(const char* uri);
+        size_t(*write)(const char* uri, const MemoryBlock* mem);
 
-        virtual IoStream* openStream(const char* uri, IoStreamFlag flags) = 0;
-        virtual size_t writeStream(IoStream* stream, const MemoryBlock* mem) = 0;
-        virtual MemoryBlock* readStream(IoStream* stream) = 0;
-        virtual void closeStream(IoStream* stream) = 0;
+        IoStream* (*openStream)(const char* uri, IoStreamFlag flags);
+        size_t(*writeStream)(IoStream* stream, const MemoryBlock* mem);
+        MemoryBlock* (*readStream)(IoStream* stream);
+        void(*closeStream)(IoStream* stream);
 
-        virtual void runAsyncLoop() = 0;
+        void(*runAsyncLoop)();
 
-        virtual IoOperationMode getOpMode() const = 0;
-        virtual const char* getUri() const = 0;
+        IoOperationMode(*getOpMode)();
+        const char* (*getUri)();
     };
 
     // Used for plugins that support both async and blocking modes
     struct IoDriverDual
     {
-        IoDriverI* blocking;
-        IoDriverI* async;
+        IoDriverApi* blocking;
+        IoDriverApi* async;
     };
 } // namespace termite

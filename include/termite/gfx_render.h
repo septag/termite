@@ -4,15 +4,14 @@
 
 namespace termite
 {
-    struct GfxApi;
+    struct GfxDriverApi;
     struct GfxPlatformData;
 
-    class BX_NO_VTABLE RendererI
+    struct RendererApi
     {
-    public:
-        virtual result_t init(bx::AllocatorI* alloc, GfxApi* driver) = 0;
-        virtual void shutdown() = 0;
-        virtual void render(const void* renderData) = 0;
+		result_t(*init)(bx::AllocatorI* alloc, GfxDriverApi* driver);
+		void(*shutdown)();
+		void(*render)(const void* renderData);
     };
 } // namespace termite
 

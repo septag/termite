@@ -48,7 +48,7 @@ struct TextureLoader
     bx::AllocatorI* alloc;
     Texture* whiteTexture;
     Texture* asyncBlankTexture;
-    GfxApi* driver;
+    GfxDriverApi* driver;
 
     TextureLoader(bx::AllocatorI* _alloc)
     {
@@ -61,7 +61,7 @@ struct TextureLoader
 
 static TextureLoader* g_texLoader = nullptr;
 
-result_t termite::initTextureLoader(GfxApi* driver, bx::AllocatorI* alloc, int texturePoolSize)
+result_t termite::initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc, int texturePoolSize)
 {
     assert(driver);
     if (g_texLoader) {
@@ -142,7 +142,7 @@ static void stbCallbackFreeImage(void* ptr, void* userData)
 bool TextureLoaderRaw::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
 {
     assert(g_texLoader);
-    GfxApi* driver = g_texLoader->driver;
+    GfxDriverApi* driver = g_texLoader->driver;
 
     // Note: Currently we always load RGBA8 format for non-compressed textures
     int width, height, comp;
@@ -270,7 +270,7 @@ bool TextureLoaderKTX::loadObj(const MemoryBlock* mem, const ResourceTypeParams&
     if (!texture)
         return false;
 
-    GfxApi* driver = g_texLoader->driver;
+    GfxDriverApi* driver = g_texLoader->driver;
     texture->handle = driver->createTexture(driver->copy(mem->data, mem->size), texParams->flags, texParams->skipMips,
                                             &texture->info);
     if (!texture->handle.isValid())

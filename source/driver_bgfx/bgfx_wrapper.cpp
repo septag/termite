@@ -972,7 +972,7 @@ static PluginDesc* getBgfxDriverDesc()
 
 static void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 {
-    static GfxApi api;
+    static GfxDriverApi api;
     memset(&api, 0x00, sizeof(api));
     api.init = initBgfx;
     api.shutdown = shutdownBgfx;
@@ -1118,6 +1118,5 @@ T_PLUGIN_EXPORT void* termiteGetPluginApi(uint16_t apiId, uint32_t version)
         return nullptr;
     }
 }
-
 
 #endif

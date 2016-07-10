@@ -32,7 +32,7 @@ namespace termite
 
     typedef void (*gfxReleaseMemCallback)(void* ptr, void* userData);
 
-    struct GfxApi
+    struct GfxDriverApi
     {
     public:
         // Init

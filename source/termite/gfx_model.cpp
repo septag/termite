@@ -52,7 +52,7 @@ public:
 struct ModelManager
 {
     bx::AllocatorI* alloc;
-    GfxApi* driver;
+    GfxDriverApi* driver;
     ModelLoader loader;
 
     PageAllocator allocStub;
@@ -67,7 +67,7 @@ struct ModelManager
 
 static ModelManager* g_modelMgr = nullptr;
 
-result_t termite::initModelLoader(GfxApi* driver, bx::AllocatorI* alloc)
+result_t termite::initModelLoader(GfxDriverApi* driver, bx::AllocatorI* alloc)
 {
     if (g_modelMgr) {
         assert(false);
@@ -123,7 +123,7 @@ static void unloadModel(ModelImpl* model)
     if (!model)
         return;
 
-    GfxApi* driver = g_modelMgr->driver;
+    GfxDriverApi* driver = g_modelMgr->driver;
 
     if (model->indexBuffers) {
         for (int i = 0, c = model->m.numGeos; i < c; i++) {
@@ -146,7 +146,7 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const R
 
     bx::Error err;
 
-    GfxApi* driver = g_modelMgr->driver;
+    GfxDriverApi* driver = g_modelMgr->driver;
     bx::AllocatorI* alloc = &g_modelMgr->allocStub;
 
     // Create model

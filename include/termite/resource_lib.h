@@ -4,7 +4,7 @@
 
 namespace termite
 {
-    class IoDriverI;
+    struct IoDriverApi;
     class ResourceLib;
 
     struct ResourceTypeT {};
@@ -40,7 +40,7 @@ namespace termite
         virtual uintptr_t getDefaultAsyncObj() = 0;
     };
 
-    TERMITE_API ResourceLib* createResourceLib(ResourceLibInitFlag flags, IoDriverI* driver, bx::AllocatorI* alloc);
+    TERMITE_API ResourceLib* createResourceLib(ResourceLibInitFlag flags, IoDriverApi* driver, bx::AllocatorI* alloc);
     TERMITE_API void destroyResourceLib(ResourceLib* resLib);
 
     TERMITE_API ResourceTypeHandle registerResourceType(ResourceLib* resLib, const char* name, 

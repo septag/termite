@@ -49,7 +49,7 @@ public:
     virtual void writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, int maxVerts,
                                  uint16_t* indices, int firstVertIdx, int maxIndices, 
                                  int* numVertsWritten, int* numIndicesWritten) = 0;
-    virtual GfxState setStates(VectorGfxContext* ctx, GfxApi* driver, const void* params) = 0;
+    virtual GfxState setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) = 0;
 };
 
 struct Batch
@@ -84,7 +84,7 @@ namespace termite
     struct VectorGfxContext
     {
         bx::AllocatorI* alloc;
-        GfxApi* driver;
+        GfxDriverApi* driver;
         uint8_t viewId;
 
         vgVertexPosCoordColor* vertexBuff;
@@ -147,7 +147,7 @@ public:
     void writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, int maxVerts,
                          uint16_t* indices, int firstVertIdx, int maxIndices, 
                          int* numVertsWritten, int* numIndicesWritten) override;
-    GfxState setStates(VectorGfxContext* ctx, GfxApi* driver, const void* params) override;
+    GfxState setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) override;
 };
 
 struct RectParams : public BatchParams
@@ -164,12 +164,12 @@ public:
     void writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, int maxVerts,
         uint16_t* indices, int firstVertIdx, int maxIndices,
         int* numVertsWritten, int* numIndicesWritten) override;
-    GfxState setStates(VectorGfxContext* ctx, GfxApi* driver, const void* params) override;
+    GfxState setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) override;
 };
 
 struct VgMgr
 {
-    GfxApi* driver;
+    GfxDriverApi* driver;
     bx::AllocatorI* alloc;
     ProgramHandle program;
     TextureHandle whiteTexture;
@@ -257,7 +257,7 @@ static void setDefaultState(VectorGfxContext* ctx, State* state)
 
 static void drawBatches(VectorGfxContext* ctx)
 {
-    GfxApi* driver = ctx->driver;
+    GfxDriverApi* driver = ctx->driver;
     GfxState baseState = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::CullCCW;
 
     uint8_t viewId = ctx->viewId;
@@ -311,7 +311,7 @@ static void drawBatches(VectorGfxContext* ctx)
     }
 }
 
-result_t termite::initVectorGfx(bx::AllocatorI* alloc, GfxApi* driver)
+result_t termite::initVectorGfx(bx::AllocatorI* alloc, GfxDriverApi* driver)
 {
     assert(driver);
     if (g_vg) {
@@ -741,7 +741,7 @@ void TextHandler::writePrimitives(VectorGfxContext* ctx, const void* params, vgV
     *numIndicesWritten = indexIdx;
 }
 
-GfxState TextHandler::setStates(VectorGfxContext* ctx, GfxApi* driver, const void* params)
+GfxState TextHandler::setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params)
 {
     const TextParams* textParams = (const TextParams*)params;
     Texture* texture = textParams->font->getTexture();
@@ -810,7 +810,7 @@ void RectHandler::writePrimitives(VectorGfxContext* ctx, const void* params, vgV
     *numIndicesWritten = indexIdx;
 }
 
-GfxState RectHandler::setStates(VectorGfxContext* ctx, GfxApi* driver, const void* params)
+GfxState RectHandler::setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params)
 {
     const RectParams* rectParams = (const RectParams*)params;
     Texture* texture = rectParams->image;

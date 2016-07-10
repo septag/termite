@@ -12,45 +12,43 @@ using namespace termite;
 
 static CoreApi_v0* g_core = nullptr;
 
-class StockRenderer : public RendererI
+struct StockRenderer
 {
-private:
-    bx::AllocatorI* m_alloc;
-    GfxApi* m_driver;
+	bx::AllocatorI* alloc;
+	GfxDriverApi* driver;
 
-public:
-    StockRenderer()
-    {
-        m_alloc = nullptr;
-        m_driver = nullptr;
-    }
-
-    result_t init(bx::AllocatorI* alloc, GfxApi* driver) override
-    {
-        m_alloc = alloc;
-        m_driver = driver;
-
-        const Config& conf = g_core->getConfig();
-        driver->reset(conf.gfxWidth, conf.gfxHeight, GfxResetFlag(conf.gfxDriverFlags));
-
-        return 0;
-    }
-
-    void shutdown() override
-    {
-    }
-
-    void render(const void* renderData) override
-    {
-        m_driver->touch(0);
-        m_driver->setViewClear(0, GfxClearFlag::Color | GfxClearFlag::Depth, 0x303030ff, 1.0f, 0);
-        m_driver->setViewRectRatio(0, 0, 0, BackbufferRatio::Equal);
-    }
+	StockRenderer()
+	{
+		alloc = nullptr;
+		driver = nullptr;
+	}
 };
 
-#ifdef termite_SHARED_LIB
-static StockRenderer g_stockRenderer;
+static StockRenderer g_sr;
 
+static result_t initRenderer(bx::AllocatorI* alloc, GfxDriverApi* driver)
+{
+    g_sr.alloc = alloc;
+    g_sr.driver = driver;
+
+    const Config& conf = g_core->getConfig();
+    driver->reset(conf.gfxWidth, conf.gfxHeight, GfxResetFlag(conf.gfxDriverFlags));
+
+    return 0;
+}
+
+static void shutdownRenderer()
+{
+}
+
+static void render(const void* renderData)
+{
+    g_sr.driver->touch(0);
+    g_sr.driver->setViewClear(0, GfxClearFlag::Color | GfxClearFlag::Depth, 0x303030ff, 1.0f, 0);
+    g_sr.driver->setViewRectRatio(0, 0, 0, BackbufferRatio::Equal);
+}
+
+#ifdef termite_SHARED_LIB
 static PluginDesc* getStockRendererDesc()
 {
     static PluginDesc desc;
@@ -67,7 +65,12 @@ static void* initStockRenderer(bx::AllocatorI* alloc, GetApiFunc getApi)
     if (!g_core)
         return nullptr;
 
-    return &g_stockRenderer;
+	static RendererApi api;
+	api.init = initRenderer;
+	api.shutdown = shutdownRenderer;
+	api.render = render;
+
+    return &api;
 }
 
 static void shutdownStockRenderer()

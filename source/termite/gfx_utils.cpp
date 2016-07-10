@@ -25,9 +25,9 @@ VertexDecl VertexFs::Decl;
 
 static VertexBufferHandle g_fsVb;
 static IndexBufferHandle g_fsIb;
-static GfxApi* g_driver = nullptr;
+static GfxDriverApi* g_driver = nullptr;
 
-result_t termite::initGfxUtils(GfxApi* driver)
+result_t termite::initGfxUtils(GfxDriverApi* driver)
 {
     VertexFs::init();
     static VertexFs fsQuad[] = {
@@ -113,10 +113,10 @@ static void releaseMemoryBlockCallback(void* ptr, void* userData)
     releaseMemoryBlock((MemoryBlock*)userData);
 }
 
-ProgramHandle termite::loadShaderProgram(GfxApi* gfxDriver, IoDriverI* ioDriver, const char* vsFilepath, 
+ProgramHandle termite::loadShaderProgram(GfxDriverApi* gfxDriver, IoDriverApi* ioDriver, const char* vsFilepath, 
                                          const char* fsFilepath)
 {
-    GfxApi* driver = gfxDriver;
+    GfxDriverApi* driver = gfxDriver;
     MemoryBlock* vso = ioDriver->read(vsFilepath);
     if (!vso) {
         T_ERROR("Opening file '%s' failed", vsFilepath);
@@ -143,7 +143,7 @@ void termite::drawFullscreenQuad(uint8_t viewId, ProgramHandle prog)
     assert(g_fsIb.isValid());
     assert(g_fsVb.isValid());
 
-    GfxApi* driver = g_driver;
+    GfxDriverApi* driver = g_driver;
 
     driver->setVertexBuffer(g_fsVb);
     driver->setIndexBuffer(g_fsIb, 0, 6);

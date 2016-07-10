@@ -53,11 +53,11 @@ VertexDecl eddVertexPosCoordColor::Decl;
 class BX_NO_VTABLE DrawHandler
 {
 public:
-    virtual result_t init(bx::AllocatorI* alloc, GfxApi* driver) = 0;
+    virtual result_t init(bx::AllocatorI* alloc, GfxDriverApi* driver) = 0;
     virtual void shutdown() = 0;
 
     virtual uint32_t getHash(const void* params) = 0;
-    virtual GfxState setStates(VectorGfxContext* ctx, GfxApi* driver, const void* params) = 0;
+    virtual GfxState setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) = 0;
 };
 
 struct State
@@ -77,7 +77,7 @@ namespace termite
     struct DebugDrawContext
     {
         bx::AllocatorI* alloc;
-        GfxApi* driver;
+        GfxDriverApi* driver;
         uint8_t viewId;
         bx::FixedPool<State> statePool;
         State::SNode* stateStack;
@@ -124,7 +124,7 @@ struct Shape
 
 struct dbgMgr
 {
-    GfxApi* driver;
+    GfxDriverApi* driver;
     bx::AllocatorI* alloc;
     ProgramHandle program;
     TextureHandle whiteTexture;
@@ -379,7 +379,7 @@ static Shape createSphere(int numSegsX, int numSegsY)
         numVerts);
 }
 
-result_t termite::initDebugDraw(bx::AllocatorI* alloc, GfxApi* driver)
+result_t termite::initDebugDraw(bx::AllocatorI* alloc, GfxDriverApi* driver)
 {
     if (g_dbg) {
         assert(false);
@@ -432,7 +432,7 @@ void termite::shutdownDebugDraw()
 {
     if (!g_dbg)
         return;
-    GfxApi* driver = g_dbg->driver;
+    GfxDriverApi* driver = g_dbg->driver;
 
     if (g_dbg->bbShape.vb.isValid())
         driver->destroyVertexBuffer(g_dbg->bbShape.vb);
@@ -511,7 +511,7 @@ void termite::ddBegin(DebugDrawContext* ctx, float viewWidth, float viewHeight, 
     if (vg)
         vgBegin(ctx->vgCtx, viewWidth, viewHeight);
 
-    GfxApi* driver = ctx->driver;
+    GfxDriverApi* driver = ctx->driver;
     uint8_t viewId = ctx->viewId;
     driver->touch(viewId);
     driver->setViewRect(viewId, 0, 0, uint16_t(viewWidth), uint16_t(viewHeight));
@@ -622,7 +622,7 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, float spacing, float boldSpaci
     int numVerts = (xlines + ylines) * 2;
 
     // Draw
-    GfxApi* driver = ctx->driver;
+    GfxDriverApi* driver = ctx->driver;
     if (!driver->checkAvailTransientVertexBuffer(numVerts, eddVertexPosCoordColor::Decl))
         return;
     TransientVertexBuffer tvb;
@@ -685,7 +685,7 @@ void termite::ddBoundingBox(DebugDrawContext* ctx, const aabb_t bb, bool showInf
 
     Shape shape = g_dbg->bbShape;
     State* state = ctx->stateStack->data;
-    GfxApi* driver = g_dbg->driver;
+    GfxDriverApi* driver = g_dbg->driver;
     driver->setVertexBuffer(shape.vb);
     driver->setTransform(mtx.f, 1);
     driver->setUniform(g_dbg->uColor, state->color.f, 1);
@@ -720,7 +720,7 @@ void termite::ddBoundingSphere(DebugDrawContext* ctx, const sphere_t sphere, boo
     mtx = ctx->billboardMtx * mtx;
 
     State* state = ctx->stateStack->data;
-    GfxApi* driver = g_dbg->driver;
+    GfxDriverApi* driver = g_dbg->driver;
     Shape shape = g_dbg->bsphereShape;
     driver->setVertexBuffer(shape.vb);
     driver->setTransform(mtx.f, 1);

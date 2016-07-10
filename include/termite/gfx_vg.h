@@ -4,12 +4,12 @@
 
 namespace termite
 {
-    struct GfxApi;
+    struct GfxDriverApi;
     struct VectorGfxContext;
     class Font;
     struct Texture;
 
-    result_t initVectorGfx(bx::AllocatorI* alloc, GfxApi* driver);
+    result_t initVectorGfx(bx::AllocatorI* alloc, GfxDriverApi* driver);
     void shutdownVectorGfx();
 
     TERMITE_API VectorGfxContext* createVectorGfxContext(uint8_t viewId, int maxVerts = 0, int maxBatches = 0);
