@@ -20,9 +20,8 @@ if (UNIX)
 endif()
 
 target_link_libraries(termite 
-    PRIVATE fcontext
+    PRIVATE fcontext imgui_impl
     PUBLIC bx ${POSIX_LIBS})
-
 #
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)
 target_include_directories(termite PUBLIC ${TERMITE_INCLUDE_DIR} ${DEP_ROOT_DIR})

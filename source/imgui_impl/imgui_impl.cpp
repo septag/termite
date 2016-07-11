@@ -147,7 +147,8 @@ static void imguiDrawLists(ImDrawData* data)
     }
 }
 
-int termite::imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, GfxDriverApi* driver, const int* keymap)
+int termite::initImGui(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, GfxDriverApi* driver,
+					   bx::AllocatorI* alloc, const int* keymap)
 {
     if (g_Im) {
         assert(false);
@@ -156,7 +157,6 @@ int termite::imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, 
 
     BX_BEGINP("Initializing ImGui Integration");
 
-    bx::AllocatorI* alloc = getHeapAlloc();
     g_Im = BX_NEW(alloc, ImGuiImpl);
     if (!g_Im) {
         BX_END_FATAL();
@@ -171,22 +171,18 @@ int termite::imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, 
     ShaderHandle fragmentShader = driver->createShader(driver->makeRef(imgui_fso, sizeof(imgui_fso), nullptr, nullptr));
     if (!fragmentShader.isValid()) {
         BX_END_FATAL();
-        T_ERROR("Creating fragment-shader failed");
         return T_ERR_FAILED;
     }
 
     ShaderHandle vertexShader = driver->createShader(driver->makeRef(imgui_vso, sizeof(imgui_vso), nullptr, nullptr));
     if (!vertexShader.isValid()) {
         BX_END_FATAL();
-        T_ERROR("Creating vertex-shader failed");
         return T_ERR_FAILED;
     }
-
 
     g_Im->progHandle = driver->createProgram(vertexShader, fragmentShader, true);
     if (!g_Im->progHandle.isValid()) {
         BX_END_FATAL();
-        T_ERROR("Creating GPU Program failed");
         return T_ERR_FAILED;
     }
     g_Im->uniformTexture = driver->createUniform("u_texture", UniformType::Int1, 1);    
@@ -227,7 +223,6 @@ int termite::imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, 
                                                  driver->makeRef(fontData, fontWidth*fontHeight*bpp, nullptr, nullptr));
     if (!g_Im->fontTexHandle.isValid()) {
         BX_END_FATAL();
-        T_ERROR("ImGui: Could not create font texture");
         return T_ERR_FAILED;
     }
     conf.Fonts->TexID = (void*)&g_Im->fontTexHandle;
@@ -238,7 +233,7 @@ int termite::imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, 
     return 0;
 }
 
-void termite::imguiShutdown()
+void termite::shutdownImGui()
 {
     //
     if (!g_Im)

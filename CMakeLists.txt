@@ -181,6 +181,7 @@ set_target_properties(animc PROPERTIES FOLDER Tools)
 add_subdirectory(tests)
 set_target_properties(test_init PROPERTIES FOLDER Tests)
 set_target_properties(test_sdl PROPERTIES FOLDER Tests)
+set_target_properties(test_gui PROPERTIES FOLDER Tests)
 
 # copy binaries
 if (WIN32)

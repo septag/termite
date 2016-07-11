@@ -4,6 +4,7 @@
 
 namespace termite
 {
-    int imguiInit(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, GfxDriverApi* driver, const int* keymap = nullptr);
-    void imguiShutdown();
+    int initImGui(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, GfxDriverApi* driver, bx::AllocatorI* alloc, 
+				  const int* keymap);
+    void shutdownImGui();
 } // namespace termite

@@ -22,6 +22,7 @@
 #include "job_dispatcher.h"
 #include "memory_pool.h"
 #include "plugin_system.h"
+#include "../imgui_impl/imgui_impl.h"
 
 #define STB_LEAKCHECK_IMPLEMENTATION
 #include "bxx/leakcheck_allocator.h"
@@ -38,6 +39,7 @@
 #include <random>
 
 #define MEM_POOL_BUCKET_SIZE 256
+#define IMGUI_VIEWID 255
 
 using namespace termite;
 
@@ -328,6 +330,12 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
             T_ERROR("Initializing Graphics Utilities failed");
             return T_ERR_FAILED;
         }
+
+		// ImGui initialize
+		if (T_FAILED(initImGui(IMGUI_VIEWID, conf.gfxWidth, conf.gfxHeight, g_core->gfxDriver, g_alloc, conf.keymap)))	{
+			T_ERROR("Initializing ImGui failed");
+			return T_ERR_FAILED;
+		}		
     }
 
     // Job Dispatcher
@@ -349,7 +357,7 @@ void termite::shutdown()
     }
 
     shutdownJobDispatcher();
-
+	shutdownImGui();
     shutdownDebugDraw();
     shutdownVectorGfx();
     shutdownFontLib();
@@ -413,8 +421,12 @@ void termite::doFrame()
     if (g_core->renderer)
         g_core->renderer->render(nullptr);
 
+	ImGui::NewFrame();
+
     if (g_core->updateFn)
         g_core->updateFn(float(dt));
+
+	ImGui::Render();
 
     if (g_core->ioDriver->async)
         g_core->ioDriver->async->runAsyncLoop();
@@ -547,14 +559,35 @@ int termite::getRandomIntUniform(int a, int b)
 
 void termite::inputSendChars(const char* chars)
 {
+	ImGuiIO& io = ImGui::GetIO();
+
+	int i = 0;
+	char c;
+	while ((c = chars[i++]) > 0) {
+		io.AddInputCharacter(chars[c]);
+		i++;
+	}
 }
 
 void termite::inputSendKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl)
 {
+	ImGuiIO& io = ImGui::GetIO();
+	memcpy(io.KeysDown, keysDown, sizeof(keysDown));
+	io.KeyShift = shift;
+	io.KeyAlt = alt;
+	io.KeyCtrl = ctrl;
 }
 
 void termite::inputSendMouse(float mousePos[2], int mouseButtons[3], float mouseWheel)
 {
+	ImGuiIO& io = ImGui::GetIO();
+	io.MousePos = ImVec2(mousePos[0], mousePos[1]);
+
+	io.MouseDown[0] = mouseButtons[0] ? true : false;
+	io.MouseDown[1] = mouseButtons[1] ? true : false;
+	io.MouseDown[2] = mouseButtons[2] ? true : false;
+
+	io.MouseWheel = mouseWheel;
 }
 
 GfxDriverApi* termite::getGfxDriver()
