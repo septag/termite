@@ -22,6 +22,8 @@
 #include "job_dispatcher.h"
 #include "memory_pool.h"
 #include "plugin_system.h"
+#include "component_system.h"
+
 #include "../imgui_impl/imgui_impl.h"
 
 #define STB_LEAKCHECK_IMPLEMENTATION
@@ -80,12 +82,14 @@ struct Core
     GfxDriverApi* gfxDriver;
     IoDriverDual* ioDriver;
     PageAllocator tempAlloc;
+	PageAllocator componentAlloc;
 
     std::random_device randDevice;
     std::mt19937 randEngine;
 
     Core() :
         tempAlloc(T_MID_TEMP),
+		componentAlloc(T_MID_COMPONENT),
         randEngine(randDevice())
     {
         gfxDriver = nullptr;
@@ -297,7 +301,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
             T_ERROR("Core init failed: Could not initialize Renderer");
             return T_ERR_FAILED;
         }
-        BX_END_OK();
+		BX_END_OK();
 
         // Init and Register graphics resource loaders
         initTextureLoader(g_core->gfxDriver, g_alloc);
@@ -339,10 +343,23 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     }
 
     // Job Dispatcher
+	BX_BEGINP("Initializing Job Dispatcher");
     if (initJobDispatcher(g_alloc, 0, 0, 0, 0, false)) {
         T_ERROR("Core init failed: Job Dispatcher init failed");
+		BX_END_FATAL();
         return T_ERR_FAILED;
     }
+	BX_END_OK();
+	BX_TRACE("%d Worker threads spawned", getNumWorkerThreads());
+
+	// Component System
+	BX_BEGINP("Initializing Component System");
+	if (T_FAILED(initComponentSystem(&g_core->componentAlloc))) {
+		T_ERROR("Core init failed: Could not initialize component-system");
+		BX_END_FATAL();
+		return T_ERR_FAILED;
+	}
+	BX_END_OK();
 
     g_core->hpTimerFreq = bx::getHPFrequency();
 
@@ -356,7 +373,14 @@ void termite::shutdown()
         return;
     }
 
+	BX_BEGINP("Shutting down Component System");
+	shutdownComponentSystem();
+	BX_END_OK();
+
+	BX_BEGINP("Shutting down Job Dispatcher");
     shutdownJobDispatcher();
+	BX_END_OK();
+
 	shutdownImGui();
     shutdownDebugDraw();
     shutdownVectorGfx();

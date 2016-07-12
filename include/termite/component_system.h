@@ -48,12 +48,12 @@ namespace termite
     typedef PhantomType<uint32_t, ComponentT, UINT32_MAX> ComponentHandle;
 
     // Entity Management
-    EntityManager* createEntityManager(bx::AllocatorI* alloc, int bufferSize = 0);
-    void destroyEntityManager(EntityManager* emgr);
+    TERMITE_API EntityManager* createEntityManager(bx::AllocatorI* alloc, int bufferSize = 0);
+    TERMITE_API void destroyEntityManager(EntityManager* emgr);
 
-    Entity createEntity(EntityManager* emgr);
-    void destroyEntity(EntityManager* emgr, Entity ent);
-    bool isEntityAlive(EntityManager* emgr, Entity ent);
+	TERMITE_API Entity createEntity(EntityManager* emgr);
+	TERMITE_API void destroyEntity(EntityManager* emgr, Entity ent);
+	TERMITE_API bool isEntityAlive(EntityManager* emgr, Entity ent);
 
     // Component System
     result_t initComponentSystem(bx::AllocatorI* alloc);
@@ -74,19 +74,19 @@ namespace termite
         ImmediateDestroy = 0x01   // Destroys component immediately after owner entity is destroyed
     };
 
-    ComponentTypeHandle registerComponentType(const char* name, uint32_t id, 
-                                              ComponentCallbacks* callbacks, ComponentFlag flags,
-                                              uint32_t dataSize, uint16_t poolSize, uint16_t growSize);
-    void garbageCollectComponents(EntityManager* emgr);
+	TERMITE_API ComponentTypeHandle registerComponentType(const char* name, uint32_t id,
+							                              const ComponentCallbacks* callbacks, ComponentFlag flags,
+										                  uint32_t dataSize, uint16_t poolSize, uint16_t growSize);
+	TERMITE_API void garbageCollectComponents(EntityManager* emgr);
 
-    ComponentHandle createComponent(Entity ent, ComponentTypeHandle handle);
-    void destroyComponent(Entity ent, ComponentHandle handle);
+	TERMITE_API ComponentHandle createComponent(Entity ent, ComponentTypeHandle handle);
+	TERMITE_API void destroyComponent(Entity ent, ComponentHandle handle);
 
-    ComponentTypeHandle findComponentTypeByName(const char* name);
-    ComponentTypeHandle findComponentTypeById(uint32_t id);
-    ComponentHandle getComponent(ComponentTypeHandle handle, Entity ent);
-    //int getComponents(ComponentTypeHandle handle, Entity ent, ComponentHandle* handles, int maxHandles);
-    void* getComponentData(ComponentHandle handle);
+	TERMITE_API ComponentTypeHandle findComponentTypeByName(const char* name);
+	TERMITE_API ComponentTypeHandle findComponentTypeById(uint32_t id);
+	TERMITE_API ComponentHandle getComponent(ComponentTypeHandle handle, Entity ent);
+	TERMITE_API void* getComponentData(ComponentHandle handle);
+	TERMITE_API uint16_t getAllComponents(ComponentTypeHandle typeHandle, ComponentHandle* handles, uint16_t maxComponents);
 
     template <typename Ty> 
     Ty* getComponentData(ComponentHandle handle)

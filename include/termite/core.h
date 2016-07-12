@@ -17,6 +17,7 @@
 #define T_THREAD_SAFE
 
 #define T_MID_TEMP 0x01
+#define T_MID_COMPONENT 0x02
 
 namespace termite
 {

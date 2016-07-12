@@ -128,7 +128,8 @@ static void update(float dt)
     g_input.mouseWheel = 0.0f;
 
     vgBegin(g_vg, WINDOW_WIDTH, WINDOW_HEIGHT);
-    // Camera look/movement
+    
+	// Camera look/movement
     const float moveSpeed = 5.0f;
     const float lookSpeed = 3.0f;
 

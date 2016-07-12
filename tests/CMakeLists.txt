@@ -29,7 +29,9 @@ target_include_directories(test_gui PUBLIC ${SDL2_INCLUDE_DIR})
 target_link_libraries(test_gui termite ${SDL2_LIBRARY})
 
 # test_component
-
+add_executable(test_component "test_component.cpp")
+target_include_directories(test_component PUBLIC ${SDL2_INCLUDE_DIR})
+target_link_libraries(test_component termite ${SDL2_LIBRARY})
 
 # Require plugins to be built
 add_dependencies(test_init tdriver_disk)

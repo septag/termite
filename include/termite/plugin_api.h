@@ -360,6 +360,39 @@ namespace termite
 
 		bool (*beginChildFrame)(ImGuiID id, const ImVec2& size, ImGuiWindowFlags extra_flags/* = 0*/);	// helper to create a child window / scrolling region that looks like a normal widget frame
 		void (*endChildFrame)();
+
+		bool (*isMouseHoveringWindow)();
+		bool (*isMouseHoveringAnyWindow)();
 	};
 }
+#endif
+
+#ifdef T_COMPONENT_API
+#include "component_system.h"
+
+namespace termite
+{
+	struct ComponentApi_v0
+	{
+		EntityManager* (*createEntityManager)(bx::AllocatorI* alloc, int bufferSize/* = 0*/);
+		void (*destroyEntityManager)(EntityManager* emgr);
+
+		Entity (*createEntity)(EntityManager* emgr);
+		void (*destroyEntity)(EntityManager* emgr, Entity ent);
+		bool (*isEntityAlive)(EntityManager* emgr, Entity ent);
+
+		ComponentTypeHandle (*registerComponentType)(const char* name, uint32_t id,
+													 const ComponentCallbacks* callbacks, ComponentFlag flags,
+													 uint32_t dataSize, uint16_t poolSize, uint16_t growSize);
+		ComponentHandle (*createComponent)(Entity ent, ComponentTypeHandle handle);
+		void (*destroyComponent)(Entity ent, ComponentHandle handle);
+
+		ComponentTypeHandle (*findComponentTypeByName)(const char* name);
+		ComponentTypeHandle (*findComponentTypeById)(uint32_t id);
+		ComponentHandle (*getComponent)(ComponentTypeHandle handle, Entity ent);
+		void* (*getComponentData)(ComponentHandle handle);
+
+		void (*garbageCollectComponents)(EntityManager* emgr);
+	};
+} // namespace termite
 #endif

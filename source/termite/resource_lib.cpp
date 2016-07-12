@@ -54,6 +54,7 @@ namespace termite
         bx::ArrayWithPop<AsyncLoadRequest> asyncLoads;
         bx::HashTableInt asyncLoadsTable;       // hash(uri) -> index in asyncLoads
         bx::MultiHashTableInt hotLoadsTable;    // hash(uri) -> list of indexes in resources
+		bx::Pool<bx::MultiHashTableInt::Node> hotLoadsNodePool;
         bx::AllocatorI* alloc;
 
     public:
@@ -86,35 +87,36 @@ namespace termite
 
 termite::ResourceLib* termite::createResourceLib(ResourceLibInitFlag flags, IoDriverApi* driver, bx::AllocatorI* alloc)
 {
-    assert(driver);
+	assert(driver);
 
-    ResourceLib* resLib = BX_NEW(alloc, ResourceLib)(alloc);
-    if (!resLib)
-        return nullptr;
+	ResourceLib* resLib = BX_NEW(alloc, ResourceLib)(alloc);
+	if (!resLib)
+		return nullptr;
 
-    resLib->driver = driver;   
-    resLib->opMode = driver->getOpMode();
-    resLib->flags = flags;
+	resLib->driver = driver;
+	resLib->opMode = driver->getOpMode();
+	resLib->flags = flags;
 
-    if (resLib->opMode == IoOperationMode::Async)   
-        driver->setCallbacks(resLib);
+	if (resLib->opMode == IoOperationMode::Async)
+		driver->setCallbacks(resLib);
 
-    if (!resLib->resourceTypes.create(20, 20, alloc) || !resLib->resourceTypesTable.create(20, alloc)) {
-        destroyResourceLib(resLib);
-        return nullptr;
-    }
+	if (!resLib->resourceTypes.create(20, 20, alloc) || !resLib->resourceTypesTable.create(20, alloc)) {
+		destroyResourceLib(resLib);
+		return nullptr;
+	}
 
-    if (!resLib->resources.create(512, 2048, alloc) || !resLib->resourcesTable.create(512, alloc)) {
-        destroyResourceLib(resLib);
-        return nullptr;
-    }
+	if (!resLib->resources.create(512, 2048, alloc) || !resLib->resourcesTable.create(512, alloc)) {
+		destroyResourceLib(resLib);
+		return nullptr;
+	}
 
-    if (!resLib->asyncLoads.create(128, 256, alloc) || !resLib->asyncLoadsTable.create(256, alloc)) {
-        destroyResourceLib(resLib);
-        return nullptr;
-    }
+	if (!resLib->asyncLoads.create(128, 256, alloc) || !resLib->asyncLoadsTable.create(256, alloc)) {
+		destroyResourceLib(resLib);
+		return nullptr;
+	}
 
-    if (!resLib->hotLoadsTable.create(128, alloc, alloc)) {
+	if (!resLib->hotLoadsNodePool.create(128, alloc) ||
+		!resLib->hotLoadsTable.create(128, alloc, &resLib->hotLoadsNodePool)) {
         destroyResourceLib(resLib);
         return nullptr;
     }
@@ -132,6 +134,7 @@ void termite::destroyResourceLib(ResourceLib* resLib)
     }
 
     resLib->hotLoadsTable.destroy();
+	resLib->hotLoadsNodePool.destroy();
 
     resLib->asyncLoads.destroy();
     resLib->asyncLoadsTable.destroy();

@@ -29,10 +29,15 @@ namespace bx
 
         void* getData(int bufferIdx);
         void* getHandleData(int bufferIdx, uint16_t handle);
-        uint16_t getCount()
+        uint16_t getCount() const
         {
             return m_partition;
         }
+
+		const uint16_t* getIndices() const
+		{
+			return m_indices;
+		}
 
         template<typename _T>
         inline _T* getData(int bufferIdx)

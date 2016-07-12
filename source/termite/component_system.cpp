@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "component_system.h"
 
+#include "bx/uint32_t.h"
 #include "bxx/array.h"
 #include "bxx/pool.h"
 #include "bxx/queue.h"
@@ -39,6 +40,7 @@ namespace termite
         bx::Array<uint8_t> generations;
         bx::AllocatorI* alloc;
         bx::MultiHashTableInt destroyTable; // keep a multi-hash for all components that entity has to destroy
+		bx::Pool<bx::MultiHashTableInt::Node> nodePool;
         
         EntityManager(bx::AllocatorI* _alloc) : 
             alloc(_alloc),
@@ -97,7 +99,8 @@ EntityManager* termite::createEntityManager(bx::AllocatorI* alloc, int bufferSiz
         bufferSize = MIN_FREE_INDICES;
     if (!emgr->generations.create(bufferSize, bufferSize, alloc) ||
         !emgr->freeIndexPool.create(bufferSize, alloc) ||
-        !emgr->destroyTable.create(bufferSize, alloc, alloc))
+		!emgr->nodePool.create(bufferSize, alloc) ||
+        !emgr->destroyTable.create(bufferSize, alloc, &emgr->nodePool))
     {
         destroyEntityManager(emgr);
         return nullptr;
@@ -111,6 +114,7 @@ void termite::destroyEntityManager(EntityManager* emgr)
     assert(emgr);
 
     emgr->freeIndexPool.destroy();
+	emgr->nodePool.destroy();
     emgr->generations.destroy();
     emgr->destroyTable.destroy();
 
@@ -173,27 +177,21 @@ result_t termite::initComponentSystem(bx::AllocatorI* alloc)
         return T_ERR_ALREADY_INITIALIZED;
     }
 
-    BX_BEGINP("Initializing Component System");
     g_csys = BX_NEW(alloc, ComponentSystem)(alloc);
     if (!g_csys) {
-        BX_END_FATAL();
         return T_ERR_OUTOFMEM;
     }
 
     if (!g_csys->components.create(32, 128, alloc)) {
-        BX_END_FATAL();
         return T_ERR_OUTOFMEM;
     }
 
     if (!g_csys->nameTable.create(128, alloc) ||
         !g_csys->idTable.create(128, alloc))
     {
-        BX_END_FATAL();
         return T_ERR_OUTOFMEM;
     }
 
-
-    BX_END_OK();
     return 0;
 }
 
@@ -211,10 +209,9 @@ void termite::shutdownComponentSystem()
     g_csys->components.destroy();
     g_csys->nameTable.destroy();
     g_csys->idTable.destroy();
-    BX_END_OK();
 }
 
-ComponentTypeHandle termite::registerComponentType(const char* name, uint32_t id, ComponentCallbacks* callbacks, 
+ComponentTypeHandle termite::registerComponentType(const char* name, uint32_t id, const ComponentCallbacks* callbacks, 
                                                    ComponentFlag flags, uint32_t dataSize, uint16_t poolSize, 
                                                    uint16_t growSize)
 {
@@ -230,7 +227,7 @@ ComponentTypeHandle termite::registerComponentType(const char* name, uint32_t id
     bx::strlcpy(ctype->name, name, sizeof(ctype->name));
     ctype->id = id;
     if (callbacks)
-        memcpy(&ctype->callbacks, &callbacks, sizeof(ComponentCallbacks));
+        memcpy(&ctype->callbacks, callbacks, sizeof(ComponentCallbacks));
     ctype->flags = flags;
     ctype->dataSize = dataSize;
     const uint32_t itemSizes[2] = {sizeof(Entity), dataSize};
@@ -350,3 +347,21 @@ void* termite::getComponentData(ComponentHandle handle)
     ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handle)];
     return ctype.dataPool.getHandleData(1, COMPONENT_INSTANCE_INDEX(handle));    
 }
+
+uint16_t termite::getAllComponents(ComponentTypeHandle typeHandle, ComponentHandle* handles, uint16_t maxComponents)
+{
+	assert(typeHandle.isValid());
+
+	const ComponentType& ctype = g_csys->components[typeHandle.value];
+	const uint16_t* indices = ctype.dataPool.getIndices();
+	uint16_t count = ctype.dataPool.getCount();
+
+	count = bx::uint32_min(count, maxComponents);
+
+	for (uint16_t i = 0; i < count; i++) {
+		handles[i] = COMPONENT_MAKE_HANDLE(typeHandle.value, indices[i]);
+	}
+
+	return count;
+}
+

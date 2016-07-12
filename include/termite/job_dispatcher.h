@@ -40,7 +40,7 @@ namespace termite
                            uint16_t maxBigFibers = 0, uint32_t bigFiberStackSize = 0,
                            bool lockThreadsToCores = true, uint8_t numWorkerThreads = UINT8_MAX);
     void shutdownJobDispatcher();
-    
+	uint8_t getNumWorkerThreads();    
 } // namespace termite
 
 

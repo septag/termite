@@ -3,6 +3,7 @@
 #include "../bx/allocator.h"
 #include "../bx/string.h"
 #include "../bx/hash.h"
+#include "pool.h"
 
 #include <cassert>
 
@@ -76,7 +77,7 @@ namespace bx
         explicit MultiHashTable(HashTableType type);
         ~MultiHashTable();
 
-        bool create(int capacity, AllocatorI* alloc, AllocatorI* node_alloc);
+        bool create(int capacity, AllocatorI* alloc, Pool<Node>* nodePool = nullptr);
         void destroy();
 
         int add(Ky key, const Ty& value);
@@ -97,7 +98,7 @@ namespace bx
     private:
         HashTableType m_type;
         AllocatorI* m_alloc;
-        AllocatorI* m_nodeAlloc;
+		Pool<Node>* m_nodePool;
         Node** m_nodes;
         Ky* m_keys;
         int m_numItems;
@@ -361,7 +362,7 @@ namespace bx
     {
         m_type = type;
         m_alloc = nullptr;
-        m_nodeAlloc = nullptr;
+        m_nodePool = nullptr;
         m_nodes = nullptr;
         m_keys = nullptr;
         m_numItems = 0;
@@ -377,15 +378,14 @@ namespace bx
     }
 
     template <typename Ty, typename Ky>
-    bool MultiHashTable<Ty, Ky>::create(int capacity, AllocatorI* alloc, AllocatorI* node_alloc)
+    bool MultiHashTable<Ty, Ky>::create(int capacity, AllocatorI* alloc, Pool<Node>* nodePool)
     {
         assert(alloc);
-        assert(node_alloc);
 
         capacity = getClosestPrime(capacity + capacity/2);
 
         m_alloc = alloc;
-        m_nodeAlloc = node_alloc;
+		m_nodePool = nodePool;
         m_nodes = (Node**)BX_ALLOC(alloc, sizeof(Node*)*capacity);
         m_keys = (Ky*)BX_ALLOC(alloc, sizeof(Ky)*capacity);
         if (!m_nodes || !m_keys)
@@ -449,7 +449,7 @@ namespace bx
             assert(idx != -1);
         }
 
-        Node* node = (Node*)BX_ALLOC(m_nodeAlloc, sizeof(Node));
+		Node* node = m_nodePool ? m_nodePool->newInstance() : BX_NEW(m_alloc, Node);
         if (!node)
             return -1;
 
@@ -486,7 +486,10 @@ namespace bx
             m_nodes[index] = node->next;
         }
 
-        BX_FREE(m_nodeAlloc, node);
+		if (m_nodePool)
+			m_nodePool->deleteInstance(node);
+		else
+			BX_DELETE(m_alloc, node);
 
         if (!m_nodes[index])
             m_keys[index] = 0;
@@ -551,5 +554,7 @@ namespace bx
             keys[idx] = key;
         }
     }
+
+
 #pragma endregion MultiHashTable
 }   // namespace: bx

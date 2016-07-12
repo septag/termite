@@ -486,19 +486,13 @@ result_t termite::initJobDispatcher(bx::AllocatorI* alloc,
         return T_ERR_OUTOFMEM;
     }
 
-    BX_BEGINP("Creating %d fibers with %d(kb) stack", maxBigFibers, bigFiberStackSize/1024);
     if (!g_dispatcher->bigFibers.create(maxBigFibers, bigFiberStackSize, alloc)) {
-        BX_END_FATAL();
         return T_ERR_FAILED;
     }
-    BX_END_OK();
 
-    BX_BEGINP("Creating %d fibers with %d(kb) stack", maxSmallFibers, smallFiberStackSize/1024);
     if (!g_dispatcher->smallFibers.create(maxSmallFibers, smallFiberStackSize, alloc)) {
-        BX_END_FATAL();
         return T_ERR_FAILED;
     }
-    BX_END_OK();
 
     // Create threads
     if (numWorkerThreads == UINT8_MAX) {
@@ -507,7 +501,6 @@ result_t termite::initJobDispatcher(bx::AllocatorI* alloc,
     }
 
     if (numWorkerThreads > 0) {
-        BX_BEGINP("Starting %d worker threads", numWorkerThreads);
         g_dispatcher->threads = (bx::Thread**)BX_ALLOC(alloc, sizeof(bx::Thread*)*numWorkerThreads);
         assert(g_dispatcher->threads);
         
@@ -518,8 +511,6 @@ result_t termite::initJobDispatcher(bx::AllocatorI* alloc,
             bx::snprintf(name, sizeof(name), "Thread #%d", i + 1);
             g_dispatcher->threads[i]->init(threadFunc, nullptr, 8 * 1024, name);
         }
-
-        BX_END_OK();
     }
     return 0;
 }
@@ -528,8 +519,6 @@ void termite::shutdownJobDispatcher()
 {
     if (!g_dispatcher)
         return;
-
-    BX_BEGINP("Shutting down Job Dispatcher");
 
     // Command all worker threads to stop
     g_dispatcher->stop = 1;
@@ -554,5 +543,9 @@ void termite::shutdownJobDispatcher()
 
     BX_DELETE(g_dispatcher->alloc, g_dispatcher);
     g_dispatcher = nullptr;
-    BX_END_OK();
+}
+
+uint8_t termite::getNumWorkerThreads()
+{
+	return g_dispatcher->numThreads;
 }

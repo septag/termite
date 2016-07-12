@@ -9,6 +9,8 @@ namespace termite
     struct DebugDrawContext;
     struct VectorGfxContext;
     struct Camera;
+	struct Texture;
+	class Font;
 
     result_t initDebugDraw(bx::AllocatorI* alloc, GfxDriverApi* driver);
     void shutdownDebugDraw();

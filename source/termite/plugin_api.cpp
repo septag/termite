@@ -3,6 +3,7 @@
 #define T_CORE_API
 #define T_GFX_API
 #define T_IMGUI_API
+#define T_COMPONENT_API
 #include "plugin_api.h"
 
 #include "gfx_utils.h"
@@ -230,7 +231,33 @@ static void* getImGuiApi0()
 	api.beginChildFrame = ImGui::BeginChildFrame;
 	api.endChildFrame = ImGui::EndChildFrame;
 
+	api.isMouseHoveringAnyWindow = ImGui::IsMouseHoveringAnyWindow;
+	api.isMouseHoveringWindow = ImGui::IsMouseHoveringWindow;
+
 	return &api;
+}
+
+static void* getComponentApi(uint32_t version)
+{
+	static ComponentApi_v0 api;
+	memset(&api, 0x00, sizeof(api));
+
+	switch (version) {
+	case 0:
+		api.createEntityManager = createEntityManager;
+		api.destroyEntityManager = destroyEntityManager;
+		api.createEntity = createEntity;
+		api.destroyEntity = destroyEntity;
+		api.isEntityAlive = isEntityAlive;
+		api.registerComponentType = registerComponentType;
+		api.createComponent = createComponent;
+		api.findComponentTypeById = findComponentTypeById;
+		api.getComponent = getComponent;
+		api.getComponentData = getComponentData;
+		return &api;
+	default:
+		return nullptr;
+	}
 }
 
 void* termite::getEngineApi(uint16_t apiId, uint32_t version)

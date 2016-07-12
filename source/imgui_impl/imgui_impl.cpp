@@ -3,8 +3,6 @@
 #include "bx/fpumath.h"
 #include "bx/uint32_t.h"
 
-#include "bxx/logger.h"
-
 #include "termite/gfx_driver.h"
 
 #include "imgui_impl.h"
@@ -155,11 +153,8 @@ int termite::initImGui(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, 
         return T_ERR_FAILED;
     }
 
-    BX_BEGINP("Initializing ImGui Integration");
-
     g_Im = BX_NEW(alloc, ImGuiImpl);
     if (!g_Im) {
-        BX_END_FATAL();
         return T_ERR_OUTOFMEM;
     }
     g_Im->alloc = alloc;
@@ -170,19 +165,16 @@ int termite::initImGui(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, 
     // Create Graphic objects
     ShaderHandle fragmentShader = driver->createShader(driver->makeRef(imgui_fso, sizeof(imgui_fso), nullptr, nullptr));
     if (!fragmentShader.isValid()) {
-        BX_END_FATAL();
         return T_ERR_FAILED;
     }
 
     ShaderHandle vertexShader = driver->createShader(driver->makeRef(imgui_vso, sizeof(imgui_vso), nullptr, nullptr));
     if (!vertexShader.isValid()) {
-        BX_END_FATAL();
         return T_ERR_FAILED;
     }
 
     g_Im->progHandle = driver->createProgram(vertexShader, fragmentShader, true);
     if (!g_Im->progHandle.isValid()) {
-        BX_END_FATAL();
         return T_ERR_FAILED;
     }
     g_Im->uniformTexture = driver->createUniform("u_texture", UniformType::Int1, 1);    
@@ -222,14 +214,12 @@ int termite::initImGui(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, 
                                                  TextureFlag::MinPoint|TextureFlag::MagPoint, 
                                                  driver->makeRef(fontData, fontWidth*fontHeight*bpp, nullptr, nullptr));
     if (!g_Im->fontTexHandle.isValid()) {
-        BX_END_FATAL();
         return T_ERR_FAILED;
     }
     conf.Fonts->TexID = (void*)&g_Im->fontTexHandle;
 
     ImGui::NewFrame();
 
-    BX_END_OK();
     return 0;
 }
 
