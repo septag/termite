@@ -200,12 +200,12 @@ namespace termite
         TextureHandle(*createTexture)(const GfxMemory* mem, TextureFlag flags, uint8_t skipMips,
             TextureInfo* info);
         TextureHandle(*createTexture2D)(uint16_t width, uint16_t height, uint8_t numMips, TextureFormat fmt,
-            TextureFlag flags, const GfxMemory* mem/* = nullptr*/);
+            TextureFlag flags/* = TextureFlag::None*/, const GfxMemory* mem/* = nullptr*/);
         TextureHandle(*createTexture2DRatio)(BackbufferRatio ratio, uint8_t numMips, TextureFormat fmt,
-            TextureFlag flags);
+            TextureFlag flags/* = TextureFlag::None*/);
 
         void (*updateTexture2D)(TextureHandle handle, uint8_t mip, uint16_t x, uint16_t y, uint16_t width,
-                                     uint16_t height, const GfxMemory* mem, uint16_t pitch) = 0;
+                                     uint16_t height, const GfxMemory* mem, uint16_t pitch/* = UINT16_MAX*/) = 0;
         TextureHandle(*createTexture3D)(uint16_t width, uint16_t height, uint16_t depth, uint8_t numMips,
             TextureFormat fmt, TextureFlag flags,
             const GfxMemory* mem/* = nullptr*/);

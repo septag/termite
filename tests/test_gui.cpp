@@ -18,6 +18,8 @@
 
 #include <conio.h>
 
+#include "nvg/nanovg.h"
+
 using namespace termite;
 
 #define WINDOW_WIDTH 1280
@@ -44,6 +46,7 @@ struct InputData
 static SDL_Window* g_window = nullptr;
 static InputData g_input;
 static ImGuiApi_v0* g_gui = nullptr;
+static NVGcontext* g_nvg = nullptr;
 
 static bool sdlPollEvents()
 {
@@ -123,6 +126,12 @@ static void update(float dt)
 	g_gui->colorEdit3("Color", color);
 	//g_gui->colorButton(ImVec4(color[0], color[1], color[2], 1.0f), true, true);
 	g_gui->end();
+
+    nvgBeginFrame(g_nvg, WINDOW_WIDTH, WINDOW_HEIGHT, 1.0f);
+    nvgFillColor(g_nvg, nvgRGB(255, 255, 255));
+    nvgRoundedRect(g_nvg, 10, 10, 100.0f, 200.0f, 10.0f);
+    nvgFill(g_nvg);
+    nvgEndFrame(g_nvg);
 }
 
 static termite::GfxPlatformData* getSDLWindowData(SDL_Window* window)
@@ -205,11 +214,13 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	g_gui = (ImGuiApi_v0*)getEngineApi(uint16_t(ApiId::ImGui), 0);
+	g_nvg = nvgCreate(1, 254, getGfxDriver(), (GfxApi_v0*)getEngineApi(uint16_t(ApiId::Gfx), 0), getHeapAlloc());
 
 	while (sdlPollEvents()) {
 		termite::doFrame();
 	}
 
+	nvgDelete(g_nvg);
 	termite::shutdown();
 	SDL_DestroyWindow(g_window);
 	SDL_Quit();

@@ -746,17 +746,17 @@ void termite::ddBoundingSphere(DebugDrawContext* ctx, const sphere_t sphere, boo
 
 void termite::ddBox(DebugDrawContext* ctx, const aabb_t aabb, const mtx4x4_t* modelMtx /*= nullptr*/)
 {
-
+	assert(false);
 }
 
 void termite::ddSphere(DebugDrawContext* ctx, const sphere_t sphere, const mtx4x4_t* modelMtx /*= nullptr*/)
 {
-
+	assert(false);
 }
 
 void termite::ddAxis(DebugDrawContext* ctx, const vec3_t axis, const mtx4x4_t* modelMtx /*= nullptr*/)
 {
-
+	assert(false);
 }
 
 void termite::ddSetFont(DebugDrawContext* ctx, Font* font)

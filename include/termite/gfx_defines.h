@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "bxx/bitmask_operators.hpp"
 
 namespace termite
 {

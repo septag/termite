@@ -26,7 +26,7 @@ target_link_libraries(test_sdl termite ${SDL2_LIBRARY})
 # test_gui
 add_executable(test_gui "test_gui.cpp")
 target_include_directories(test_gui PUBLIC ${SDL2_INCLUDE_DIR})
-target_link_libraries(test_gui termite ${SDL2_LIBRARY})
+target_link_libraries(test_gui termite ${SDL2_LIBRARY} nanovg)
 
 # test_component
 add_executable(test_component "test_component.cpp")

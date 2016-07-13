@@ -32,6 +32,10 @@ namespace termite
     TERMITE_API void ddSphere(DebugDrawContext* ctx, const sphere_t sphere, const mtx4x4_t* modelMtx = nullptr);
     TERMITE_API void ddAxis(DebugDrawContext* ctx, const vec3_t axis, const mtx4x4_t* modelMtx = nullptr);
     TERMITE_API void ddRect(DebugDrawContext* ctx, const vec3_t& vmin, const vec3_t& vmax);
+	TERMITE_API void ddCircle(DebugDrawContext* ctx, const vec3_t& pos, float radius, const mtx4x4_t* modelMtx = nullptr,
+							  bool showDir = false);
+	TERMITE_API void ddRect(DebugDrawContext* ctx, const vec3_t& minpt, const vec3_t& maxpt, const mtx4x4_t* modelMtx = nullptr);
+	TERMITE_API void ddLine(DebugDrawContext* ctx, const vec3_t& startPt, const vec3_t& endPt, const mtx4x4_t* modelMtx = nullptr);
 
     // State
     TERMITE_API void ddSetFont(DebugDrawContext* ctx, Font* font);

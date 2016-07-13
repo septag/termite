@@ -94,12 +94,14 @@ namespace termite {
 #include "vec_math.h"
 #include "gfx_defines.h"
 namespace termite {
+    struct IoDriverApi;
+
     struct GfxApi_v0
     {
         void(*calcGaussKernel)(vec4_t* kernel, int kernelSize, float stdDevSqr, float intensity,
-   int direction /*=0 horizontal, =1 vertical*/, int width, int height);
+							   int direction /*=0 horizontal, =1 vertical*/, int width, int height);
         ProgramHandle(*loadShaderProgram)(GfxDriverApi* gfxDriver, IoDriverApi* ioDriver, const char* vsFilepath,
-   const char* fsFilepath);
+										  const char* fsFilepath);
         void(*drawFullscreenQuad)(uint8_t viewId, ProgramHandle prog);
 
         VertexDecl* (*vdeclBegin)(VertexDecl* vdecl, RendererType _type);

@@ -3,6 +3,7 @@
 #include "bx/bx.h"
 #include "bx/fpumath.h"
 #include <float.h>
+#include <cassert>
 
 // Add some 2D transform functions to bx
 namespace bx

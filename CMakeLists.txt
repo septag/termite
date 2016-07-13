@@ -146,7 +146,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 # dependencies
 add_subdirectory(deps/deboost.context)
 add_subdirectory(deps/bx)
+add_subdirectory(deps/nvg)
 set_target_properties(fcontext PROPERTIES FOLDER Deps)
+set_target_properties(nanovg PROPERTIES FOLDER Deps)
 
 if (BUILD_BOX2D)
     add_subdirectory(deps/Box2D)
