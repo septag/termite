@@ -39,6 +39,12 @@ namespace bx
 			return m_indices;
 		}
 
+        uint16_t indexAt(uint16_t index) const
+        {
+            assert(index < m_partition);
+            return m_indices[index];
+        }
+
         template<typename _T>
         inline _T* getData(int bufferIdx)
         {

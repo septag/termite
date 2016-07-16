@@ -86,7 +86,9 @@ namespace termite
 	TERMITE_API ComponentTypeHandle findComponentTypeById(uint32_t id);
 	TERMITE_API ComponentHandle getComponent(ComponentTypeHandle handle, Entity ent);
 	TERMITE_API void* getComponentData(ComponentHandle handle);
+    TERMITE_API Entity getComponentEntity(ComponentHandle handle);
 	TERMITE_API uint16_t getAllComponents(ComponentTypeHandle typeHandle, ComponentHandle* handles, uint16_t maxComponents);
+	
 
     template <typename Ty> 
     Ty* getComponentData(ComponentHandle handle)

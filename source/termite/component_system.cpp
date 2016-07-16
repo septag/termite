@@ -254,7 +254,7 @@ void termite::garbageCollectComponents(EntityManager* emgr)
         if ((ctype.flags & ComponentFlag::ImmediateDestroy) == ComponentFlag::None) {
             int aliveInRow = 0;
             while (ctype.dataPool.getCount() && aliveInRow < 4) {
-                uint16_t r = (uint16_t)getRandomIntUniform(0, (int)ctype.dataPool.getCount() - 1);
+                uint16_t r = ctype.dataPool.indexAt((uint16_t)getRandomIntUniform(0, (int)ctype.dataPool.getCount() - 1));
                 Entity ent = *ctype.dataPool.getHandleData<Entity>(0, r);
                 if (isEntityAlive(emgr, ent)) {
                     aliveInRow++;
@@ -266,7 +266,6 @@ void termite::garbageCollectComponents(EntityManager* emgr)
             }
         }
     }
-    
 }
 
 ComponentHandle termite::createComponent(Entity ent, ComponentTypeHandle handle)
@@ -297,7 +296,7 @@ void termite::destroyComponent(Entity ent, ComponentHandle handle)
 {
     assert(handle.isValid());
 
-    ComponentType& ctype = g_csys->components[handle.value];
+    ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handle)];
 
     // Call destroy callback
     if (ctype.callbacks.destroyInstance)
@@ -348,18 +347,25 @@ void* termite::getComponentData(ComponentHandle handle)
     return ctype.dataPool.getHandleData(1, COMPONENT_INSTANCE_INDEX(handle));    
 }
 
+Entity termite::getComponentEntity(ComponentHandle handle)
+{
+    assert(handle.isValid());
+
+    ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handle)];
+    return *ctype.dataPool.getHandleData<Entity>(0, COMPONENT_INSTANCE_INDEX(handle));
+}
+
 uint16_t termite::getAllComponents(ComponentTypeHandle typeHandle, ComponentHandle* handles, uint16_t maxComponents)
 {
 	assert(typeHandle.isValid());
 
 	const ComponentType& ctype = g_csys->components[typeHandle.value];
-	const uint16_t* indices = ctype.dataPool.getIndices();
 	uint16_t count = ctype.dataPool.getCount();
 
 	count = bx::uint32_min(count, maxComponents);
 
 	for (uint16_t i = 0; i < count; i++) {
-		handles[i] = COMPONENT_MAKE_HANDLE(typeHandle.value, indices[i]);
+		handles[i] = COMPONENT_MAKE_HANDLE(typeHandle.value, ctype.dataPool.indexAt(i));
 	}
 
 	return count;

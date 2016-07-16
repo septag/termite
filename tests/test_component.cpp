@@ -211,6 +211,7 @@ static void update(float dt)
 	ComponentHandle components[256];
 	uint16_t numComponents = getAllComponents(TestComponent::Handle, components, 256);
 	char** names = (char**)alloca(numComponents*sizeof(char*));
+    Entity* ents = (Entity*)alloca(numComponents * sizeof(Entity));
 
 	for (uint16_t i = 0; i < numComponents; i++) {
 		TestComponent* data = getComponentData<TestComponent>(components[i]);
@@ -223,6 +224,8 @@ static void update(float dt)
 
 		names[i] = (char*)alloca(strlen(data->name) + 1);
 		strcpy(names[i], data->name);
+
+        ents[i] = getComponentEntity(components[i]);
 	}
 
 	ddEnd(g_ddraw);
@@ -237,8 +240,15 @@ static void update(float dt)
 		createComponent(ent, TestComponent::Handle);
 	}
 
-	static int current = 0;
+	static int current = -1;
 	g_gui->listBox("Entities", &current, (const char**)names, numComponents, -1);
+
+    if (g_gui->button("Destroy", ImVec2(100, 0))) {
+        if (current != -1)
+            destroyEntity(g_emgr, ents[current]);
+    }
+
+    garbageCollectComponents(g_emgr);
 
 	g_gui->end();
 

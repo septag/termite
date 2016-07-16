@@ -442,15 +442,15 @@ void termite::doFrame()
     int64_t frameTick = bx::getHPCounter();
     double dt = double(frameTick - fd.lastFrameTick)/g_core->hpTimerFreq;
 
-    if (g_core->renderer)
-        g_core->renderer->render(nullptr);
-
 	ImGui::NewFrame();
 
-    if (g_core->updateFn)
-        g_core->updateFn(float(dt));
+	if (g_core->updateFn)
+		g_core->updateFn(float(dt));
 
 	ImGui::Render();
+
+    if (g_core->renderer)
+        g_core->renderer->render(nullptr);
 
     if (g_core->ioDriver->async)
         g_core->ioDriver->async->runAsyncLoop();
