@@ -130,10 +130,27 @@ Entity termite::createEntity(EntityManager* emgr)
     } else {
         idx = emgr->generations.getCount();
         uint8_t* gen = emgr->generations.push();
-        *gen = 0;
+        *gen = 1;
         assert(idx < (1 << kEntityIndexBits));
     }
     return Entity(idx, emgr->generations[idx]);
+}
+
+static void destroyComponentNoImmDestroy(EntityManager* emgr, Entity ent, ComponentHandle handle)
+{
+    assert(handle.isValid());
+
+    ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handle)];
+
+    // Call destroy callback
+    if (ctype.callbacks.destroyInstance)
+        ctype.callbacks.destroyInstance(ent, handle);
+
+    ctype.dataPool.freeHandle(COMPONENT_INSTANCE_INDEX(handle));
+
+    int r = ctype.entTable.find(ent.id);
+    if (r != -1)
+        ctype.entTable.remove(r);
 }
 
 void termite::destroyEntity(EntityManager* emgr, Entity ent)
@@ -148,7 +165,7 @@ void termite::destroyEntity(EntityManager* emgr, Entity ent)
         while (node) {
             bx::MultiHashTableInt::Node* next = node->next;
             ComponentHandle component(uint32_t(node->value));
-            destroyComponent(ent, component);
+            destroyComponentNoImmDestroy(emgr, ent, component);
 
             emgr->destroyTable.remove(entIdx, node);
             node = next;
@@ -262,13 +279,13 @@ void termite::garbageCollectComponents(EntityManager* emgr)
                 }
 
                 aliveInRow = 0;
-                destroyComponent(ent, COMPONENT_MAKE_HANDLE(i, r));
+                destroyComponent(emgr, ent, COMPONENT_MAKE_HANDLE(i, r));
             }
         }
     }
 }
 
-ComponentHandle termite::createComponent(Entity ent, ComponentTypeHandle handle)
+ComponentHandle termite::createComponent(EntityManager* emgr, Entity ent, ComponentTypeHandle handle)
 {
     ComponentType& ctype = g_csys->components[handle.value];
 
@@ -280,9 +297,13 @@ ComponentHandle termite::createComponent(Entity ent, ComponentTypeHandle handle)
         return ComponentHandle();
     Entity* pEnt = ctype.dataPool.getHandleData<Entity>(0, cIdx);
     *pEnt = ent;
-    
+
     ComponentHandle chandle = COMPONENT_MAKE_HANDLE(handle.value, cIdx);
     ctype.entTable.add(ent.id, int(chandle.value));
+
+    if ((ctype.flags & ComponentFlag::ImmediateDestroy) != ComponentFlag::None) {
+        emgr->destroyTable.add(ent.id, int(chandle.value));
+    }
 
     // Call create callback
     if (ctype.callbacks.createInstance) {
@@ -292,21 +313,25 @@ ComponentHandle termite::createComponent(Entity ent, ComponentTypeHandle handle)
     return chandle;
 }
 
-void termite::destroyComponent(Entity ent, ComponentHandle handle)
+void termite::destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle handle)
 {
-    assert(handle.isValid());
-
+    destroyComponentNoImmDestroy(emgr, ent, handle);
+    
     ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handle)];
 
-    // Call destroy callback
-    if (ctype.callbacks.destroyInstance)
-        ctype.callbacks.destroyInstance(ent, handle);
-
-    ctype.dataPool.freeHandle(COMPONENT_INSTANCE_INDEX(handle));
-    
-    int r = ctype.entTable.find(ent.id);
-    if (r != -1)
-        ctype.entTable.remove(r);
+    if ((ctype.flags & ComponentFlag::ImmediateDestroy) != ComponentFlag::None) {
+        int r = emgr->destroyTable.find(ent.id);
+        if (r != -1) {
+            bx::MultiHashTableInt::Node* node = emgr->destroyTable.getNode(r);
+            while (node) {
+                if (node->value == int(handle.value)) {
+                    emgr->destroyTable.remove(r, node);
+                    break;
+                }
+                node = node->next;
+            }
+        }
+    }
 }
 
 ComponentTypeHandle termite::findComponentTypeByName(const char* name)

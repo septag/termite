@@ -386,8 +386,8 @@ namespace termite
 		ComponentTypeHandle (*registerComponentType)(const char* name, uint32_t id,
 													 const ComponentCallbacks* callbacks, ComponentFlag flags,
 													 uint32_t dataSize, uint16_t poolSize, uint16_t growSize);
-		ComponentHandle (*createComponent)(Entity ent, ComponentTypeHandle handle);
-		void (*destroyComponent)(Entity ent, ComponentHandle handle);
+		ComponentHandle (*createComponent)(EntityManager* emgr, Entity ent, ComponentTypeHandle handle);
+		void (*destroyComponent)(EntityManager* emgr, Entity ent, ComponentHandle handle);
 
 		ComponentTypeHandle (*findComponentTypeByName)(const char* name);
 		ComponentTypeHandle (*findComponentTypeById)(uint32_t id);

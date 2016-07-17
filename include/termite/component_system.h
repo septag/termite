@@ -79,8 +79,8 @@ namespace termite
 										                  uint32_t dataSize, uint16_t poolSize, uint16_t growSize);
 	TERMITE_API void garbageCollectComponents(EntityManager* emgr);
 
-	TERMITE_API ComponentHandle createComponent(Entity ent, ComponentTypeHandle handle);
-	TERMITE_API void destroyComponent(Entity ent, ComponentHandle handle);
+	TERMITE_API ComponentHandle createComponent(EntityManager* emgr, Entity ent, ComponentTypeHandle handle);
+	TERMITE_API void destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle handle);
 
 	TERMITE_API ComponentTypeHandle findComponentTypeByName(const char* name);
 	TERMITE_API ComponentTypeHandle findComponentTypeById(uint32_t id);

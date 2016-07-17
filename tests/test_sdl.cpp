@@ -239,7 +239,7 @@ int main(int argc, char* argv[])
     bx::Path pluginPath(argv[0]);
     strcpy(conf.pluginPath, pluginPath.getDirectory().cstr());
 
-    g_window = SDL_CreateWindow("stTestSDL", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
+    g_window = SDL_CreateWindow("TestSDL", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
                                WINDOW_WIDTH, WINDOW_HEIGHT, 0);
     if (!g_window) {
         BX_FATAL("SDL window creation failed");
