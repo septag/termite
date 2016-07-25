@@ -1,5 +1,5 @@
-// Original Author: Ali Salehi
-// Modifications and bx adaptation: septag
+// Original Author: Ali Salehi - https://github.com/lordhippo
+// Adapted for BX by septag
 #pragma once
 
 #include "bx/bx.h"

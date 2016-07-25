@@ -9,6 +9,7 @@ namespace termite
 
     typedef bool(*ExecuteCommandFn)(const void* param);
     typedef void(*UndoCommandFn)();
+    typedef void(*CleanupCommandFn)();
 
     struct CommandTypeT {};
     struct CommandT {};
@@ -16,7 +17,8 @@ namespace termite
     typedef PhantomType<uint16_t, CommandT, UINT16_MAX> CommandHandle;
     typedef PhantomType<uint16_t, CommandTypeT, UINT16_MAX> CommandTypeHandle;
 
-    CommandTypeHandle registerCommand(const char* name, ExecuteCommandFn executeFn, UndoCommandFn undoFn, size_t paramSize);
+    CommandTypeHandle registerCommand(const char* name, ExecuteCommandFn executeFn, UndoCommandFn undoFn, 
+                                      CleanupCommandFn cleanupFn, size_t paramSize);
     CommandTypeHandle findCommand(const char* name);
     
     CommandHandle executeCommand(CommandTypeHandle handle, const void* param);

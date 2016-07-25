@@ -160,7 +160,7 @@ add_subdirectory(source/imgui_impl)
 set_target_properties(imgui_impl PROPERTIES FOLDER Common)
 set_target_properties(imgui PROPERTIES FOLDER Deps)
 
-# main
+## main
 add_subdirectory(source/termite)
 
 # plugins

@@ -217,7 +217,6 @@ void termite::shutdownComponentSystem()
     if (!g_csys)
         return;
 
-    BX_BEGINP("Shutting down Component System");
     for (int i = 0; i < g_csys->components.getCount(); i++) {
         ComponentType& ctype = g_csys->components[i];
         ctype.dataPool.destroy();
