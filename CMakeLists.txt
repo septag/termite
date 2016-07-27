@@ -136,8 +136,11 @@ copy_build_flags(PROFILE)
 copy_build_flags(DEVELOPMENT)
 
 # http://stackoverflow.com/questions/33829152/for-cmake-can-you-modify-the-release-debug-compiler-flags-with-add-compiler-fl
-set(DEBUG_COMPILE_OPTIONS "-DBX_CONFIG_ALLOCATOR_DEBUG")
+set(DEBUG_COMPILE_OPTIONS "-DBX_CONFIG_ALLOCATOR_DEBUG" "-Dtermite_DEV")
 add_compile_options("$<$<CONFIG:Debug>:${DEBUG_COMPILE_OPTIONS}>")
+
+set(DEVELOPMENT_COMPILE_OPTIONS "-Dtermite_DEV")
+add_compile_options("$<$<CONFIG:Development>:${DEVELOPMENT_COMPILE_OPTIONS}>")
 
 # Common include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -150,7 +153,7 @@ add_subdirectory(deps/nvg)
 set_target_properties(fcontext PROPERTIES FOLDER Deps)
 set_target_properties(nanovg PROPERTIES FOLDER Deps)
 
-if (BUILD_BOX2D)
+if (termite_BUILD_BOX2D)
     add_subdirectory(deps/Box2D)
     set_target_properties(Box2D PROPERTIES FOLDER Deps)
 endif()

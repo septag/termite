@@ -204,7 +204,7 @@ int termite::initImGui(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, 
         conf.KeyMap[ImGuiKey_X] = keymap[int(GuiKeyMap::X)];
         conf.KeyMap[ImGuiKey_Y] = keymap[int(GuiKeyMap::Y)];
         conf.KeyMap[ImGuiKey_Z] = keymap[int(GuiKeyMap::Z)];
-        }
+    }
 
     uint8_t* fontData;
     int fontWidth, fontHeight, bpp;
