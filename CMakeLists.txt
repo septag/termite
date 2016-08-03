@@ -150,8 +150,10 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_subdirectory(deps/deboost.context)
 add_subdirectory(deps/bx)
 add_subdirectory(deps/nvg)
+add_subdirectory(deps/Box2D)
 set_target_properties(fcontext PROPERTIES FOLDER Deps)
 set_target_properties(nanovg PROPERTIES FOLDER Deps)
+set_target_properties(Box2D PROPERTIES FOLDER Deps)
 
 if (termite_BUILD_BOX2D)
     add_subdirectory(deps/Box2D)
@@ -188,6 +190,7 @@ set_target_properties(test_init PROPERTIES FOLDER Tests)
 set_target_properties(test_sdl PROPERTIES FOLDER Tests)
 set_target_properties(test_gui PROPERTIES FOLDER Tests)
 set_target_properties(test_component PROPERTIES FOLDER Tests)
+set_target_properties(test_box2d PROPERTIES FOLDER Tests)
 
 # copy binaries
 if (WIN32)

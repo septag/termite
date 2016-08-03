@@ -33,6 +33,11 @@ add_executable(test_component "test_component.cpp")
 target_include_directories(test_component PUBLIC ${SDL2_INCLUDE_DIR})
 target_link_libraries(test_component termite ${SDL2_LIBRARY})
 
+# test_box2d
+add_executable(test_box2d "test_box2d.cpp")
+target_include_directories(test_box2d PUBLIC ${SDL2_INCLUDE_DIR})
+target_link_libraries(test_box2d termite ${SDL2_LIBRARY} Box2D nanovg)
+
 # Require plugins to be built
 add_dependencies(test_init tdriver_disk)
 add_dependencies(test_sdl trender_stock tdriver_disk tdriver_bgfx ${WIN_DEPS})

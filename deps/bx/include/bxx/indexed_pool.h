@@ -69,7 +69,7 @@ namespace bx
         uint16_t m_partition;
     };
 
-    IndexedPool::IndexedPool()
+    inline IndexedPool::IndexedPool()
     {
         m_alloc = nullptr;
         m_indices = nullptr;
@@ -81,7 +81,7 @@ namespace bx
         m_numBuffers = 0;
     }
 
-    bool IndexedPool::create(const uint32_t* itemSizes, int numBuffers, uint16_t maxItems, uint16_t growSize, AllocatorI* alloc)
+    inline bool IndexedPool::create(const uint32_t* itemSizes, int numBuffers, uint16_t maxItems, uint16_t growSize, AllocatorI* alloc)
     {
         assert(numBuffers <= BX_INDEXED_POOL_MAX_BUFFERS);
         assert(numBuffers > 0);
@@ -118,7 +118,7 @@ namespace bx
         return true;
     }
 
-    void IndexedPool::destroy()
+    inline void IndexedPool::destroy()
     {
         if (m_indices) {
             assert(m_alloc);
@@ -132,13 +132,13 @@ namespace bx
         memset(m_itemSizes, 0x00, sizeof(uint32_t)*BX_INDEXED_POOL_MAX_BUFFERS);
     }
 
-    IndexedPool::~IndexedPool()
+    inline IndexedPool::~IndexedPool()
     {
         assert(m_indices == nullptr);
         assert(m_revIndices == nullptr);
     }
 
-    uint16_t IndexedPool::newHandle()
+    inline uint16_t IndexedPool::newHandle()
     {
         // Grow buffer if needed
         if (m_partition == m_maxItems) {
@@ -177,7 +177,7 @@ namespace bx
         return m_indices[m_partition++];
     }
 
-    void IndexedPool::freeHandle(uint16_t handle)
+    inline void IndexedPool::freeHandle(uint16_t handle)
     {
         assert(handle < m_maxItems);
 
@@ -194,13 +194,13 @@ namespace bx
         m_partition--;
     }
 
-    void* IndexedPool::getData(int bufferIdx)
+    inline void* IndexedPool::getData(int bufferIdx)
     {
         assert(bufferIdx < m_numBuffers);
         return m_buffers[bufferIdx];
     }
 
-    void* IndexedPool::getHandleData(int bufferIdx, uint16_t handle)
+    inline void* IndexedPool::getHandleData(int bufferIdx, uint16_t handle)
     {
         assert(bufferIdx < m_numBuffers);
         assert(handle < m_maxItems);
