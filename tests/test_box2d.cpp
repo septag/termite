@@ -219,7 +219,7 @@ static void setupWorld()
     shape.m_radius = 5.0f;
     pd.shape = &shape;
     pd.flags = b2_elasticParticle;
-    pd.strength = 0.3f;
+    pd.strength = 1.0f;
     pd.position.Set(0, 10.0f);
     g_ball = g_ps->CreateParticleGroup(pd);
 }
@@ -304,6 +304,8 @@ static void update(float dt)
     g_input.mouseButtons[0] = g_input.mouseButtons[1] = g_input.mouseButtons[2] = 0;
     g_input.mouseWheel = 0.0f;
 
+    const uint8_t* keys = SDL_GetKeyboardState(nullptr);
+
     /*
     static bool opened = true;
     g_gui->begin("test", &opened, 0);
@@ -320,24 +322,27 @@ static void update(float dt)
     nvgEndFrame(g_nvg);
     */
 
-    if (mouseMask & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+    if (mouseMask & SDL_BUTTON(SDL_BUTTON_LEFT) && g_ball) {
         g_ball->ApplyLinearImpulse(b2Vec2(0, 100.0f));
+    }
 
-        /*
-        b2ParticleDef pd;
-        pd.flags = b2_elasticParticle;
-        pd.lifetime = 5.0f;
-        //pd.color.Set(getRandomIntUniform(0, 255), getRandomIntUniform(0, 255), getRandomIntUniform(0, 255), 255);
-        b2Vec2 pos = g_ball->GetPosition();
-        float xRight = pos.x < -1.0f ? 0 : 0.1f;
-        float xLeft = pos.x > 1.0f ? 0 : -0.1f;
-        pd.position = pos + b2Vec2(0, -1.0f);
-        pd.velocity = b2Vec2(getRandomFloatUniform(xLeft, xRight), getRandomFloatUniform(0, 0.1f));
-        g_ps->CreateParticle(pd);
+    if (keys[SDL_SCANCODE_SPACE] && g_ball) {
+        //g_ball->SetGroupFlags(b2_powderParticle);
+        g_ball->SetGroupFlags(g_ball->GetGroupFlags() & ~b2_particleGroupCanBeEmpty);
+        g_ball->DestroyParticles();
 
-        pd.velocity = b2Vec2(getRandomFloatUniform(xLeft, xRight), getRandomFloatUniform(0, 0.1f));
-        g_ps->CreateParticle(pd);
-        */
+        b2ParticleGroupDef pd;
+        b2CircleShape shape;
+        shape.m_radius = 5.0f;
+        pd.shape = &shape;
+        pd.flags = b2_viscousParticle;
+        pd.strength = 0.1f;
+        b2Vec2 pos = g_ball->GetCenter();
+        pd.position.Set(pos.x, pos.y);
+        pd.linearVelocity.Set(0, -15.0f);
+        g_ps->CreateParticleGroup(pd);   
+
+        g_ball = nullptr;
     }
 
     g_world->Step(1.0f/20.0f, 8, 3, 2);
@@ -358,12 +363,16 @@ static void update(float dt)
     nvgRect(g_nvg, 10.0f, 10.0f, 30.0f, 10.0f);
     nvgFill(g_nvg);*/
     g_world->DrawDebugData();
-    b2Vec2 pos = g_ball->GetCenter();
-    nvgBeginPath(g_nvg);
-    nvgStrokeColor(g_nvg, nvgRGB(0, 255, 0));
-    nvgStrokeWidth(g_nvg, 0.1f);
-    nvgCircle(g_nvg, pos.x, pos.y, 5.0f);
-    nvgStroke(g_nvg);
+    /*
+    if (g_ball) {
+        b2Vec2 pos = g_ball->GetCenter();
+        nvgBeginPath(g_nvg);
+        nvgStrokeColor(g_nvg, nvgRGB(0, 255, 0));
+        nvgStrokeWidth(g_nvg, 0.1f);
+        nvgCircle(g_nvg, pos.x, pos.y, 5.0f);
+        nvgStroke(g_nvg);
+    }
+    */
     nvgEndFrame(g_nvg);
     
 }
