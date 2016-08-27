@@ -840,7 +840,7 @@ int main(int argc, char* argv[])
 
     conf.gfxWidth = WINDOW_WIDTH;
     conf.gfxHeight = WINDOW_HEIGHT;
-    conf.enableJobDispatcher = false;
+    conf.engineFlags = InitEngineFlags::None;
     conf.gfxDriverFlags = uint32_t(GfxResetFlag::VSync);
     strcpy(conf.uiIniFilename, "sheetmaker.ini");
     conf.pageSize = 64;

@@ -30,6 +30,7 @@ namespace termite
 
     enum class InitEngineFlags
     {
+        None = 0,
         EnableJobDispatcher = 0x1,
         LockThreadsToCores = 0x2,
         ScanFontsDirectory = 0x4
