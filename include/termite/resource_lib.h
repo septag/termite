@@ -29,15 +29,16 @@ namespace termite
     {
         const char* uri;
         const void* userParams;
+        ResourceFlag flags;
     };
 
     class BX_NO_VTABLE ResourceCallbacksI
     {
     public:
-        virtual bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) = 0;
-        virtual void unloadObj(uintptr_t obj) = 0;
+        virtual bool loadObj(ResourceLib* resLib, const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) = 0;
+        virtual void unloadObj(ResourceLib* resLib, uintptr_t obj) = 0;
         virtual void onReload(ResourceLib* resLib, ResourceHandle handle) = 0;
-        virtual uintptr_t getDefaultAsyncObj() = 0;
+        virtual uintptr_t getDefaultAsyncObj(ResourceLib* resLib) = 0;
     };
 
     TERMITE_API ResourceLib* createResourceLib(ResourceLibInitFlag flags, IoDriverApi* driver, bx::AllocatorI* alloc);

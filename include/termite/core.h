@@ -28,6 +28,13 @@ namespace termite
     struct RendererApi;
     struct IoDriverDual;
 
+    enum class InitEngineFlags
+    {
+        EnableJobDispatcher = 0x1,
+        LockThreadsToCores = 0x2,
+        ScanFontsDirectory = 0x4
+    };
+
     struct Config
     {
         // Plugins
@@ -37,13 +44,26 @@ namespace termite
         char ioName[32];
         char rendererName[32];
         char gfxName[32];
+        char uiIniFilename[32];
 
         // Graphics
         uint16_t gfxDeviceId;
         uint16_t gfxWidth;
         uint16_t gfxHeight;
-        uint32_t gfxDriverFlags;    // see gfxResetFlag
+        uint32_t gfxDriverFlags;    /// gfxResetFlag
         int keymap[19];
+
+        // Job Dispatcher
+        uint16_t maxSmallFibers;
+        uint16_t smallFiberSize;    // in Kb
+        uint16_t maxBigFibers;
+        uint16_t bigFiberSize;      // in Kb
+        uint8_t numWorkerThreads;
+        InitEngineFlags engineFlags;
+
+        // Memory
+        uint32_t pageSize;          // in Kb
+        int maxPagesPerPool;
 
         Config()
         {
@@ -52,12 +72,21 @@ namespace termite
             strcpy(ioName, "");
             strcpy(dataUri, "");
             strcpy(gfxName, "");
+            strcpy(uiIniFilename, "");
 
             gfxWidth = 0;
             gfxHeight = 0;
             gfxDeviceId = 0;
             gfxDriverFlags = 0;
             memset(keymap, 0x00, sizeof(keymap));
+
+            maxSmallFibers = maxBigFibers = 0;
+            smallFiberSize = bigFiberSize = 0;
+            numWorkerThreads = UINT8_MAX;
+            engineFlags = InitEngineFlags::EnableJobDispatcher;
+
+            pageSize = 0;
+            maxPagesPerPool = 0;
         }
     };
 
@@ -108,4 +137,6 @@ namespace termite
     TERMITE_API ResourceLib* getDefaultResourceLib() T_THREAD_SAFE;
 
 } // namespace termite
+
+C11_DEFINE_FLAG_TYPE(termite::InitEngineFlags);
 

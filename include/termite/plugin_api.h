@@ -365,6 +365,7 @@ namespace termite
 
 		bool (*isMouseHoveringWindow)();
 		bool (*isMouseHoveringAnyWindow)();
+        bool (*isItemHovered)();
 	};
 }
 #endif

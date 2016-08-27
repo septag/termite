@@ -6,7 +6,7 @@ file(GLOB INCLUDE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "../../include/term
 source_group(source FILES ${SOURCE_FILES})
 source_group(include FILES ${INCLUDE_FILES})
 
-# Shaders
+## Shaders
 file(GLOB SHADER_SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.?sc")
 source_group(shaders FILES ${SHADER_SOURCES})
 bgfx_add_shaders("${SHADER_SOURCES}" IGNORE IGNORE "shaders_h" TRUE IGNORE SHADER_GEN_FILES)
@@ -29,7 +29,7 @@ target_include_directories(termite PUBLIC ${TERMITE_INCLUDE_DIR} ${DEP_ROOT_DIR}
 # PCH
 add_precompiled_header(termite pch.h)
 
-# Install
+## Install
 install(TARGETS termite
         RUNTIME DESTINATION bin
         ARCHIVE DESTINATION lib

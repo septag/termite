@@ -39,7 +39,7 @@ namespace bx
 			return m_indices;
 		}
 
-        uint16_t indexAt(uint16_t index) const
+        uint16_t handleAt(uint16_t index) const
         {
             assert(index < m_partition);
             return m_indices[index];
@@ -142,36 +142,33 @@ namespace bx
     {
         // Grow buffer if needed
         if (m_partition == m_maxItems) {
-            uint8_t* buff = (uint8_t*)m_indices;
             uint16_t prevMax = m_maxItems;
             m_maxItems += m_growSize;
             size_t totalSize = 2 * sizeof(uint16_t)*m_maxItems;
             for (int i = 0; i < m_numBuffers; i++)
                 totalSize += m_itemSizes[i] * m_maxItems;
 
-            buff = (uint8_t*)BX_REALLOC(m_alloc, buff, totalSize);
+            void* prevBuff = m_indices;
+            uint8_t* buff = (uint8_t*)BX_ALLOC(m_alloc, totalSize);
             if (!buff)
                 return UINT16_MAX;
 
-            uint8_t* startBuff = buff;
-            uint16_t* indices = (uint16_t*)buff;      buff += sizeof(uint16_t)*m_maxItems;
-            uint16_t* revIndices = (uint16_t*)buff;   buff += sizeof(uint16_t)*m_maxItems;
-
+            // Fill the new buffer
+            memcpy(buff, m_indices, sizeof(uint16_t)*prevMax);  
+            m_indices = (uint16_t*)buff;        buff += sizeof(uint16_t)*m_maxItems;
+            memcpy(buff, m_revIndices + sizeof(uint16_t)*prevMax, sizeof(uint16_t)*prevMax);
+            m_revIndices = (uint16_t*)buff;     buff += sizeof(uint16_t)*m_maxItems;
             for (int i = 0; i < m_numBuffers; i++) {
+                memcpy(buff, m_buffers[i], m_itemSizes[i] * prevMax);
                 m_buffers[i] = buff;
-                buff += m_itemSizes[i]*m_maxItems;
+                buff += m_itemSizes[i] * m_maxItems;
             }
-
-            memcpy(indices, startBuff, sizeof(uint16_t)*prevMax);
-            memcpy(revIndices, startBuff + sizeof(uint16_t)*prevMax, sizeof(uint16_t)*prevMax);
 
             for (uint16_t i = prevMax, c = m_maxItems; i < c; i++) {
-                indices[i] = i;
-                revIndices[i] = i;
+                m_indices[i] = i;
+                m_revIndices[i] = i;
             }
-
-            m_indices = indices;
-            m_revIndices = revIndices;
+            BX_FREE(m_alloc, prevBuff);
         }
 
         return m_indices[m_partition++];

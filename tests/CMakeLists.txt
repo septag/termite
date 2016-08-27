@@ -38,14 +38,12 @@ add_executable(test_box2d "test_box2d.cpp")
 target_include_directories(test_box2d PUBLIC ${SDL2_INCLUDE_DIR})
 target_link_libraries(test_box2d termite ${SDL2_LIBRARY} Box2D nanovg)
 
+# test_sprite
+add_executable(test_sprite "test_sprite.cpp")
+target_include_directories(test_sprite PUBLIC ${SDL2_INCLUDE_DIR})
+target_link_libraries(test_sprite termite ${SDL2_LIBRARY} Box2D nanovg)
+
 # Require plugins to be built
 add_dependencies(test_init tdriver_disk)
 add_dependencies(test_sdl trender_stock tdriver_disk tdriver_bgfx ${WIN_DEPS})
 
-if (WIN32)
-    add_dependencies(test_sdl SDL2CopyBinaries)
-endif()
-
-##########
-install(TARGETS test_init RUNTIME DESTINATION bin)
-install(TARGETS test_sdl RUNTIME DESTINATION bin)

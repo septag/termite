@@ -233,6 +233,7 @@ static void* getImGuiApi0()
 
 	api.isMouseHoveringAnyWindow = ImGui::IsMouseHoveringAnyWindow;
 	api.isMouseHoveringWindow = ImGui::IsMouseHoveringWindow;
+    api.isItemHovered = ImGui::IsItemHovered;
 
 	return &api;
 }

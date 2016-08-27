@@ -77,7 +77,7 @@ static void imguiDrawLists(ImDrawData* data)
     bx::mtxOrtho(proj, 0.0f, width, height, 0.0f, -1.0f, 1.0f);
 
     GfxState state = gfxStateBlendAlpha() |
-        GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::CullCCW;
+        GfxState::RGBWrite | GfxState::AlphaWrite/* | GfxState::CullCCW*/;
     driver->touch(viewId);
     driver->setViewRectRatio(viewId, 0, 0, BackbufferRatio::Equal);
     driver->setViewSeq(viewId, true);
@@ -133,6 +133,7 @@ static void imguiDrawLists(ImDrawData* data)
                 TextureHandle* handle = (TextureHandle*)cmd.TextureId;
                 if (handle)
                     driver->setTexture(0, g_Im->uniformTexture, *handle, TextureFlag::FromTexture);
+
                 driver->setTransientIndexBufferI(&tib, indexOffset, cmd.ElemCount);
                 driver->setTransientVertexBufferI(&tvb, 0, numVertices);
                 driver->setState(state, 0);
@@ -146,7 +147,7 @@ static void imguiDrawLists(ImDrawData* data)
 }
 
 int termite::initImGui(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, GfxDriverApi* driver,
-					   bx::AllocatorI* alloc, const int* keymap)
+					   bx::AllocatorI* alloc, const int* keymap, const char* iniFilename, void* nativeWindowHandle)
 {
     if (g_Im) {
         assert(false);
@@ -177,40 +178,41 @@ int termite::initImGui(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, 
     if (!g_Im->progHandle.isValid()) {
         return T_ERR_FAILED;
     }
-    g_Im->uniformTexture = driver->createUniform("u_texture", UniformType::Int1, 1);    
+    g_Im->uniformTexture = driver->createUniform("u_texture", UniformType::Int1, 1);   
 
     // Setup ImGui
     ImGuiIO& conf = ImGui::GetIO();
     conf.DisplaySize = ImVec2((float)viewWidth, (float)viewHeight);
+    conf.IniFilename = (iniFilename == nullptr || iniFilename[0] == 0) ? "imgui.ini" : iniFilename;
     conf.RenderDrawListsFn = imguiDrawLists;
     conf.MemAllocFn = imguiAlloc;
     conf.MemFreeFn = imguiFree;
+    conf.ImeWindowHandle = nativeWindowHandle;
 
     if (keymap) {
-        conf.KeyMap[ImGuiKey_Tab] = keymap[int(GuiKeyMap::Tab)];
-        conf.KeyMap[ImGuiKey_LeftArrow] = keymap[int(GuiKeyMap::LeftArrow)];
-        conf.KeyMap[ImGuiKey_RightArrow] = keymap[int(GuiKeyMap::RightArrow)];
-        conf.KeyMap[ImGuiKey_UpArrow] = keymap[int(GuiKeyMap::UpArrow)];
-        conf.KeyMap[ImGuiKey_DownArrow] = keymap[int(GuiKeyMap::DownArrow)];
-        conf.KeyMap[ImGuiKey_Home] = keymap[int(GuiKeyMap::Home)];
-        conf.KeyMap[ImGuiKey_End] = keymap[int(GuiKeyMap::End)];
-        conf.KeyMap[ImGuiKey_Delete] = keymap[int(GuiKeyMap::Delete)];
-        conf.KeyMap[ImGuiKey_Backspace] = keymap[int(GuiKeyMap::Backspace)];
-        conf.KeyMap[ImGuiKey_Enter] = keymap[int(GuiKeyMap::Enter)];
-        conf.KeyMap[ImGuiKey_Escape] = keymap[int(GuiKeyMap::Escape)];
-        conf.KeyMap[ImGuiKey_A] = keymap[int(GuiKeyMap::A)];
-        conf.KeyMap[ImGuiKey_C] = keymap[int(GuiKeyMap::C)];
-        conf.KeyMap[ImGuiKey_V] = keymap[int(GuiKeyMap::V)];
-        conf.KeyMap[ImGuiKey_X] = keymap[int(GuiKeyMap::X)];
-        conf.KeyMap[ImGuiKey_Y] = keymap[int(GuiKeyMap::Y)];
-        conf.KeyMap[ImGuiKey_Z] = keymap[int(GuiKeyMap::Z)];
+        conf.KeyMap[ImGuiKey_Tab] = keymap[ImGuiKey_Tab];
+        conf.KeyMap[ImGuiKey_LeftArrow] = keymap[ImGuiKey_LeftArrow];
+        conf.KeyMap[ImGuiKey_RightArrow] = keymap[ImGuiKey_RightArrow];
+        conf.KeyMap[ImGuiKey_UpArrow] = keymap[ImGuiKey_UpArrow];
+        conf.KeyMap[ImGuiKey_DownArrow] = keymap[ImGuiKey_DownArrow];
+        conf.KeyMap[ImGuiKey_Home] = keymap[ImGuiKey_Home];
+        conf.KeyMap[ImGuiKey_End] = keymap[ImGuiKey_End];
+        conf.KeyMap[ImGuiKey_Delete] = keymap[ImGuiKey_Delete];
+        conf.KeyMap[ImGuiKey_Backspace] = keymap[ImGuiKey_Backspace];
+        conf.KeyMap[ImGuiKey_Enter] = keymap[ImGuiKey_Enter];
+        conf.KeyMap[ImGuiKey_Escape] = keymap[ImGuiKey_Escape];
+        conf.KeyMap[ImGuiKey_A] = keymap[ImGuiKey_A];
+        conf.KeyMap[ImGuiKey_C] = keymap[ImGuiKey_C];
+        conf.KeyMap[ImGuiKey_V] = keymap[ImGuiKey_V];
+        conf.KeyMap[ImGuiKey_X] = keymap[ImGuiKey_X];
+        conf.KeyMap[ImGuiKey_Y] = keymap[ImGuiKey_Y];
+        conf.KeyMap[ImGuiKey_Z] = keymap[ImGuiKey_Z];
     }
 
     uint8_t* fontData;
     int fontWidth, fontHeight, bpp;
-    conf.Fonts->GetTexDataAsAlpha8(&fontData, &fontWidth, &fontHeight, &bpp);
-
-    g_Im->fontTexHandle = driver->createTexture2D((uint16_t)fontWidth, (uint16_t)fontHeight, 1, TextureFormat::A8, 
+    conf.Fonts->GetTexDataAsRGBA32(&fontData, &fontWidth, &fontHeight, &bpp);
+    g_Im->fontTexHandle = driver->createTexture2D((uint16_t)fontWidth, (uint16_t)fontHeight, 1, TextureFormat::RGBA8, 
                                                  TextureFlag::MinPoint|TextureFlag::MagPoint, 
                                                  driver->makeRef(fontData, fontWidth*fontHeight*bpp, nullptr, nullptr));
     if (!g_Im->fontTexHandle.isValid()) {
@@ -233,7 +235,6 @@ void termite::shutdownImGui()
     GfxDriverApi* driver = g_Im->driver;
 
     ImGui::Shutdown();
-
     if (g_Im->uniformTexture.isValid())
         driver->destroyUniform(g_Im->uniformTexture);
     if (g_Im->fontTexHandle.isValid())    

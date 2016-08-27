@@ -270,7 +270,7 @@ void termite::garbageCollectComponents(EntityManager* emgr)
         if ((ctype.flags & ComponentFlag::ImmediateDestroy) == ComponentFlag::None) {
             int aliveInRow = 0;
             while (ctype.dataPool.getCount() && aliveInRow < 4) {
-                uint16_t r = ctype.dataPool.indexAt((uint16_t)getRandomIntUniform(0, (int)ctype.dataPool.getCount() - 1));
+                uint16_t r = ctype.dataPool.handleAt((uint16_t)getRandomIntUniform(0, (int)ctype.dataPool.getCount() - 1));
                 Entity ent = *ctype.dataPool.getHandleData<Entity>(0, r);
                 if (isEntityAlive(emgr, ent)) {
                     aliveInRow++;
@@ -389,7 +389,7 @@ uint16_t termite::getAllComponents(ComponentTypeHandle typeHandle, ComponentHand
 	count = bx::uint32_min(count, maxComponents);
 
 	for (uint16_t i = 0; i < count; i++) {
-		handles[i] = COMPONENT_MAKE_HANDLE(typeHandle.value, ctype.dataPool.indexAt(i));
+		handles[i] = COMPONENT_MAKE_HANDLE(typeHandle.value, ctype.dataPool.handleAt(i));
 	}
 
 	return count;

@@ -121,7 +121,7 @@ STBRP_DEF void stbrp_init_target (stbrp_context *context, int width, int height,
 //
 // There is no "shutdown" function. The 'nodes' memory must stay valid for
 // the following stbrp_pack_rects() call (or calls), but can be freed after
-// the call (or calls) finish.
+// the call (or calls) finish.  
 //
 // Note: to guarantee best results, either:
 //       1. make sure 'num_nodes' >= 'width'

@@ -574,37 +574,19 @@ namespace termite
         Count
     };
 
-    enum class GuiKeyMap : int
-    {
-        Tab,       // for tabbing through fields
-        LeftArrow, // for text edit
-        RightArrow,// for text edit
-        UpArrow,   // for text edit
-        DownArrow, // for text edit
-        PageUp,
-        PageDown,
-        Home,      // for text edit
-        End,       // for text edit
-        Delete,    // for text edit
-        Backspace, // for text edit
-        Enter,     // for text edit
-        Escape,    // for text edit
-        A,         // for text edit CTRL+A: select all
-        C,         // for text edit CTRL+C: copy
-        V,         // for text edit CTRL+V: paste
-        X,         // for text edit CTRL+X: cut
-        Y,         // for text edit CTRL+Y: redo
-        Z,         // for text edit CTRL+Z: undo
-
-        Count
-    };
-
     struct VertexDecl
     {
         uint32_t hash;
         uint16_t stride;
         uint16_t offset[int(VertexAttrib::Count)];
         uint16_t attribs[int(VertexAttrib::Count)];
+    };
+
+    struct GfxAttachment
+    {
+        TextureHandle handle; //!< Texture handle.
+        uint16_t mip;         //!< Mip level.
+        uint16_t layer;       //!< Cubemap side or depth layer/slice.
     };
 
 } // namespace termite

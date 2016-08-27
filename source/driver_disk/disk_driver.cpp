@@ -132,12 +132,12 @@ static void asyncShutdown()
 {
     uv_fs_event_stop(&g_async.dirChange);
 
-    g_async.fsReqPool.destroy();
-
     // Walk the event loop handles and close all
     uv_walk(&g_async.loop, uvWalk, nullptr);
     uv_run(&g_async.loop, UV_RUN_DEFAULT);
     uv_loop_close(&g_async.loop);
+
+    g_async.fsReqPool.destroy();
 }
 
 static void asyncSetCallbacks(IoDriverEventsI* callbacks)
@@ -384,7 +384,7 @@ static size_t blockWrite(const char* uri, const MemoryBlock* mem)
 
     bx::CrtFileWriter file;
     bx::Error err;
-    if (file.open(filepath.cstr(), false, &err)) {
+    if (!file.open(filepath.cstr(), false, &err)) {
         T_ERROR_API(g_core, "Unable to open file '%s' for writing", filepath.cstr());
         return 0;
     }

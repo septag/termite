@@ -47,6 +47,7 @@ namespace bx
 
         Path& normalizeSelf();
         Path& join(const char* path);
+        Path& joinUnix(const char* path);
         PathType getType();        
     };
 
@@ -202,6 +203,20 @@ namespace bx
         return *this;
     }
 
+    inline Path& Path::joinUnix(const char* path)
+    {
+        const char* sep = "/";
+        if (this->text[0] != 0) {
+            if (path[0] != 0) {
+                bx::strlcat(this->text, sep, sizeof(this->text));
+                bx::strlcat(this->text, path, sizeof(this->text));
+            }
+        } else {
+            bx::strlcpy(this->text, path, sizeof(this->text));
+        }
+
+        return *this;
+    }
 
     inline bx::PathType Path::getType()
     {

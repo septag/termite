@@ -47,3 +47,6 @@ deps/sdl
 *.fso
 *.vso
 *.pyc
+
+# external projects
+digger
