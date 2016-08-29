@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vec_math.h"
+#include "gfx_utils.h"
 
 namespace termite
 {
@@ -44,12 +45,6 @@ namespace termite
     TERMITE_API void camStrafe(Camera* cam, float strafe);
     TERMITE_API mtx4x4_t camViewMtx(Camera* cam);
     TERMITE_API mtx4x4_t camProjMtx(Camera* cam, float aspectRatio);
-
-    enum class DisplayPolicy
-    {
-        FitToHeight,
-        FitToWidth
-    };
 
     struct Camera2D
     {

@@ -34,6 +34,7 @@ include(Bgfx)
 # options
 option(BUILD_BOX2D "Build Box2D Physics engine" OFF)
 option(BUILD_DIGGER "Build Digger Game Prototype" OFF)
+option(USE_SDL2 "Use SDL2 with the engine" OFF)
 
 # Check dependencies
 

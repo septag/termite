@@ -22,9 +22,14 @@ endif()
 target_link_libraries(termite 
     PRIVATE fcontext imgui_impl
     PUBLIC bx ${POSIX_LIBS})
-#
+
+# 
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)
 target_include_directories(termite PUBLIC ${TERMITE_INCLUDE_DIR} ${DEP_ROOT_DIR})
+if (USE_SDL2)
+    target_include_directories(termite PUBLIC ${SDL2_INCLUDE_DIR})
+    target_link_libraries(termite PUBLIC ${SDL2_LIBRARY})
+endif()
 
 # PCH
 add_precompiled_header(termite pch.h)

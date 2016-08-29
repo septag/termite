@@ -307,6 +307,15 @@ namespace termite
         void* context;  // GL context, d3d device
         void* backBuffer;   // GL backbuffer or d3d render target view
         void* backBufferDS; // Backbuffer depth/stencil
+
+        GfxPlatformData()
+        {
+            ndt = nullptr;
+            nwh = nullptr;
+            context = nullptr;
+            backBuffer = nullptr;
+            backBufferDS = nullptr;
+        }
     };
 
     struct GfxInternalData
