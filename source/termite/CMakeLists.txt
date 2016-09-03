@@ -6,7 +6,7 @@ file(GLOB INCLUDE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "../../include/term
 source_group(source FILES ${SOURCE_FILES})
 source_group(include FILES ${INCLUDE_FILES})
 
-# Shaders
+## Shaders
 file(GLOB SHADER_SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.?sc")
 source_group(shaders FILES ${SHADER_SOURCES})
 bgfx_add_shaders("${SHADER_SOURCES}" IGNORE IGNORE "shaders_h" TRUE IGNORE SHADER_GEN_FILES)
@@ -22,14 +22,19 @@ endif()
 target_link_libraries(termite 
     PRIVATE fcontext imgui_impl
     PUBLIC bx ${POSIX_LIBS})
-#
+
+# 
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)
 target_include_directories(termite PUBLIC ${TERMITE_INCLUDE_DIR} ${DEP_ROOT_DIR})
+if (USE_SDL2)
+    target_include_directories(termite PUBLIC ${SDL2_INCLUDE_DIR})
+    target_link_libraries(termite PUBLIC ${SDL2_LIBRARY})
+endif()
 
 # PCH
 add_precompiled_header(termite pch.h)
 
-# Install
+## Install
 install(TARGETS termite
         RUNTIME DESTINATION bin
         ARCHIVE DESTINATION lib

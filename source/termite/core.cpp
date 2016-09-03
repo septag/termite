@@ -17,6 +17,7 @@
 #include "gfx_debugdraw.h"
 #include "gfx_model.h"
 #include "gfx_render.h"
+#include "gfx_sprite.h"
 #include "resource_lib.h"
 #include "io_driver.h"
 #include "job_dispatcher.h"
@@ -196,7 +197,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     if (!g_core->memPool.create(MEM_POOL_BUCKET_SIZE, g_alloc))
         return T_ERR_OUTOFMEM;
 
-    if (initMemoryPool(g_alloc))
+    if (initMemoryPool(g_alloc, conf.pageSize*1024, conf.maxPagesPerPool))
         return T_ERR_OUTOFMEM;
 
     // Initialize plugins system and enumerate plugins
@@ -315,7 +316,9 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
             T_ERROR("Initializing font library failed");
             return T_ERR_FAILED;
         }
-        loadFontsInDirectory(g_core->ioDriver->blocking->getUri(), "fonts");
+
+        if ((conf.engineFlags & InitEngineFlags::ScanFontsDirectory) == InitEngineFlags::ScanFontsDirectory)
+            loadFontsInDirectory(g_core->ioDriver->blocking->getUri(), "fonts");
 
         // VectorGraphics
         if (initVectorGfx(g_alloc, g_core->gfxDriver)) {
@@ -336,21 +339,34 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
         }
 
 		// ImGui initialize
-		if (T_FAILED(initImGui(IMGUI_VIEWID, conf.gfxWidth, conf.gfxHeight, g_core->gfxDriver, g_alloc, conf.keymap)))	{
+		if (T_FAILED(initImGui(IMGUI_VIEWID, conf.gfxWidth, conf.gfxHeight, g_core->gfxDriver, g_alloc, conf.keymap,
+                               conf.uiIniFilename, platform ? platform->nwh : nullptr)))	
+        {
 			T_ERROR("Initializing ImGui failed");
 			return T_ERR_FAILED;
 		}		
+
+        if (T_FAILED(initSpriteSystem(g_core->gfxDriver, g_alloc))) {
+            T_ERROR("Initializing Sprite System failed");
+            return T_ERR_FAILED;
+        }
+        registerSpriteSheetToResourceLib(g_core->resLib);
     }
 
     // Job Dispatcher
-	BX_BEGINP("Initializing Job Dispatcher");
-    if (initJobDispatcher(g_alloc, 0, 0, 0, 0, false)) {
-        T_ERROR("Core init failed: Job Dispatcher init failed");
-		BX_END_FATAL();
-        return T_ERR_FAILED;
+    if ((conf.engineFlags & InitEngineFlags::EnableJobDispatcher) == InitEngineFlags::EnableJobDispatcher) {
+        BX_BEGINP("Initializing Job Dispatcher");
+        if (initJobDispatcher(g_alloc, conf.maxSmallFibers, conf.smallFiberSize*1024, conf.maxBigFibers, 
+                              conf.bigFiberSize*1024, 
+                              (conf.engineFlags & InitEngineFlags::LockThreadsToCores) == InitEngineFlags::LockThreadsToCores)) 
+        {
+            T_ERROR("Core init failed: Job Dispatcher init failed");
+            BX_END_FATAL();
+            return T_ERR_FAILED;
+        }
+        BX_END_OK();
+        BX_TRACE("%d Worker threads spawned", getNumWorkerThreads());
     }
-	BX_END_OK();
-	BX_TRACE("%d Worker threads spawned", getNumWorkerThreads());
 
 	// Component System
 	BX_BEGINP("Initializing Component System");
@@ -381,6 +397,8 @@ void termite::shutdown()
     shutdownJobDispatcher();
 	BX_END_OK();
 
+    BX_BEGINP("Shutting down Graphics Subsystems");
+    shutdownSpriteSystem();
 	shutdownImGui();
     shutdownDebugDraw();
     shutdownVectorGfx();
@@ -388,6 +406,7 @@ void termite::shutdown()
     shutdownModelLoader();
     shutdownTextureLoader();
     shutdownGfxUtils();
+    BX_END_OK();
 
     if (g_core->renderer) {
         BX_BEGINP("Shutting down Renderer");
@@ -442,12 +461,13 @@ void termite::doFrame()
     int64_t frameTick = bx::getHPCounter();
     double dt = double(frameTick - fd.lastFrameTick)/g_core->hpTimerFreq;
 
-	ImGui::NewFrame();
+    ImGui::GetIO().DeltaTime = float(dt);
+    ImGui::NewFrame();
 
 	if (g_core->updateFn)
 		g_core->updateFn(float(dt));
 
-	ImGui::Render();
+    ImGui::Render();
 
     if (g_core->renderer)
         g_core->renderer->render(nullptr);
@@ -588,7 +608,8 @@ void termite::inputSendChars(const char* chars)
 	int i = 0;
 	char c;
 	while ((c = chars[i++]) > 0) {
-		io.AddInputCharacter(chars[c]);
+        if (c > 0 && c <  0x10000)
+		    io.AddInputCharacter((ImWchar)c);
 		i++;
 	}
 }
@@ -596,7 +617,7 @@ void termite::inputSendChars(const char* chars)
 void termite::inputSendKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl)
 {
 	ImGuiIO& io = ImGui::GetIO();
-	memcpy(io.KeysDown, keysDown, sizeof(keysDown));
+	memcpy(io.KeysDown, keysDown, 512*sizeof(bool));
 	io.KeyShift = shift;
 	io.KeyAlt = alt;
 	io.KeyCtrl = ctrl;

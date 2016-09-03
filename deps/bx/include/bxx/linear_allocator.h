@@ -32,14 +32,28 @@ namespace bx
         virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) BX_OVERRIDE
         {
             if (_size) {
-                if (m_offset + _size > m_size)
+                if (m_offset + _size + sizeof(size_t) > m_size)
                     return nullptr;
 
-                void* p = m_ptr + m_offset;
-                m_offset += _size;
+                void* p = m_ptr + m_offset + sizeof(uint32_t);
+                *((uint32_t*)((uint8_t*)p - sizeof(uint32_t))) = uint32_t(_size);
+                m_offset += _size + sizeof(uint32_t);
+
+                if (_ptr) {
+                    size_t prevsize = *((uint32_t*)((uint8_t*)_ptr - sizeof(uint32_t)));
+                    if (_size < prevsize)
+                        prevsize = _size;
+                    memcpy(p, _ptr, prevsize);
+                }
+
                 return p;
             }
             return nullptr;
+        }
+
+        void reset()
+        {
+            m_offset = 0;
         }
 
     private:

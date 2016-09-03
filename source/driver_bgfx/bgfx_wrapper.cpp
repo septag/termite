@@ -881,6 +881,13 @@ static FrameBufferHandle createFrameBufferMRT(uint8_t num, const TextureHandle* 
     return r;
 }
 
+static FrameBufferHandle createFrameBufferAttachment(uint8_t num, const GfxAttachment* attachment, bool destroyTextures)
+{
+    FrameBufferHandle r;
+    r.value = bgfx::createFrameBuffer(num, (const bgfx::Attachment*)attachment, destroyTextures).idx;
+    return r;
+}
+
 static FrameBufferHandle createFrameBufferNative(void* nwh, uint16_t width, uint16_t height, TextureFormat depthFmt)
 {
     FrameBufferHandle r;
@@ -1086,6 +1093,7 @@ static void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.createFrameBufferRatio = createFrameBufferRatio;
     api.createFrameBufferMRT = createFrameBufferMRT;
     api.createFrameBufferNative = createFrameBufferNative;
+    api.createFrameBufferAttachment = createFrameBufferAttachment;
     api.destroyFrameBuffer = destroyFrameBuffer;
     api.checkAvailInstanceDataBuffer = checkAvailInstanceDataBuffer;
     api.allocInstanceDataBuffer = allocInstanceDataBuffer;

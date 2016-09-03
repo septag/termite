@@ -305,25 +305,25 @@ int main(int argc, char* argv[])
 	conf.gfxHeight = WINDOW_HEIGHT;
 
 	// Set Keymap
-	conf.keymap[int(GuiKeyMap::Tab)] = SDLK_TAB;
-	conf.keymap[int(GuiKeyMap::LeftArrow)] = SDL_SCANCODE_LEFT;
-	conf.keymap[int(GuiKeyMap::DownArrow)] = SDL_SCANCODE_DOWN;
-	conf.keymap[int(GuiKeyMap::UpArrow)] = SDL_SCANCODE_UP;
-	conf.keymap[int(GuiKeyMap::DownArrow)] = SDL_SCANCODE_DOWN;
-	conf.keymap[int(GuiKeyMap::PageUp)] = SDL_SCANCODE_PAGEUP;
-	conf.keymap[int(GuiKeyMap::PageDown)] = SDL_SCANCODE_PAGEDOWN;
-	conf.keymap[int(GuiKeyMap::Home)] = SDL_SCANCODE_HOME;
-	conf.keymap[int(GuiKeyMap::End)] = SDL_SCANCODE_END;
-	conf.keymap[int(GuiKeyMap::Delete)] = SDLK_DELETE;
-	conf.keymap[int(GuiKeyMap::Backspace)] = SDLK_BACKSPACE;
-	conf.keymap[int(GuiKeyMap::Enter)] = SDLK_RETURN;
-	conf.keymap[int(GuiKeyMap::Escape)] = SDLK_ESCAPE;
-	conf.keymap[int(GuiKeyMap::A)] = SDLK_a;
-	conf.keymap[int(GuiKeyMap::C)] = SDLK_c;
-	conf.keymap[int(GuiKeyMap::V)] = SDLK_v;
-	conf.keymap[int(GuiKeyMap::X)] = SDLK_x;
-	conf.keymap[int(GuiKeyMap::Y)] = SDLK_y;
-	conf.keymap[int(GuiKeyMap::Z)] = SDLK_z;
+	conf.keymap[ImGuiKey_Tab] = SDLK_TAB;
+	conf.keymap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
+	conf.keymap[ImGuiKey_RightArrow] = SDL_SCANCODE_DOWN;
+	conf.keymap[ImGuiKey_UpArrow] = SDL_SCANCODE_UP;
+	conf.keymap[ImGuiKey_RightArrow] = SDL_SCANCODE_DOWN;
+	conf.keymap[ImGuiKey_PageUp] = SDL_SCANCODE_PAGEUP;
+	conf.keymap[ImGuiKey_PageDown] = SDL_SCANCODE_PAGEDOWN;
+	conf.keymap[ImGuiKey_Home] = SDL_SCANCODE_HOME;
+	conf.keymap[ImGuiKey_End] = SDL_SCANCODE_END;
+	conf.keymap[ImGuiKey_Delete] = SDLK_DELETE;
+	conf.keymap[ImGuiKey_Backspace] = SDLK_BACKSPACE;
+	conf.keymap[ImGuiKey_Enter] = SDLK_RETURN;
+	conf.keymap[ImGuiKey_Escape] = SDLK_ESCAPE;
+	conf.keymap[ImGuiKey_A] = SDLK_a;
+	conf.keymap[ImGuiKey_C] = SDLK_c;
+	conf.keymap[ImGuiKey_V] = SDLK_v;
+	conf.keymap[ImGuiKey_X] = SDLK_x;
+	conf.keymap[ImGuiKey_Y] = SDLK_y;
+	conf.keymap[ImGuiKey_Z] = SDLK_z;
 
 	if (termite::initialize(conf, update, getSDLWindowData(g_window))) {
 		BX_FATAL(termite::getErrorString());

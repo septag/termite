@@ -33,6 +33,8 @@ include(Bgfx)
 
 # options
 option(BUILD_BOX2D "Build Box2D Physics engine" OFF)
+option(BUILD_DIGGER "Build Digger Game Prototype" OFF)
+option(USE_SDL2 "Use SDL2 with the engine" OFF)
 
 # Check dependencies
 
@@ -180,9 +182,11 @@ set_target_properties(trender_stock PROPERTIES FOLDER Plugins)
 add_subdirectory(source/ls-model)
 add_subdirectory(source/modelc)
 add_subdirectory(source/animc)
+add_subdirectory(source/sheetmaker)
 set_target_properties(ls-model PROPERTIES FOLDER Tools)
 set_target_properties(modelc PROPERTIES FOLDER Tools)
 set_target_properties(animc PROPERTIES FOLDER Tools)
+set_target_properties(sheetmaker PROPERTIES FOLDER Tools)
 
 # tests
 add_subdirectory(tests)
@@ -191,12 +195,18 @@ set_target_properties(test_sdl PROPERTIES FOLDER Tests)
 set_target_properties(test_gui PROPERTIES FOLDER Tests)
 set_target_properties(test_component PROPERTIES FOLDER Tests)
 set_target_properties(test_box2d PROPERTIES FOLDER Tests)
+set_target_properties(test_sprite PROPERTIES FOLDER Tests)
 
 # copy binaries
 if (WIN32)
     set_target_properties(AssimpCopyBinaries PROPERTIES FOLDER Deps/CopyBinaries) 
     set_target_properties(LibuvCopyBinaries PROPERTIES FOLDER Deps/CopyBinaries) 
     set_target_properties(SDL2CopyBinaries PROPERTIES FOLDER Deps/CopyBinaries) 
+endif()
+
+# Digger
+if (BUILD_DIGGER)
+    add_subdirectory(digger)
 endif()
 
 

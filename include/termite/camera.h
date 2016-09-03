@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vec_math.h"
+#include "gfx_utils.h"
 
 namespace termite
 {
@@ -44,4 +45,20 @@ namespace termite
     TERMITE_API void camStrafe(Camera* cam, float strafe);
     TERMITE_API mtx4x4_t camViewMtx(Camera* cam);
     TERMITE_API mtx4x4_t camProjMtx(Camera* cam, float aspectRatio);
+
+    struct Camera2D
+    {
+        vec2_t pos;
+        float zoom;
+        float refWidth;
+        float refHeight;
+        DisplayPolicy policy;
+    };
+
+    TERMITE_API void cam2dInit(Camera2D* cam, float refWidth, float refHeight, 
+                               DisplayPolicy policy, float zoom = 1.0f, const vec2_t pos = vec2f(0, 0));
+    TERMITE_API void cam2dPan(Camera2D* cam, vec2_t pan);
+    TERMITE_API void cam2dZoom(Camera2D* cam, float zoom);
+    TERMITE_API mtx4x4_t cam2dViewMtx(const Camera2D& cam);
+    TERMITE_API mtx4x4_t cam2dProjMtx(const Camera2D& cam, float width, float height);
 } // namespace termite

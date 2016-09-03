@@ -196,3 +196,51 @@ mtx4x4_t termite::camProjMtx(Camera* cam, float aspectRatio)
                    0, 0, zf / (zf - zn), 1.0f,
                    0, 0, zn*zf / (zn - zf), 0);
 }
+
+void termite::cam2dInit(Camera2D* cam, float refWidth, float refHeight, DisplayPolicy policy, 
+                        float zoom /*= 1.0f*/, const vec2_t pos /*= vec2f(0, 0)*/)
+{
+    cam->refWidth = refWidth;
+    cam->refHeight = refHeight;
+    cam->zoom = zoom;
+    cam->pos = pos;
+    cam->policy = policy;
+}
+
+void termite::cam2dPan(Camera2D* cam, vec2_t pan)
+{
+    cam->pos = cam->pos + pan;
+}
+
+void termite::cam2dZoom(Camera2D* cam, float zoom)
+{
+    cam->zoom = zoom;
+}
+
+mtx4x4_t termite::cam2dViewMtx(const Camera2D& cam)
+{
+    return mtx4x4f3(1.0f, 0, 0,
+                    0, 1.0f, 0,
+                    0, 0, 1.0f,
+                    -cam.pos.x, -cam.pos.y, 0);
+}
+
+mtx4x4_t termite::cam2dProjMtx(const Camera2D& cam, float width, float height)
+{
+    float s = 1.0f / cam.zoom;
+
+    // keep the ratio in scale of 1.0
+    float hw, hh;
+    float ratio = cam.refWidth / cam.refHeight;
+    if (cam.policy == DisplayPolicy::FitToHeight) {
+        hw = 1.0f;
+        hh = hw / ratio;
+    } else if (cam.policy == DisplayPolicy::FitToWidth) {
+        hh = 1.0f;
+        hw = ratio * hh;
+    }
+
+    mtx4x4_t projMtx;
+    bx::mtxOrtho(projMtx.f, -hw*s, hw*s, -hh*s, hh*s, 0, 1.0f);
+    return projMtx;
+}

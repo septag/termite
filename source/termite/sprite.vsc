@@ -1,0 +1,29 @@
+$input a_position, a_texcoord0, a_transform, a_color0
+$output v_texcoord0, v_color0
+
+#include <bgfx_shader.sh>
+
+void main()
+{
+	float rot = radians(a_position.w);
+    vec2 posOffset = a_transform.xy;
+    vec2 anchor = a_transform.zw;
+    
+    // Rotate
+	float s, c;
+	sincos(rot, s, c);
+	mat3 m;
+	m[0] = vec3(c, s, 0);
+	m[1] = vec3(-s, c, 0);
+	m[2] = vec3(0, 0, 1.0);
+
+	a_position.xy -= anchor;
+	vec3 pos = mul(m, vec3(a_position.xy, 0));
+    pos.xy += posOffset;
+
+    gl_Position = mul(u_viewProj, vec4(pos, 1.0));
+	gl_Position.z = a_position.z;
+    v_texcoord0 = a_texcoord0;
+
+    v_color0 = a_color0;
+}

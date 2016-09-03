@@ -220,10 +220,11 @@ namespace termite
         void(*destroyTexture)(TextureHandle handle);
 
         // Frame Buffers
-        FrameBufferHandle(*createFrameBuffer)(uint16_t width, uint16_t height, TextureFormat fmt, TextureFlag flags);
-        FrameBufferHandle(*createFrameBufferRatio)(BackbufferRatio ratio, TextureFormat fmt, TextureFlag flags);
-        FrameBufferHandle(*createFrameBufferMRT)(uint8_t num, const TextureHandle* handles, bool destroyTextures);
-        FrameBufferHandle(*createFrameBufferNative)(void* nwh, uint16_t width, uint16_t height, TextureFormat depthFmt);
+        FrameBufferHandle(*createFrameBuffer)(uint16_t width, uint16_t height, TextureFormat fmt, TextureFlag flags/* = TextureFlag::U_Clamp | TextureFlag::V_Clamp*/);
+        FrameBufferHandle(*createFrameBufferRatio)(BackbufferRatio ratio, TextureFormat fmt, TextureFlag flags/* = TextureFlag::U_Clamp | TextureFlag::V_Clamp*/);
+        FrameBufferHandle(*createFrameBufferMRT)(uint8_t num, const TextureHandle* handles, bool destroyTextures/* = false*/);
+        FrameBufferHandle(*createFrameBufferAttachment)(uint8_t num, const GfxAttachment* attachment, bool destroyTextures/* = false*/);
+        FrameBufferHandle(*createFrameBufferNative)(void* nwh, uint16_t width, uint16_t height, TextureFormat depthFmt/* = TextureFormat::UnknownDepth*/);
         void(*destroyFrameBuffer)(FrameBufferHandle handle);
 
         // Instance Buffer

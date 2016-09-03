@@ -10,7 +10,7 @@
 using namespace termite;
 
 #define DEFAULT_MAX_PAGES_PER_POOL 32   // 32 pages per pool
-#define DEFAULT_PAGE_SIZE 1024*2048     // 2MB
+#define DEFAULT_PAGE_SIZE 2*1024*1024     // 2MB
 
 struct Bucket;
 
@@ -151,6 +151,7 @@ static bx::AllocatorI* newPage(Bucket* bucket, uint64_t tag)
     page->tag = tag;
     bx::addListNode<Page*>(&gMemPool->pages, &page->lnode, page);
     bx::atomicFetchAndAdd(&gMemPool->numPages, 1);
+    page->linAlloc.reset();
     return &page->linAlloc;
 }
 

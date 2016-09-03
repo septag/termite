@@ -149,3 +149,22 @@ void termite::drawFullscreenQuad(uint8_t viewId, ProgramHandle prog)
     driver->setIndexBuffer(g_fsIb, 0, 6);
     driver->submit(viewId, prog, 0, false);
 }
+
+vec2int_t termite::getRelativeDisplaySize(int refWidth, int refHeight, int targetWidth, int targetHeight, DisplayPolicy policy)
+{
+    float w, h;
+    float ratio = float(refWidth) / float(refHeight);
+    switch (policy) {
+    case DisplayPolicy::FitToHeight:
+        h = float(targetHeight);
+        w = h*ratio;
+        break;
+
+    case DisplayPolicy::FitToWidth:
+        w = float(targetWidth);
+        h = w / ratio;
+        break;
+    }
+
+    return vec2i(int(w), int(h));
+}

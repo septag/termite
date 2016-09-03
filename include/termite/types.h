@@ -52,7 +52,7 @@ namespace termite
             return value;
         }
 
-        inline bool isValid()
+        inline bool isValid() const
         {
             return value != _Invalid;
         }
