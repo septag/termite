@@ -52,6 +52,7 @@ struct TextureLoader
     bx::AllocatorI* alloc;
     Texture* whiteTexture;
     Texture* asyncBlankTexture;
+    Texture* failTexture;
     GfxDriverApi* driver;
 
     TextureLoader(bx::AllocatorI* _alloc)
@@ -59,6 +60,7 @@ struct TextureLoader
         alloc = _alloc;
         whiteTexture = nullptr;
         asyncBlankTexture = nullptr;
+        failTexture = nullptr;
         driver = nullptr;
     }
 };
@@ -82,22 +84,43 @@ result_t termite::initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc,
     }
 
     // Create a default async object (1x1 RGBA white)
+    static uint32_t whitePixel = 0xffffffff;
     g_texLoader->whiteTexture = loader->texturePool.newInstance();
     if (!g_texLoader->whiteTexture)
         return T_ERR_OUTOFMEM;
 
-    static uint32_t whitePixel = 0xffffffff;
-    g_texLoader->whiteTexture->handle = driver->createTexture2D(1, 1, 1, TextureFormat::RGBA8,
+    g_texLoader->whiteTexture->handle = driver->createTexture2D(1, 1, false, 1, TextureFormat::RGBA8,
         TextureFlag::U_Clamp|TextureFlag::V_Clamp|TextureFlag::MinPoint|TextureFlag::MagPoint,
         driver->makeRef(&whitePixel, sizeof(uint32_t), nullptr, nullptr));
     g_texLoader->whiteTexture->info.width = 1;
     g_texLoader->whiteTexture->info.height = 1;
     g_texLoader->whiteTexture->info.format = TextureFormat::RGBA8;
     if (!g_texLoader->whiteTexture->handle.isValid()) {
-        T_ERROR("Creating blank 1x1 texture failed");
+        T_ERROR("Creating Blank 1x1 texture failed");
         return T_ERR_FAILED;
     }
     g_texLoader->asyncBlankTexture = g_texLoader->whiteTexture;
+
+    // Fail texture (Checkers 2x2)
+    static uint32_t checkerPixels[] = {
+        0xff0000ff,
+        0xffffffff,
+        0xff0000ff,
+        0xffffffff
+    };
+    g_texLoader->failTexture = loader->texturePool.newInstance();
+    if (!g_texLoader->failTexture)
+        return T_ERR_OUTOFMEM;
+    g_texLoader->failTexture->handle = driver->createTexture2D(2, 2, false, 1, TextureFormat::RGBA8,
+                                                               TextureFlag::MinPoint | TextureFlag::MagPoint,
+                                                               driver->makeRef(checkerPixels, sizeof(checkerPixels), nullptr, nullptr));
+    g_texLoader->failTexture->info.width = 2;
+    g_texLoader->failTexture->info.height = 2;
+    g_texLoader->failTexture->info.format = TextureFormat::RGBA8;
+    if (!g_texLoader->failTexture->handle.isValid()) {
+        T_ERROR("Creating Fail 2x2 texture failed");
+        return T_ERR_FAILED;
+    }
 
     return 0;
 }
@@ -105,10 +128,12 @@ result_t termite::initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc,
 void termite::registerTextureToResourceLib(ResourceLib* resLib)
 {
     ResourceTypeHandle handle;
-    handle = registerResourceType(resLib, "image", &g_texLoader->rawLoader, sizeof(LoadTextureParams));
+    handle = registerResourceType(resLib, "image", &g_texLoader->rawLoader, sizeof(LoadTextureParams), 
+                                  uintptr_t(g_texLoader->failTexture));
     assert(handle.isValid());
 
-    handle = registerResourceType(resLib, "texture", &g_texLoader->loader, sizeof(LoadTextureParams));
+    handle = registerResourceType(resLib, "texture", &g_texLoader->loader, sizeof(LoadTextureParams),
+                                  uintptr_t(g_texLoader->failTexture));
     assert(handle.isValid());
 }
 
@@ -120,6 +145,11 @@ void termite::shutdownTextureLoader()
     if (g_texLoader->whiteTexture) {
         if (g_texLoader->whiteTexture->handle.isValid())
             g_texLoader->driver->destroyTexture(g_texLoader->whiteTexture->handle);
+    }
+
+    if (g_texLoader->failTexture) {
+        if (g_texLoader->failTexture->handle.isValid())
+            g_texLoader->driver->destroyTexture(g_texLoader->failTexture->handle);
     }
 
     g_texLoader->texturePool.destroy();
@@ -238,7 +268,8 @@ bool TextureLoaderRaw::loadObj(ResourceLib* resLib, const MemoryBlock* mem, cons
         gmem = driver->makeRef(pixels, width*height * 4, stbCallbackFreeImage, nullptr);
     }
 
-    texture->handle = driver->createTexture2D(width, height, numMips, TextureFormat::RGBA8, texParams->flags, gmem);
+    texture->handle = driver->createTexture2D(width, height, texParams->generateMips, 1, TextureFormat::RGBA8, 
+                                              texParams->flags, gmem);
     if (!texture->handle.isValid())
         return false;
 
@@ -249,6 +280,7 @@ bool TextureLoaderRaw::loadObj(ResourceLib* resLib, const MemoryBlock* mem, cons
     info->numMips = 1;
     info->storageSize = width * height * 4;
     info->bitsPerPixel = 32;
+    texture->ratio = float(info->width) / float(info->height);
 
     *obj = uintptr_t(texture);
     return true;
@@ -263,8 +295,9 @@ void TextureLoaderRaw::unloadObj(ResourceLib* resLib, uintptr_t obj)
     if (texture == g_texLoader->asyncBlankTexture)
         return;
 
-    if (texture->handle.isValid())
+    if (texture->handle.isValid()) {
         g_texLoader->driver->destroyTexture(texture->handle);
+    }
 
     g_texLoader->texturePool.deleteInstance(texture);
 }
@@ -297,6 +330,7 @@ bool TextureLoaderKTX::loadObj(ResourceLib* resLib, const MemoryBlock* mem, cons
                                             &texture->info);
     if (!texture->handle.isValid())
         return false;
+    texture->ratio = float(texture->info.width) / float(texture->info.height);
 
     *obj = uintptr_t(texture);
     return true;

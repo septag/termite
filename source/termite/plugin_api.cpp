@@ -72,8 +72,6 @@ static void* getImGuiApi0()
 	api.pushStyleVar = static_cast<void(*)(ImGuiStyleVar, float)>(ImGui::PushStyleVar);
 	api.pushStyleVarVec2 = static_cast<void(*)(ImGuiStyleVar, const ImVec2&)>(ImGui::PushStyleVar);
 	api.popStyleVar = static_cast<void(*)(int)>(ImGui::PopStyleVar);
-	api.getColorU32 = static_cast<ImU32(*)(ImGuiCol, float)>(ImGui::GetColorU32);
-	api.getColorU32Vec4 = static_cast<ImU32(*)(const ImVec4&)>(ImGui::GetColorU32);
 	api.pushItemWidth = ImGui::PushItemWidth;
 	api.popItemWidth = ImGui::PopItemWidth;
 	api.calcItemWidth = ImGui::CalcItemWidth;
@@ -263,8 +261,7 @@ static void* getComponentApi(uint32_t version)
 
 void* termite::getEngineApi(uint16_t apiId, uint32_t version)
 {
-    ApiId id = ApiId(apiId);
-    if (id == ApiId::Core && version == 0) {
+    if (apiId == ApiId::Core && version == 0) {
         static CoreApi_v0 core0;
         core0.copyMemoryBlock = copyMemoryBlock;
         core0.createMemoryBlock = createMemoryBlock;
@@ -284,7 +281,7 @@ void* termite::getEngineApi(uint16_t apiId, uint32_t version)
         core0.getTempAlloc = getTempAlloc;
 
         return &core0;
-    } else if (id == ApiId::Gfx && version == 0) {
+    } else if (apiId == ApiId::Gfx && version == 0) {
         static GfxApi_v0 gfx0;
         gfx0.calcGaussKernel = calcGaussKernel;
         gfx0.drawFullscreenQuad = drawFullscreenQuad;
@@ -298,7 +295,7 @@ void* termite::getEngineApi(uint16_t apiId, uint32_t version)
         gfx0.vdeclSkip = vdeclSkip;
 
         return &gfx0;
-	} else if (id == ApiId::ImGui && version == 0) {
+	} else if (apiId == ApiId::ImGui && version == 0) {
 		return getImGuiApi0();
 	}
 

@@ -20,9 +20,9 @@ static void jobCallback2(int jobIndex, void* userParam)
 {
     printf("JOB2 - %d (Thread: %u)\n", jobIndex, bx::getTid());
 
-    jobDesc jobs[] = {
-        jobDesc(subJobCallback1),
-        jobDesc(subJobCallback1)
+    JobDesc jobs[] = {
+        JobDesc(subJobCallback1),
+        JobDesc(subJobCallback1)
     };
     JobHandle handle = dispatchSmallJobs(jobs, 2);
     waitJobs(handle);
@@ -42,9 +42,7 @@ int main(int argc, char* argv[])
     
     termite::Config conf;
     bx::Path pluginPath(argv[0]);
-    strcpy(conf.rendererName, "[none]");
-
-    strcpy(conf.pluginPath, pluginPath.getDirectory().cstr());
+    strcpy(conf.gfxName, "");
 
     if (termite::initialize(conf, nullptr)) {
         BX_FATAL(termite::getErrorString());
@@ -57,10 +55,10 @@ int main(int argc, char* argv[])
     puts("Press ESC to quit ...");
 
     // start some jobs
-    const jobDesc jobs[] = {
-        jobDesc(jobCallback1),
-        jobDesc(jobCallback1),
-        jobDesc(jobCallback2)
+    const JobDesc jobs[] = {
+        JobDesc(jobCallback1),
+        JobDesc(jobCallback1),
+        JobDesc(jobCallback2)
     };
 
     JobHandle handle = dispatchSmallJobs(jobs, 3);

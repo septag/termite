@@ -12,16 +12,28 @@ source_group(shaders FILES ${SHADER_SOURCES})
 bgfx_add_shaders("${SHADER_SOURCES}" IGNORE IGNORE "shaders_h" TRUE IGNORE SHADER_GEN_FILES)
 source_group(shaders\\compiled FILES ${SHADER_GEN_FILES})
 
-add_library(termite SHARED ${SOURCE_FILES} ${INCLUDE_FILES} ${SHADER_SOURCES} ${SHADER_GEN_FILES})
+add_library(termite ${BUILD_LIBRARY_TYPE} ${SOURCE_FILES} ${INCLUDE_FILES} ${SHADER_SOURCES} ${SHADER_GEN_FILES})
 
 # libraries for unix/posix
-if (UNIX)
-    set(POSIX_LIBS pthread dl)
+if (ANDROID)
+    set(STD_LIBS log dl GLESv2 EGL android)
+elseif (UNIX)
+    set(STD_LIBS pthread dl)
+endif()
+
+# statically linked plugin libraries
+if (BUILD_STATIC)
+    if (ANDROID)
+        set(DISK_DRIVER android_assets_driver)
+    else()
+        set(DISK_DRIVER disk_driver)
+    endif()
+    set(PLUGIN_LIBS bgfx_driver ${DISK_DRIVER})
 endif()
 
 target_link_libraries(termite 
     PRIVATE fcontext imgui_impl
-    PUBLIC bx ${POSIX_LIBS})
+    PUBLIC bx ${STD_LIBS} ${PLUGIN_LIBS})
 
 # 
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)

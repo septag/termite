@@ -22,9 +22,12 @@ source_group(shaders\\compiled FILES ${SHADER_GEN_FILES})
 # ImGui itself
 add_library(imgui STATIC ${IMGUI_SOURCES})
 target_include_directories(imgui PUBLIC ${DEP_ROOT_DIR}/imgui)
+set_target_properties(imgui PROPERTIES FOLDER Deps)
 
 # ImGui Drawing for termite
 add_library(imgui_impl STATIC ${SOURCE_FILES} ${SHADER_SOURCES} ${SHADER_GEN_FILES})
+set_target_properties(imgui_impl PROPERTIES FOLDER Common)
+
 target_link_libraries(imgui_impl 
     PRIVATE bx
     PUBLIC imgui)

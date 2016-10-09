@@ -550,6 +550,11 @@ namespace bx
 		_result[15] = 1.0f;
 	}
 
+	inline void mtxScale(float* _result, float _scale)
+	{
+		mtxScale(_result, _scale, _scale, _scale);
+	}
+
 	inline void mtxFromNormal(float* __restrict _result, const float* __restrict _normal, float _scale, const float* __restrict _pos)
 	{
 		float tangent[3];
@@ -579,7 +584,7 @@ namespace bx
 		const float x2  =  x + x;
 		const float y2  =  y + y;
 		const float z2  =  z + z;
-		const float x2x = x2 * x; //-V525
+		const float x2x = x2 * x;
 		const float x2y = x2 * y;
 		const float x2z = x2 * z;
 		const float x2w = x2 * w;

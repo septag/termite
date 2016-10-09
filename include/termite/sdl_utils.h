@@ -4,7 +4,10 @@
 
 namespace termite
 {
-    TERMITE_API void sdlGetNativeWindowHandle(SDL_Window* window, void** pWndHandle, void** pDisplayHandle = nullptr);
+    struct Config;
+
+    TERMITE_API void sdlGetNativeWindowHandle(SDL_Window* window, void** pWndHandle, void** pDisplayHandle = nullptr,
+                                              void** pBackbuffer = nullptr);
     TERMITE_API bool sdlHandleEvent(const SDL_Event& ev);
-    TERMITE_API void sdlMapImGuiKeys(int keymap[19]);
+    TERMITE_API void sdlMapImGuiKeys(Config* conf);
 } // namespace termite

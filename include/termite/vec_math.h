@@ -825,7 +825,7 @@ namespace termite
 
     inline vec2_t operator-(const vec2_t& a, const vec2_t& b)
     {
-        return vec2f(a.x - b.x, a.x - b.y);
+        return vec2f(a.x - b.x, a.y - b.y);
     }
 
     inline vec2_t operator*(const vec2_t& v, float k)

@@ -2,6 +2,7 @@
 
 #include "bx/allocator.h"
 #include "bx/cpu.h"
+#include "pool.h"
 
 namespace bx
 {
@@ -52,48 +53,65 @@ namespace bx
     // SpScQueueAlloc and container
     // http://drdobbs.com/article/print?articleId=210604448&siteSectionName=
     template <typename Ty>
-    class SpScUnboundedQueueAlloc
+    class SpScUnboundedQueuePool
     {
-        BX_CLASS(SpScUnboundedQueueAlloc
+        BX_CLASS(SpScUnboundedQueuePool
                  , NO_COPY
                  , NO_ASSIGNMENT
                  );
+    public:
+        struct Node
+        {
+            Node() : next(NULL)
+            {
+            }
+
+            Node(const Ty& _value) 
+                : value(_value)
+                , next(NULL)
+            {
+            }
+
+            Ty value;
+            Node* next;
+        };
 
     public:
-        explicit SpScUnboundedQueueAlloc(AllocatorI* _alloc)
+        explicit SpScUnboundedQueuePool(bx::Pool<Node>* _pool)
             :
-              m_alloc(_alloc)
-            , m_first(BX_NEW(_alloc, Node))
+              m_pool(_pool)
+            , m_first(_pool->newInstance())
             , m_divider(m_first)
             , m_last(m_first)
 
         {
         }
 
-        ~SpScUnboundedQueueAlloc()
+        ~SpScUnboundedQueuePool()
         {
             while (NULL != m_first) {
                 Node* node = m_first;
-                m_first = node->m_next;
-                BX_DELETE(m_alloc, node);
+                m_first = node->next;
+                m_pool->deleteInstance(node);
             }
         }
 
         void push(const Ty& _value) // producer only
         {
-            m_last->m_next = BX_NEW(m_alloc, Node)(_value);
-            atomicExchangePtr((void**)&m_last, m_last->m_next);
+            m_last->next = m_pool->newInstance();
+            m_last->next->value = _value;
+            atomicExchangePtr((void**)&m_last, m_last->next);
             while (m_first != m_divider) {
                 Node* node = m_first;
-                m_first = m_first->m_next;
-                BX_DELETE(m_alloc, node);
+                m_first = m_first->next;
+                m_pool->deleteInstance(node);
             }
         }
 
         const Ty& peek() const // consumer only
         {
             if (m_divider != m_last) {
-                Ty& val = m_divider->m_next->m_value;
+                Ty& val = m_divider->next->value;
                 return val;
             }
 
@@ -103,8 +121,8 @@ namespace bx
         bool pop(Ty* val) // consumer only
         {
             if (m_divider != m_last) {
-                *val = m_divider->m_next->m_value;
-                atomicExchangePtr((void**)&m_divider, m_divider->m_next);
+                *val = m_divider->next->value;
+                atomicExchangePtr((void**)&m_divider, m_divider->next);
                 return true;
             }
 
@@ -112,26 +130,7 @@ namespace bx
         }
 
     private:
-        template <typename Tn> 
-        struct Node_t
-        {
-            Node_t() : m_next(NULL)
-            {
-            }
-
-            Node_t(const Tn& _value) 
-                : m_value(_value)
-                , m_next(NULL)
-            {
-            }
-
-            Tn m_value;
-            Node_t<Tn>* m_next;
-        };
-
-        typedef Node_t<Ty> Node;
-
-        AllocatorI* m_alloc;
+        bx::Pool<Node>* m_pool;
         Node* m_first;
         Node* m_divider;
         Node* m_last;

@@ -3,14 +3,15 @@
 #include "types.h"
 #include "bx/bx.h"
 #include "bx/allocator.h"
-#include "bxx/bitmask_operators.hpp"
 
 namespace termite
 {
-    static const uint32_t kEntityIndexBits = 22;
+    static const uint32_t kEntityIndexBits = 16;
     static const uint32_t kEntityIndexMask = (1 << kEntityIndexBits) - 1;
-    static const uint32_t kEntityGenerationBits = 8;
+    static const uint32_t kEntityGenerationBits = 16;
     static const uint32_t kEntityGenerationMask = (1 << kEntityGenerationBits) - 1;
+
+    struct GfxDriverApi;
 
     struct Entity
     {
@@ -63,38 +64,66 @@ namespace termite
     {
         bool(*createInstance)(Entity ent, ComponentHandle handle);
         void(*destroyInstance)(Entity ent, ComponentHandle handle);
-        void(*updateAll)();
-        void(*preUpdateAll)();
-        void(*postUpdateAll)();
+        void(*updateAll)(const ComponentHandle* handles, uint16_t count, float dt);
+        void(*preUpdateAll)(const ComponentHandle* handles, uint16_t count, float dt);
+        void(*postUpdateAll)(const ComponentHandle* handles, uint16_t count, float dt);
+        void(*renderAll)(const ComponentHandle* handles, uint16_t count, GfxDriverApi* driver);
+
+        ComponentCallbacks()
+        {
+            createInstance = nullptr;
+            destroyInstance = nullptr;
+            updateAll = nullptr;
+            preUpdateAll = nullptr;
+            postUpdateAll = nullptr;
+            renderAll = nullptr;
+        }
     };
 
-    enum class ComponentFlag
+    struct ComponentUpdateStage
     {
-        None = 0x0,
-        ImmediateDestroy = 0x01   // Destroys component immediately after owner entity is destroyed
+        enum Enum
+        {
+            PreUpdate,
+            Update,
+            PostUpdate,
+        };
+    };
+
+    struct ComponentFlag
+    {
+        enum Enum
+        {
+            None = 0x0,
+            ImmediateDestroy = 0x01   // Destroys component immediately after owner entity is destroyed
+        };
+
+        typedef uint8_t Bits;
     };
 
 	TERMITE_API ComponentTypeHandle registerComponentType(const char* name, uint32_t id,
-							                              const ComponentCallbacks* callbacks, ComponentFlag flags,
+							                              const ComponentCallbacks* callbacks, ComponentFlag::Bits flags,
 										                  uint32_t dataSize, uint16_t poolSize, uint16_t growSize);
 	TERMITE_API void garbageCollectComponents(EntityManager* emgr);
 
 	TERMITE_API ComponentHandle createComponent(EntityManager* emgr, Entity ent, ComponentTypeHandle handle);
 	TERMITE_API void destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle handle);
+    TERMITE_API void callComponentUpdates(ComponentUpdateStage::Enum updateStage, float dt);
+    TERMITE_API void callRenderComponents(GfxDriverApi* driver);
+    TERMITE_API void resetComponentUpdateCache();
 
 	TERMITE_API ComponentTypeHandle findComponentTypeByName(const char* name);
 	TERMITE_API ComponentTypeHandle findComponentTypeById(uint32_t id);
 	TERMITE_API ComponentHandle getComponent(ComponentTypeHandle handle, Entity ent);
 	TERMITE_API void* getComponentData(ComponentHandle handle);
     TERMITE_API Entity getComponentEntity(ComponentHandle handle);
-	TERMITE_API uint16_t getAllComponents(ComponentTypeHandle typeHandle, ComponentHandle* handles, uint16_t maxComponents);	
+
+    // Pass handles=nullptr to get the count of all components only
+    TERMITE_API uint16_t getAllComponents(ComponentTypeHandle typeHandle, ComponentHandle* handles, uint16_t maxComponents);
 
     template <typename Ty> 
     Ty* getComponentData(ComponentHandle handle)
     {
         return (Ty*)getComponentData(handle);
     }
-    
 } // namespace termite
-
-C11_DEFINE_FLAG_TYPE(termite::ComponentFlag);

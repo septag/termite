@@ -71,5 +71,16 @@ namespace termite
                                          float persistance, bx::AllocatorI* alloc);
     TERMITE_API float normalDist(float x, float mean, float stdDev);
 
+
+    // Reference: http://stackoverflow.com/questions/707370/clean-efficient-algorithm-for-wrapping-integers-in-c
+    inline int iwrap(int kX, int const kLowerBound, int const kUpperBound)
+    {
+        int range_size = kUpperBound - kLowerBound + 1;
+
+        if (kX < kLowerBound)
+            kX += range_size * ((kLowerBound - kX) / range_size + 1);
+
+        return kLowerBound + (kX - kLowerBound) % range_size;
+    }
 } // namespace termite
 

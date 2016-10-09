@@ -11,23 +11,28 @@
 namespace termite
 {
     struct Camera2D;
-    struct SpriteT {};
+    struct SpriteT;
+    struct SpriteAnimT;
     typedef PhantomType<uint16_t, SpriteT, UINT16_MAX> SpriteHandle;
+    typedef PhantomType<uint16_t, SpriteAnimT, UINT16_MAX> SpriteAnimHandle;
 
     struct SpriteAnimClip
     {
         char name[32];
-        float fps;
+        uint32_t nameHash;
         int startFrame;
         int endFrame;
+        float fps;
+        float totalTime;
     };
 
     struct SpriteSheet
     {
         ResourceHandle textureHandle;
-        int numRegions;
+        int numFrames;
         int numAnimClips;
-        vec4_t* regions;
+        vec4_t* frames; // count = numFrames
+        uint32_t* tags; // count = numFrames (hashed value of tag name)
         SpriteAnimClip* clips;
     };
 
@@ -56,9 +61,34 @@ namespace termite
                                        const float* rotBuffer, const color_t* tintColors);
 
     TERMITE_API void drawSprites(uint8_t viewId, const SpriteHandle* sprites, int numSprites,
-                                 const vec2_t* posBuffer, const float* rotBuffer, const color_t* tintColors,
-                                 ProgramHandle prog = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr);
+                                 const vec2_t* posBuffer, const float* rotBuffer = nullptr, const float* sizeBuffer = nullptr,
+                                 const color_t* tintColors = nullptr,
+                                 ProgramHandle prog = ProgramHandle(), SetSpriteStateCallback stateFunc = nullptr);
     TERMITE_API void drawSprites(uint8_t viewId, SpriteCache* spriteCache);
+
+    // Sprite Animation API
+    typedef void(*SpriteAnimCallback)(SpriteAnimHandle handle, void* userData);
+
+    TERMITE_API SpriteAnimHandle createSpriteAnim(SpriteHandle sprite);
+    TERMITE_API void destroySpriteAnim(SpriteAnimHandle handle);
+    TERMITE_API void stepSpriteAnim(SpriteAnimHandle handle, float dt);
+    TERMITE_API void queueSpriteAnim(SpriteAnimHandle handle, const char* clipName, bool looped, 
+                                     bool reverse = false, SpriteAnimCallback finishedCallback = nullptr, 
+                                     void* userData = nullptr);
+    TERMITE_API void addSpriteAnimEvent(SpriteAnimHandle handle, const char* tagName, SpriteAnimCallback tagInCallback,
+                                        void* userData = nullptr, SpriteAnimCallback tagOutCallback = nullptr);
+    TERMITE_API void resetSpriteAnim(SpriteAnimHandle handle);
+    TERMITE_API void stopSpriteAnim(SpriteAnimHandle handle);
+    TERMITE_API void setSpriteAnimPlaybackSpeed(SpriteAnimHandle handle, float speed);
+    TERMITE_API float getSpriteAnimPlaybackSpeed(SpriteAnimHandle handle);
+    TERMITE_API void playSpriteAnim(SpriteAnimHandle handle);
+
+    TERMITE_API void setSpriteFrame(SpriteHandle handle, int frameIdx);
+    TERMITE_API int getSpriteFrame(SpriteHandle handle);
+    TERMITE_API void setSpriteAnchor(SpriteHandle handle, const vec2_t localAnchor);
+    TERMITE_API vec2_t getSpriteAnchor(SpriteHandle handle);
+    TERMITE_API void setSpriteSize(SpriteHandle handle, const vec2_t halfSize);
+    TERMITE_API vec2_t getSpriteSize(SpriteHandle handle);
 
     // Registers "spritesheet" resource type and Loads SpriteSheet object
     void registerSpriteSheetToResourceLib(ResourceLib* resLib);
@@ -67,15 +97,178 @@ namespace termite
     {
         bool generateMips;
         uint8_t skipMips;
-        TextureFlag flags;
+        TextureFlag::Bits flags;
 
         LoadSpriteSheetParams()
         {
             generateMips = false;
             skipMips = 0;
             flags = TextureFlag::U_Clamp | TextureFlag::V_Clamp |
-                TextureFlag::MinPoint | TextureFlag::MagPoint;
+                    TextureFlag::MinPoint | TextureFlag::MagPoint;
         }
+    };
+
+    // Helper Wrappers
+    class Sprite
+    {
+    public:
+        SpriteHandle handle;
+
+    public:
+        inline Sprite()
+        {
+        }
+
+        explicit inline Sprite(SpriteHandle _handle) : 
+            handle(_handle)
+        {
+        }
+
+        inline ~Sprite()
+        {
+            assert(!handle.isValid());
+        }
+
+        inline void setFrame(int index)
+        {
+            setSpriteFrame(this->handle, index);
+        }
+
+        inline int getFrame() const 
+        {
+            return getSpriteFrame(this->handle);
+        }
+
+        inline void setSize(const vec2_t& halfSize)
+        {
+            setSpriteSize(this->handle, halfSize);
+        }
+
+        inline vec2_t getSize() const
+        {
+            return getSpriteSize(this->handle);
+        }
+
+        inline void setLocalAnchor(const vec2_t& anchor)
+        {
+            setSpriteAnchor(this->handle, anchor);
+        }
+
+        inline vec2_t getLocalAnchor() const
+        {
+            return getSpriteAnchor(this->handle);
+        }
+
+        inline bool isValid() const
+        {
+            return this->handle.isValid();
+        }
+
+        inline bool create(ResourceHandle textureHandle, 
+                           const vec2_t halfSize,
+                           const vec2_t localAnchor = vec2f(0, 0),
+                           const vec2_t topLeftCoords = vec2f(0, 0),
+                           const vec2_t bottomRightCoords = vec2f(1.0f, 1.0f))
+        {
+            this->handle =  createSpriteFromTexture(textureHandle, halfSize, localAnchor, topLeftCoords, bottomRightCoords);
+            return this->handle.isValid();
+        }
+
+        inline bool create(ResourceHandle spritesheetHandle, 
+                           const vec2_t halfSize,
+                           const vec2_t localAnchor = vec2f(0, 0), 
+                           int frameIndex = -1)
+        {
+            this->handle = createSpriteFromSpritesheet(spritesheetHandle, halfSize, localAnchor, frameIndex);
+            return this->handle.isValid();
+        }
+
+        inline void destroy()
+        {
+            destroySprite(this->handle);
+            this->handle.reset();
+        }
+    };
+
+    class SpriteAnim
+    {
+    public:
+        SpriteAnimHandle handle;
+
+    public:
+        inline SpriteAnim()
+        {
+        }
+
+        explicit inline SpriteAnim(SpriteAnimHandle _handle) :
+            handle(_handle)
+        {
+        }
+
+        inline ~SpriteAnim()
+        {
+            assert(!handle.isValid());
+        }
+
+        inline bool create(const Sprite& sprite)
+        {
+            this->handle = createSpriteAnim(sprite.handle);
+            return this->handle.isValid();
+        }
+
+        inline void destroy()
+        {
+            destroySpriteAnim(this->handle);
+            this->handle.reset();
+        }
+
+        inline void step(float dt)
+        {
+            stepSpriteAnim(this->handle, dt);
+        }
+
+        inline SpriteAnim& stop()
+        {
+            stopSpriteAnim(this->handle);
+            return *this;
+        }
+
+        inline SpriteAnim& queue(const char* clipName, bool looped, bool reverse = false,
+                                 SpriteAnimCallback finishCallback = nullptr, void* userData = nullptr)
+        {
+            queueSpriteAnim(this->handle, clipName, looped, reverse, finishCallback, userData);
+            return *this;
+        }
+
+        inline SpriteAnim& play()
+        {
+            playSpriteAnim(this->handle);
+            return *this;
+        }
+
+        inline SpriteAnim& reset()
+        {
+            resetSpriteAnim(this->handle);
+            return *this;
+        }
+
+        inline SpriteAnim& addEvent(const char* tagName, SpriteAnimCallback tagInCallback,
+                                    void* userData = nullptr, SpriteAnimCallback tagOutCallback = nullptr)
+        {
+            addSpriteAnimEvent(this->handle, tagName, tagInCallback, userData, tagOutCallback);
+            return *this;
+        }
+
+        inline void setPlaySpeed(float speedMult)
+        {
+            setSpriteAnimPlaybackSpeed(this->handle, speedMult);
+        }
+
+        inline float getPlaySpeed() const
+        {
+            return getSpriteAnimPlaybackSpeed(this->handle);
+        }
+
     };
 
 } // namespace termite

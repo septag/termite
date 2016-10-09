@@ -3,14 +3,12 @@
 #  define HAVE_STDINT_H 1
 #endif
 #include <SDL.h>
-#undef main
 #include <SDL_syswm.h>
-#undef None
 
-#include "termite/core.h"
 #include "bxx/logger.h"
 #include "bxx/path.h"
 
+#include "termite/core.h"
 #include "termite/gfx_defines.h"
 #include "termite/gfx_font.h"
 #include "termite/gfx_vg.h"
@@ -21,217 +19,69 @@
 #include "termite/gfx_model.h"
 #include "termite/io_driver.h"
 #include "termite/gfx_utils.h"
+#include "termite/sdl_utils.h"
+
 #include "imgui/imgui.h"
 
 #include <conio.h>
 
-using namespace termite;
-
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 800
 
-struct InputData
-{
-    int mouseButtons[3];
-    float mouseWheel;
-    bool keysDown[512];
-    bool keyShift;
-    bool keyCtrl;
-    bool keyAlt;
-
-    InputData()
-    {
-        mouseButtons[0] = mouseButtons[1] = mouseButtons[2] = 0;
-        mouseWheel = 0.0f;
-        keyShift = keyCtrl = keyAlt = false;
-        memset(keysDown, 0x00, sizeof(keysDown));
-    }
-};
-
 static SDL_Window* g_window = nullptr;
-static InputData g_input;
-static VectorGfxContext* g_vg = nullptr;
-static DebugDrawContext* g_debug = nullptr;
-static Camera g_cam;
-static ResourceHandle g_model;
-static ProgramHandle g_modelProg;
-static UniformHandle g_modelColor;
-
-static bool sdlPollEvents()
-{
-    SDL_Event e;
-    SDL_PollEvent(&e);
-
-    switch (e.type) {
-    case SDL_QUIT:
-        return false;
-    case SDL_MOUSEWHEEL:
-    {
-        if (e.wheel.y > 0)
-            g_input.mouseWheel = 1.0f;
-        else if (e.wheel.y < 0)
-            g_input.mouseWheel = -1.0f;
-        break;
-    }
-
-    case SDL_MOUSEBUTTONDOWN:
-    {
-        if (e.button.button == SDL_BUTTON_LEFT) g_input.mouseButtons[0] = 1;
-        if (e.button.button == SDL_BUTTON_RIGHT) g_input.mouseButtons[1] = 1;
-        if (e.button.button == SDL_BUTTON_MIDDLE) g_input.mouseButtons[2] = 1;
-        break;
-    }
-
-    case SDL_TEXTINPUT:
-        inputSendChars(e.text.text);
-        break;
-
-    case SDL_KEYDOWN:
-    case SDL_KEYUP:
-    {
-        int key = e.key.keysym.sym & ~SDLK_SCANCODE_MASK;
-        g_input.keysDown[key] = e.type == SDL_KEYDOWN;
-        g_input.keyShift = (SDL_GetModState() & KMOD_SHIFT) != 0;
-        g_input.keyCtrl = (SDL_GetModState() & KMOD_CTRL) != 0;
-        g_input.keyAlt = (SDL_GetModState() & KMOD_ALT) != 0;
-        inputSendKeys(g_input.keysDown, g_input.keyShift, g_input.keyAlt, g_input.keyCtrl);
-        break;
-    }
-
-    default:
-        break;
-    }
-
-    return true;
-}
+static termite::VectorGfxContext* g_vg = nullptr;
+static termite::DebugDrawContext* g_debug = nullptr;
+static termite::Camera g_cam;
+static termite::vec2int_t g_displaySize = termite::vec2i(WINDOW_WIDTH, WINDOW_HEIGHT);
 
 static void update(float dt)
 {
     int mx, my;
     uint32_t mouseMask = SDL_GetMouseState(&mx, &my);
 
-    float mousePos[2] = { 0.0f, 0.0f };
-    if (SDL_GetWindowFlags(g_window) & SDL_WINDOW_MOUSE_FOCUS) {
-        mousePos[0] = (float)mx;
-        mousePos[1] = (float)my;
-    } else {
-        mousePos[0] = -1.0f;
-        mousePos[1] = -1.0f;
-    }
-
-    g_input.mouseButtons[0] = (mouseMask & SDL_BUTTON(SDL_BUTTON_LEFT)) ? 1 : 0;
-    g_input.mouseButtons[1] = (mouseMask & SDL_BUTTON(SDL_BUTTON_RIGHT)) ? 1 : 0;
-    g_input.mouseButtons[2] = (mouseMask & SDL_BUTTON(SDL_BUTTON_MIDDLE)) ? 1 : 0;
-
-    inputSendMouse(mousePos, g_input.mouseButtons, g_input.mouseWheel);
-
-    g_input.mouseButtons[0] = g_input.mouseButtons[1] = g_input.mouseButtons[2] = 0;
-    g_input.mouseWheel = 0.0f;
-
-    vgBegin(g_vg, WINDOW_WIDTH, WINDOW_HEIGHT);
-    
-	// Camera look/movement
-    const float moveSpeed = 5.0f;
-    const float lookSpeed = 3.0f;
+    // Camera look/movement
+    const float moveSpeed = BX_ENABLED(BX_PLATFORM_ANDROID) ? 1.0f : 5.0f;
+    const float lookSpeed = BX_ENABLED(BX_PLATFORM_ANDROID) ? 0.1f : 3.0f;
 
     int numKeys;
     const uint8_t* keys = SDL_GetKeyboardState(&numKeys);
     if (keys[SDL_SCANCODE_A] || keys[SDL_SCANCODE_LEFT])
-        camStrafe(&g_cam, -1.0f*moveSpeed*dt);
+        termite::camStrafe(&g_cam, -1.0f*moveSpeed*dt);
     if (keys[SDL_SCANCODE_D] || keys[SDL_SCANCODE_RIGHT])
-        camStrafe(&g_cam, moveSpeed*dt);
+        termite::camStrafe(&g_cam, moveSpeed*dt);
     if (keys[SDL_SCANCODE_W] || keys[SDL_SCANCODE_UP])
-        camForward(&g_cam, moveSpeed*dt);
+        termite::camForward(&g_cam, moveSpeed*dt);
     if (keys[SDL_SCANCODE_S] || keys[SDL_SCANCODE_DOWN])
-        camForward(&g_cam, -1.0f*moveSpeed*dt);
+        termite::camForward(&g_cam, -1.0f*moveSpeed*dt);
     SDL_GetRelativeMouseState(&mx, &my);
     if (mouseMask & SDL_BUTTON(SDL_BUTTON_LEFT)) {
-        camPitchYaw(&g_cam, -float(my)*lookSpeed*dt, -float(mx)*lookSpeed*dt);
-    }
-    vgTextf(g_vg, 10.0f, 10.0f, "pitch=%.4f", g_cam.pitch);
-    vgEnd(g_vg);
-
-    ddBegin(g_debug, WINDOW_WIDTH, WINDOW_HEIGHT, &g_cam, g_vg);
-    ddColor(g_debug, vec4f(0, 0.5f, 0, 1.0f));
-    ddSnapGridXZ(g_debug, 1.0f, 5.0f, 50.0f);
-    ddColor(g_debug, vec4f(1.0f, 0, 0, 1.0f));
-    ddBoundingBox(g_debug, aabbf(-1.0f, -0.5f, -0.5f, 0.5f, 1.5f, 2.5f), true);
-    ddBoundingSphere(g_debug, spheref(0, 0, 5.0f, 1.5f), true);
-    ddEnd(g_debug);
-
-#if 0
-    const vec4_t colors[] = {
-        vec4f(1.0f, 1.0f, 1.0f, 1.0f),
-        vec4f(1.0f, 0, 0, 1.0f),
-        vec4f(0, 0, 1.0f, 1.0f)
-    };
-
-    gfxModel* model = dsGetObjPtr<gfxModel*>(nullptr, g_model);
-    if (model) {
-        gfxDriverI* driver = coreGetGfxDriver();
-        mtx4x4_t viewMtx = camViewMtx(&g_cam);
-        mtx4x4_t projMtx = camProjMtx(&g_cam, float(WINDOW_WIDTH) / float(WINDOW_HEIGHT));
-
-        driver->touch(6);
-        driver->setViewRect(6, 0, 0, gfxBackbufferRatio::Equal);
-        driver->setViewTransform(6, &viewMtx, &projMtx);
-
-        for (int i = 0; i < model->numNodes; i++) {
-            const gfxModel::Node& node = model->nodes[i];
-            const gfxModel::Mesh& mesh = model->meshes[node.mesh];
-            const gfxModel::Geometry& geo = model->geos[mesh.geo];
-
-            mtx4x4_t localmtx = node.localMtx;
-            if (node.parent != -1) {
-                const gfxModel::Node& parentNode = model->nodes[node.parent];
-                localmtx = localmtx * parentNode.localMtx;
-            }
-
-            for (int c = 0; c < mesh.numSubmeshes; c++) {
-                const gfxModel::Submesh& submesh = mesh.submeshes[c];
-                driver->setTransform(&localmtx, 1);
-                driver->setUniform(g_modelColor, &colors[submesh.mtl % 3]);
-                driver->setVertexBuffer(mdlGetVertexBuffer(model, mesh.geo));
-                driver->setIndexBuffer(mdlGetIndexBuffer(model, mesh.geo), submesh.startIndex, submesh.numIndices);
-
-                driver->submit(6, g_modelProg);
-            }
-        }
-    }
-#endif
-}
-
-static termite::GfxPlatformData* getSDLWindowData(SDL_Window* window)
-{
-    static termite::GfxPlatformData platform;
-    memset(&platform, 0x00, sizeof(platform));
-
-    SDL_SysWMinfo wmi;
-    SDL_VERSION(&wmi.version);
-    if (!SDL_GetWindowWMInfo(window, &wmi)) {
-        BX_WARN("Could not fetch SDL window handle");
-        return nullptr;
+        termite::camPitchYaw(&g_cam, -float(my)*lookSpeed*dt, -float(mx)*lookSpeed*dt);
     }
 
-#if BX_PLATFORM_LINUX || BX_PLATFORM_BSD
-    platform.ndt = wmi.info.x11.display;
-    platform.nwh = (void*)(uintptr_t)wmi.info.x11.window;
-#elif BX_PLATFORM_OSX
-    platform.ndt = NULL;
-    platform.nwh = wmi.info.cocoa.window;
-#elif BX_PLATFORM_WINDOWS
-    platform.ndt = NULL;
-    platform.nwh = wmi.info.win.window;
-#endif // BX_PLATFORM_
+    // Clear Scene
+    termite::getGfxDriver()->touch(0);
+    termite::getGfxDriver()->setViewClear(0, termite::GfxClearFlag::Color | termite::GfxClearFlag::Depth, 0x303030ff, 1.0f, 0);
+    termite::getGfxDriver()->setViewRectRatio(0, 0, 0, termite::BackbufferRatio::Equal);
 
-    return &platform;
+    termite::vgBegin(g_vg, float(g_displaySize.x), float(g_displaySize.y));
+    termite::vgTextf(g_vg, 10.0f, 10.0f, "Ft = %f", termite::getFrameTime()*1000.0);
+    termite::vgEnd(g_vg);
+
+    termite::ddBegin(g_debug, float(g_displaySize.x), float(g_displaySize.y), &g_cam, g_vg);
+    termite::ddColor(g_debug, termite::vec4f(0, 0.5f, 0, 1.0f));
+    termite::ddSnapGridXZ(g_debug, 1.0f, 5.0f, 50.0f);
+    termite::ddColor(g_debug, termite::vec4f(1.0f, 0, 0, 1.0f));
+    termite::ddBoundingBox(g_debug, termite::aabbf(-1.0f, -0.5f, -0.5f, 0.5f, 1.5f, 2.5f), true);
+    termite::ddBoundingSphere(g_debug, termite::spheref(0, 0, 5.0f, 1.5f), true);
+    termite::ddEnd(g_debug);
 }
 
 int main(int argc, char* argv[])
 {
     bx::enableLogToFileHandle(stdout, stderr);
+    bx::setLogTag("Termite");
 
-    if (SDL_Init(0) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         BX_FATAL("SDL Init failed");
         return -1;
     }
@@ -240,39 +90,33 @@ int main(int argc, char* argv[])
     bx::Path pluginPath(argv[0]);
     strcpy(conf.pluginPath, pluginPath.getDirectory().cstr());
 
-    g_window = SDL_CreateWindow("TestSDL", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
-                               WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+#if BX_PLATFORM_ANDROID
+    SDL_DisplayMode disp;
+    if (SDL_GetCurrentDisplayMode(0, &disp) == 0) {
+        g_displaySize.x = disp.w;
+        g_displaySize.y = disp.h;
+    }    
+#endif
+
+    g_window = SDL_CreateWindow("TestSDL", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                                g_displaySize.x, g_displaySize.y, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
     if (!g_window) {
         BX_FATAL("SDL window creation failed");
         termite::shutdown();
         return -1;
     }
 
-    conf.gfxWidth = WINDOW_WIDTH;
-    conf.gfxHeight = WINDOW_HEIGHT;
+    conf.gfxWidth = g_displaySize.x;
+    conf.gfxHeight = g_displaySize.y;
 
-    // Set Keymap
-    conf.keymap[ImGuiKey_Tab] = SDLK_TAB;
-    conf.keymap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
-    conf.keymap[ImGuiKey_RightArrow] = SDL_SCANCODE_DOWN;
-    conf.keymap[ImGuiKey_UpArrow] = SDL_SCANCODE_UP;
-    conf.keymap[ImGuiKey_RightArrow] = SDL_SCANCODE_DOWN;
-    conf.keymap[ImGuiKey_PageUp] = SDL_SCANCODE_PAGEUP;
-    conf.keymap[ImGuiKey_PageDown] = SDL_SCANCODE_PAGEDOWN;
-    conf.keymap[ImGuiKey_Home] = SDL_SCANCODE_HOME;
-    conf.keymap[ImGuiKey_End] = SDL_SCANCODE_END;
-    conf.keymap[ImGuiKey_Delete] = SDLK_DELETE;
-    conf.keymap[ImGuiKey_Backspace] = SDLK_BACKSPACE;
-    conf.keymap[ImGuiKey_Enter] = SDLK_RETURN;
-    conf.keymap[ImGuiKey_Escape] = SDLK_ESCAPE;
-    conf.keymap[ImGuiKey_A] = SDLK_a;
-    conf.keymap[ImGuiKey_C] = SDLK_c;
-    conf.keymap[ImGuiKey_V] = SDLK_v;
-    conf.keymap[ImGuiKey_X] = SDLK_x;
-    conf.keymap[ImGuiKey_Y] = SDLK_y;
-    conf.keymap[ImGuiKey_Z] = SDLK_z;
+    termite::sdlMapImGuiKeys(&conf);
 
-    if (termite::initialize(conf, update, getSDLWindowData(g_window))) {
+    termite::GfxPlatformData platformData;
+    termite::sdlGetNativeWindowHandle(g_window, &platformData.nwh);
+    
+    if (termite::initialize(conf, update, &platformData) ||
+        T_FAILED(termite::registerFont("fonts/fixedsys.fnt", "fixedsys")))
+    {
         BX_FATAL(termite::getErrorString());
         BX_VERBOSE(termite::getErrorCallstack());
         termite::shutdown();
@@ -281,30 +125,36 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    g_vg = createVectorGfxContext(101);
-    g_debug = createDebugDrawContext(100);
-    camInit(&g_cam);
-    camLookAt(&g_cam, vec3f(0, 1.0f, -12.0f), vec3f(0, 0, 0));
+    g_vg = termite::createVectorGfxContext(101);
+    g_debug = termite::createDebugDrawContext(100);
+    termite::camInit(&g_cam);
+    termite::camLookAt(&g_cam, termite::vec3f(0, 1.0f, -12.0f), termite::vec3f(0, 0, 0));
 
-    LoadModelParams modelParams;
-    g_model = loadResource(nullptr, "model", "models/torus.t3d", &modelParams);
-    assert(g_model.isValid());
-
-    GfxDriverApi* driver = getGfxDriver();
-    g_modelProg = loadShaderProgram(driver, getIoDriver()->blocking, "shaders/test_model.vso", "shaders/test_model.fso");
-    assert(g_modelProg.isValid());
-    g_modelColor = driver->createUniform("u_color", UniformType::Vec4, 1);
-        
-    while (sdlPollEvents()) {
+    // reset graphics driver
+    termite::getGfxDriver()->reset(g_displaySize.x, g_displaySize.y, 0);
+    
+    SDL_Event ev;
+    while (true) {
+        if (SDL_PollEvent(&ev)) {
+            termite::sdlHandleEvent(ev);
+            if (ev.type == SDL_QUIT)
+                break;
+            if (ev.type == SDL_WINDOWEVENT) {
+                if (ev.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+                    BX_VERBOSE("Resume");
+                    termite::sdlGetNativeWindowHandle(g_window, &platformData.nwh);
+                    termite::getGfxDriver()->setPlatformData(platformData);
+                    termite::getGfxDriver()->reset(g_displaySize.x, g_displaySize.y, 0);
+                } else if (ev.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+                    BX_VERBOSE("Pause");
+                }
+            }
+        }
         termite::doFrame();
     }
 
-    driver->destroyUniform(g_modelColor);
-    driver->destroyProgram(g_modelProg);
-    unloadResource(nullptr, g_model);
-
-    destroyDebugDrawContext(g_debug);
-    destroyVectorGfxContext(g_vg);
+    termite::destroyDebugDrawContext(g_debug);
+    termite::destroyVectorGfxContext(g_vg);
     termite::shutdown();
     SDL_DestroyWindow(g_window);
     SDL_Quit();

@@ -4,6 +4,7 @@
 #include "bx/os.h"
 #include "bx/cpu.h"
 #include "bx/timer.h"
+#include "bxx/path.h"
 #include "bxx/inifile.h"
 #include "bxx/pool.h"
 #include "bxx/lock.h"
@@ -45,7 +46,7 @@
 #define IMGUI_VIEWID 255
 
 using namespace termite;
-
+//
 struct FrameData
 {
     int64_t frame;
@@ -70,6 +71,59 @@ struct HeapMemoryImpl
     }
 };
 
+class GfxDriverEvents : public GfxDriverEventsI
+{
+public:
+    void onFatal(GfxFatalType::Enum type, const char* str) override
+    {
+        char strTrimed[2048];
+        bx::strlcpy(strTrimed, str, sizeof(strTrimed));
+        strTrimed[strlen(strTrimed) - 1] = 0;
+
+        BX_FATAL("Graphics Driver: %s", strTrimed);
+    }
+
+    void onTraceVargs(const char* filepath, int line, const char* format, va_list argList) override
+    {
+        char text[2048];
+        vsnprintf(text, sizeof(text), format, argList);
+
+        text[strlen(text) - 1] = 0;
+        BX_VERBOSE("Graphics Driver: %s", text);
+    }
+
+    uint32_t onCacheReadSize(uint64_t id) override
+    {
+        return 0;
+    }
+
+    bool onCacheRead(uint64_t id, void* data, uint32_t size) override
+    {
+        return false;
+    }
+
+    void onCacheWrite(uint64_t id, const void* data, uint32_t size) override
+    {
+    }
+
+    void onScreenShot(const char *filePath, uint32_t width, uint32_t height, uint32_t pitch, 
+                      const void *data, uint32_t size, bool yflip) override
+    {
+    }
+
+    void onCaptureBegin(uint32_t width, uint32_t height, uint32_t pitch, TextureFormat::Enum fmt, bool yflip) override
+    {
+    }
+
+    void onCaptureEnd() override
+    {
+    }
+
+    void onCaptureFrame(const void* data, uint32_t size) override
+    {
+    }
+};
+
 struct Core
 {
     UpdateCallback updateFn;
@@ -84,6 +138,7 @@ struct Core
     IoDriverDual* ioDriver;
     PageAllocator tempAlloc;
 	PageAllocator componentAlloc;
+    GfxDriverEvents gfxDriverEvents;
 
     std::random_device randDevice;
     std::mt19937 randEngine;
@@ -110,7 +165,26 @@ static bx::CrtAllocator g_allocStub;
 #endif
 static bx::AllocatorI* g_alloc = &g_allocStub;
 
+static bx::Path g_dataDir;
+static bx::Path g_cacheDir;
 static Core* g_core = nullptr;
+
+#if BX_PLATFORM_ANDROID
+#include <jni.h>
+extern "C" JNIEXPORT void JNICALL Java_com_termite_utils_PlatformUtils_termiteInitPaths(JNIEnv* env, jclass cls, 
+                                                                                        jstring dataDir, jstring cacheDir)
+{
+    BX_UNUSED(cls);
+    
+    const char* str = env->GetStringUTFChars(dataDir, nullptr);
+    bx::strlcpy(g_dataDir.getBuffer(), str, sizeof(g_dataDir));
+    env->ReleaseStringUTFChars(dataDir, str);
+
+    str = env->GetStringUTFChars(cacheDir, nullptr);
+    bx::strlcpy(g_cacheDir.getBuffer(), str, sizeof(g_cacheDir));
+    env->ReleaseStringUTFChars(cacheDir, str);
+}
+#endif
 
 static void callbackConf(const char* key, const char* value, void* userParam)
 {
@@ -188,6 +262,13 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
 
     g_core->updateFn = updateFn;
 
+    // Set Data and Cache Dir paths
+#if !BX_PLATFORM_ANDROID
+    bx::strlcpy(g_dataDir.getBuffer(), conf.dataUri, sizeof(g_dataDir));
+    g_dataDir.normalizeSelf();
+    g_cacheDir = bx::getTempDir();        
+#endif
+
     // Error handler
     if (initErrorReport(g_alloc)) {
         return T_ERR_FAILED;
@@ -206,12 +287,16 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
         return T_ERR_FAILED;
     }
 
-    // Initialize and blocking data driver for permanent resources
     int r;
     PluginHandle pluginHandle;
 
     // IO
-    r = findPluginByName(conf.ioName[0] ? conf.ioName : "DiskIO" , 0, &pluginHandle, 1, PluginType::IoDriver);
+#if BX_PLATFORM_ANDROID
+    const char* ioDriverName = "AssetIO";
+#else
+    const char* ioDriverName = "DiskIO";
+#endif
+    r = findPluginByName(conf.ioName[0] ? conf.ioName : ioDriverName , 0, &pluginHandle, 1, PluginType::IoDriver);
     if (r > 0) {
         g_core->ioDriver = (IoDriverDual*)initPlugin(pluginHandle, g_alloc);
         if (!g_core->ioDriver) {
@@ -237,12 +322,11 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
             T_FAILED(g_core->ioDriver->async->init(g_alloc, uri, nullptr, nullptr))) 
         {
             BX_END_FATAL();
-            T_ERROR("Engine init failed: Initializing Async IoDriver failed");
+            T_ERROR("Engine init failed: Initializing IoDriver failed");
             return T_ERR_FAILED;
         }
         BX_END_OK();
     }
-
 
     if (!g_core->ioDriver) {
         T_ERROR("Engine init failed: No IoDriver is detected");
@@ -250,31 +334,31 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     }
 
     BX_BEGINP("Initializing Resource Library");
-    g_core->resLib = createResourceLib(ResourceLibInitFlag::HotLoading, g_core->ioDriver->async, g_alloc);
+    g_core->resLib = createResourceLib(BX_ENABLED(termite_DEV) ? ResourceLibInitFlag::HotLoading : 0, g_core->ioDriver->async, g_alloc);
     if (!g_core->resLib) {
         T_ERROR("Core init failed: Creating default ResourceLib failed");
         return T_ERR_FAILED;
     }
     BX_END_OK();
 
-    // Graphics
-    r = findPluginByName(conf.rendererName[0] ? conf.rendererName : "StockRenderer", 0, &pluginHandle, 1, PluginType::Renderer);
-    if (r > 0) {
-        g_core->renderer = (RendererApi*)initPlugin(pluginHandle, g_alloc);
-        const PluginDesc& desc = getPluginDesc(pluginHandle);
-        BX_TRACE("Found Renderer: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version), T_VERSION_MINOR(desc.version));
+    // Renderer
+    if (conf.rendererName[0] != 0) {
+        r = findPluginByName(conf.rendererName, 0, &pluginHandle, 1, PluginType::Renderer);
+        if (r > 0) {
+            g_core->renderer = (RendererApi*)initPlugin(pluginHandle, g_alloc);
+            const PluginDesc& desc = getPluginDesc(pluginHandle);
+            BX_TRACE("Found Renderer: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version), T_VERSION_MINOR(desc.version));
 
-        if (!platform) {
-            T_ERROR("Core init failed: PlatformData is not provided for Renderer");
-            return T_ERR_FAILED;
-        }
-    } else {
-        BX_WARN("No Renderer found - Graphics output will be unavailable");
+            if (!platform) {
+                T_ERROR("Core init failed: PlatformData is not provided for Renderer");
+                return T_ERR_FAILED;
+            }
+        } 
     }
 
     // Graphics Device
-    if (g_core->renderer) {
-        r = findPluginByName(conf.gfxName[0] ? conf.gfxName : "Bgfx", 0, &pluginHandle, 1, PluginType::GraphicsDriver);
+    if (conf.gfxName[0] != 0)    {
+        r = findPluginByName(conf.gfxName, 0, &pluginHandle, 1, PluginType::GraphicsDriver);
         if (r > 0) {
             g_core->gfxDriver = (GfxDriverApi*)initPlugin(pluginHandle, g_alloc);
         }
@@ -285,24 +369,27 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
         }
 
         const PluginDesc& desc = getPluginDesc(pluginHandle);
-        BX_BEGINP("Initializing Graphics Driver: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version), 
-                                                                        T_VERSION_MINOR(desc.version));
-        g_core->gfxDriver->setPlatformData(*platform);
-        if (T_FAILED(g_core->gfxDriver->init(conf.gfxDeviceId, nullptr, g_alloc))) {
+        BX_BEGINP("Initializing Graphics Driver: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version),
+                  T_VERSION_MINOR(desc.version));
+        if (platform)
+            g_core->gfxDriver->setPlatformData(*platform);
+        if (T_FAILED(g_core->gfxDriver->init(conf.gfxDeviceId, &g_core->gfxDriverEvents, g_alloc))) {
             BX_END_FATAL();
             T_ERROR("Core init failed: Could not initialize Graphics driver");
             return T_ERR_FAILED;
         }
         BX_END_OK();
 
-        // Initialize Renderer
-        BX_BEGINP("Initializing Renderer");
-        if (T_FAILED(g_core->renderer->init(g_alloc, g_core->gfxDriver))) {
-            BX_END_FATAL();
-            T_ERROR("Core init failed: Could not initialize Renderer");
-            return T_ERR_FAILED;
+        // Initialize Renderer with Gfx Driver
+        if (g_core->renderer) {
+            BX_BEGINP("Initializing Renderer");
+            if (T_FAILED(g_core->renderer->init(g_alloc, g_core->gfxDriver))) {
+                BX_END_FATAL();
+                T_ERROR("Core init failed: Could not initialize Renderer");
+                return T_ERR_FAILED;
+            }
+            BX_END_OK();
         }
-		BX_END_OK();
 
         // Init and Register graphics resource loaders
         initTextureLoader(g_core->gfxDriver, g_alloc);
@@ -338,13 +425,12 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
             return T_ERR_FAILED;
         }
 
-		// ImGui initialize
-		if (T_FAILED(initImGui(IMGUI_VIEWID, conf.gfxWidth, conf.gfxHeight, g_core->gfxDriver, g_alloc, conf.keymap,
-                               conf.uiIniFilename, platform ? platform->nwh : nullptr)))	
-        {
-			T_ERROR("Initializing ImGui failed");
-			return T_ERR_FAILED;
-		}		
+        // ImGui initialize
+        if (T_FAILED(initImGui(IMGUI_VIEWID, conf.gfxWidth, conf.gfxHeight, g_core->gfxDriver, g_alloc, conf.keymap,
+                               conf.uiIniFilename, platform ? platform->nwh : nullptr))) {
+            T_ERROR("Initializing ImGui failed");
+            return T_ERR_FAILED;
+        }
 
         if (T_FAILED(initSpriteSystem(g_core->gfxDriver, g_alloc))) {
             T_ERROR("Initializing Sprite System failed");
@@ -461,13 +547,24 @@ void termite::doFrame()
     int64_t frameTick = bx::getHPCounter();
     double dt = double(frameTick - fd.lastFrameTick)/g_core->hpTimerFreq;
 
-    ImGui::GetIO().DeltaTime = float(dt);
-    ImGui::NewFrame();
+    if (g_core->gfxDriver) {
+        ImGui::GetIO().DeltaTime = float(dt);
+        ImGui::NewFrame();
+    }
 
-	if (g_core->updateFn)
-		g_core->updateFn(float(dt));
+    callComponentUpdates(ComponentUpdateStage::PreUpdate, float(dt));
 
-    ImGui::Render();
+    if (g_core->updateFn)
+        g_core->updateFn(float(dt));
+    callComponentUpdates(ComponentUpdateStage::Update, float(dt));
+
+    callComponentUpdates(ComponentUpdateStage::PostUpdate, float(dt));
+    resetComponentUpdateCache();
+
+    if (g_core->gfxDriver) {
+        ImGui::Render();
+        ImGui::GetIO().MouseWheel = 0;
+    }
 
     if (g_core->renderer)
         g_core->renderer->render(nullptr);
@@ -499,6 +596,10 @@ double termite::getFps()
 {
     return g_core->frameData.fps;
 }
+int64_t termite::getFrameIndex()
+{
+    return g_core->frameData.frame;
+}
 
 termite::MemoryBlock* termite::createMemoryBlock(uint32_t size, bx::AllocatorI* alloc)
 {
@@ -515,12 +616,12 @@ termite::MemoryBlock* termite::createMemoryBlock(uint32_t size, bx::AllocatorI* 
     return (termite::MemoryBlock*)mem;
 }
 
-termite::MemoryBlock* termite::refMemoryBlockPtr(void* data, uint32_t size)
+termite::MemoryBlock* termite::refMemoryBlockPtr(const void* data, uint32_t size)
 {
     g_core->memPoolLock.lock();
     HeapMemoryImpl* mem = g_core->memPool.newInstance();
     g_core->memPoolLock.unlock();
-    mem->m.data = (uint8_t*)data;
+    mem->m.data = (uint8_t*)const_cast<void*>(data);
     mem->m.size = size;
     return (MemoryBlock*)mem;
 }
@@ -632,7 +733,7 @@ void termite::inputSendMouse(float mousePos[2], int mouseButtons[3], float mouse
 	io.MouseDown[1] = mouseButtons[1] ? true : false;
 	io.MouseDown[2] = mouseButtons[2] ? true : false;
 
-	io.MouseWheel = mouseWheel;
+	io.MouseWheel += mouseWheel;
 }
 
 GfxDriverApi* termite::getGfxDriver()
@@ -640,9 +741,14 @@ GfxDriverApi* termite::getGfxDriver()
     return g_core->gfxDriver;
 }
 
-IoDriverDual* termite::getIoDriver()
+IoDriverApi* termite::getBlockingIoDriver() T_THREAD_SAFE
 {
-    return g_core->ioDriver;
+    return g_core->ioDriver->blocking;
+}
+
+IoDriverApi* termite::getAsyncIoDriver() T_THREAD_SAFE
+{
+    return g_core->ioDriver->async;
 }
 
 RendererApi* termite::getRenderer()
@@ -665,12 +771,23 @@ bx::AllocatorI* termite::getTempAlloc() T_THREAD_SAFE
     return &g_core->tempAlloc;
 }
 
-const Config& termite::getConfig()
+const Config& termite::getConfig() T_THREAD_SAFE
 {
     return g_core->conf;
 }
 
-ResourceLib* termite::getDefaultResourceLib()
+const char* termite::getCacheDir() T_THREAD_SAFE
+{
+    return g_cacheDir.cstr();
+}
+
+const char* termite::getDataDir() T_THREAD_SAFE
+{
+    return g_dataDir.cstr();
+}
+
+// Used in resource_lib.cpp
+ResourceLib* getDefaultResourceLibPtr() 
 {
     return g_core->resLib;
 }

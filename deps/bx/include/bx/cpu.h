@@ -34,6 +34,10 @@ extern "C" void _ReadWriteBarrier();
 #   pragma intrinsic(_InterlockedXor)
 #   pragma intrinsic(_InterlockedAnd)
 #   pragma intrinsic(_InterlockedOr)
+#elif (__arm__)
+#  if __ARM_NEON__
+#   include <arm_neon.h>
+#  endif
 #else
 #	include <xmmintrin.h>
 #endif // BX_COMPILER_MSVC
@@ -70,9 +74,13 @@ namespace bx
 #endif // BX_COMPILER
 	}
 
-    inline void relaxCpu()
+    inline void yieldCpu()
     {
+#ifdef __arm__
+        asm volatile("NOP");
+#else
         _mm_pause();
+#endif
     }
 
 	///

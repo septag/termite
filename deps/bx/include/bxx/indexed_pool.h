@@ -156,7 +156,7 @@ namespace bx
             // Fill the new buffer
             memcpy(buff, m_indices, sizeof(uint16_t)*prevMax);  
             m_indices = (uint16_t*)buff;        buff += sizeof(uint16_t)*m_maxItems;
-            memcpy(buff, m_revIndices + sizeof(uint16_t)*prevMax, sizeof(uint16_t)*prevMax);
+            memcpy(buff, m_revIndices, sizeof(uint16_t)*prevMax);
             m_revIndices = (uint16_t*)buff;     buff += sizeof(uint16_t)*m_maxItems;
             for (int i = 0; i < m_numBuffers; i++) {
                 memcpy(buff, m_buffers[i], m_itemSizes[i] * prevMax);

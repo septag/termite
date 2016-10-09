@@ -1,9 +1,9 @@
 #pragma once
 
+#include <cstdio>
+
 #include "../bx/platform.h"
 #include "terminal_colors.h"
-#include <atomic>
-#include <cstdio>
 
 #ifdef BX_TRACE
 #   undef BX_TRACE
@@ -44,85 +44,106 @@
 
 namespace bx
 {
-    enum class LogType
+    struct LogType
     {
-        Text,
-        Verbose,
-        Fatal,
-        Warning,
-        Init,
-        Shutdown,
-        Debug
+        enum Enum
+        {
+            Text,
+            Verbose,
+            Fatal,
+            Warning,
+            Debug
+        };
     };
 
-    enum class LogColor
+    struct LogColor
     {
-        None = 0,
-        Green,
-        Red,
-        Gray,
-        Cyan,
-        Yellow,
-        Magenta,
-        Black,
-        White
+        enum Enum
+        {
+            None = 0,
+            Green,
+            Red,
+            Gray,
+            Cyan,
+            Yellow,
+            Magenta,
+            Black,
+            White
+        };
     };
 
-    enum class LogProgressResult
+    struct LogProgressResult
     {
-        Ok,
-        Fatal,
-        NonFatal
+        enum Enum
+        {
+            Ok,
+            Fatal,
+            NonFatal
+        };
     };
 
     // This will only passed to callbacks
-    enum class LogExtraParam
+    struct LogExtraParam
     {
-        None = 0,
-        InProgress,
-        ProgressEndOk,
-        ProgressEndFatal,
-        ProgressEndNonFatal
+        enum Enum
+        {
+            None = 0,
+            InProgress,
+            ProgressEndOk,
+            ProgressEndFatal,
+            ProgressEndNonFatal
+        };
     };
 
-    enum class LogTimeFormat
+    struct LogTimeFormat
     {
-        Time,
-        DateTime
+        enum Enum
+        {
+            Time,
+            DateTime
+        };
     };
 
-    typedef void(*LogCallbackFn)(const char* filename, int line, LogType type, const char* text, void* userData, 
-                                 LogExtraParam extra, time_t tm);
+    typedef void(*LogCallbackFn)(const char* filename, int line, LogType::Enum type, const char* text, void* userData, 
+                                 LogExtraParam::Enum extra, time_t tm);
 
+    BX_LOGGER_API void setLogTag(const char* tag);
     BX_LOGGER_API bool enableLogToFile(const char* filepath, const char* errFilepath = nullptr);
     BX_LOGGER_API bool enableLogToFileHandle(FILE* file, FILE* errFile = nullptr);
     BX_LOGGER_API void enableLogToCallback(LogCallbackFn callback, void* userParam);
-    BX_LOGGER_API void enableLogTimestamps(LogTimeFormat timeFormat);
+    BX_LOGGER_API void enableLogTimestamps(LogTimeFormat::Enum timeFormat);
 
     BX_LOGGER_API void disableLogToFile();
     BX_LOGGER_API void disableLogToCallback();
     BX_LOGGER_API void disableLogTimestamps();
 
-    BX_LOGGER_API void logPrint(const char* sourceFile, int line, LogType type, const char* text);
-    BX_LOGGER_API void logPrintf(const char* sourceFile, int line, LogType type, const char* fmt, ...);
+    BX_LOGGER_API void logPrint(const char* sourceFile, int line, LogType::Enum type, const char* text);
+    BX_LOGGER_API void logPrintf(const char* sourceFile, int line, LogType::Enum type, const char* fmt, ...);
     BX_LOGGER_API void logBeginProgress(const char* sourceFile, int line, const char* fmt, ...);
-    BX_LOGGER_API void logEndProgress(LogProgressResult result);
+    BX_LOGGER_API void logEndProgress(LogProgressResult::Enum result);
 
-    BX_LOGGER_API void excludeFromLog(LogType type);
-    BX_LOGGER_API void includeToLog(LogType type);
-    BX_LOGGER_API void overrideLogColor(LogColor color);
+    BX_LOGGER_API void excludeFromLog(LogType::Enum type);
+    BX_LOGGER_API void includeToLog(LogType::Enum type);
+    BX_LOGGER_API void overrideLogColor(LogColor::Enum color);
 }
 
 #ifdef BX_IMPLEMENT_LOGGER
 #undef BX_IMPLEMENT_LOGGER
 
 #include <cassert>
-#include <cstdio>
 #include <ctime>
+#include <atomic>
+#include <cstdio>
+
+#include "../bx/string.h"
 
 #if BX_PLATFORM_WINDOWS
 #   define WIN32_LEAN_AND_MEAN
 #   include <Windows.h>
+#endif
+
+#if BX_PLATFORM_ANDROID
+#   include <android/log.h>
 #endif
 
 namespace bx
@@ -137,19 +158,20 @@ namespace bx
         void* userParam;
 
         std::atomic_bool insideProgress;
-        LogTimeFormat timeFormat;
+        LogTimeFormat::Enum timeFormat;
 
-        LogType excludeList[EXCLUDE_LIST_COUNT];
+        LogType::Enum excludeList[EXCLUDE_LIST_COUNT];
         std::atomic_int numExcludes;
         std::atomic_int numErrors;
         std::atomic_int numWarnings;
         std::atomic_int numMessages;
-        LogColor colorOverride;
+        LogColor::Enum colorOverride;
 
 #if BX_PLATFORM_WINDOWS
         HANDLE consoleHdl;
         WORD consoleAttrs;
 #endif
+        char tag[32];
 
         Logger()
         {
@@ -166,6 +188,7 @@ namespace bx
             numMessages = 0;
             colorOverride = LogColor::None;
             memset(excludeList, 0x00, sizeof(excludeList));
+            tag[0] = 0;
 
 #if BX_PLATFORM_WINDOWS
             consoleHdl = nullptr;
@@ -174,18 +197,18 @@ namespace bx
         }
     };
 
-    static Logger gLogger;
+    static Logger g_logger;
 
     bool enableLogToFile(const char* filepath, const char* errFilepath)
     {
         disableLogToFile();
 
-        gLogger.logFile = fopen(filepath, "wt");
-        if (!gLogger.logFile)
+        g_logger.logFile = fopen(filepath, "wt");
+        if (!g_logger.logFile)
             return false;
         if (errFilepath) {
-            gLogger.errFile = fopen(errFilepath, "wt");
-            if (!gLogger.errFile)
+            g_logger.errFile = fopen(errFilepath, "wt");
+            if (!g_logger.errFile)
                 return false;
         }
 
@@ -196,18 +219,18 @@ namespace bx
     {
         disableLogToFile();
 
-        if (gLogger.logFile == stdout && gLogger.errFile != stderr)
+        if (g_logger.logFile == stdout && g_logger.errFile != stderr)
             return false;
 
-        gLogger.logFile = file;
-        gLogger.errFile = errFile;
+        g_logger.logFile = file;
+        g_logger.errFile = errFile;
 
 #if BX_PLATFORM_WINDOWS
         if (file == stdout || errFile == stderr) {
-            gLogger.consoleHdl = GetStdHandle(STD_OUTPUT_HANDLE);
+            g_logger.consoleHdl = GetStdHandle(STD_OUTPUT_HANDLE);
             CONSOLE_SCREEN_BUFFER_INFO coninfo;
-            GetConsoleScreenBufferInfo(gLogger.consoleHdl, &coninfo);
-            gLogger.consoleAttrs = coninfo.wAttributes;
+            GetConsoleScreenBufferInfo(g_logger.consoleHdl, &coninfo);
+            g_logger.consoleAttrs = coninfo.wAttributes;
         }
 #endif
 
@@ -218,53 +241,88 @@ namespace bx
     {
         assert(callback);
 
-        gLogger.callback = callback;
-        gLogger.userParam = userParam;
+        g_logger.callback = callback;
+        g_logger.userParam = userParam;
     }
 
-    void enableLogTimestamps(LogTimeFormat timeFormat)
+    void enableLogTimestamps(LogTimeFormat::Enum timeFormat)
     {
-        gLogger.timestamps = true;
-        gLogger.timeFormat = timeFormat;
+        g_logger.timestamps = true;
+        g_logger.timeFormat = timeFormat;
     }
 
     void disableLogToFile()
     {
 #if BX_PLATFORM_WINDOWS
-        if (gLogger.consoleHdl) {
-            SetConsoleTextAttribute(gLogger.consoleHdl, gLogger.consoleAttrs);
-            CloseHandle(gLogger.consoleHdl);
-            gLogger.consoleHdl = nullptr;
+        if (g_logger.consoleHdl) {
+            SetConsoleTextAttribute(g_logger.consoleHdl, g_logger.consoleAttrs);
+            CloseHandle(g_logger.consoleHdl);
+            g_logger.consoleHdl = nullptr;
         }
 #endif
 
-        if (gLogger.logFile) {
-            fclose(gLogger.logFile);
-            gLogger.logFile = nullptr;
+        if (g_logger.logFile) {
+            fclose(g_logger.logFile);
+            g_logger.logFile = nullptr;
         }
 
-        if (gLogger.errFile) {
-            fclose(gLogger.errFile);
-            gLogger.errFile = nullptr;
+        if (g_logger.errFile) {
+            fclose(g_logger.errFile);
+            g_logger.errFile = nullptr;
         }
     }
 
     void disableLogToCallback()
     {
-        gLogger.callback = nullptr;
+        g_logger.callback = nullptr;
     }
 
     void disableLogTimestamps()
     {
-        gLogger.timestamps = false;
+        g_logger.timestamps = false;
     }
 
-    static void logPrintRaw(const char* filename, int line, LogType type, LogExtraParam extra, const char* text)
+    void setLogTag(const char* tag)
+    {
+        bx::strlcpy(g_logger.tag, tag, sizeof(g_logger.tag));
+    }
+
+#if BX_PLATFORM_ANDROID
+    static void logPrintRawAndroid(LogType::Enum type, const char* text)
+    {
+        android_LogPriority pr;
+        switch (type) {
+        case LogType::Text:
+            pr = ANDROID_LOG_INFO;
+            break;
+        case LogType::Verbose:
+            pr = ANDROID_LOG_VERBOSE;
+            break;
+        case LogType::Fatal:
+            pr = ANDROID_LOG_FATAL;
+            break;
+        case LogType::Warning:
+            pr = ANDROID_LOG_WARN;
+            break;
+        case LogType::Debug:
+            pr = ANDROID_LOG_DEBUG;
+            break;
+
+        default:
+            pr = ANDROID_LOG_INFO;
+            break;
+        }
+
+        __android_log_write(pr, g_logger.tag, text);
+    }
+#endif
+
+    static void logPrintRaw(const char* filename, int line, LogType::Enum type, LogExtraParam::Enum extra, const char* text)
     {
         // Filter out mesages that are in exclude filter
-        if (gLogger.numExcludes) {
-            for (int i = 0, c = gLogger.numExcludes; i < c; i++) {
-                if (gLogger.excludeList[i] == type)
+        if (g_logger.numExcludes) {
+            for (int i = 0, c = g_logger.numExcludes; i < c; i++) {
+                if (g_logger.excludeList[i] == type)
                     return;
             }
         }
@@ -272,64 +330,61 @@ namespace bx
         // Add counter
         switch (type) {
         case LogType::Fatal:
-            gLogger.numErrors++;   break;
+            g_logger.numErrors++;   break;
         case LogType::Warning:
-            gLogger.numWarnings++; break;
+            g_logger.numWarnings++; break;
         default:                break;
         }
 
         switch (extra) {
         case LogExtraParam::ProgressEndFatal:
-            gLogger.numErrors++;   break;
+            g_logger.numErrors++;   break;
         case LogExtraParam::ProgressEndNonFatal:
-            gLogger.numWarnings++; break;
+            g_logger.numWarnings++; break;
         default:            break;
         }
-        gLogger.numMessages++;
+        g_logger.numMessages++;
 
 
         // Timestamps
         char timestr[32];
         timestr[0] = 0;
         time_t t = 0;
-        if (gLogger.timestamps) {
+        if (g_logger.timestamps) {
             t = time(nullptr);
             tm* timeinfo = localtime(&t);
 
-            if (gLogger.timeFormat == LogTimeFormat::Time) {
+            if (g_logger.timeFormat == LogTimeFormat::Time) {
                 snprintf(timestr, sizeof(timestr), "%.2d:%.2d:%.2d",
                          timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-            } else if (gLogger.timeFormat == LogTimeFormat::DateTime) {
+            } else if (g_logger.timeFormat == LogTimeFormat::DateTime) {
                 snprintf(timestr, sizeof(timestr), "%.2d/%.2d/%.2d %.2d %.2d %.2d",
                          timeinfo->tm_mon, timeinfo->tm_mday, (timeinfo->tm_year + 1900) % 1000,
                          timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
             }
         }
 
-
         // File/Std streams
-        if (gLogger.logFile) {
+        if (g_logger.logFile) {
             const char* prefix = "";
             const char* post = "";
             bool formatted = false;
-            if (gLogger.logFile == stdout) {
+            if (g_logger.logFile == stdout) {
                 formatted = true;
                 // Choose color for the log line
 #if !BX_PLATFORM_WINDOWS
-                if (gLogger.colorOverride == LogColor::None) {
+                if (g_logger.colorOverride == LogColor::None) {
                     if (extra == LogExtraParam::None || extra == LogExtraParam::InProgress) {
                         switch (type) {
                         case LogType::Text:
                             prefix = TERM_RESET;        break;
                         case LogType::Verbose:
+                        case LogType::Debug:
                             prefix = TERM_DIM;          break;
                         case LogType::Fatal:
                             prefix = TERM_RED_BOLD;      break;
                         case LogType::Warning:
                             prefix = TERM_YELLOW_BOLD;   break;
-                        case LogType::Init:
-                        case LogType::Shutdown:
-                            prefix = TERM_CYAN;          break;
                         default:
                             prefix = TERM_RESET;        break;
                         }
@@ -346,7 +401,7 @@ namespace bx
                         }
                     }
                 } else {
-                    switch (gLogger.colorOverride) {
+                    switch (g_logger.colorOverride) {
                     case LogColor::Black:
                         prefix = TERM_BLACK;                       break;
                     case LogColor::Cyan:
@@ -368,60 +423,58 @@ namespace bx
                     }
                 }
 #else
-                if (gLogger.colorOverride == LogColor::None) {
+                if (g_logger.colorOverride == LogColor::None) {
                     if (extra == LogExtraParam::None || extra == LogExtraParam::InProgress) {
                         switch (type) {
                         case LogType::Text:
-                            SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);        break;
+                            SetConsoleTextAttribute(g_logger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);        break;
                         case LogType::Verbose:
-                            SetConsoleTextAttribute(gLogger.consoleHdl, gLogger.consoleAttrs);          break;
+                        case LogType::Debug:
+                            SetConsoleTextAttribute(g_logger.consoleHdl, g_logger.consoleAttrs);          break;
                         case LogType::Fatal:
-                            SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_INTENSITY);      break;
+                            SetConsoleTextAttribute(g_logger.consoleHdl, FOREGROUND_RED | FOREGROUND_INTENSITY);      break;
                         case LogType::Warning:
-                            SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);   break;
-                        case LogType::Init:
-                        case LogType::Shutdown:
-                            SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_BLUE | FOREGROUND_GREEN);      break;
+                            SetConsoleTextAttribute(g_logger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);   break;
                         default:
                             break;
                         }
                     } else {
                         switch (extra) {
                         case LogExtraParam::ProgressEndOk:
-                            SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_GREEN | FOREGROUND_INTENSITY);    break;
+                            SetConsoleTextAttribute(g_logger.consoleHdl, FOREGROUND_GREEN | FOREGROUND_INTENSITY);    break;
                         case LogExtraParam::ProgressEndFatal:
-                            SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_INTENSITY);      break;
+                            SetConsoleTextAttribute(g_logger.consoleHdl, FOREGROUND_RED | FOREGROUND_INTENSITY);      break;
                         case LogExtraParam::ProgressEndNonFatal:
-                            SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);   break;
+                            SetConsoleTextAttribute(g_logger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);   break;
                         default:
                             break;
                         }
                     }
                 } else {
-                    switch (gLogger.colorOverride) {
+                    switch (g_logger.colorOverride) {
                     case LogColor::Black:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, 0);
+                        SetConsoleTextAttribute(g_logger.consoleHdl, 0);
                         break;
                     case LogColor::Cyan:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_BLUE | FOREGROUND_GREEN);
+                        SetConsoleTextAttribute(g_logger.consoleHdl, FOREGROUND_BLUE | FOREGROUND_GREEN);
                         break;
                     case LogColor::Gray:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, gLogger.consoleAttrs);
+                        SetConsoleTextAttribute(g_logger.consoleHdl, g_logger.consoleAttrs);
                         break;
                     case LogColor::Green:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_GREEN);
+                        SetConsoleTextAttribute(g_logger.consoleHdl, FOREGROUND_GREEN);
                         break;
                     case LogColor::Magenta:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_BLUE);
+                        SetConsoleTextAttribute(g_logger.consoleHdl, FOREGROUND_RED | FOREGROUND_BLUE);
                         break;
                     case LogColor::Red:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED);
+                        SetConsoleTextAttribute(g_logger.consoleHdl, FOREGROUND_RED);
                         break;
                     case LogColor::White:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_BLUE);
+                        SetConsoleTextAttribute(g_logger.consoleHdl, FOREGROUND_RED | FOREGROUND_BLUE);
                         break;
                     case LogColor::Yellow:
-                        SetConsoleTextAttribute(gLogger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN);
+                        SetConsoleTextAttribute(g_logger.consoleHdl, FOREGROUND_RED | FOREGROUND_GREEN);
                         break;
                     default:
                         break;
@@ -429,30 +482,36 @@ namespace bx
                 }
 #endif
             }
-
+            
             if (extra != LogExtraParam::InProgress)
                 post = "\n" TERM_RESET;
             else if (extra == LogExtraParam::InProgress)
                 post = "... ";
-
-            FILE* output = gLogger.logFile;
-            if (gLogger.errFile && type == LogType::Fatal)
-                output = gLogger.errFile;
+            FILE* output = g_logger.logFile;
+            if (g_logger.errFile && type == LogType::Fatal)
+                output = g_logger.errFile;
             if (output) {
-                if (!gLogger.timestamps || (extra != LogExtraParam::InProgress && extra != LogExtraParam::None)) {
+#if BX_PLATFORM_ANDROID
+                if (output == stdout || output == stderr) {
+                    if (extra == LogExtraParam::None || extra == LogExtraParam::InProgress)
+                        logPrintRawAndroid(type, text);
+                }
+#else
+                if (!g_logger.timestamps || (extra != LogExtraParam::InProgress && extra != LogExtraParam::None)) {
                     fprintf(output, "%s%s%s", prefix, text, post);
                 } else {
                     fprintf(output, "[%s] %s%s%s", timestr, prefix, text, post);
                 }
+#endif
             }
         }
 
         // Callback
-        if (gLogger.callback)
-            gLogger.callback(filename, line, type, text, gLogger.userParam, extra, t);
+        if (g_logger.callback)
+            g_logger.callback(filename, line, type, text, g_logger.userParam, extra, t);
     }
 
-    void logPrintf(const char* sourceFile, int line, LogType type, const char* fmt, ...)
+    void logPrintf(const char* sourceFile, int line, LogType::Enum type, const char* fmt, ...)
     {
         char text[4096];
 
@@ -464,7 +523,7 @@ namespace bx
         logPrintRaw(sourceFile, line, type, LogExtraParam::None, text);
     }
 
-    void logPrint(const char* sourceFile, int line, LogType type, const char* text)
+    void logPrint(const char* sourceFile, int line, LogType::Enum type, const char* text)
     {
         logPrintRaw(sourceFile, line, type, LogExtraParam::None, text);
     }
@@ -478,15 +537,15 @@ namespace bx
         vsnprintf(text, sizeof(text), fmt, args);
         va_end(args);
 
-        gLogger.insideProgress = true;
+        g_logger.insideProgress = true;
         logPrintRaw(sourceFile, line, LogType::Text, LogExtraParam::InProgress, text);
     }
 
-    void logEndProgress(LogProgressResult result)
+    void logEndProgress(LogProgressResult::Enum result)
     {
-        gLogger.insideProgress = false;
+        g_logger.insideProgress = false;
 
-        LogExtraParam extra;
+        LogExtraParam::Enum extra;
         const char* text;
         switch (result) {
         case LogProgressResult::Ok:
@@ -512,34 +571,34 @@ namespace bx
         logPrintRaw(__FILE__, __LINE__, LogType::Text, extra, text);
     }
 
-    void excludeFromLog(LogType type)
+    void excludeFromLog(LogType::Enum type)
     {
-        if (gLogger.numExcludes == EXCLUDE_LIST_COUNT)
+        if (g_logger.numExcludes == EXCLUDE_LIST_COUNT)
             return;
 
-        for (int i = 0; i < gLogger.numExcludes; i++) {
-            if (type == gLogger.excludeList[i])
+        for (int i = 0; i < g_logger.numExcludes; i++) {
+            if (type == g_logger.excludeList[i])
                 return;
         }
 
-        gLogger.excludeList[gLogger.numExcludes++] = type;
+        g_logger.excludeList[g_logger.numExcludes++] = type;
     }
 
-    void includeToLog(LogType type)
+    void includeToLog(LogType::Enum type)
     {
-        for (int i = 0; i < gLogger.numExcludes; i++) {
-            if (type == gLogger.excludeList[i]) {
-                for (int c = i + 1; c < gLogger.numExcludes; c++)
-                    gLogger.excludeList[c - 1] = gLogger.excludeList[c];
-                gLogger.numExcludes--;
+        for (int i = 0; i < g_logger.numExcludes; i++) {
+            if (type == g_logger.excludeList[i]) {
+                for (int c = i + 1; c < g_logger.numExcludes; c++)
+                    g_logger.excludeList[c - 1] = g_logger.excludeList[c];
+                g_logger.numExcludes--;
                 break;
             }
         }
     }
 
-    void overrideLogColor(LogColor color)
+    void overrideLogColor(LogColor::Enum color)
     {
-        gLogger.colorOverride = color;
+        g_logger.colorOverride = color;
     }
 
 }

@@ -76,8 +76,7 @@ static void imguiDrawLists(ImDrawData* data)
     uint8_t viewId = g_Im->viewId;
     bx::mtxOrtho(proj, 0.0f, width, height, 0.0f, -1.0f, 1.0f);
 
-    GfxState state = gfxStateBlendAlpha() |
-        GfxState::RGBWrite | GfxState::AlphaWrite/* | GfxState::CullCCW*/;
+    GfxState::Bits state = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite;
     driver->touch(viewId);
     driver->setViewRectRatio(viewId, 0, 0, BackbufferRatio::Equal);
     driver->setViewSeq(viewId, true);
@@ -212,7 +211,7 @@ int termite::initImGui(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, 
     uint8_t* fontData;
     int fontWidth, fontHeight, bpp;
     conf.Fonts->GetTexDataAsRGBA32(&fontData, &fontWidth, &fontHeight, &bpp);
-    g_Im->fontTexHandle = driver->createTexture2D((uint16_t)fontWidth, (uint16_t)fontHeight, 1, TextureFormat::RGBA8, 
+    g_Im->fontTexHandle = driver->createTexture2D((uint16_t)fontWidth, (uint16_t)fontHeight, false, 1, TextureFormat::RGBA8, 
                                                  TextureFlag::MinPoint|TextureFlag::MagPoint, 
                                                  driver->makeRef(fontData, fontWidth*fontHeight*bpp, nullptr, nullptr));
     if (!g_Im->fontTexHandle.isValid()) {

@@ -13,4 +13,5 @@ if (WIN32)
     add_dependencies(ls-model AssimpCopyBinaries)
 endif()
 
+set_target_properties(ls-model PROPERTIES FOLDER Tools)
 install(TARGETS ls-model RUNTIME DESTINATION bin)

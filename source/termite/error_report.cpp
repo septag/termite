@@ -4,6 +4,8 @@
 #include <cstdarg>
 #include <string>
 
+#include "bx/string.h"
+
 struct ErrorItem
 {
     char* desc;
@@ -125,10 +127,9 @@ const char* termite::getErrorCallstack()
     for (int i = gErr->numReports - 1; i >= 0; i--) {
         const ErrorItem* r = gErr->reports[i];
 
-        std::string line = std::string("- ") + (r->source ? r->source : "") + std::string("(Line:") +
-            std::to_string(r->line) + std::string(")\n");
-
-        size += line.length() + 1;
+        char line[256];
+        bx::snprintf(line, sizeof(line), "- %s (Line:%d)\n", r->source ? r->source : "", r->line);
+        size += strlen(line) + 1;
 
         gErr->fullString = (char*)BX_REALLOC(gErr->alloc, gErr->fullString, size);
         if (!gErr->fullString) {
@@ -137,9 +138,9 @@ const char* termite::getErrorCallstack()
         }
 
         if (i == gErr->numReports - 1)
-            strcpy(gErr->fullString, line.c_str());
+            strcpy(gErr->fullString, line);
         else
-            strcat(gErr->fullString, line.c_str());
+            strcat(gErr->fullString, line);
     }
 
     return gErr->fullString;

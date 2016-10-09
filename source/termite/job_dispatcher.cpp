@@ -16,7 +16,7 @@
 
 #include <mutex>
 #include <condition_variable>
-#include <thread>  
+#include <thread>
 
 using namespace termite;
 
@@ -33,7 +33,7 @@ struct Fiber
 {
     typedef bx::ListNode<Fiber*> LNode;
 
-    uint32_t ownerThread;    // by default, owner thread is -1, which indicates that thread owns this fiber
+    uint32_t ownerThread;    // by default, owner thread is 0, which indicates that thread owns this fiber
                              // If we wait on a job (fiber), owner thread gets a valid value
     uint16_t jobIndex;
     uint16_t stackIndex;
@@ -45,7 +45,7 @@ struct Fiber
     LNode lnode;
 
     JobCallback callback;
-    JobPriority priority;
+    JobPriority::Enum priority;
     void* userData;
 };
 
@@ -68,7 +68,7 @@ public:
     bool create(uint16_t maxFibers, uint32_t stackSize, bx::AllocatorI* alloc);
     void destroy();
 
-    Fiber* newFiber(JobCallback callbackFn, void* userData, uint16_t index, JobPriority priority, FiberPool* pool,
+    Fiber* newFiber(JobCallback callbackFn, void* userData, uint16_t index, JobPriority::Enum priority, FiberPool* pool,
                     JobCounter* counter);
     void deleteFiber(Fiber* fiber);
 
@@ -259,8 +259,8 @@ static void fiberCallback(fcontext_transfer_t transfer)
     jump_fcontext(transfer.ctx, transfer.data);
 }
 
-Fiber* FiberPool::newFiber(JobCallback callbackFn, void* userData, uint16_t index, JobPriority priority, FiberPool* pool,
-                           JobCounter* counter)
+Fiber* FiberPool::newFiber(JobCallback callbackFn, void* userData, uint16_t index, JobPriority::Enum priority, 
+                           FiberPool* pool, JobCounter* counter)
 {
     bx::LockScope lk(m_lock);
     if (m_index > 0) {
@@ -329,6 +329,7 @@ static void jobPusherCallback(fcontext_transfer_t transfer)
             break;
         }
 
+        // Stay idle in worker threads if no job is in queue
         if (!data->main) {
             std::unique_lock<std::mutex> lk(g_dispatcher->workMutex);
             g_dispatcher->workCv.wait(lk, [] {return g_dispatcher->numWaits > 0; });
@@ -339,7 +340,7 @@ static void jobPusherCallback(fcontext_transfer_t transfer)
     jump_fcontext(transfer.ctx, transfer.data);
 }
 
-static JobHandle dispatch(const jobDesc* jobs, uint16_t numJobs, FiberPool* pool) T_THREAD_SAFE
+static JobHandle dispatch(const JobDesc* jobs, uint16_t numJobs, FiberPool* pool) T_THREAD_SAFE
 {
     // Get dispatcher counter to assign to jobs
     ThreadData* data = (ThreadData*)g_dispatcher->threadData.get();
@@ -365,7 +366,7 @@ static JobHandle dispatch(const jobDesc* jobs, uint16_t numJobs, FiberPool* pool
         int index = numJobs - i - 1;
         Fiber* fiber = pool->newFiber(jobs[index].callback, jobs[index].userParam, index, jobs[index].priority, pool, counter);
         if (fiber) {
-            bx::addListNode<Fiber*>(&g_dispatcher->waitList[int(fiber->priority)], &fiber->lnode, fiber);
+            bx::addListNode<Fiber*>(&g_dispatcher->waitList[fiber->priority], &fiber->lnode, fiber);
             c++;
         } else {
             BX_WARN("Exceeded maximum jobs (%d)", pool->getMax());
@@ -383,12 +384,12 @@ static JobHandle dispatch(const jobDesc* jobs, uint16_t numJobs, FiberPool* pool
     return counter;
 }
 
-JobHandle termite::dispatchSmallJobs(const jobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE
+JobHandle termite::dispatchSmallJobs(const JobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE
 {
     return dispatch(jobs, numJobs, &g_dispatcher->smallFibers);
 }
 
-JobHandle termite::dispatchBigJobs(const jobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE
+JobHandle termite::dispatchBigJobs(const JobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE
 {
     return dispatch(jobs, numJobs, &g_dispatcher->bigFibers);
 }
@@ -397,7 +398,7 @@ void termite::waitJobs(JobHandle handle) T_THREAD_SAFE
 {
     ThreadData* data = (ThreadData*)g_dispatcher->threadData.get();
 
-    if (*handle > 0) {
+    while (*handle > 0) {
         // Jump back to worker thread (current job is not finished)
         fcontext_stack_t* stack = pushWaitStack(data);
         if (!stack) {

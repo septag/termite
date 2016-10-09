@@ -15,4 +15,5 @@ if (WIN32)
     add_dependencies(animc AssimpCopyBinaries)
 endif()
 
+set_target_properties(animc PROPERTIES FOLDER Tools)
 install(TARGETS animc RUNTIME DESTINATION bin)

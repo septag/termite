@@ -47,7 +47,7 @@ static const uint8_t(*gAttribTypeSize[])[(int)VertexAttribType::Count][4] =
 };
 BX_STATIC_ASSERT(BX_COUNTOF(gAttribTypeSize) == (int)RendererType::Count + 1);
 
-VertexDecl* termite::vdeclBegin(VertexDecl* vdecl, RendererType _type /*= RendererType::Null*/)
+VertexDecl* termite::vdeclBegin(VertexDecl* vdecl, RendererType::Enum _type /*= RendererType::Null*/)
 {
     vdecl->hash = (uint32_t)_type;
     vdecl->stride = 0;
@@ -65,7 +65,8 @@ void termite::vdeclEnd(VertexDecl* vdecl)
     vdecl->hash = murmur.end();
 }
 
-VertexDecl* termite::vdeclAdd(VertexDecl* vdecl, VertexAttrib _attrib, uint8_t _num, VertexAttribType _type, bool _normalized /*= false*/, bool _asInt /*= false*/)
+VertexDecl* termite::vdeclAdd(VertexDecl* vdecl, VertexAttrib::Enum _attrib, uint8_t _num, VertexAttribType::Enum _type, 
+                              bool _normalized /*= false*/, bool _asInt /*= false*/)
 {
     int aidx = (int)_attrib;
     const uint16_t encodedNorm = (_normalized & 1) << 7;
@@ -84,16 +85,17 @@ VertexDecl* termite::vdeclSkip(VertexDecl* vdecl, uint8_t _numBytes)
     return vdecl;
 }
 
-void termite::vdeclDecode(VertexDecl* vdecl, VertexAttrib _attrib, uint8_t* _num, VertexAttribType* _type, bool* _normalized, bool* _asInt)
+void termite::vdeclDecode(VertexDecl* vdecl, VertexAttrib::Enum _attrib, uint8_t* _num, VertexAttribType::Enum* _type, 
+                          bool* _normalized, bool* _asInt)
 {
-    uint16_t val = vdecl->attribs[(int)_attrib];
+    uint16_t val = vdecl->attribs[_attrib];
     *_num = (val & 3) + 1;
-    *_type = VertexAttribType((val >> 3) & 7);
+    *_type = VertexAttribType::Enum((val >> 3) & 7);
     *_normalized = !!(val&(1 << 7));
     *_asInt = !!(val&(1 << 8));
 }
 
-bool termite::vdeclHas(VertexDecl* vdecl, VertexAttrib _attrib)
+bool termite::vdeclHas(VertexDecl* vdecl, VertexAttrib::Enum _attrib)
 {
     return vdecl->attribs[(int)_attrib] != UINT16_MAX;
 }

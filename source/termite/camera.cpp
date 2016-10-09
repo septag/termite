@@ -83,7 +83,7 @@ void termite::camCalcFrustumCorners(Camera* cam, vec3_t result[8], float aspectR
     result[7] = centerFar + (xFarScaled - yFarScaled);
 }
 
-void termite::camCalcFrustumPlanes(plane_t result[int(CameraPlane::Count)], const mtx4x4_t& viewProjMtx)
+void termite::camCalcFrustumPlanes(plane_t result[CameraPlane::Count], const mtx4x4_t& viewProjMtx)
 {
     const mtx4x4_t vp = viewProjMtx;
     result[0] = planef(vp.m14 + vp.m11, vp.m24 + vp.m21, vp.m34 + vp.m31, vp.m44 + vp.m41);
@@ -197,8 +197,8 @@ mtx4x4_t termite::camProjMtx(Camera* cam, float aspectRatio)
                    0, 0, zn*zf / (zn - zf), 0);
 }
 
-void termite::cam2dInit(Camera2D* cam, float refWidth, float refHeight, DisplayPolicy policy, 
-                        float zoom /*= 1.0f*/, const vec2_t pos /*= vec2f(0, 0)*/)
+void termite::cam2dInit(Camera2D* cam, float refWidth, float refHeight, DisplayPolicy::Enum policy, float zoom /*= 1.0f*/, 
+                        const vec2_t pos /*= vec2f(0, 0)*/)
 {
     cam->refWidth = refWidth;
     cam->refHeight = refHeight;
@@ -225,7 +225,7 @@ mtx4x4_t termite::cam2dViewMtx(const Camera2D& cam)
                     -cam.pos.x, -cam.pos.y, 0);
 }
 
-mtx4x4_t termite::cam2dProjMtx(const Camera2D& cam, float width, float height)
+static vec2_t calcCam2dHalfSize(const Camera2D& cam)
 {
     float s = 1.0f / cam.zoom;
 
@@ -239,8 +239,21 @@ mtx4x4_t termite::cam2dProjMtx(const Camera2D& cam, float width, float height)
         hh = 1.0f;
         hw = ratio * hh;
     }
+    
+    return vec2f(hw*s, hh*s);
+}
 
+mtx4x4_t termite::cam2dProjMtx(const Camera2D& cam)
+{
     mtx4x4_t projMtx;
-    bx::mtxOrtho(projMtx.f, -hw*s, hw*s, -hh*s, hh*s, 0, 1.0f);
+    vec2_t halfSize = calcCam2dHalfSize(cam);
+    bx::mtxOrtho(projMtx.f, -halfSize.x, halfSize.x, -halfSize.y, halfSize.y, 0, 1.0f);
     return projMtx;
+}
+
+rect_t termite::cam2dGetRect(const Camera2D& cam)
+{
+    vec2_t halfSize = calcCam2dHalfSize(cam);
+    vec2_t pos = cam.pos;
+    return rectf(-halfSize.x + pos.x, -halfSize.y + pos.y, halfSize.x + pos.x, halfSize.y + pos.y);
 }

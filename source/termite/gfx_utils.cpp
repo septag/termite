@@ -150,7 +150,8 @@ void termite::drawFullscreenQuad(uint8_t viewId, ProgramHandle prog)
     driver->submit(viewId, prog, 0, false);
 }
 
-vec2int_t termite::getRelativeDisplaySize(int refWidth, int refHeight, int targetWidth, int targetHeight, DisplayPolicy policy)
+vec2int_t termite::getRelativeDisplaySize(int refWidth, int refHeight, int targetWidth, int targetHeight, 
+                                          DisplayPolicy::Enum policy)
 {
     float w, h;
     float ratio = float(refWidth) / float(refHeight);

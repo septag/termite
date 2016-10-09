@@ -133,7 +133,7 @@ namespace
 
 		termite::UniformHandle s_tex;
 
-		termite::GfxState state;
+		termite::GfxState::Bits state;
 		termite::TextureHandle th;
 		termite::TextureHandle texMissing;
 
@@ -252,7 +252,7 @@ namespace
 		const termite::GfxMemory* mem = gl->driver->alloc(4*4*4);
 		uint32_t* bgra8 = (uint32_t*)mem->data;
 		memset(bgra8, 0, 4*4*4);
-		gl->texMissing = gl->driver->createTexture2D(4, 4, 0, termite::TextureFormat::BGRA8, termite::TextureFlag::None, mem);
+		gl->texMissing = gl->driver->createTexture2D(4, 4, false, 1, termite::TextureFormat::BGRA8, termite::TextureFlag::None, mem);
 
 		gl->u_scissorMat      = gl->driver->createUniform("u_scissorMat",      termite::UniformType::Mat3, 1);
 		gl->u_paintMat        = gl->driver->createUniform("u_paintMat",        termite::UniformType::Mat3, 1);
@@ -310,13 +310,14 @@ namespace
 
 		tex->id = gl->driver->createTexture2D(tex->width
 						, tex->height
-						, 1
+						, false, 1
 						, NVG_TEXTURE_RGBA == _type ? termite::TextureFormat::RGBA8 : termite::TextureFormat::R8
 						, termite::TextureFlag::None, nullptr);
 
 		if (NULL != mem)
 		{
 			gl->driver->updateTexture2D(tex->id
+                    , 0
 					, 0
 					, 0
 					, 0
@@ -349,6 +350,7 @@ namespace
 		uint32_t pitch = tex->width * bytesPerPixel;
 
 		gl->driver->updateTexture2D(tex->id
+                , 0
 				, 0
 				, x
 				, y
@@ -591,7 +593,7 @@ namespace
 			// Draw fringes
 			for (i = 0; i < npaths; i++)
 			{
-				gl->driver->setState(termite::GfxState(gl->state) | termite::GfxState::PrimitiveTriStrip, 0);
+				gl->driver->setState(gl->state | termite::GfxState::PrimitiveTriStrip, 0);
 				gl->driver->setStencil(
 					termite::GfxStencilState::TestEqual
 					| termite::gfxStencilRMask(0xff)
@@ -606,7 +608,7 @@ namespace
 		}
 
 		// Draw fill
-		gl->driver->setState(termite::GfxState(gl->state), 0);
+		gl->driver->setState(gl->state, 0);
 		gl->driver->setTransientVertexBufferI(&gl->tvb, call->vertexOffset, call->vertexCount);
 		gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
 		gl->driver->setStencil(
@@ -631,7 +633,7 @@ namespace
 		for (i = 0; i < npaths; i++)
 		{
 			if (paths[i].fillCount == 0) continue;
-			gl->driver->setState(termite::GfxState(gl->state), 0);
+			gl->driver->setState(gl->state, 0);
 			gl->driver->setTransientVertexBuffer(&gl->tvb);
 			gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
 			fan(gl, paths[i].fillOffset, paths[i].fillCount);
@@ -643,7 +645,7 @@ namespace
 			// Draw fringes
 			for (i = 0; i < npaths; i++)
 			{
-				gl->driver->setState(termite::GfxState(gl->state) | termite::GfxState::PrimitiveTriStrip, 0);
+				gl->driver->setState(gl->state | termite::GfxState::PrimitiveTriStrip, 0);
 				gl->driver->setTransientVertexBufferI(&gl->tvb, paths[i].strokeOffset, paths[i].strokeCount);
 				gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
 				gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
@@ -661,7 +663,7 @@ namespace
 		// Draw Strokes
 		for (i = 0; i < npaths; i++)
 		{
-			gl->driver->setState(termite::GfxState(gl->state) | termite::GfxState::PrimitiveTriStrip, 0);
+			gl->driver->setState(gl->state | termite::GfxState::PrimitiveTriStrip, 0);
 			gl->driver->setTransientVertexBufferI(&gl->tvb, paths[i].strokeOffset, paths[i].strokeCount);
 			gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
 			gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
@@ -674,7 +676,7 @@ namespace
 		{
 			nvgRenderSetUniforms(gl, call->uniformOffset, call->image);
 
-			gl->driver->setState(termite::GfxState(gl->state), 0);
+			gl->driver->setState(gl->state, 0);
 			gl->driver->setTransientVertexBufferI(&gl->tvb, call->vertexOffset, call->vertexCount);
 			gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
 			gl->driver->submit(gl->m_viewId, gl->prog, 0, false);

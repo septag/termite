@@ -15,4 +15,5 @@ if (WIN32)
     add_dependencies(modelc AssimpCopyBinaries)
 endif()
 
+set_target_properties(modelc PROPERTIES FOLDER Tools)
 install(TARGETS modelc RUNTIME DESTINATION bin)

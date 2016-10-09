@@ -35,8 +35,9 @@ include(Bgfx)
 option(BUILD_BOX2D "Build Box2D Physics engine" OFF)
 option(BUILD_DIGGER "Build Digger Game Prototype" OFF)
 option(USE_SDL2 "Use SDL2 with the engine" OFF)
+option(BUILD_STATIC "Force Static library builds" OFF)
 
-# Check dependencies
+# Dependencies
 
 # Run find package scripts
 include(FindSDL2)
@@ -44,30 +45,38 @@ include(FindAssimp)
 include(FindLibuv)
 include(FindBgfx)
 
-# windows dependencies
+# standard windows dependencies
 if (WIN32)
-    # Assimp
     if (NOT ASSIMP_FOUND)
         download_package(${DOWNLOAD_URL_ROOT}/assimp_vc140.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
         include(FindAssimp)
     endif()
-
-    # libuv
     if (NOT LIBUV_FOUND)
         download_package(${DOWNLOAD_URL_ROOT}/libuv_vc140.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
         include(FindLibuv)
     endif()
-
-    # SDL2
     if (NOT SDL2_FOUND)
         download_package(${DOWNLOAD_URL_ROOT}/sdl_vc140.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
         include (FindSDL2)
     endif()
 endif()
 
+# force download android dependencies
+if (ANDROID)
+    IF (NOT ANDROID_PACKAGES_CACHED)
+        download_package(${DOWNLOAD_URL_ROOT}/libuv_android_arm.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
+        download_package(${DOWNLOAD_URL_ROOT}/sdl_android_arm.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
+        download_package(${DOWNLOAD_URL_ROOT}/bgfx_android_arm.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
+        set(ANDROID_PACKAGES_CACHED 1 CACHE BOOL "Download prebuilt packages" FORCE)
+    endif()
+endif()
+
 # Download dependencies that doesn't have packages on any platform
 if (NOT BGFX_FOUND)
-    download_package(${DOWNLOAD_URL_ROOT}/bgfx_vc140.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
+    if (MSVC)
+        download_package(${DOWNLOAD_URL_ROOT}/bgfx_vc140.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
+    endif()
+
     include(FindBgfx)
 endif()
 
@@ -78,7 +87,7 @@ if (ASSIMP_FOUND)
     else()
         message(STATUS "Found Assimp library: ${ASSIMP_LIBRARY}")
     endif()
-else()
+elseif(NOT ANDROID)
     message(FATAL_ERROR "Assimp library not found")
 endif()
 
@@ -128,21 +137,43 @@ if(MSVC)
     remove_cxx_flag("/GR")
     add_compile_options(/GR-)
 else()
-    add_compile_options(-std=c++11 -fPIC -fno-rtti -fno-exceptions -Wno-switch)
+    add_compile_options(-std=c++11 -fPIC -Wno-switch)
+    if (NOT ANDROID)
+        add_compile_options(-fno-rtti -fno-exceptions)
+    endif()
 endif()
 
-add_definitions(-Dtermite_SHARED_LIB)
+if (ANDROID)    
+    add_definitions(-D__STDC_LIMIT_MACROS 
+                    -D__STDC_CONSTANT_MACROS)
+    set(BUILD_STATIC 1)
+endif()
+
+if (BUILD_STATIC)
+    add_definitions(-Dtermite_STATIC_LIB)
+    set(BUILD_LIBRARY_TYPE STATIC)
+else()
+    add_definitions(-Dtermite_SHARED_LIB)
+    set(BUILD_LIBRARY_TYPE SHARED)
+endif()
 
 # copy release flags into profile
 copy_build_flags(PROFILE)
 copy_build_flags(DEVELOPMENT)
 
 # http://stackoverflow.com/questions/33829152/for-cmake-can-you-modify-the-release-debug-compiler-flags-with-add-compiler-fl
-set(DEBUG_COMPILE_OPTIONS "-DBX_CONFIG_ALLOCATOR_DEBUG" "-Dtermite_DEV")
+set(DEBUG_COMPILE_OPTIONS "-DBX_CONFIG_ALLOCATOR_DEBUG" "-Dtermite_DEV=1")
 add_compile_options("$<$<CONFIG:Debug>:${DEBUG_COMPILE_OPTIONS}>")
 
-set(DEVELOPMENT_COMPILE_OPTIONS "-Dtermite_DEV")
+set(DEVELOPMENT_COMPILE_OPTIONS "-Dtermite_DEV=1")
 add_compile_options("$<$<CONFIG:Development>:${DEVELOPMENT_COMPILE_OPTIONS}>")
+
+set(PROFILE_COMPILE_OPTIONS "-Dtermite_DEV=0")
+add_compile_options("$<$<CONFIG:Profile>:${PROFILE_COMPILE_OPTIONS}>")
+
+set(RELEASE_COMPILE_OPTIONS "-Dtermite_DEV=0")
+add_compile_options("$<$<CONFIG:Release>:${RELEASE_COMPILE_OPTIONS}>")
+
 
 # Common include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -164,38 +195,29 @@ endif()
 
 # common
 add_subdirectory(source/imgui_impl)
-set_target_properties(imgui_impl PROPERTIES FOLDER Common)
-set_target_properties(imgui PROPERTIES FOLDER Deps)
 
 ## main
 add_subdirectory(source/termite)
 
 # plugins
 add_subdirectory(source/driver_bgfx)
-add_subdirectory(source/driver_disk)
+if (ANDROID)
+    add_subdirectory(source/driver_android_assets)
+else()
+    add_subdirectory(source/driver_disk)
+endif()
 add_subdirectory(source/render_stock)
-set_target_properties(tdriver_bgfx PROPERTIES FOLDER Plugins)
-set_target_properties(tdriver_disk PROPERTIES FOLDER Plugins)
-set_target_properties(trender_stock PROPERTIES FOLDER Plugins)
 
 # tools
-add_subdirectory(source/ls-model)
-add_subdirectory(source/modelc)
-add_subdirectory(source/animc)
-add_subdirectory(source/sheetmaker)
-set_target_properties(ls-model PROPERTIES FOLDER Tools)
-set_target_properties(modelc PROPERTIES FOLDER Tools)
-set_target_properties(animc PROPERTIES FOLDER Tools)
-set_target_properties(sheetmaker PROPERTIES FOLDER Tools)
+if (NOT ANDROID)
+    add_subdirectory(source/ls-model)
+    add_subdirectory(source/modelc)
+    add_subdirectory(source/animc)
+    add_subdirectory(source/sheetmaker)
+endif()
 
 # tests
 add_subdirectory(tests)
-set_target_properties(test_init PROPERTIES FOLDER Tests)
-set_target_properties(test_sdl PROPERTIES FOLDER Tests)
-set_target_properties(test_gui PROPERTIES FOLDER Tests)
-set_target_properties(test_component PROPERTIES FOLDER Tests)
-set_target_properties(test_box2d PROPERTIES FOLDER Tests)
-set_target_properties(test_sprite PROPERTIES FOLDER Tests)
 
 # copy binaries
 if (WIN32)

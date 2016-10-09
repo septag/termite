@@ -23,24 +23,32 @@
 
 namespace termite
 {
-    enum class ApiId : uint16_t
+    struct ApiId
     {
-        Core = 0,
-        Plugin, 
-        Gfx,
-		ImGui
+        enum Enum
+        {
+            Core = 0,
+            Plugin,
+            Gfx,
+            ImGui
+        };
+
+        typedef uint16_t Type;
     };
 
     // Plugins should also implement this function
     // Should be named "termiteGetPluginApi" (extern "C")
     typedef void* (*GetApiFunc)(uint16_t apiId, uint32_t version);
 
-    enum PluginType : uint16_t
+    struct PluginType
     {
-        Unknown = 0,
-        GraphicsDriver,
-        IoDriver,
-        Renderer
+        enum Enum
+        {
+            Unknown = 0,
+            GraphicsDriver,
+            IoDriver,
+            Renderer
+        };
     };
 
     struct PluginDesc
@@ -48,7 +56,7 @@ namespace termite
         char name[32];
         char description[64];
         uint32_t version;
-        PluginType type;
+        PluginType::Enum type;
     };
 
     struct PluginApi_v0
@@ -69,7 +77,7 @@ namespace termite {
     struct CoreApi_v0
     {
         MemoryBlock* (*createMemoryBlock)(uint32_t size, bx::AllocatorI* alloc);
-        MemoryBlock* (*refMemoryBlockPtr)(void* data, uint32_t size);
+        MemoryBlock* (*refMemoryBlockPtr)(const void* data, uint32_t size);
         MemoryBlock* (*refMemoryBlock)(MemoryBlock* mem);
         MemoryBlock* (*copyMemoryBlock)(const void* data, uint32_t size, bx::AllocatorI* alloc);
         void(*releaseMemoryBlock)(MemoryBlock* mem);
@@ -78,10 +86,10 @@ namespace termite {
         void(*reportError)(const char* source, int line, const char* desc);
         void(*reportErrorf)(const char* source, int line, const char* fmt, ...);
 
-        void(*logPrint)(const char* sourceFile, int line, bx::LogType type, const char* text);
-        void(*logPrintf)(const char* sourceFile, int line, bx::LogType type, const char* fmt, ...);
+        void(*logPrint)(const char* sourceFile, int line, bx::LogType::Enum type, const char* text);
+        void(*logPrintf)(const char* sourceFile, int line, bx::LogType::Enum type, const char* fmt, ...);
         void(*logBeginProgress)(const char* sourceFile, int line, const char* fmt, ...);
-        void(*logEndProgress)(bx::LogProgressResult result);
+        void(*logEndProgress)(bx::LogProgressResult::Enum result);
 
         const Config& (*getConfig)();
         uint32_t(*getEngineVersion)();
@@ -104,12 +112,14 @@ namespace termite {
 										  const char* fsFilepath);
         void(*drawFullscreenQuad)(uint8_t viewId, ProgramHandle prog);
 
-        VertexDecl* (*vdeclBegin)(VertexDecl* vdecl, RendererType _type);
+        VertexDecl* (*vdeclBegin)(VertexDecl* vdecl, RendererType::Enum _type);
         void(*vdeclEnd)(VertexDecl* vdecl);
-        VertexDecl* (*vdeclAdd)(VertexDecl* vdecl, VertexAttrib _attrib, uint8_t _num, VertexAttribType _type, bool _normalized, bool _asInt);
+        VertexDecl* (*vdeclAdd)(VertexDecl* vdecl, VertexAttrib::Enum _attrib, uint8_t _num, VertexAttribType::Enum _type, 
+                                bool _normalized, bool _asInt);
         VertexDecl* (*vdeclSkip)(VertexDecl* vdecl, uint8_t _numBytes);
-        void(*vdeclDecode)(VertexDecl* vdecl, VertexAttrib _attrib, uint8_t* _num, VertexAttribType* _type, bool* _normalized, bool* _asInt);
-        bool(*vdeclHas)(VertexDecl* vdecl, VertexAttrib _attrib);
+        void(*vdeclDecode)(VertexDecl* vdecl, VertexAttrib::Enum _attrib, uint8_t* _num, VertexAttribType::Enum* _type,
+                           bool* _normalized, bool* _asInt);
+        bool(*vdeclHas)(VertexDecl* vdecl, VertexAttrib::Enum _attrib);
         uint32_t(*vdeclGetSize)(VertexDecl* vdecl, uint32_t _num);
     };
 }
@@ -180,9 +190,6 @@ namespace termite
 		void (*pushStyleVar)(ImGuiStyleVar idx, float val);
 		void (*pushStyleVarVec2)(ImGuiStyleVar idx, const ImVec2& val);
 		void (*popStyleVar)(int count/* = 1*/);
-		ImU32 (*getColorU32)(ImGuiCol idx, float alpha_mul/* = 1.0f*/);         // retrieve given style color with style alpha applied and optional extra alpha multiplier
-		ImU32 (*getColorU32Vec4)(const ImVec4& col);          // retrieve given color with style alpha applied
-
 																									// Parameters stacks (current window)
 		void (*pushItemWidth)(float item_width);         // width of items for the common item+label case, pixels. 0.0f = default to ~2/3 of windows width, >0.0f: width in pixels, <0.0f align xx pixels to the right of window (so -1.0f always align width to the right side)
 		void (*popItemWidth)();
@@ -385,7 +392,7 @@ namespace termite
 		bool (*isEntityAlive)(EntityManager* emgr, Entity ent);
 
 		ComponentTypeHandle (*registerComponentType)(const char* name, uint32_t id,
-													 const ComponentCallbacks* callbacks, ComponentFlag flags,
+													 const ComponentCallbacks* callbacks, ComponentFlag::Bits flags,
 													 uint32_t dataSize, uint16_t poolSize, uint16_t growSize);
 		ComponentHandle (*createComponent)(EntityManager* emgr, Entity ent, ComponentTypeHandle handle);
 		void (*destroyComponent)(EntityManager* emgr, Entity ent, ComponentHandle handle);

@@ -1,13 +1,13 @@
+#include "bxx/path.h"
+#include "bxx/pool.h"
+#include "bx/platform.h"
+#include "bx/crtimpl.h"
+
 #include "termite/core.h"
 #include "termite/io_driver.h"
 
 #define T_CORE_API
 #include "termite/plugin_api.h"
-
-#include "bx/crtimpl.h"
-#include "bxx/path.h"
-#include "bxx/logger.h"
-#include "bxx/pool.h"
 
 #include "uv.h"
 #include <fcntl.h>
@@ -81,10 +81,17 @@ static void uvCallbackFsEvent(uv_fs_event_t* handle, const char* filename, int e
         filepath.join(filename);
 
         if (filepath.getType() == bx::PathType::File) {
+#ifdef BX_PLATFORM_WINDOWS
+            // Transform '\\' to '/' on windows to match the original references
+            bx::Path filenamep(filename);
+            filenamep.toUnix();
+            filename = filenamep.cstr();
+#endif
             // Ignore file changes less than 0.1 second
             double curTime = g_core->getElapsedTime();
             if (lastModFile.isEqual(filename) && (curTime - lastModTime) < 0.1)
-                return;
+                return;            
+            
             g_async.callbacks->onModified(filename);
             lastModFile = filename;
             lastModTime = curTime;
@@ -102,23 +109,27 @@ static result_t asyncInit(bx::AllocatorI* alloc, const char* uri, const void* pa
     uv_loop_init(&g_async.loop);
     uv_fs_event_init(&g_async.loop, &g_async.dirChange);
 
+#if !BX_PLATFORM_ANDROID
     if (g_async.rootDir.getType() != bx::PathType::Directory) {
         T_ERROR_API(g_core, "Root Directory '%s' does not exist", g_async.rootDir.cstr());
         return T_ERR_FAILED;
     }
+#endif
 
     g_async.callbacks = callbacks;
 
-    if (!g_async.fsReqPool.create(20, alloc)) {
+    if (!g_async.fsReqPool.create(32, alloc)) {
         return T_ERR_OUTOFMEM;
     }
 
+#if termite_DEV && !BX_PLATFORM_ANDROID
     // Monitor root dir
     // Note: Recursive flag does not work under linux, according to documentation
     if (uv_fs_event_start(&g_async.dirChange, uvCallbackFsEvent, g_async.rootDir.cstr(), UV_FS_EVENT_RECURSIVE)) {
         T_ERROR_API(g_core, "Could not monitor root directory '%s' for changes", g_async.rootDir.cstr());
         return T_ERR_FAILED;
     }
+#endif
 
     return 0;
 }
@@ -130,7 +141,9 @@ static void uvWalk(uv_handle_t* handle, void* arg)
 
 static void asyncShutdown()
 {
+#if termite_DEV && !BX_PLATFORM_ANDROID
     uv_fs_event_stop(&g_async.dirChange);
+#endif
 
     // Walk the event loop handles and close all
     uv_walk(&g_async.loop, uvWalk, nullptr);
@@ -328,10 +341,12 @@ static int blockInit(bx::AllocatorI* alloc, const char* uri, const void* params,
     g_blocking.rootDir = uri;
     g_blocking.rootDir.normalizeSelf();
 
+#if !BX_PLATFORM_ANDROID
     if (g_blocking.rootDir.getType() != bx::PathType::Directory) {
         T_ERROR_API(g_core, "Root Directory '%s' does not exist", g_blocking.rootDir.cstr());
         return T_ERR_FAILED;
     }
+#endif
 
     return 0;
 }
@@ -410,18 +425,17 @@ static const char* blockGetUri()
 }
 
 
-#ifdef termite_SHARED_LIB
-static PluginDesc* getDiskDriverDesc()
+PluginDesc* getDiskDriverDesc()
 {
     static PluginDesc desc;
     strcpy(desc.name, "DiskIO");
     strcpy(desc.description, "DiskIO Driver (Blocking and Async)");
     desc.type = PluginType::IoDriver;
-    desc.version = T_MAKE_VERSION(0, 9);
+    desc.version = T_MAKE_VERSION(1, 0);
     return &desc;
 }
 
-static void* initDiskDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
+void* initDiskDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 {
     g_core = (CoreApi_v0*)getApi(uint16_t(ApiId::Core), 0);
     if (!g_core)
@@ -460,10 +474,11 @@ static void* initDiskDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     return &driver;
 }
 
-static void shutdownDiskDriver()
+void shutdownDiskDriver()
 {
 }
 
+#ifdef termite_SHARED_LIB
 T_PLUGIN_EXPORT void* termiteGetPluginApi(uint16_t apiId, uint32_t version)
 {
     static PluginApi_v0 v0;

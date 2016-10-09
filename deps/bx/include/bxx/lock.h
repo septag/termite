@@ -23,7 +23,7 @@ namespace bx
         {
             int32_t me = atomicFetchAndAdd<int32_t>(&m_data.s.users, 1);
             while (m_data.s.ticket != me)
-                relaxCpu();
+                yieldCpu();
         }
 
         void unlock()
@@ -122,7 +122,7 @@ namespace bx
             int64_t me = atomicFetchAndAdd<int64_t>(&m_data.u, 0x100000000 /*1<<32*/);
             int16_t val = int16_t((me >> 32) & 0xffff);
             while (val != m_data.s.write)
-                relaxCpu();
+                yieldCpu();
         }
 
         void unlockWrite()
@@ -155,7 +155,7 @@ namespace bx
             int64_t me = atomicFetchAndAdd<int64_t>(&m_data.u, 0x100000000 /*1<<32*/);
             int16_t val = int16_t((me >> 32) & 0xffff);
             while (val != m_data.s.read)
-                relaxCpu();
+                yieldCpu();
             m_data.s.read++;
         }
 

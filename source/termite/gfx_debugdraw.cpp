@@ -57,7 +57,7 @@ public:
     virtual void shutdown() = 0;
 
     virtual uint32_t getHash(const void* params) = 0;
-    virtual GfxState setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) = 0;
+    virtual GfxState::Bits setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) = 0;
 };
 
 struct State

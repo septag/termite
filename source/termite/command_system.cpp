@@ -17,18 +17,24 @@ static const uint32_t kCommandTypeHandleMask = (1 << kCommandTypeHandleBits) - 1
 #define COMMAND_TYPE_INDEX(_Handle) uint16_t((_Handle.value >> kCommandIndexBits) & kCommandTypeHandleMask)
 #define COMMAND_MAKE_HANDLE(_CTypeIdx, _CIdx) CommandHandle((uint32_t(_CTypeIdx) << kCommandTypeHandleBits) | uint32_t(_CIdx))
 
-enum class CommandMode
+struct CommandMode
 {
-    Normal = 0,
-    Chain,
-    Group
+    enum Enum
+    {
+        Normal = 0,
+        Chain,
+        Group
+    };
 };
 
-enum class CommandState
+struct CommandState
 {
-    None = 0,
-    Execute,
-    Undo
+    enum Enum
+    {
+        None = 0,
+        Execute,
+        Undo
+    };
 };
 
 struct CommandType
@@ -56,8 +62,8 @@ struct Command
     CommandHandle prevHandle;
     CommandHandle childHandle;
     uint16_t paramIndex;
-    CommandMode mode;
-    CommandState state;
+    CommandMode::Enum mode;
+    CommandState::Enum state;
     void* userData;
 
     Command()

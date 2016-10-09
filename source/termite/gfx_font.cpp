@@ -9,6 +9,7 @@
 #include "bxx/path.h"
 #include "bxx/linked_list.h"
 #include "bxx/pool.h"
+#include "bxx/logger.h"
 
 using namespace termite;
 
@@ -84,7 +85,7 @@ struct FontItem
 {
     char name[32];
     uint16_t size;
-    FontFlags flags;
+    FontFlags::Bits flags;
     Font* font;
     
     typedef bx::ListNode<FontItem*> LNode;
@@ -117,10 +118,9 @@ termite::Font::Font(bx::AllocatorI* alloc) :
     m_numChars = m_numKerns = m_lineHeight = m_baseValue = m_fsize = m_charWidth = 0;
     m_kerns = nullptr;
     m_glyphs = nullptr;
-    m_resLib = nullptr;
 }
 
-Font* termite::Font::create(const MemoryBlock* mem, const char* fntFilepath, bx::AllocatorI* alloc, ResourceLib* resLib)
+Font* termite::Font::create(const MemoryBlock* mem, const char* fntFilepath, bx::AllocatorI* alloc)
 {
     bx::Error err;
     bx::MemoryReader ms(mem->data, mem->size);
@@ -128,7 +128,7 @@ Font* termite::Font::create(const MemoryBlock* mem, const char* fntFilepath, bx:
     Font* font = BX_NEW(alloc, Font)(alloc);
     if (!font)
         return nullptr;
-    font->m_resLib = resLib;    
+    font->m_resLib = getDefaultResourceLib();    
 
     // Sign
     char sign[4];
@@ -182,9 +182,9 @@ Font* termite::Font::create(const MemoryBlock* mem, const char* fntFilepath, bx:
     LoadTextureParams texParams;
 
     if (texFilepath.getFileExt().isEqualNoCase("dds"))
-        font->m_textureHandle = loadResource(resLib, "texture", texFilepath.cstr(), &texParams);
+        font->m_textureHandle = font->m_resLib.loadResource("texture", texFilepath.cstr(), &texParams);
     else
-        font->m_textureHandle = loadResource(resLib, "image", texFilepath.cstr(), &texParams);
+        font->m_textureHandle = font->m_resLib.loadResource("image", texFilepath.cstr(), &texParams);
 
     if (!font->m_textureHandle.isValid()) {
         T_ERROR("Loading font '%s' failed: Loading texture '%s' failed", fntFilepath, texFilepath.cstr());
@@ -263,7 +263,7 @@ termite::Font::~Font()
         bx::AllocatorI* alloc = m_alloc;
 
         if (m_textureHandle.isValid())
-            unloadResource(m_resLib, m_textureHandle);
+            m_resLib.unloadResource(m_textureHandle);
 
         m_charTable.destroy();
 
@@ -363,7 +363,7 @@ void termite::shutdownFontLib()
     g_fontLib = nullptr;
 }
 
-static uint32_t hashFontItem(const char* name, uint16_t size, FontFlags flags)
+static uint32_t hashFontItem(const char* name, uint16_t size, FontFlags::Enum flags)
 {
     bx::HashMurmur2A hasher;
     uint32_t flags_ = uint32_t(flags);
@@ -374,7 +374,7 @@ static uint32_t hashFontItem(const char* name, uint16_t size, FontFlags flags)
     return hasher.end();
 }
 
-result_t termite::registerFont(const char* fntFilepath, const char* name, uint16_t size, FontFlags flags)
+result_t termite::registerFont(const char* fntFilepath, const char* name, uint16_t size, FontFlags::Enum flags)
 {
     assert(fntFilepath);
     assert(g_fontLib);
@@ -417,7 +417,7 @@ result_t termite::registerFont(const char* fntFilepath, const char* name, uint16
     return 0;
 }
 
-void termite::unregisterFont(const char* name, uint16_t size /*= 0*/, FontFlags flags /*= fntFlags::Normal*/)
+void termite::unregisterFont(const char* name, uint16_t size /*= 0*/, FontFlags::Enum flags /*= fntFlags::Normal*/)
 {
     uint32_t hash = hashFontItem(name, size, flags);
     int fontIndex = g_fontLib->fontTable.find(hash);
@@ -434,7 +434,7 @@ void termite::unregisterFont(const char* name, uint16_t size /*= 0*/, FontFlags 
     }
 }
 
-const Font* termite::getFont(const char* name, uint16_t size /*= 0*/, FontFlags flags /*= fntFlags::Normal*/)
+const Font* termite::getFont(const char* name, uint16_t size /*= 0*/, FontFlags::Enum flags /*= fntFlags::Normal*/)
 {
     uint32_t hash = hashFontItem(name, size, flags);
     int fontIndex = g_fontLib->fontTable.find(hash);

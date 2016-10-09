@@ -244,4 +244,34 @@ namespace bx
 #endif
     }
 
+#if BX_PLATFORM_WINDOWS
+    inline bx::Path getTempDir()
+    {
+        bx::Path r;
+        GetTempPath(sizeof(r), r.getBuffer());
+
+        /* remove \\ from the end of the path */
+        int sz = r.getLength();
+        if (sz > 0 && r[sz - 1] == '\\')
+            r[sz - 1] = 0;
+        return r;
+    }
+#elif BX_PLATFORM_LINUX || BX_PLATFORM_RPI || BX_PLATFORM_OSX
+    inline bx::Path getTempDir()
+    {
+        return bx::Path("/tmp");
+    }
+#elif BX_PLATFORM_IOS
+    inline bx::Path getTempDir()
+    {
+        return bx::Path("tmp");
+    }
+#else
+    inline bx::Path getTempDir()
+    {
+        assert(false);
+        return bx::Path();
+    }
+#endif
+
 }   // namespace: bx

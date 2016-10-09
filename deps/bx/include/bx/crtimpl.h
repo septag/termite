@@ -82,6 +82,23 @@ namespace bx
 #endif // BX_CONFIG_ALLOCATOR_CRT
 
 #if BX_CONFIG_CRT_FILE_READER_WRITER
+
+#	if BX_CRT_MSVC
+#		define fseeko64 _fseeki64
+#		define ftello64 _ftelli64
+#	elif 0 \
+	  || BX_PLATFORM_ANDROID \
+	  || BX_PLATFORM_BSD \
+	  || BX_PLATFORM_IOS \
+	  || BX_PLATFORM_OSX \
+	  || BX_PLATFORM_QNX
+#		define fseeko64 fseeko
+#		define ftello64 ftello
+#	elif BX_PLATFORM_PS4
+#		define fseeko64 fseek
+#		define ftello64 ftell
+#	endif // BX_
+
 	class CrtFileReader : public FileReaderI
 	{
 	public:
@@ -101,6 +118,7 @@ namespace bx
 			m_file = fopen(_filePath, "rb");
 			if (NULL == m_file)
 			{
+				BX_ERROR_SET(_err, BX_ERROR_READERWRITER_OPEN, "CrtFileReader: Failed to open file.");
 				return false;
 			}
 
@@ -125,6 +143,15 @@ namespace bx
 			int32_t size = (int32_t)fread(_data, 1, _size, m_file);
 			if (size != _size)
 			{
+				if (0 != feof(m_file) )
+				{
+					BX_ERROR_SET(_err, BX_ERROR_READERWRITER_EOF, "CrtFileWriter: EOF.");
+				}
+				else if (0 != ferror(m_file) )
+				{
+					BX_ERROR_SET(_err, BX_ERROR_READERWRITER_READ, "CrtFileWriter: read error.");
+				}
+
 				return size >= 0 ? size : 0;
 			}
 
@@ -153,6 +180,7 @@ namespace bx
 
 			if (NULL == m_file)
 			{
+				BX_ERROR_SET(_err, BX_ERROR_READERWRITER_OPEN, "CrtFileWriter: Failed to open file.");
 				return false;
 			}
 
@@ -177,6 +205,7 @@ namespace bx
 			int32_t size = (int32_t)fwrite(_data, 1, _size, m_file);
 			if (size != _size)
 			{
+				BX_ERROR_SET(_err, BX_ERROR_READERWRITER_WRITE, "CrtFileWriter: write failed.");
 				return size >= 0 ? size : 0;
 			}
 
@@ -190,10 +219,10 @@ namespace bx
 
 #if BX_CONFIG_CRT_PROCESS
 
-#if BX_COMPILER_MSVC_COMPATIBLE
+#if BX_CRT_MSVC
 #	define popen  _popen
 #	define pclose _pclose
-#endif // BX_COMPILER_MSVC_COMPATIBLE
+#endif // BX_CRT_MSVC
 
 	class ProcessReader : public ReaderOpenI, public CloserI, public ReaderI
 	{
@@ -215,7 +244,7 @@ namespace bx
 			m_file = popen(_command, "r");
 			if (NULL == m_file)
 			{
-				//BX_ERROR_SET(_err, BX_ERROR_READERWRITER_OPEN, "ProcessReader: Failed to open process.");
+				BX_ERROR_SET(_err, BX_ERROR_READERWRITER_OPEN, "ProcessReader: Failed to open process.");
 				return false;
 			}
 
@@ -236,6 +265,15 @@ namespace bx
 			int32_t size = (int32_t)fread(_data, 1, _size, m_file);
 			if (size != _size)
 			{
+				if (0 != feof(m_file) )
+				{
+					BX_ERROR_SET(_err, BX_ERROR_READERWRITER_EOF, "CrtFileWriter: EOF.");
+				}
+				else if (0 != ferror(m_file) )
+				{
+					BX_ERROR_SET(_err, BX_ERROR_READERWRITER_READ, "CrtFileWriter: read error.");
+				}
+
 				return size >= 0 ? size : 0;
 			}
 
@@ -266,7 +304,7 @@ namespace bx
 			m_file = popen(_command, "w");
 			if (NULL == m_file)
 			{
-				//BX_ERROR_SET(_err, BX_ERROR_READERWRITER_OPEN, "ProcessWriter: Failed to open process.");
+				BX_ERROR_SET(_err, BX_ERROR_READERWRITER_OPEN, "ProcessWriter: Failed to open process.");
 				return false;
 			}
 
@@ -287,6 +325,11 @@ namespace bx
 			int32_t size = (int32_t)fwrite(_data, 1, _size, m_file);
 			if (size != _size)
 			{
+				if (0 != ferror(m_file) )
+				{
+					BX_ERROR_SET(_err, BX_ERROR_READERWRITER_WRITE, "CrtFileWriter: write error.");
+				}
+
 				return size >= 0 ? size : 0;
 			}
 

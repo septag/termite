@@ -58,7 +58,7 @@ struct ModelData
         t3dGeometry g;
         t3dJoint* joints;
         float* initPose;
-        t3dVertexAttrib* attribs;
+        t3dVertexAttrib::Type* attribs;
         int* attribOffsets;
         void* verts;
         uint16_t* indices;
@@ -254,7 +254,7 @@ static void setupGeoJoints(const aiScene* scene, const bx::Array<aiNode*>& bones
     }
 }
 
-static int findAttrib(const t3dVertexAttrib* attribs, int numAttribs, t3dVertexAttrib elem)
+static int findAttrib(const t3dVertexAttrib::Type* attribs, int numAttribs, t3dVertexAttrib::Enum elem)
 {
     for (int i = 0; i < numAttribs; i++) {
         if (attribs[i] == elem)
@@ -307,8 +307,8 @@ static int importGeo(const aiScene* scene, ModelData* model, unsigned int* amesh
         return -1;
     }
 
-    t3dVertexAttrib attribs[int(t3dVertexAttrib::Count)];
-    int attribOffsets[int(t3dVertexAttrib::Count)];
+    t3dVertexAttrib::Type attribs[t3dVertexAttrib::Count];
+    int attribOffsets[t3dVertexAttrib::Count];
     int numAttribs = 0;
     int vertStride = 0;
 
@@ -378,10 +378,10 @@ static int importGeo(const aiScene* scene, ModelData* model, unsigned int* amesh
     }
     geo->g.numAttribs = numAttribs;
     geo->g.vertStride = vertStride;
-    geo->attribs = (t3dVertexAttrib*)BX_ALLOC(&g_alloc, sizeof(t3dVertexAttrib)*numAttribs);
+    geo->attribs = (t3dVertexAttrib::Type*)BX_ALLOC(&g_alloc, sizeof(t3dVertexAttrib::Type)*numAttribs);
     geo->attribOffsets = (int*)BX_ALLOC(&g_alloc, sizeof(int)*numAttribs);
     assert(geo->attribs);
-    memcpy(geo->attribs, attribs, sizeof(t3dVertexAttrib)*numAttribs);
+    memcpy(geo->attribs, attribs, sizeof(t3dVertexAttrib::Type)*numAttribs);
     memcpy(geo->attribOffsets, attribOffsets, sizeof(int)*numAttribs);
 
     // Skeleton, and joints

@@ -14,7 +14,7 @@ namespace termite
     {
         bool generateMips;
         uint8_t skipMips;
-        TextureFlag flags;
+        TextureFlag::Bits flags;
 
         LoadTextureParams()
         {
@@ -29,10 +29,12 @@ namespace termite
     {
         TextureHandle handle;
         TextureInfo info;
+        float ratio;
 
         Texture()
         {
             memset(&info, 0x00, sizeof(info));
+            ratio = 0;
         }
     };
 

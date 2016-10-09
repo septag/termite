@@ -11,4 +11,5 @@ add_executable(sheetmaker ${SOURCE_FILES} ${INCLUDE_FILES})
 target_link_libraries(sheetmaker termite ${SDL2_LIBRARY} nanovg)
 target_include_directories(sheetmaker PRIVATE ${SDL2_INCLUDE_DIR})
 
+set_target_properties(sheetmaker PROPERTIES FOLDER Tools)
 install(TARGETS sheetmaker RUNTIME DESTINATION bin)

@@ -21,6 +21,18 @@ Lib
 ipch
 __pycache__
 Thumbs.db
+.build
+.build_android
+
+# Gradle
+.gradle
+/local.properties
+/.idea/workspace.xml
+/.idea/libraries
+/build
+/captures
+
+
 
 # Generated files
 docs/Doxyfile
@@ -35,6 +47,9 @@ deps/assimp
 deps/bgfx
 deps/libuv
 deps/sdl
+deps/sdl_android_arm
+deps/libuv_android_arm
+deps/bgfx_android_arm
 
 # Compiled binaries
 *.so

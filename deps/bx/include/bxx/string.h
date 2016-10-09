@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../bx/string.h"
+#include <cassert>
 
 namespace bx
 {
@@ -41,6 +42,18 @@ namespace bx
         String<_Size>& format(const char* fmt, ...);
         String<_Size>& trimWhitespace();
         String<_Size>& replace(char replace_char, char with_char);
+
+        char& operator[](int index)
+        {
+            assert(index < _Size);
+            return this->text[index];
+        }
+
+        const char operator[](int index) const
+        {
+            assert(index < _Size);
+            return this->text[index];
+        }
 
     protected:
         char text[_Size];

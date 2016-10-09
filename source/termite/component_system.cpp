@@ -8,6 +8,7 @@
 #include "bxx/indexed_pool.h"
 #include "bxx/hash_table.h"
 #include "bxx/logger.h"
+#include "bxx/linear_allocator.h"
 
 #define MIN_FREE_INDICES 1024
 
@@ -37,7 +38,7 @@ namespace termite
         bx::Pool<FreeIndex> freeIndexPool;
         FreeIndex::QNode* freeIndexQueue;
         uint32_t freeIndexSize;
-        bx::Array<uint8_t> generations;
+        bx::Array<uint16_t> generations;
         bx::AllocatorI* alloc;
         bx::MultiHashTableInt destroyTable; // keep a multi-hash for all components that entity has to destroy
 		bx::Pool<bx::MultiHashTableInt::Node> nodePool;
@@ -54,13 +55,15 @@ namespace termite
 
 struct ComponentType
 {
+    ComponentTypeHandle myHandle;
     char name[32];
     uint32_t id;
     ComponentCallbacks callbacks;
-    ComponentFlag flags;
+    ComponentFlag::Bits flags;
     uint32_t dataSize;
     bx::IndexedPool dataPool;
     bx::HashTableInt entTable;  // Entity -> ComponentHandle
+    ComponentHandle* cachedHandles; // Keep cached component handles (lifetime is one frame only)
 
     ComponentType() : 
         entTable(bx::HashTableType::Mutable)
@@ -70,6 +73,7 @@ struct ComponentType
         memset(&callbacks, 0x00, sizeof(callbacks));
         flags = ComponentFlag::None;
         dataSize = 0;
+        cachedHandles = nullptr;
     }
 };
 
@@ -129,7 +133,7 @@ Entity termite::createEntity(EntityManager* emgr)
         emgr->freeIndexSize--;
     } else {
         idx = emgr->generations.getCount();
-        uint8_t* gen = emgr->generations.push();
+        uint16_t* gen = emgr->generations.push();
         *gen = 1;
         assert(idx < (1 << kEntityIndexBits));
     }
@@ -177,6 +181,7 @@ void termite::destroyEntity(EntityManager* emgr, Entity ent)
     
     EntityManager::FreeIndex* fi = emgr->freeIndexPool.newInstance();
     if (fi) {
+        fi->index = idx;
         bx::pushQueueNode<EntityManager::FreeIndex*>(&emgr->freeIndexQueue, &fi->qnode, fi);
         emgr->freeIndexSize++;
     }
@@ -228,7 +233,7 @@ void termite::shutdownComponentSystem()
 }
 
 ComponentTypeHandle termite::registerComponentType(const char* name, uint32_t id, const ComponentCallbacks* callbacks, 
-                                                   ComponentFlag flags, uint32_t dataSize, uint16_t poolSize, 
+                                                   ComponentFlag::Bits flags, uint32_t dataSize, uint16_t poolSize, 
                                                    uint16_t growSize)
 {
     assert(g_csys);
@@ -258,7 +263,9 @@ ComponentTypeHandle termite::registerComponentType(const char* name, uint32_t id
     g_csys->idTable.add(id, index);
     g_csys->nameTable.add(bx::hashMurmur2A(name, (uint32_t)strlen(name)), index);
 
-    return ComponentTypeHandle(uint16_t(index));
+    ComponentTypeHandle handle = ComponentTypeHandle(uint16_t(index));
+    ctype->myHandle = handle;
+    return handle;
 }
 
 void termite::garbageCollectComponents(EntityManager* emgr)
@@ -267,7 +274,7 @@ void termite::garbageCollectComponents(EntityManager* emgr)
     for (int i = 0, c = g_csys->components.getCount(); i < c; i++) {
         ComponentType& ctype = g_csys->components[i];
 
-        if ((ctype.flags & ComponentFlag::ImmediateDestroy) == ComponentFlag::None) {
+        if ((ctype.flags & ComponentFlag::ImmediateDestroy) == 0) {
             int aliveInRow = 0;
             while (ctype.dataPool.getCount() && aliveInRow < 4) {
                 uint16_t r = ctype.dataPool.handleAt((uint16_t)getRandomIntUniform(0, (int)ctype.dataPool.getCount() - 1));
@@ -288,8 +295,10 @@ ComponentHandle termite::createComponent(EntityManager* emgr, Entity ent, Compon
 {
     ComponentType& ctype = g_csys->components[handle.value];
 
-    if (ctype.entTable.find(ent.id) != -1)
+    if (ctype.entTable.find(ent.id) != -1) {
+        assert(false);  // Component instance Already exists for the entity
         return ComponentHandle();
+    }
 
     uint16_t cIdx = ctype.dataPool.newHandle();
     if (cIdx == UINT16_MAX)
@@ -300,7 +309,7 @@ ComponentHandle termite::createComponent(EntityManager* emgr, Entity ent, Compon
     ComponentHandle chandle = COMPONENT_MAKE_HANDLE(handle.value, cIdx);
     ctype.entTable.add(ent.id, int(chandle.value));
 
-    if ((ctype.flags & ComponentFlag::ImmediateDestroy) != ComponentFlag::None) {
+    if (ctype.flags & ComponentFlag::ImmediateDestroy) {
         emgr->destroyTable.add(ent.id, int(chandle.value));
     }
 
@@ -318,7 +327,7 @@ void termite::destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle 
     
     ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handle)];
 
-    if ((ctype.flags & ComponentFlag::ImmediateDestroy) != ComponentFlag::None) {
+    if (ctype.flags & ComponentFlag::ImmediateDestroy) {
         int r = emgr->destroyTable.find(ent.id);
         if (r != -1) {
             bx::MultiHashTableInt::Node* node = emgr->destroyTable.getNode(r);
@@ -330,6 +339,76 @@ void termite::destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle 
                 node = node->next;
             }
         }
+    }
+}
+
+static ComponentHandle* gatherComponents(const ComponentType& ctype, bx::AllocatorI* alloc)
+{
+    // Gather all components    
+    uint16_t count = ctype.dataPool.getCount();
+    ComponentHandle* handles = (ComponentHandle*)BX_ALLOC(alloc, sizeof(ComponentHandle)*count);
+    assert(handles);
+    ComponentTypeHandle myHandle = ctype.myHandle;
+    for (uint16_t i = 0; i < count; i++) {
+        handles[i] = COMPONENT_MAKE_HANDLE(myHandle.value, ctype.dataPool.handleAt(i));
+    }
+
+    return handles;
+}
+
+void termite::callComponentUpdates(ComponentUpdateStage::Enum updateStage, float dt)
+{
+    bx::AllocatorI* tmpAlloc = getTempAlloc();
+
+    // Get components by their registration order
+    for (int i = 0, c = g_csys->components.getCount(); i < c; i++) {
+        ComponentType& ctype = g_csys->components[i];
+        uint16_t count = ctype.dataPool.getCount();
+        if (count) {
+            if (!ctype.cachedHandles)
+                ctype.cachedHandles = gatherComponents(ctype, tmpAlloc);
+
+            switch (updateStage) {
+            case ComponentUpdateStage::PreUpdate:
+                if (ctype.callbacks.preUpdateAll)
+                    ctype.callbacks.preUpdateAll(ctype.cachedHandles, count, dt);
+                break;
+
+            case ComponentUpdateStage::PostUpdate:
+                if (ctype.callbacks.postUpdateAll)
+                    ctype.callbacks.postUpdateAll(ctype.cachedHandles, count, dt);
+                break;
+
+            case ComponentUpdateStage::Update:
+                if (ctype.callbacks.updateAll)
+                    ctype.callbacks.updateAll(ctype.cachedHandles, count, dt);
+                break;
+            }
+        }
+    }
+}
+
+void termite::callRenderComponents(GfxDriverApi* driver)
+{
+    // Get components by their registration order
+    for (int i = 0, c = g_csys->components.getCount(); i < c; i++) {
+        ComponentType& ctype = g_csys->components[i];
+        uint16_t count = ctype.dataPool.getCount();
+        if (count) {
+            assert(ctype.cachedHandles);
+
+            if (ctype.callbacks.renderAll)
+                ctype.callbacks.renderAll(ctype.cachedHandles, count, driver);
+        }
+    }
+}
+
+void termite::resetComponentUpdateCache()
+{
+    // Get components by their registration order
+    for (int i = 0, c = g_csys->components.getCount(); i < c; i++) {
+        ComponentType& ctype = g_csys->components[i];
+        ctype.cachedHandles = nullptr;
     }
 }
 
@@ -383,11 +462,12 @@ uint16_t termite::getAllComponents(ComponentTypeHandle typeHandle, ComponentHand
 {
 	assert(typeHandle.isValid());
 
-	const ComponentType& ctype = g_csys->components[typeHandle.value];
-	uint16_t count = ctype.dataPool.getCount();
+    const ComponentType& ctype = g_csys->components[typeHandle.value];
+    uint16_t count = ctype.dataPool.getCount();
+    if (handles == nullptr)
+        return count;
 
 	count = bx::uint32_min(count, maxComponents);
-
 	for (uint16_t i = 0; i < count; i++) {
 		handles[i] = COMPONENT_MAKE_HANDLE(typeHandle.value, ctype.dataPool.handleAt(i));
 	}

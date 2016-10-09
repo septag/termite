@@ -41,9 +41,7 @@ namespace bx
 
                 if (_ptr) {
                     size_t prevsize = *((uint32_t*)((uint8_t*)_ptr - sizeof(uint32_t)));
-                    if (_size < prevsize)
-                        prevsize = _size;
-                    memcpy(p, _ptr, prevsize);
+                    memcpy(p, _ptr, _size > prevsize ? prevsize : _size);
                 }
 
                 return p;

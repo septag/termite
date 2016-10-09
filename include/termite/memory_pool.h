@@ -30,6 +30,9 @@ namespace termite
 
         void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) override
         {
+            if (!_size)
+                return nullptr;
+
             if (!m_linAlloc) {
                 m_linAlloc = allocPage(m_tag);
                 if (!m_linAlloc)

@@ -1,8 +1,9 @@
 #pragma once
 
 #include <cassert>
+#include <algorithm>
+
 #include "bx/allocator.h"
-#include "bxx/bitmask_operators.hpp"
 
 // Windows
 #if BX_PLATFORM_WINDOWS
@@ -26,21 +27,23 @@ namespace termite
     struct GfxDriverApi;
     struct IoDriverApi;
     struct RendererApi;
-    struct IoDriverDual;
 
-    enum class InitEngineFlags
+    struct InitEngineFlags
     {
-        None = 0,
-        EnableJobDispatcher = 0x1,
-        LockThreadsToCores = 0x2,
-        ScanFontsDirectory = 0x4
+        enum Enum
+        {
+            None = 0,
+            EnableJobDispatcher = 0x1,
+            LockThreadsToCores = 0x2,
+            ScanFontsDirectory = 0x4
+        };
     };
 
     struct Config
     {
         // Plugins
-        char pluginPath[128];
-        char dataUri[128];
+        char pluginPath[256];
+        char dataUri[256];
 
         char ioName[32];
         char rendererName[32];
@@ -51,7 +54,7 @@ namespace termite
         uint16_t gfxDeviceId;
         uint16_t gfxWidth;
         uint16_t gfxHeight;
-        uint32_t gfxDriverFlags;    /// gfxResetFlag
+        uint32_t gfxDriverFlags; 
         int keymap[19];
 
         // Job Dispatcher
@@ -60,7 +63,7 @@ namespace termite
         uint16_t maxBigFibers;
         uint16_t bigFiberSize;      // in Kb
         uint8_t numWorkerThreads;
-        InitEngineFlags engineFlags;
+        InitEngineFlags::Enum engineFlags;
 
         // Memory
         uint32_t pageSize;          // in Kb
@@ -72,7 +75,7 @@ namespace termite
             strcpy(rendererName, "");
             strcpy(ioName, "");
             strcpy(dataUri, "");
-            strcpy(gfxName, "");
+            strcpy(gfxName, "Bgfx");
             strcpy(uiIniFilename, "");
 
             gfxWidth = 0;
@@ -111,9 +114,10 @@ namespace termite
     TERMITE_API double getFrameTime();
     TERMITE_API double getElapsedTime();
     TERMITE_API double getFps();
+    TERMITE_API int64_t getFrameIndex();
 
     TERMITE_API MemoryBlock* createMemoryBlock(uint32_t size, bx::AllocatorI* alloc = nullptr);
-    TERMITE_API MemoryBlock* refMemoryBlockPtr(void* data, uint32_t size);
+    TERMITE_API MemoryBlock* refMemoryBlockPtr(const void* data, uint32_t size);
     TERMITE_API MemoryBlock* refMemoryBlock(MemoryBlock* mem);
     TERMITE_API MemoryBlock* copyMemoryBlock(const void* data, uint32_t size, bx::AllocatorI* alloc = nullptr);
     TERMITE_API void releaseMemoryBlock(MemoryBlock* mem);
@@ -129,15 +133,15 @@ namespace termite
 
     // Development
     TERMITE_API GfxDriverApi* getGfxDriver() T_THREAD_SAFE;
-    TERMITE_API IoDriverDual* getIoDriver() T_THREAD_SAFE;
+    TERMITE_API IoDriverApi* getBlockingIoDriver() T_THREAD_SAFE;
+    TERMITE_API IoDriverApi* getAsyncIoDriver() T_THREAD_SAFE;
     TERMITE_API RendererApi* getRenderer() T_THREAD_SAFE;
     TERMITE_API uint32_t getEngineVersion() T_THREAD_SAFE;
     TERMITE_API bx::AllocatorI* getHeapAlloc() T_THREAD_SAFE;
     TERMITE_API bx::AllocatorI* getTempAlloc() T_THREAD_SAFE;
     TERMITE_API const Config& getConfig() T_THREAD_SAFE;
-    TERMITE_API ResourceLib* getDefaultResourceLib() T_THREAD_SAFE;
-
+    TERMITE_API const char* getCacheDir() T_THREAD_SAFE;
+    TERMITE_API const char* getDataDir() T_THREAD_SAFE;
 } // namespace termite
 
-C11_DEFINE_FLAG_TYPE(termite::InitEngineFlags);
 

@@ -30,6 +30,52 @@ struct PluginSystem
 
 static PluginSystem* g_pluginSys = nullptr;
 
+#ifdef termite_STATIC_LIB
+#if BX_PLATFORM_ANDROID
+void* initAndroidAssetDriver(bx::AllocatorI* alloc, GetApiFunc getApi);
+PluginDesc* getAndroidAssetDriverDesc();
+void shutdownAndroidAssetDriver();
+#else
+PluginDesc* getDiskDriverDesc();
+void* initDiskDriver(bx::AllocatorI* alloc, GetApiFunc getApi);
+void shutdownDiskDriver();
+#endif
+
+PluginDesc* getBgfxDriverDesc();
+void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi);
+void shutdownBgfxDriver();
+
+static void loadStaticPlugins()
+{
+    // IoDriver
+    static PluginApi_v0 ioApi;
+    Plugin* p = g_pluginSys->plugins.push();
+    memset(p, 0x00, sizeof(*p));
+#if BX_PLATFORM_ANDROID
+    memcpy(&p->desc, getAndroidAssetDriverDesc(), sizeof(p->desc));
+    ioApi.getDesc = getAndroidAssetDriverDesc;
+    ioApi.init = initAndroidAssetDriver;
+    ioApi.shutdown = shutdownAndroidAssetDriver;
+#else
+    memcpy(&p->desc, getDiskDriverDesc(), sizeof(p->desc));
+    ioApi.getDesc = getDiskDriverDesc;
+    ioApi.init = initDiskDriver;
+    ioApi.shutdown = shutdownDiskDriver;
+#endif
+    p->api = &ioApi;
+
+    // BgfxDriver
+    static PluginApi_v0 bgfxApi;
+    p = g_pluginSys->plugins.push();
+    memset(p, 0x00, sizeof(*p));
+    memcpy(&p->desc, getBgfxDriverDesc(), sizeof(p->desc));
+    bgfxApi.getDesc = getBgfxDriverDesc;
+    bgfxApi.init = initBgfxDriver;
+    bgfxApi.shutdown = shutdownBgfxDriver;
+    p->api = &bgfxApi;
+}
+#endif
+
 static result_t loadPlugin(const bx::Path& pluginPath, void** pDllHandle, PluginApi_v0** pApi)
 {
     bx::Path pluginExt = pluginPath.getFileExt();
@@ -46,7 +92,7 @@ static result_t loadPlugin(const bx::Path& pluginPath, void** pDllHandle, Plugin
         return -1;  // Not a plugin
     }
 
-    PluginApi_v0* pluginApi = (PluginApi_v0*)getPluginApi(uint16_t(ApiId::Plugin), 0);
+    PluginApi_v0* pluginApi = (PluginApi_v0*)getPluginApi(ApiId::Plugin, 0);
     if (!pluginApi) {
         bx::dlclose(dllHandle);
         return -1;  // Incompatible plugin
@@ -87,6 +133,9 @@ result_t termite::initPluginSystem(const char* pluginPath, bx::AllocatorI* alloc
     if (!g_pluginSys->plugins.create(10, 20, alloc))
         return T_ERR_OUTOFMEM;
     
+#ifdef termite_STATIC_LIB
+    loadStaticPlugins();
+#else
     // Enumerate plugins in the 'pluginPath' directory
     BX_VERBOSE("Scanning for plugins in directory '%s' ...", pluginPath);
     DIR* dir = opendir(pluginPath);
@@ -111,13 +160,13 @@ result_t termite::initPluginSystem(const char* pluginPath, bx::AllocatorI* alloc
             }
         }
     }
-
     closedir(dir);
+#endif
 
     // List enumerated plugins
     for (int i = 0; i < g_pluginSys->plugins.getCount(); i++) {
         const PluginDesc& desc = g_pluginSys->plugins[i].desc;
-        BX_VERBOSE("Found PlugIn => Name: '%s', Version: '%d.%d'",
+        BX_VERBOSE("Found Plugin => Name: '%s', Version: '%d.%d'",
             desc.name, T_VERSION_MAJOR(desc.version), T_VERSION_MINOR(desc.version));
     }
 
@@ -132,7 +181,7 @@ void termite::shutdownPluginSystem()
     // Shutdown live plugins
     for (int i = 0; i < g_pluginSys->plugins.getCount(); i++) {
         const Plugin& p = g_pluginSys->plugins[i];
-        if (p.dllHandle && p.api) {
+        if (p.api) {
             shutdownPlugin(PluginHandle(uint16_t(i)));
         }
     }
@@ -164,11 +213,14 @@ void termite::shutdownPlugin(PluginHandle handle)
     Plugin& p = g_pluginSys->plugins[handle.value];
     if (p.api)
         p.api->shutdown();
+    if (p.dllHandle)
+        bx::dlclose(p.dllHandle);
     p.dllHandle = nullptr;
     p.api = nullptr;
 }
 
-int termite::findPluginByName(const char* name, uint32_t version, PluginHandle* handles, int maxHandles, PluginType type)
+int termite::findPluginByName(const char* name, uint32_t version, PluginHandle* handles, int maxHandles, 
+                              PluginType::Enum type)
 {
     int index = 0;
     for (int i = 0, c = g_pluginSys->plugins.getCount(); i < c && index < maxHandles; i++) {
@@ -180,7 +232,7 @@ int termite::findPluginByName(const char* name, uint32_t version, PluginHandle* 
     return index;
 }
 
-int termite::findPluginByType(PluginType type, uint32_t version, PluginHandle* handles, int maxHandles)
+int termite::findPluginByType(PluginType::Enum type, uint32_t version, PluginHandle* handles, int maxHandles)
 {
     int index = 0;
     for (int i = 0, c = g_pluginSys->plugins.getCount(); i < c && index < maxHandles; i++) {

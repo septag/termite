@@ -63,15 +63,12 @@ namespace bx
     class MultiHashTable
     {
     public:
-        template <typename _N>
-        struct Node_t
+        struct Node
         {
-            Node_t<_N>* next;
-            Node_t<_N>* prev;
-            _N value;
+            Node* next;
+            Node* prev;
+            Ty value;
         };
-
-        typedef Node_t<Ty> Node;
 
     public:
         explicit MultiHashTable(HashTableType type);

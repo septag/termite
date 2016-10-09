@@ -38,7 +38,10 @@ BX_PRAGMA_DIAGNOSTIC_PUSH();
 BX_PRAGMA_DIAGNOSTIC_IGNORED_CLANG_GCC("-Wmissing-field-initializers");
 BX_PRAGMA_DIAGNOSTIC_IGNORED_CLANG_GCC("-Wshadow");
 BX_PRAGMA_DIAGNOSTIC_IGNORED_CLANG_GCC("-Wint-to-pointer-cast")
+
+#ifdef termite_SHARED_LIB
 #define STB_IMAGE_IMPLEMENTATION
+#endif
 #include "../stb/stb_image.h"
 BX_PRAGMA_DIAGNOSTIC_POP();
 

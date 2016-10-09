@@ -26,6 +26,7 @@ function toolchain(_buildDir, _libDir)
 			{ "linux-mips-gcc",  "Linux (MIPS, GCC compiler)" },
 			{ "linux-arm-gcc",   "Linux (ARM, GCC compiler)"  },
 			{ "ios-arm",         "iOS - ARM"                  },
+			{ "ios-arm64",       "iOS - ARM64"                },
 			{ "ios-simulator",   "iOS - Simulator"            },
 			{ "tvos-arm64",      "tvOS - ARM64"               },
 			{ "tvos-simulator",  "tvOS - Simulator"           },
@@ -36,7 +37,7 @@ function toolchain(_buildDir, _libDir)
 			{ "netbsd",          "NetBSD"                     },
 			{ "osx",             "OSX"                        },
 			{ "pnacl",           "Native Client - PNaCl"      },
-			{ "ps4",             "PS4"                        },
+			{ "orbis",           "Orbis"                      },
 			{ "qnx-arm",         "QNX/Blackberry - ARM"       },
 			{ "rpi",             "RaspberryPi"                },
 		},
@@ -58,9 +59,9 @@ function toolchain(_buildDir, _libDir)
 			{ "winstore81",    "Windows Store 8.1"               },
 			{ "winstore82",    "Universal Windows App"           },
 			{ "durango",       "Durango"                         },
+			{ "orbis",         "Orbis"                           },
 		},
 	}
-
 
 	newoption {
 		trigger = "xcode",
@@ -74,26 +75,36 @@ function toolchain(_buildDir, _libDir)
 	}
 
 	newoption {
-		trigger = "with-android",
-		value   = "#",
+		trigger     = "with-android",
+		value       = "#",
 		description = "Set Android platform version (default: android-14).",
 	}
 
 	newoption {
-		trigger = "with-ios",
-		value   = "#",
+		trigger     = "with-ios",
+		value       = "#",
 		description = "Set iOS target version (default: 8.0).",
 	}
 
 	newoption {
-		trigger = "with-tvos",
-		value   = "#",
+		trigger     = "with-tvos",
+		value       = "#",
 		description = "Set tvOS target version (default: 9.0).",
 	}
 
 	newoption {
-		trigger = "with-dynamic-runtime",
+		trigger     = "with-dynamic-runtime",
 		description = "Dynamically link with the runtime rather than statically",
+	}
+
+	newoption {
+		trigger     = "with-32bit-compiler",
+		description = "Use 32-bit compiler instead 64-bit.",
+	}
+
+	newoption {
+		trigger     = "with-avx",
+		description = "Use AVX extension.",
 	}
 
 	-- Avoid error when invoking genie --help.
@@ -118,6 +129,11 @@ function toolchain(_buildDir, _libDir)
 	local tvosPlatform = ""
 	if _OPTIONS["with-tvos"] then
 		tvosPlatform = _OPTIONS["with-tvos"]
+	end
+
+	local compiler32bit = false
+	if _OPTIONS["with-32bit-compiler"] then
+		compiler32bit = true
 	end
 
 	if _ACTION == "gmake" or _ACTION == "ninja" then
@@ -179,11 +195,12 @@ function toolchain(_buildDir, _libDir)
 		elseif "freebsd" == _OPTIONS["gcc"] then
 			location (path.join(_buildDir, "projects", _ACTION .. "-freebsd"))
 
-		elseif "ios-arm" == _OPTIONS["gcc"] then
+		elseif "ios-arm"   == _OPTIONS["gcc"]
+			or "ios-arm64" == _OPTIONS["gcc"] then
 			premake.gcc.cc  = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
 			premake.gcc.cxx = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"
 			premake.gcc.ar  = "ar"
-			location (path.join(_buildDir, "projects", _ACTION .. "-ios-arm"))
+			location (path.join(_buildDir, "projects", _ACTION .. "-" .. _OPTIONS["gcc"]))
 
 		elseif "ios-simulator" == _OPTIONS["gcc"] then
 			premake.gcc.cc  = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
@@ -247,8 +264,17 @@ function toolchain(_buildDir, _libDir)
 			location (path.join(_buildDir, "projects", _ACTION .. "-linux-steamlink"))
 
 		elseif "mingw-gcc" == _OPTIONS["gcc"] then
-			premake.gcc.cc  = "$(MINGW)/bin/x86_64-w64-mingw32-gcc"
-			premake.gcc.cxx = "$(MINGW)/bin/x86_64-w64-mingw32-g++"
+			local mingwToolchain = "x86_64-w64-mingw32"
+			if compiler32bit then
+				if os.is("linux") then
+					mingwToolchain = "i686-w64-mingw32"
+				else
+					mingwToolchain = "mingw32"
+				end
+			end
+
+			premake.gcc.cc  = "$(MINGW)/bin/" .. mingwToolchain .. "-gcc"
+			premake.gcc.cxx = "$(MINGW)/bin/" .. mingwToolchain .. "-g++"
 			premake.gcc.ar  = "$(MINGW)/bin/ar"
 			location (path.join(_buildDir, "projects", _ACTION .. "-mingw-gcc"))
 
@@ -266,11 +292,11 @@ function toolchain(_buildDir, _libDir)
 				print("Set NACL_SDK_ROOT enviroment variable.")
 			end
 
-			naclToolchain = "$(NACL_SDK_ROOT)/toolchain/win_x86_newlib/bin/x86_64-nacl-"
+			naclToolchain = "$(NACL_SDK_ROOT)/toolchain/win_x86_glibc/bin/x86_64-nacl-"
 			if os.is("macosx") then
-				naclToolchain = "$(NACL_SDK_ROOT)/toolchain/mac_x86_newlib/bin/x86_64-nacl-"
+				naclToolchain = "$(NACL_SDK_ROOT)/toolchain/mac_x86_glibc/bin/x86_64-nacl-"
 			elseif os.is("linux") then
-				naclToolchain = "$(NACL_SDK_ROOT)/toolchain/linux_x86_newlib/bin/x86_64-nacl-"
+				naclToolchain = "$(NACL_SDK_ROOT)/toolchain/linux_x86_glibc/bin/x86_64-nacl-"
 			end
 
 			premake.gcc.cc  = naclToolchain .. "gcc"
@@ -284,11 +310,11 @@ function toolchain(_buildDir, _libDir)
 				print("Set NACL_SDK_ROOT enviroment variable.")
 			end
 
-			naclToolchain = "$(NACL_SDK_ROOT)/toolchain/win_arm_newlib/bin/arm-nacl-"
+			naclToolchain = "$(NACL_SDK_ROOT)/toolchain/win_arm_glibc/bin/arm-nacl-"
 			if os.is("macosx") then
-				naclToolchain = "$(NACL_SDK_ROOT)/toolchain/mac_arm_newlib/bin/arm-nacl-"
+				naclToolchain = "$(NACL_SDK_ROOT)/toolchain/mac_arm_glibc/bin/arm-nacl-"
 			elseif os.is("linux") then
-				naclToolchain = "$(NACL_SDK_ROOT)/toolchain/linux_arm_newlib/bin/arm-nacl-"
+				naclToolchain = "$(NACL_SDK_ROOT)/toolchain/linux_arm_glibc/bin/arm-nacl-"
 			end
 
 			premake.gcc.cc  = naclToolchain .. "gcc"
@@ -299,10 +325,14 @@ function toolchain(_buildDir, _libDir)
 		elseif "osx" == _OPTIONS["gcc"] then
 
 			if os.is("linux") then
-				local osxToolchain = "x86_64-apple-darwin13-"
-				premake.gcc.cc  = osxToolchain .. "clang"
-				premake.gcc.cxx = osxToolchain .. "clang++"
-				premake.gcc.ar  = osxToolchain .. "ar"
+				if not os.getenv("OSXCROSS") then
+					print("Set OSXCROSS enviroment variable.")
+				end
+
+				local osxToolchain = "x86_64-apple-darwin15-"
+				premake.gcc.cc  = "$(OSXCROSS)/target/bin/" .. osxToolchain .. "clang"
+				premake.gcc.cxx = "$(OSXCROSS)/target/bin/" .. osxToolchain .. "clang++"
+				premake.gcc.ar  = "$(OSXCROSS)/target/bin/" .. osxToolchain .. "ar"
 			end
 			location (path.join(_buildDir, "projects", _ACTION .. "-osx"))
 
@@ -324,18 +354,18 @@ function toolchain(_buildDir, _libDir)
 			premake.gcc.ar  = naclToolchain .. "ar"
 			location (path.join(_buildDir, "projects", _ACTION .. "-pnacl"))
 
-		elseif "ps4" == _OPTIONS["gcc"] then
+		elseif "orbis" == _OPTIONS["gcc"] then
 
-			if not os.getenv("PS4_SDK_ROOT") then
-				print("Set PS4_SDK_ROOT enviroment variable.")
+			if not os.getenv("SCE_ORBIS_SDK_DIR") then
+				print("Set SCE_ORBIS_SDK_DIR enviroment variable.")
 			end
 
-			ps4Toolchain = "$(PS4_SDK_ROOT)/host_tools/bin/orbis-"
+			orbisToolchain = "$(SCE_ORBIS_SDK_DIR)/host_tools/bin/orbis-"
 
-			premake.gcc.cc  = ps4Toolchain .. "clang"
-			premake.gcc.cxx = ps4Toolchain .. "clang++"
-			premake.gcc.ar  = ps4Toolchain .. "ar"
-			location (path.join(_buildDir, "projects", _ACTION .. "-ps4"))
+			premake.gcc.cc  = orbisToolchain .. "clang"
+			premake.gcc.cxx = orbisToolchain .. "clang++"
+			premake.gcc.ar  = orbisToolchain .. "ar"
+			location (path.join(_buildDir, "projects", _ACTION .. "-orbis"))
 
 		elseif "qnx-arm" == _OPTIONS["gcc"] then
 
@@ -399,6 +429,15 @@ function toolchain(_buildDir, _libDir)
 			premake.vstudio.storeapp = "durango"
 			platforms { "Durango" }
 			location (path.join(_buildDir, "projects", _ACTION .. "-durango"))
+		elseif "orbis" == _OPTIONS["vs"] then
+
+			if not os.getenv("SCE_ORBIS_SDK_DIR") then
+				print("Set SCE_ORBIS_SDK_DIR enviroment variable.")
+			end
+
+			platforms { "Orbis" }
+			location (path.join(_buildDir, "projects", _ACTION .. "-orbis"))
+
 		end
 
 		elseif ("vs2012-xp") == _OPTIONS["vs"] then
@@ -433,6 +472,10 @@ function toolchain(_buildDir, _libDir)
 		flags { "StaticRuntime" }
 	end
 
+	if _OPTIONS["with-avx"] then
+		flags { "EnableAVX" }
+	end
+
 	flags {
 		"NoPCH",
 		"NativeWChar",
@@ -448,6 +491,11 @@ function toolchain(_buildDir, _libDir)
 		"__STDC_CONSTANT_MACROS",
 	}
 
+	configuration { "qbs" }
+		flags {
+			"ExtraWarnings",
+		}
+
 	configuration { "Debug" }
 		targetsuffix "Debug"
 
@@ -462,7 +510,7 @@ function toolchain(_buildDir, _libDir)
 			"EnableSSE2",
 		}
 
-	configuration { "vs*" }
+	configuration { "vs*", "not orbis" }
 		includedirs { path.join(bxDir, "include/compat/msvc") }
 		defines {
 			"WIN32",
@@ -896,10 +944,10 @@ function toolchain(_buildDir, _libDir)
 		linkoptions { "-melf32_nacl" }
 
 	configuration { "x32", "nacl", "Debug" }
-		libdirs { "$(NACL_SDK_ROOT)/lib/newlib_x86_32/Debug" }
+		libdirs { "$(NACL_SDK_ROOT)/lib/glibc_x86_32/Debug" }
 
 	configuration { "x32", "nacl", "Release" }
-		libdirs { "$(NACL_SDK_ROOT)/lib/newlib_x86_32/Release" }
+		libdirs { "$(NACL_SDK_ROOT)/lib/glibc_x86_32/Release" }
 
 	configuration { "x64", "nacl" }
 		targetdir (path.join(_buildDir, "nacl-x64/bin"))
@@ -908,10 +956,10 @@ function toolchain(_buildDir, _libDir)
 		linkoptions { "-melf64_nacl" }
 
 	configuration { "x64", "nacl", "Debug" }
-		libdirs { "$(NACL_SDK_ROOT)/lib/newlib_x86_64/Debug" }
+		libdirs { "$(NACL_SDK_ROOT)/lib/glibc_x86_64/Debug" }
 
 	configuration { "x64", "nacl", "Release" }
-		libdirs { "$(NACL_SDK_ROOT)/lib/newlib_x86_64/Release" }
+		libdirs { "$(NACL_SDK_ROOT)/lib/glibc_x86_64/Release" }
 
 	configuration { "nacl-arm" }
 		buildoptions {
@@ -922,10 +970,10 @@ function toolchain(_buildDir, _libDir)
 		libdirs { path.join(_libDir, "lib/nacl-arm") }
 
 	configuration { "nacl-arm", "Debug" }
-		libdirs { "$(NACL_SDK_ROOT)/lib/newlib_arm/Debug" }
+		libdirs { "$(NACL_SDK_ROOT)/lib/glibc_arm/Debug" }
 
 	configuration { "nacl-arm", "Release" }
-		libdirs { "$(NACL_SDK_ROOT)/lib/newlib_arm/Release" }
+		libdirs { "$(NACL_SDK_ROOT)/lib/glibc_arm/Release" }
 
 	configuration { "pnacl" }
 		targetdir (path.join(_buildDir, "pnacl/bin"))
@@ -1006,8 +1054,26 @@ function toolchain(_buildDir, _libDir)
 		objdir (path.join(_buildDir, "ios-arm/obj"))
 		libdirs { path.join(_libDir, "lib/ios-arm") }
 		linkoptions {
-			"-miphoneos-version-min=7.0",
 			"-arch armv7",
+		}
+		buildoptions {
+			"-arch armv7",
+		}
+
+	configuration { "ios-arm64" }
+		targetdir (path.join(_buildDir, "ios-arm64/bin"))
+		objdir (path.join(_buildDir, "ios-arm64/obj"))
+		libdirs { path.join(_libDir, "lib/ios-arm64") }
+		linkoptions {
+			"-arch arm64",
+		}
+		buildoptions {
+			"-arch arm64",
+		}
+
+	configuration { "ios-arm*" }
+		linkoptions {
+			"-miphoneos-version-min=7.0",
 			"--sysroot=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS" ..iosPlatform .. ".sdk",
 			"-L/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS" ..iosPlatform .. ".sdk/usr/lib/system",
 			"-F/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS" ..iosPlatform .. ".sdk/System/Library/Frameworks",
@@ -1015,7 +1081,6 @@ function toolchain(_buildDir, _libDir)
 		}
 		buildoptions {
 			"-miphoneos-version-min=7.0",
-			"-arch armv7",
 			"--sysroot=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS" ..iosPlatform .. ".sdk",
 		}
 
@@ -1088,14 +1153,14 @@ function toolchain(_buildDir, _libDir)
 			"--sysroot=/Applications/Xcode.app/Contents/Developer/Platforms/AppleTVSimulator.platform/Developer/SDKs/AppleTVSimulator" ..tvosPlatform .. ".sdk",
 		}
 
-	configuration { "ps4" }
-		targetdir (path.join(_buildDir, "ps4/bin"))
-		objdir (path.join(_buildDir, "ps4/obj"))
-		libdirs { path.join(_libDir, "lib/ps4") }
+	configuration { "orbis" }
+		targetdir (path.join(_buildDir, "orbis/bin"))
+		objdir (path.join(_buildDir, "orbis/obj"))
+		libdirs { path.join(_libDir, "lib/orbis") }
 		includedirs {
 			path.join(bxDir, "include/compat/freebsd"),
-			"$(PS4_SDK_ROOT)/target/include",
-			"$(PS4_SDK_ROOT)/target/include_common",
+			"$(SCE_ORBIS_SDK_DIR)/target/include",
+			"$(SCE_ORBIS_SDK_DIR)/target/include_common",
 		}
 		buildoptions {
 		}

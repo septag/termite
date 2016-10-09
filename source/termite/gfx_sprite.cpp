@@ -3,11 +3,16 @@
 #include "gfx_texture.h"
 #include "memory_pool.h"
 #include "camera.h"
+#include "math_util.h"
 
 #include "bx/readerwriter.h"
 #include "bxx/path.h"
 #include "bxx/indexed_pool.h"
 #include "bxx/array.h"
+#include "bxx/linked_list.h"
+#include "bxx/pool.h"
+#include "bxx/logger.h"
+#include "bx/hash.h"
 
 #include "../include_common/sprite_format.h"
 #include "shaders_h/sprite.vso"
@@ -26,20 +31,24 @@ namespace termite
         int numSprites;
     };
 
-    enum class SpriteBase
+    struct SpriteBase
     {
-        FromTexture,
-        FromSpriteSheet
+        enum Enum
+        {
+            FromTexture,
+            FromSpriteSheet
+        };
     };
 
-    struct Sprite
+    struct SpriteImpl
     {
         ResourceHandle resHandle;   // depends on base type
-        SpriteBase base;
+        SpriteBase::Enum base;
         vec2_t halfSize;
         vec2_t localAnchor;
         vec2_t topLeft;
         vec2_t bottomRight;
+        int frameIdx;               // initial Frame Index 
     };
 }
 
@@ -47,8 +56,8 @@ struct SpriteVertex
 {
     float x;
     float y;
-    float z;
     float r;
+    float s;
     float tx;
     float ty;
     float offsetx;
@@ -79,15 +88,69 @@ class SpriteSheetLoader : public ResourceCallbacksI
     uintptr_t getDefaultAsyncObj(ResourceLib* resLib) override;
 };
 
+struct SpriteAnimEvent
+{
+    uint32_t tagNameHash;
+    SpriteAnimCallback inCallback;
+    SpriteAnimCallback outCallback;
+    void* userData;
+    SpriteAnimEvent* next;
+
+    SpriteAnimEvent()
+    {
+        tagNameHash = 0;
+        inCallback = nullptr;
+        userData = nullptr;
+        next = nullptr;
+        inCallback = nullptr;
+        outCallback = nullptr;
+    }
+};
+
+struct SpriteAnimAction
+{
+    uint32_t clipNameHash;
+    bool reverse;
+    bool looped;
+    SpriteAnimCallback finishCallback;
+    void* userData;
+    SpriteAnimAction* next;
+
+    SpriteAnimAction()
+    {
+        clipNameHash = 0;
+        reverse = false;
+        looped = false;
+        finishCallback = nullptr;
+        userData = nullptr;
+        next = nullptr;
+    }
+};
+
+struct SpriteAnimImpl
+{
+    SpriteHandle sprite;
+    float t;
+    float speed;
+    float resumeSpeed;
+    uint32_t clipNameHash;
+    SpriteAnimAction* action;
+    SpriteAnimEvent* events;
+    SpriteAnimEvent* lastCalledEvent;
+};
+
 struct SpriteSystem
 {
     GfxDriverApi* driver;
     bx::AllocatorI* alloc;
     PageAllocator allocStub;
     bx::IndexedPool spritePool;
+    bx::IndexedPool animPool;
     ProgramHandle spriteProg;
     UniformHandle u_texture;
     SpriteSheetLoader loader;
+    bx::Pool<SpriteAnimAction> actionPool;
+    bx::Pool<SpriteAnimEvent> eventPool;
 
     SpriteSystem(bx::AllocatorI* _alloc) : 
         allocStub(T_SPRITE_MEMORY_TAG)
@@ -113,10 +176,23 @@ result_t termite::initSpriteSystem(GfxDriverApi* driver, bx::AllocatorI* alloc, 
 
     g_sprite->driver = driver;
 
-    const uint32_t itemSizes[] = {
-        sizeof(Sprite)
+    const uint32_t spriteSizes[] = {
+        sizeof(SpriteImpl)
     };
-    if (!g_sprite->spritePool.create(itemSizes, 1, poolSize, poolSize, &g_sprite->allocStub)) {
+    if (!g_sprite->spritePool.create(spriteSizes, 1, poolSize, poolSize, &g_sprite->allocStub)) {
+        return T_ERR_OUTOFMEM;
+    }
+
+    const uint32_t animSizes[] = {
+        sizeof(SpriteAnimImpl)
+    };
+    if (!g_sprite->animPool.create(animSizes, 1, poolSize, poolSize, &g_sprite->allocStub)) {
+        return T_ERR_OUTOFMEM;
+    }
+
+    if (!g_sprite->actionPool.create(128, &g_sprite->allocStub) ||
+        !g_sprite->eventPool.create(64, &g_sprite->allocStub))
+    {
         return T_ERR_OUTOFMEM;
     }
 
@@ -145,6 +221,9 @@ void termite::shutdownSpriteSystem()
     if (g_sprite->u_texture.isValid())
         driver->destroyUniform(g_sprite->u_texture);
 
+    g_sprite->eventPool.destroy();
+    g_sprite->actionPool.destroy();
+    g_sprite->animPool.destroy();
     g_sprite->spritePool.destroy();
     BX_DELETE(alloc, g_sprite);
     g_sprite = nullptr;
@@ -160,13 +239,14 @@ SpriteHandle termite::createSpriteFromTexture(ResourceHandle textureHandle, cons
 
     SpriteHandle handle(g_sprite->spritePool.newHandle());
     
-    Sprite* sprite = g_sprite->spritePool.getHandleData<Sprite>(0, handle.value);
+    SpriteImpl* sprite = g_sprite->spritePool.getHandleData<SpriteImpl>(0, handle.value);
     sprite->base = SpriteBase::FromTexture;
     sprite->resHandle = textureHandle;
     sprite->halfSize = halfSize;
     sprite->localAnchor = localAnchor;
     sprite->topLeft = topLeftCoords;
     sprite->bottomRight = bottomRightCoords;
+    sprite->frameIdx = 0;
     
     return handle;
 }
@@ -174,7 +254,20 @@ SpriteHandle termite::createSpriteFromTexture(ResourceHandle textureHandle, cons
 SpriteHandle termite::createSpriteFromSpritesheet(ResourceHandle spritesheetHandle, const vec2_t halfSize, 
                                                   const vec2_t localAnchor /*= vec2f(0, 0)*/, int index /*= -1*/)
 {
-    return SpriteHandle();
+    if (!spritesheetHandle.isValid())
+        return SpriteHandle();
+    SpriteHandle handle(g_sprite->spritePool.newHandle());
+    SpriteImpl* sprite = g_sprite->spritePool.getHandleData<SpriteImpl>(0, handle.value);
+    sprite->base = SpriteBase::FromSpriteSheet;
+    sprite->resHandle = spritesheetHandle;
+    sprite->halfSize = halfSize;
+    sprite->localAnchor = localAnchor;
+    
+    if (index == -1)
+        index = 0;
+    sprite->frameIdx = index;
+
+    return handle;
 }
 
 void termite::destroySprite(SpriteHandle handle)
@@ -201,20 +294,25 @@ void termite::updateSpriteCache(const SpriteHandle* sprites, int numSprites, con
 }
 
 void termite::drawSprites(uint8_t viewId, const SpriteHandle* sprites, int numSprites, 
-                          const vec2_t* posBuffer, const float* rotBuffer, const color_t* tintColors,
-                          ProgramHandle prog, SetSpriteStateCallback stateCallback)
+                          const vec2_t* posBuffer, const float* rotBuffer, const float* sizeBuffer,
+                          const color_t* tintColors,
+                          ProgramHandle prog, SetSpriteStateCallback stateFunc)
 {
+    assert(sprites);
+    assert(posBuffer);
+    
     if (numSprites <= 0)
         return;
 
     GfxDriverApi* driver = g_sprite->driver;
+    ResourceLibHelper resLib = getDefaultResourceLib();
 
     TransientVertexBuffer tvb;
     TransientIndexBuffer tib;
     
     const int numVerts = numSprites * 4;
     const int numIndices = numSprites * 6;
-    GfxState baseState = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::CullCCW;
+    GfxState::Bits baseState = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::CullCCW;
 
     if (!driver->checkAvailTransientVertexBuffer(numVerts, SpriteVertex::Decl))
         return;
@@ -238,10 +336,31 @@ void termite::drawSprites(uint8_t viewId, const SpriteHandle* sprites, int numSp
         sortedSprites[i].handle = sprites[i];
     }
     std::sort(sortedSprites, sortedSprites + numSprites, [](const SortedSprite& a, const SortedSprite&b)->bool {
-        Sprite* sa = g_sprite->spritePool.getHandleData<Sprite>(0, a.handle.value);
-        Sprite* sb = g_sprite->spritePool.getHandleData<Sprite>(0, b.handle.value);
+        SpriteImpl* sa = g_sprite->spritePool.getHandleData<SpriteImpl>(0, a.handle.value);
+        SpriteImpl* sb = g_sprite->spritePool.getHandleData<SpriteImpl>(0, b.handle.value);
         return sa->resHandle.value < sb->resHandle.value;
     });
+
+    // Fill Default buffers
+    if (rotBuffer == nullptr) {
+        float* rots = (float*)BX_ALLOC(tmpAlloc, sizeof(float)*numSprites);
+        memset(rots, 0x00, sizeof(float)*numSprites);
+        rotBuffer = rots;
+    }
+
+    if (sizeBuffer == nullptr) {
+        float* sizes = (float*)BX_ALLOC(tmpAlloc, sizeof(float)*numSprites);
+        for (int i = 0; i < numSprites; i++)
+            sizes[i] = 1.0f;
+        sizeBuffer = sizes;
+    }
+
+    if (tintColors == nullptr) {
+        color_t* colors = (color_t*)BX_ALLOC(tmpAlloc, sizeof(color_t)*numSprites);
+        for (int i = 0; i < numSprites; i++)
+            colors[i] = 0xffffffff;
+        tintColors = colors;
+    }
 
     // Fill sprites
     SpriteVertex* verts = (SpriteVertex*)tvb.data;
@@ -250,7 +369,33 @@ void termite::drawSprites(uint8_t viewId, const SpriteHandle* sprites, int numSp
     int vertexIdx = 0;
     for (int i = 0; i < numSprites; i++) {
         const SortedSprite& ss = sortedSprites[i];
-        Sprite* sprite = g_sprite->spritePool.getHandleData<Sprite>(0, ss.handle.value);
+        SpriteImpl* sprite = g_sprite->spritePool.getHandleData<SpriteImpl>(0, ss.handle.value);
+        vec2_t halfSize = sprite->halfSize;
+
+        // Resolve sprite bounds
+        if (sprite->base == SpriteBase::FromSpriteSheet) {
+            SpriteSheet* sheet = resLib.getResourcePtr<SpriteSheet>(sprite->resHandle);
+            if (sheet) {
+                Texture* texture = resLib.getResourcePtr<Texture>(sheet->textureHandle);
+                vec4_t frame = sheet->frames[sprite->frameIdx];
+                sprite->topLeft = vec2f(frame.x, frame.y);
+                sprite->bottomRight = vec2f(frame.z, frame.w);
+                float w = (frame.z - frame.x)*float(texture->info.width);
+                float h = (frame.w - frame.y)*float(texture->info.height);
+                float ratio = w / h;
+                if (halfSize.x == 0)
+                    halfSize.x = ratio*halfSize.y;
+                if (halfSize.y == 0)
+                    halfSize.y = halfSize.x / ratio;
+            }
+        } else if (sprite->base == SpriteBase::FromTexture) {
+            Texture* texture = resLib.getResourcePtr<Texture>(sprite->resHandle);
+            if (halfSize.x == 0)
+                halfSize.x = texture->ratio*halfSize.y;
+            if (halfSize.y == 0)
+                halfSize.y = halfSize.x / texture->ratio;
+        }
+
         SpriteVertex& v0 = verts[vertexIdx];
         SpriteVertex& v1 = verts[vertexIdx + 1];
         SpriteVertex& v2 = verts[vertexIdx + 2];
@@ -258,7 +403,6 @@ void termite::drawSprites(uint8_t viewId, const SpriteHandle* sprites, int numSp
 
         vec2_t topleft = sprite->topLeft;
         vec2_t bottomright = sprite->bottomRight;
-        vec2_t halfSize = sprite->halfSize;
         vec2_t localAnchor = sprite->localAnchor;
         vec2_t pos = posBuffer[ss.index];
         vec2_t anchor = vec2f(2.0f*localAnchor.x*halfSize.x, 2.0f*localAnchor.y*halfSize.y);
@@ -279,8 +423,8 @@ void termite::drawSprites(uint8_t viewId, const SpriteHandle* sprites, int numSp
         v3.x = halfSize.x;      v3.y = -halfSize.y;          
         v3.tx = bottomright.x;          v3.ty = bottomright.y;
 
-        v0.z = v1.z = v2.z = v3.z = 0;
         v0.r = v1.r = v2.r = v3.r = rotBuffer[ss.index];
+        v0.s = v1.s = v2.s = v3.s = sizeBuffer[ss.index];
 
         v0.offsetx = v1.offsetx = v2.offsetx = v3.offsetx = pos.x;
         v0.offsety = v1.offsety = v2.offsety = v3.offsety = pos.y;
@@ -304,17 +448,23 @@ void termite::drawSprites(uint8_t viewId, const SpriteHandle* sprites, int numSp
     {
         int index;
         int count;
+        //int dummy; // TODO: WTF is this? when the size of Batch is 8 the whole system crumbles
     };
-    bx::Array<Batch> batches;
-    batches.create(32, 64, tmpAlloc);
+    int maxBatches = 32;
+    int numBatches = 0;
+    Batch* batches = (Batch*)BX_ALLOC(tmpAlloc, sizeof(Batch)*maxBatches);
 
     ResourceHandle prevHandle;
     Batch* curBatch = nullptr;
     for (int i = 0; i < numSprites; i++) {
-        Sprite* sprite = g_sprite->spritePool.getHandleData<Sprite>(0, sortedSprites[i].handle.value);
-        ResourceHandle curHandle = g_sprite->spritePool.getHandleData<Sprite>(0, sortedSprites[i].handle.value)->resHandle;
+        SpriteImpl* sprite = g_sprite->spritePool.getHandleData<SpriteImpl>(0, sortedSprites[i].handle.value);
+        ResourceHandle curHandle = g_sprite->spritePool.getHandleData<SpriteImpl>(0, sortedSprites[i].handle.value)->resHandle;
         if (curHandle.value != prevHandle.value) {
-            curBatch = batches.push();
+            if (numBatches == maxBatches) {
+                maxBatches += 32;
+                batches = (Batch*)BX_REALLOC(tmpAlloc, batches, sizeof(Batch)*maxBatches);
+            }
+            curBatch = &batches[numBatches++];
             curBatch->index = i;
             curBatch->count = 0;
             prevHandle = curHandle;
@@ -326,29 +476,301 @@ void termite::drawSprites(uint8_t viewId, const SpriteHandle* sprites, int numSp
     if (!prog.isValid())
         prog = g_sprite->spriteProg;
 
-    for (int i = 0, c = batches.getCount(); i < c; i++) {
+    for (int i = 0; i < numBatches; i++) {
         const Batch& batch = batches[i];
         driver->setState(baseState, 0);
         driver->setTransientVertexBufferI(&tvb, 0, batch.count*4);
         driver->setTransientIndexBufferI(&tib, batch.index*6, batch.count*6);   
-        Sprite* sprite = g_sprite->spritePool.getHandleData<Sprite>(0, sortedSprites[batch.index].handle.value);
+        SpriteImpl* sprite = g_sprite->spritePool.getHandleData<SpriteImpl>(0, sortedSprites[batch.index].handle.value);
         if (sprite->resHandle.isValid()) {
             TextureHandle texHandle;
             if (sprite->base == SpriteBase::FromTexture) {
-                texHandle = ((Texture*)getResourceObj(nullptr, sprite->resHandle))->handle;
+                texHandle = resLib.getResourcePtr<Texture>(sprite->resHandle)->handle;
             } else if (sprite->base == SpriteBase::FromSpriteSheet) {
-                SpriteSheet* sheet = (SpriteSheet*)getResourceObj(nullptr, sprite->resHandle);
-                texHandle = ((Texture*)getResourceObj(nullptr, sheet->textureHandle))->handle;
+                SpriteSheet* sheet = resLib.getResourcePtr<SpriteSheet>(sprite->resHandle);
+                if (sheet)
+                    texHandle = resLib.getResourcePtr<Texture>(sheet->textureHandle)->handle;
+                else
+                    texHandle = getWhiteTexture1x1();
             }
             driver->setTexture(0, g_sprite->u_texture, texHandle, TextureFlag::FromTexture);
         }
 
-        if (stateCallback)
-            stateCallback(driver);
+        if (stateFunc)
+            stateFunc(driver);
         driver->submit(viewId, g_sprite->spriteProg, 0, false);
     }
+}
 
-    batches.destroy();
+SpriteAnimHandle termite::createSpriteAnim(SpriteHandle sprite)
+{
+    assert(sprite.isValid());
+
+    uint16_t animIdx = g_sprite->animPool.newHandle();
+    SpriteAnimImpl* anim = g_sprite->animPool.getHandleData<SpriteAnimImpl>(0, animIdx);
+    memset(anim, 0x00, sizeof(SpriteAnimImpl));
+
+    anim->sprite = sprite;
+    anim->speed = anim->resumeSpeed = 1.0f;
+    
+    return SpriteAnimHandle(animIdx);
+}
+
+void termite::destroySpriteAnim(SpriteAnimHandle handle)
+{
+    assert(handle.isValid());
+
+    SpriteAnimImpl* anim = g_sprite->animPool.getHandleData<SpriteAnimImpl>(0, handle.value);
+
+    // Free all actions
+    while (anim->action) {
+        SpriteAnimAction* action = anim->action;
+        anim->action = anim->action->next;
+        g_sprite->actionPool.deleteInstance(action);
+    }
+    g_sprite->animPool.freeHandle(handle.value);
+}
+
+inline SpriteAnimClip* searchClips(SpriteSheet* ss, uint32_t nameHash)
+{
+    for (int i = 0, c = ss->numAnimClips; i < c; i++) {
+        if (ss->clips[i].nameHash = nameHash)
+            return &ss->clips[i];
+    }
+    return nullptr;
+}
+
+inline void removeAnimAction(SpriteAnimImpl* anim)
+{
+    SpriteAnimAction* action = anim->action;
+    if (action) {
+        g_sprite->actionPool.deleteInstance(action);
+        anim->action = action->next;
+    } 
+}
+
+static void processSpriteAnimEvents(SpriteAnimHandle handle, SpriteSheet* sheet, int frameIdx)
+{
+    assert(frameIdx < sheet->numFrames);
+
+    SpriteAnimImpl* anim = g_sprite->animPool.getHandleData<SpriteAnimImpl>(0, handle.value);
+    uint32_t tag = sheet->tags[frameIdx];
+
+    SpriteAnimEvent* ev = anim->events;
+    while (ev) {
+        if (ev->tagNameHash == tag) {
+            ev->inCallback(handle, ev->userData);
+            anim->lastCalledEvent = ev;
+        } else if (anim->lastCalledEvent == ev) {
+            if (anim->lastCalledEvent->outCallback)
+                anim->lastCalledEvent->outCallback(handle, anim->lastCalledEvent->userData);
+            anim->lastCalledEvent = nullptr;
+        }
+        ev = ev->next;
+    }
+    
+}
+
+void termite::stepSpriteAnim(SpriteAnimHandle handle, float dt)
+{
+    assert(handle.isValid());
+    SpriteAnimImpl* anim = g_sprite->animPool.getHandleData<SpriteAnimImpl>(0, handle.value);
+    SpriteImpl* sprite = g_sprite->spritePool.getHandleData<SpriteImpl>(0, anim->sprite.value);
+    if (sprite->base != SpriteBase::FromSpriteSheet)
+        return;
+
+    SpriteSheet* ss = getDefaultResourceLib().getResourcePtr<SpriteSheet>(sprite->resHandle);
+    if (!ss)
+        return;
+
+    // Check For play action
+    SpriteAnimAction* action = anim->action;
+    if (action) {
+        SpriteAnimClip* clip = searchClips(ss, action->clipNameHash);
+        if (clip) {
+            float t = anim->t;
+
+            t += dt * anim->speed;
+            float progress = t * clip->fps;
+            float frames = bx::ffloor(progress);
+            float reminder = frames != 0 ? bx::fmod(progress, frames) : progress;
+            anim->t = reminder / clip->fps;
+            
+            int frameIdx = std::max<int>(sprite->frameIdx, clip->startFrame);
+            int iframes = int(frames);
+            if (!action->reverse) {
+                if (action->looped) {
+                    frameIdx = iwrap(frameIdx + iframes, clip->startFrame, clip->endFrame - 1);
+                } else {
+                    frameIdx = std::min<int>(frameIdx + iframes, clip->endFrame - 1);
+                    if (frameIdx == (clip->endFrame - 1)) {
+                        removeAnimAction(anim);
+                        if (action->finishCallback)
+                            action->finishCallback(handle, action->userData);
+                    }
+                }
+            } else {
+                if (action->looped) {
+                    frameIdx = iwrap(frameIdx - iframes, clip->startFrame, clip->endFrame - 1);
+                } else {
+                    frameIdx = std::max<int>(frameIdx - iframes, clip->startFrame);
+                    if (frameIdx == clip->startFrame) {
+                        removeAnimAction(anim);
+                        if (action->finishCallback)
+                            action->finishCallback(handle, action->userData);
+                    }
+                }
+            }            
+
+            sprite->frameIdx = frameIdx;
+
+            processSpriteAnimEvents(handle, ss, frameIdx);
+        }  // if clip  
+    }
+}
+
+void termite::queueSpriteAnim(SpriteAnimHandle handle, const char* clipName, bool looped, bool reverse /*= false*/,
+                                  SpriteAnimCallback finishedCallback /*= nullptr*/, void* userData /*= nullptr*/)
+{
+    assert(handle.isValid());
+
+    SpriteAnimImpl* anim = g_sprite->animPool.getHandleData<SpriteAnimImpl>(0, handle.value);
+    SpriteAnimAction* action = g_sprite->actionPool.newInstance();
+    if (action) {
+        action->clipNameHash = bx::hashMurmur2A(clipName, (uint32_t)strlen(clipName));
+        action->looped = looped;
+        action->reverse = reverse;
+        action->finishCallback = finishedCallback;
+        action->userData = userData;
+
+        // Add to action list
+        if (!anim->action) {
+            anim->action = action;
+        } else {
+            SpriteAnimAction* lastAction = anim->action;
+            while (lastAction->next != nullptr) {
+                lastAction = lastAction->next;
+            }
+            lastAction->next = action;
+        }
+    }
+}
+
+void termite::addSpriteAnimEvent(SpriteAnimHandle handle, const char* tagName, SpriteAnimCallback tagInCallback,
+                                 void* userData /*= nullptr*/, SpriteAnimCallback tagOutCallback /*= nullptr*/)
+{
+    assert(handle.isValid());
+
+    uint32_t tagNameHash = bx::hashMurmur2A(tagName, (uint32_t)strlen(tagName));
+    SpriteAnimImpl* anim = g_sprite->animPool.getHandleData<SpriteAnimImpl>(0, handle.value);
+
+    // Search in previous events, must not be duplicate
+    SpriteAnimEvent* ev = anim->events;
+    while (ev) {
+        if (ev->tagNameHash == tagNameHash)
+            return;
+        ev = ev->next;
+    }
+
+    ev = g_sprite->eventPool.newInstance();
+    if (ev) {
+        ev->tagNameHash = tagNameHash;
+        ev->inCallback = tagInCallback;
+        ev->outCallback = tagOutCallback;
+        ev->userData = userData;
+
+        // Add to action list
+        if (!anim->events) {
+            anim->events = ev;
+        } else {
+            SpriteAnimEvent* lastEvent = anim->events;
+            while (lastEvent->next != nullptr) {
+                lastEvent = lastEvent->next;
+            }
+            lastEvent->next = ev;
+        }
+    }
+}
+
+void termite::resetSpriteAnim(SpriteAnimHandle handle)
+{
+    stopSpriteAnim(handle);
+    SpriteAnimImpl* anim = g_sprite->animPool.getHandleData<SpriteAnimImpl>(0, handle.value);
+    SpriteImpl* sprite = g_sprite->spritePool.getHandleData<SpriteImpl>(0, anim->sprite.value);
+
+    anim->t = 0;
+    sprite->frameIdx = 0;
+}
+
+void termite::stopSpriteAnim(SpriteAnimHandle handle)
+{
+    assert(handle.isValid());
+    SpriteAnimImpl* anim = g_sprite->animPool.getHandleData<SpriteAnimImpl>(0, handle.value);
+    // Delete all actions and stop
+    while (anim->action) {
+        SpriteAnimAction* action = anim->action;
+        anim->action = anim->action->next;
+        g_sprite->actionPool.deleteInstance(action);
+    }
+    anim->speed = 0;
+}
+
+void termite::setSpriteAnimPlaybackSpeed(SpriteAnimHandle handle, float speed)
+{
+    assert(handle.isValid());
+    SpriteAnimImpl* anim = g_sprite->animPool.getHandleData<SpriteAnimImpl>(0, handle.value);
+    anim->resumeSpeed = speed;
+    anim->speed = speed;
+}
+
+float termite::getSpriteAnimPlaybackSpeed(SpriteAnimHandle handle)
+{
+    assert(handle.isValid());
+    SpriteAnimImpl* anim = g_sprite->animPool.getHandleData<SpriteAnimImpl>(0, handle.value);
+    return anim->resumeSpeed;
+}
+
+void termite::playSpriteAnim(SpriteAnimHandle handle)
+{
+    assert(handle.isValid());
+    SpriteAnimImpl* anim = g_sprite->animPool.getHandleData<SpriteAnimImpl>(0, handle.value);
+    anim->speed = anim->resumeSpeed;
+}
+
+void termite::setSpriteFrame(SpriteHandle handle, int frameIdx)
+{
+    SpriteImpl* sprite = (SpriteImpl*)g_sprite->spritePool.getHandleData<SpriteImpl>(0, handle.value);
+    sprite->frameIdx = frameIdx;
+}
+
+int termite::getSpriteFrame(SpriteHandle handle)
+{
+    SpriteImpl* sprite = (SpriteImpl*)g_sprite->spritePool.getHandleData<SpriteImpl>(0, handle.value);
+    return sprite->frameIdx;
+}
+
+void termite::setSpriteAnchor(SpriteHandle handle, const vec2_t localAnchor)
+{
+    SpriteImpl* sprite = (SpriteImpl*)g_sprite->spritePool.getHandleData<SpriteImpl>(0, handle.value);
+    sprite->localAnchor = localAnchor;
+}
+
+vec2_t termite::getSpriteAnchor(SpriteHandle handle)
+{
+    SpriteImpl* sprite = (SpriteImpl*)g_sprite->spritePool.getHandleData<SpriteImpl>(0, handle.value);
+    return sprite->localAnchor;
+}
+
+void termite::setSpriteSize(SpriteHandle handle, const vec2_t halfSize)
+{
+    SpriteImpl* sprite = (SpriteImpl*)g_sprite->spritePool.getHandleData<SpriteImpl>(0, handle.value);
+    sprite->halfSize = halfSize;
+}
+
+vec2_t termite::getSpriteSize(SpriteHandle handle)
+{
+    SpriteImpl* sprite = (SpriteImpl*)g_sprite->spritePool.getHandleData<SpriteImpl>(0, handle.value);
+    return sprite->halfSize;
 }
 
 void termite::registerSpriteSheetToResourceLib(ResourceLib* resLib)
@@ -400,14 +822,16 @@ bool SpriteSheetLoader::loadObj(ResourceLib* resLib, const MemoryBlock* mem, con
 
     // Load Descriptor
     if (header.numSprites) {
-        ss->regions = (vec4_t*)BX_ALLOC(&g_sprite->allocStub, sizeof(vec4_t)*header.numSprites);
-        if (!ss->regions)
+        ss->frames = (vec4_t*)BX_ALLOC(&g_sprite->allocStub, sizeof(vec4_t)*header.numSprites);
+        ss->tags = (uint32_t*)BX_ALLOC(&g_sprite->allocStub, sizeof(uint32_t)*header.numSprites);
+        if (!ss->frames || !ss->tags)
             return false;
-        ss->numRegions = header.numSprites;
+        ss->numFrames = header.numSprites;
         for (int i = 0; i < header.numSprites; i++) {
             tsSprite sprite;
             reader.read(&sprite, sizeof(sprite), &err);
-            ss->regions[i] = vec4f(sprite.tx0, sprite.ty0, sprite.tx1, sprite.ty1);
+            ss->frames[i] = vec4f(sprite.tx0, sprite.ty0, sprite.tx1, sprite.ty1);
+            ss->tags[i] = sprite.tag;
         }
     }
 
@@ -420,9 +844,11 @@ bool SpriteSheetLoader::loadObj(ResourceLib* resLib, const MemoryBlock* mem, con
             tsAnimation anim;
             reader.read(&anim, sizeof(anim), &err);
             bx::strlcpy(ss->clips[i].name, anim.name, sizeof(ss->clips[i].name));
-            ss->clips[i].fps = float(anim.fps);
+            ss->clips[i].nameHash = bx::hashMurmur2A(anim.name, (uint32_t)strlen(anim.name));
             ss->clips[i].startFrame = anim.startFrame;
             ss->clips[i].endFrame = anim.endFrame;
+            ss->clips[i].totalTime = float(anim.endFrame - anim.startFrame) / float(anim.fps);
+            ss->clips[i].fps = float(anim.fps);
         }
     }
 

@@ -69,6 +69,15 @@ if (WIN32)
 	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/sdl CACHE PATH "SDL2 root directory")
 endif()
 
+if (ANDROID)
+	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/sdl_android_arm CACHE PATH "SDL2 root directory")
+    set(SDL2_LIBRARY ${SDL2_PATH}/lib/armeabi-v7a/libSDL2.so)
+    set(SDL2_INCLUDE_DIR ${SDL2_PATH}/include/SDL2)
+    set(SDL2_FOUND TRUE)
+    set(SDL2_ANDROID_MAIN_ENTRY ${SDL2_PATH}/src/main/android/SDL_android_main.c)
+    return()
+endif()
+
 SET(SDL2_SEARCH_PATHS
 	~/Library/Frameworks
 	/Library/Frameworks

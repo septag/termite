@@ -6,6 +6,7 @@
 
 #include "bxx/pool.h"
 #include "bxx/stack.h"
+#include "bxx/logger.h"
 
 #include <cstdarg>
 
@@ -49,7 +50,7 @@ public:
     virtual void writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, int maxVerts,
                                  uint16_t* indices, int firstVertIdx, int maxIndices, 
                                  int* numVertsWritten, int* numIndicesWritten) = 0;
-    virtual GfxState setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) = 0;
+    virtual GfxState::Bits setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) = 0;
 };
 
 struct Batch
@@ -147,7 +148,7 @@ public:
     void writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, int maxVerts,
                          uint16_t* indices, int firstVertIdx, int maxIndices, 
                          int* numVertsWritten, int* numIndicesWritten) override;
-    GfxState setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) override;
+    GfxState::Bits setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) override;
 };
 
 struct RectParams : public BatchParams
@@ -164,7 +165,7 @@ public:
     void writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, int maxVerts,
         uint16_t* indices, int firstVertIdx, int maxIndices,
         int* numVertsWritten, int* numIndicesWritten) override;
-    GfxState setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) override;
+    GfxState::Bits setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) override;
 };
 
 struct VgMgr
@@ -258,7 +259,7 @@ static void setDefaultState(VectorGfxContext* ctx, State* state)
 static void drawBatches(VectorGfxContext* ctx)
 {
     GfxDriverApi* driver = ctx->driver;
-    GfxState baseState = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::CullCCW;
+    GfxState::Bits baseState = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::CullCCW;
 
     uint8_t viewId = ctx->viewId;
     rect_t vp = ctx->viewport;
@@ -292,7 +293,7 @@ static void drawBatches(VectorGfxContext* ctx)
     for (int i = 0, c = ctx->numBatches; i < c; i++) {
         const Batch& batch = ctx->batches[i];
 
-        GfxState state = baseState | batch.handler->setStates(ctx, driver, batch.params);
+        GfxState::Bits state = baseState | batch.handler->setStates(ctx, driver, batch.params);
 
         const mtx3x3_t xf = batch.xformMtx;
         mtx4x4_t worldMtx = mtx4x4f3(xf.m11, xf.m12, 0.0f,
@@ -402,10 +403,8 @@ VectorGfxContext* termite::createVectorGfxContext(uint8_t viewId, int maxVerts, 
     ctx->maxBatches = maxBatches;
     
     ctx->defaultFont = getFont("fixedsys");
-    if (!ctx->defaultFont) {
-        destroyVectorGfxContext(ctx);
-        return nullptr;
-    }    
+    if (!ctx->defaultFont)
+        BX_WARN("Default font 'fixedsys' not found. Make sure to set a font to VectorGfxContext before draw");
 
     if (!ctx->statePool.create(STATE_POOL_SIZE, alloc)) {
         destroyVectorGfxContext(ctx);
@@ -741,7 +740,7 @@ void TextHandler::writePrimitives(VectorGfxContext* ctx, const void* params, vgV
     *numIndicesWritten = indexIdx;
 }
 
-GfxState TextHandler::setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params)
+GfxState::Bits TextHandler::setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params)
 {
     const TextParams* textParams = (const TextParams*)params;
     Texture* texture = textParams->font->getTexture();
@@ -810,7 +809,7 @@ void RectHandler::writePrimitives(VectorGfxContext* ctx, const void* params, vgV
     *numIndicesWritten = indexIdx;
 }
 
-GfxState RectHandler::setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params)
+GfxState::Bits RectHandler::setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params)
 {
     const RectParams* rectParams = (const RectParams*)params;
     Texture* texture = rectParams->image;

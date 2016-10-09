@@ -6,21 +6,31 @@ namespace termite
 {
     typedef void(*JobCallback)(int jobIndex, void* userParam);
 
-    enum class JobPriority : int
+    struct JobPriority
     {
-        High = 0,
-        Normal,
-        Low,
-        Count
+        enum Enum
+        {
+            High = 0,
+            Normal,
+            Low,
+            Count
+        };
     };
 
-    struct jobDesc
+    struct JobDesc
     {
         JobCallback callback;
-        JobPriority priority;
+        JobPriority::Enum priority;
         void* userParam;
 
-        explicit jobDesc(JobCallback _callback, void* _userParam = nullptr, JobPriority _priority = JobPriority::Normal)
+        JobDesc()
+        {
+            callback = nullptr;
+            priority = JobPriority::Normal;
+            userParam = nullptr;
+        }
+
+        explicit JobDesc(JobCallback _callback, void* _userParam = nullptr, JobPriority::Enum _priority = JobPriority::Normal)
         {
             callback = _callback;
             userParam = _userParam;
@@ -31,8 +41,8 @@ namespace termite
     typedef volatile int32_t JobCounter;
     typedef JobCounter* JobHandle;
     
-    TERMITE_API JobHandle dispatchSmallJobs(const jobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE;
-    TERMITE_API JobHandle dispatchBigJobs(const jobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE;
+    TERMITE_API JobHandle dispatchSmallJobs(const JobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE;
+    TERMITE_API JobHandle dispatchBigJobs(const JobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE;
     TERMITE_API void waitJobs(JobHandle handle) T_THREAD_SAFE;
 
     result_t initJobDispatcher(bx::AllocatorI* alloc, 

@@ -241,11 +241,11 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const R
         // Vertex Decl
         vdeclBegin(&geo.vdecl);
         for (int c = 0; c < tgeo.numAttribs; c++) {
-            t3dVertexAttrib tatt;
+            t3dVertexAttrib::Type tatt;
             data->read(&tatt, sizeof(tatt), &err);
-            VertexAttrib att = (VertexAttrib)tatt;
+            VertexAttrib::Enum att = (VertexAttrib::Enum)tatt;
             int num;
-            VertexAttribType type;
+            VertexAttribType::Enum type;
             bool normalized = false;
 
             switch (att) {

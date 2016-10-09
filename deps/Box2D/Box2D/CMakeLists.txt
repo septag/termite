@@ -201,9 +201,9 @@ if(BOX2D_BUILD_STATIC)
 		VERSION ${BOX2D_VERSION}
 	)
 
-	if(UNIX AND NOT APPLE)
+	if(UNIX AND NOT APPLE AND NOT ANDROID)
 		target_link_libraries(Box2D rt)
-	endif(UNIX AND NOT APPLE)
+	endif(UNIX AND NOT APPLE AND NOT ANDROID)
 endif()
 
 target_include_directories(Box2D PUBLIC ../ )

@@ -11,21 +11,27 @@ namespace termite
     struct IoDriverApi;
     struct Texture;
 
-    enum class FontFlags : uint8_t
+    struct FontFlags
     {
-        Normal = 0x0,
-        Bold = 0x1,
-        Italic = 0x2,
-        Underline = 0x4
+        enum Enum
+        {
+            Normal = 0x0,
+            Bold = 0x1,
+            Italic = 0x2,
+            Underline = 0x4
+        };
+
+        typedef uint8_t Bits;
     };
 
     // Font Library
     result_t initFontLib(bx::AllocatorI* alloc, IoDriverApi* ioDriver);
     void shutdownFontLib();
 
-    TERMITE_API result_t registerFont(const char* fntFilepath, const char* name, uint16_t size = 0, FontFlags flags = FontFlags::Normal);
-    TERMITE_API void unregisterFont(const char* name, uint16_t size = 0, FontFlags flags = FontFlags::Normal);
-    TERMITE_API const Font* getFont(const char* name, uint16_t size = 0, FontFlags flags = FontFlags::Normal);
+    TERMITE_API result_t registerFont(const char* fntFilepath, const char* name, uint16_t size = 0, 
+                                      FontFlags::Enum flags = FontFlags::Normal);
+    TERMITE_API void unregisterFont(const char* name, uint16_t size = 0, FontFlags::Enum flags = FontFlags::Normal);
+    TERMITE_API const Font* getFont(const char* name, uint16_t size = 0, FontFlags::Enum flags = FontFlags::Normal);
 
     struct FontKerning
     {
@@ -49,7 +55,7 @@ namespace termite
 
     class Font
     {
-        friend result_t termite::registerFont(const char*, const char*, uint16_t, FontFlags);
+        friend result_t termite::registerFont(const char*, const char*, uint16_t, FontFlags::Enum);
 
     private:
         bx::AllocatorI* m_alloc;
@@ -64,11 +70,11 @@ namespace termite
         FontGlyph* m_glyphs;
         FontKerning* m_kerns;
         bx::HashTableInt m_charTable;
-        ResourceLib* m_resLib;
+        ResourceLibHelper m_resLib;
 
     public:
         Font(bx::AllocatorI* alloc);
-        static Font* create(const MemoryBlock* mem, const char* fntFilepath, bx::AllocatorI* alloc, ResourceLib* ds = nullptr);
+        static Font* create(const MemoryBlock* mem, const char* fntFilepath, bx::AllocatorI* alloc);
 
     public:
         ~Font();
@@ -95,7 +101,7 @@ namespace termite
 
         Texture* getTexture() const
         {
-            return (Texture*)getResourceObj(m_resLib, m_textureHandle);
+            return m_resLib.getResourcePtr<Texture>(m_textureHandle);
         }
 
         int findGlyph(uint32_t glyphId) const
@@ -114,5 +120,3 @@ namespace termite
         float applyKern(int glyphIdx, int nextGlyphIdx) const;
     };
 } // namespace termite
-
-C11_DEFINE_FLAG_TYPE(termite::FontFlags);
