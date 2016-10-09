@@ -36,7 +36,7 @@ namespace termite
 
         inline VertexDeclHelper& begin(RendererType::Enum _type = RendererType::Null)
         {
-            vdeclBegin(m_decl, type);
+            vdeclBegin(m_decl, _type);
             return *this;
         }
 

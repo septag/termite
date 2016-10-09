@@ -154,7 +154,7 @@ namespace termite
             return termite::getResourceObj(m_resLib, handle);
         }
 
-        inline getResourceParamSize(const char* name)
+        inline int getResourceParamSize(const char* name)
         {
             return termite::getResourceParamSize(m_resLib, name);
         }

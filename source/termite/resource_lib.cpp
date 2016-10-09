@@ -509,7 +509,7 @@ int termite::getResourceParamSize(ResourceLib* resLib, const char* name)
 {
     assert(resLib);
 
-    int typeIdx = resLib->resourceTypesTable.find(res->typeNameHash);
+    int typeIdx = resLib->resourceTypesTable.find(bx::hashMurmur2A(name, (uint32_t)strlen(name)));
     if (typeIdx != -1)
         return resLib->resourceTypes[resLib->resourceTypesTable.getValue(typeIdx)].userParamsSize;
     else
