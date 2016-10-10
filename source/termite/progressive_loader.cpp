@@ -20,7 +20,7 @@ struct LoadResourceRequest
     uint8_t userParams[T_RESOURCE_MAX_USERPARAM_SIZE];
     ResourceFlag::Bits flags;
 
-    ResourceHandle handle;
+    ResourceHandle* pHandle;
 
     LNode lnode;
 };
@@ -29,22 +29,28 @@ struct LoaderGroup
 {
     LoadingScheme scheme;
     LoadResourceRequest::LNode* requestList;
+
+    float elapsedTime;
+    int frameCount;
 };
 
-struct ProgressiveLoader
+namespace termite
 {
-    bx::AllocatorI* alloc;
-    ResourceLibHelper resLib;
-    bx::Pool<LoadResourceRequest> requestPool;
-    bx::IndexedPool groupPool;
-    LoaderGroupHandle curGroupHandle;
-
-    ProgressiveLoader(ResourceLib* _resLib, bx::AllocatorI* _alloc) : 
-        alloc(_alloc),
-        resLib(_resLib)
+    struct ProgressiveLoader
     {
-    }
-};
+        bx::AllocatorI* alloc;
+        ResourceLibHelper resLib;
+        bx::Pool<LoadResourceRequest> requestPool;
+        bx::IndexedPool groupPool;
+        LoaderGroupHandle curGroupHandle;
+
+        ProgressiveLoader(ResourceLib* _resLib, bx::AllocatorI* _alloc) :
+            alloc(_alloc),
+            resLib(_resLib)
+        {
+        }
+    };
+}
 
 ProgressiveLoader* termite::createProgressiveLoader(ResourceLib* resLib, bx::AllocatorI* alloc)
 {
@@ -80,26 +86,38 @@ void termite::beginLoaderGroup(ProgressiveLoader* loader, const LoadingScheme& s
     assert(handle.isValid());
     LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, handle.value);
     memcpy(&group->scheme, &scheme, sizeof(scheme));
+    group->frameCount = 0;
+    group->elapsedTime = 0;
 
     loader->curGroupHandle = handle;
 }
 
-termite::LoaderGroupHandle termite::endLoaderGroup(ProgressiveLoader* loader)
+LoaderGroupHandle termite::endLoaderGroup(ProgressiveLoader* loader)
 {
     assert(loader);
+    LoaderGroupHandle handle = loader->curGroupHandle;
     loader->curGroupHandle = LoaderGroupHandle();
+    return handle;
 }
 
-bool termite::isLoaderGroupDone(ProgressiveLoader* loader, LoaderGroupHandle handle)
+bool termite::checkLoaderGroupDone(ProgressiveLoader* loader, LoaderGroupHandle handle)
 {
     assert(loader);
+
     LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, handle.value);
-    return group->requestList == nullptr;
+    bool done = group->requestList == nullptr;
+    if (done) {
+        loader->groupPool.freeHandle(handle.value);
+    }
+    return done;
 }
 
-void termite::loadResource(ProgressiveLoader* loader, const char* name, const char* uri, const void* userParams, ResourceFlag::Bits flags /*= 0*/)
+void termite::loadResource(ProgressiveLoader* loader, 
+                           ResourceHandle* pHandle,
+                           const char* name, const char* uri, const void* userParams, ResourceFlag::Bits flags /*= 0*/)
 {
     assert(loader->curGroupHandle.isValid());
+    assert(pHandle);
 
     // create a new request
     LoadResourceRequest* req = loader->requestPool.newInstance();
@@ -114,15 +132,15 @@ void termite::loadResource(ProgressiveLoader* loader, const char* name, const ch
     if (paramSize && userParams) {
         memcpy(req->userParams, userParams, paramSize);
     } else {
-        req->userParams = nullptr;
+        memset(req->userParams, 0x00, sizeof(req->userParams));
     }
     req->flags = flags;
-    req->handle.reset();
+    req->pHandle = pHandle;
 
     // Add to group
     LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, loader->curGroupHandle.value);
     assert(group);
-    bx::addListNodeToEnd<LoaderGroup*>(&group->requestList, &req->lnode, req);
+    bx::addListNodeToEnd<LoadResourceRequest*>(&group->requestList, &req->lnode, req);
 }
 
 void termite::unloadResource(ProgressiveLoader* loader, ResourceHandle handle)
@@ -131,19 +149,98 @@ void termite::unloadResource(ProgressiveLoader* loader, ResourceHandle handle)
     assert(false);  // not implemented
 }
 
+static LoadResourceRequest* getFirstLoadRequest(ProgressiveLoader* loader, LoaderGroup* group)
+{
+    LoadResourceRequest::LNode* node = group->requestList;
+    while (node) {
+        LoadResourceRequest* req = node->data;
+        LoadResourceRequest::LNode* next = node->next;
+
+        if (!req->pHandle->isValid())
+            return req;
+
+        // Remove items that are not in progress
+        if (loader->resLib.getResourceLoadState(*req->pHandle) != ResourceLoadState::LoadInProgress) {
+            bx::removeListNode<LoadResourceRequest*>(&group->requestList, &req->lnode);
+            loader->requestPool.deleteInstance(req);
+        }
+
+        node = next;
+    }
+
+    return nullptr;
+}
+
+static void stepLoadGroupSequential(ProgressiveLoader* loader, LoaderGroup* group)
+{
+    LoadResourceRequest* req = getFirstLoadRequest(loader, group);
+    if (req) {
+        // check the previous request, it should be loaded in order to proceed to next one
+        LoadResourceRequest::LNode* prev = req->lnode.prev;
+        if (prev && loader->resLib.getResourceLoadState(*prev->data->pHandle) == ResourceLoadState::LoadInProgress)
+            return;
+
+        *req->pHandle = loader->resLib.loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
+        if (!req->pHandle->isValid()) {
+            // Something went wrong, remove the request from the list
+            bx::removeListNode<LoadResourceRequest*>(&group->requestList, &req->lnode);
+            loader->requestPool.deleteInstance(req);
+        }
+    }
+}
+
+static void stepLoadGroupDeltaFrame(ProgressiveLoader* loader, LoaderGroup* group)
+{
+    group->frameCount++;
+    if (group->frameCount >= group->scheme.frameDelta) {
+        LoadResourceRequest* req = getFirstLoadRequest(loader, group);
+        *req->pHandle = loader->resLib.loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
+        if (!req->pHandle->isValid()) {
+            // Something went wrong, remove the request from the list
+            bx::removeListNode<LoadResourceRequest*>(&group->requestList, &req->lnode);
+            loader->requestPool.deleteInstance(req);
+        }
+
+        group->frameCount = 0;
+    }
+}
+
+static void stepLoadGroupDeltaTime(ProgressiveLoader* loader, LoaderGroup* group, float dt)
+{
+    group->elapsedTime += dt;
+    if (group->elapsedTime >= group->scheme.deltaTime) {
+        LoadResourceRequest* req = getFirstLoadRequest(loader, group);
+        *req->pHandle = loader->resLib.loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
+        if (!req->pHandle->isValid()) {
+            // Something went wrong, remove the request from the list
+            bx::removeListNode<LoadResourceRequest*>(&group->requestList, &req->lnode);
+            loader->requestPool.deleteInstance(req);
+        }
+
+        group->elapsedTime = 0;
+    }
+}
+
 void termite::stepLoader(ProgressiveLoader* loader, float dt)
 {
     // move through groups and progress their loading
     uint16_t count = loader->groupPool.getCount();
     for (uint16_t i = 0; i < count; i++) {
-        LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(loader->groupPool.handleAt(i));
-        switch (group->scheme.type) {
-        case LoadingScheme::Sequential:
-            break;
-        case LoadingScheme::LoadDeltaFrame:
-            break;
-        case LoadingScheme::LoadDeltaTime:
-            break;
+        uint16_t groupHandle = loader->groupPool.handleAt(i);
+        LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, groupHandle);
+
+        if (group->requestList) {
+            switch (group->scheme.type) {
+            case LoadingScheme::Sequential:
+                stepLoadGroupSequential(loader, group);
+                break;
+            case LoadingScheme::LoadDeltaFrame:
+                stepLoadGroupDeltaFrame(loader, group);
+                break;
+            case LoadingScheme::LoadDeltaTime:
+                stepLoadGroupDeltaTime(loader, group, dt);
+                break;
+            }
         }
     }
 }
