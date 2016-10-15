@@ -33,10 +33,15 @@ namespace termite
 
             uint32_t index;
             QNode qnode;
+
+            FreeIndex() :
+                qnode(this)
+            {
+            }
         };
 
         bx::Pool<FreeIndex> freeIndexPool;
-        FreeIndex::QNode* freeIndexQueue;
+        bx::Queue<FreeIndex*> freeIndexQueue;
         uint32_t freeIndexSize;
         bx::Array<uint16_t> generations;
         bx::AllocatorI* alloc;
@@ -45,10 +50,9 @@ namespace termite
         
         EntityManager(bx::AllocatorI* _alloc) : 
             alloc(_alloc),
-            destroyTable(bx::HashTableType::Mutable)
+            destroyTable(bx::HashTableType::Mutable),
+            freeIndexSize(0)
         {
-            freeIndexSize = 0;
-            freeIndexQueue = nullptr;
         }
     };
 }
@@ -129,7 +133,9 @@ Entity termite::createEntity(EntityManager* emgr)
 {
     uint32_t idx;
     if (emgr->freeIndexSize > MIN_FREE_INDICES) {
-        idx = bx::popQueue<EntityManager::FreeIndex*>(&emgr->freeIndexQueue)->index;
+        EntityManager::FreeIndex* fidx;
+        emgr->freeIndexQueue.pop(&fidx);
+        idx = fidx->index;
         emgr->freeIndexSize--;
     } else {
         idx = emgr->generations.getCount();
@@ -182,7 +188,7 @@ void termite::destroyEntity(EntityManager* emgr, Entity ent)
     EntityManager::FreeIndex* fi = emgr->freeIndexPool.newInstance();
     if (fi) {
         fi->index = idx;
-        bx::pushQueueNode<EntityManager::FreeIndex*>(&emgr->freeIndexQueue, &fi->qnode, fi);
+        emgr->freeIndexQueue.push(&fi->qnode);
         emgr->freeIndexSize++;
     }
 }

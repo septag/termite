@@ -90,6 +90,11 @@ struct FontItem
     
     typedef bx::ListNode<FontItem*> LNode;
     LNode lnode;
+
+    FontItem() :
+        lnode(this)
+    {
+    }
 };
 
 struct FontLibrary
@@ -97,14 +102,13 @@ struct FontLibrary
     IoDriverApi* ioDriver;
     bx::AllocatorI* alloc;
     bx::HashTable<FontItem*> fontTable;
-    FontItem::LNode* fontList;
+    bx::List<FontItem*> fontList;
     bx::Pool<FontItem> fontItemPool;
 
     FontLibrary() : fontTable(bx::HashTableType::Mutable)
     {
         ioDriver = nullptr;
         alloc = nullptr;
-        fontList = nullptr;
     }
 };
 
@@ -348,7 +352,7 @@ void termite::shutdownFontLib()
     bx::AllocatorI* alloc = g_fontLib->alloc;
 
     // Delete all fonts
-    FontItem::LNode* node = g_fontLib->fontList;
+    FontItem::LNode* node = g_fontLib->fontList.getFirst();
     while (node) {
         FontItem* libItem = node->data;
         if (libItem->font)
@@ -356,7 +360,6 @@ void termite::shutdownFontLib()
         g_fontLib->fontItemPool.deleteInstance(libItem);
         node = node->next;
     }
-    g_fontLib->fontList = nullptr;
     g_fontLib->fontItemPool.destroy();
     g_fontLib->fontTable.destroy();
     BX_DELETE(alloc, g_fontLib);
@@ -412,7 +415,7 @@ result_t termite::registerFont(const char* fntFilepath, const char* name, uint16
     item->flags = flags;
     item->font = font;
 
-    bx::addListNode<FontItem*>(&g_fontLib->fontList, &item->lnode, item);
+    g_fontLib->fontList.add(&item->lnode);
     g_fontLib->fontTable.add(hash, item);    
     return 0;
 }
@@ -424,7 +427,7 @@ void termite::unregisterFont(const char* name, uint16_t size /*= 0*/, FontFlags:
     if (fontIndex != -1) {
         FontItem* item = g_fontLib->fontTable.getValue(fontIndex);
         
-        bx::removeListNode<FontItem*>(&g_fontLib->fontList, &item->lnode);
+        g_fontLib->fontList.remove(&item->lnode);
         g_fontLib->fontTable.remove(fontIndex);
         
         if (item->font)

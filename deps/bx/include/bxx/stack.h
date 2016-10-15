@@ -10,34 +10,62 @@ namespace bx
         StackNode<Ty>* down;
         Ty data;
 
-        StackNode()
+        explicit StackNode(const Ty& _value) :
+            down(nullptr),
+            data(_value)
         {
-            down = nullptr;
         }
     };
 
     template <typename Ty>
-    void pushStackNode(StackNode<Ty>** _ref, StackNode<Ty>* _node, const Ty& _data)
+    class Stack
     {
-        _node->down = *_ref;
-        *_ref = _node;
-        _node->data = _data;
-    }
-
-    template <typename Ty>
-    Ty popStack(StackNode<Ty>** _ref)
-    {
-        StackNode<Ty>* node = *_ref;
-        if (node) {
-            *_ref = node->down;
-            node->down = nullptr;
+    public:
+        Stack() :
+            m_head(nullptr)
+        {
         }
-        return node->data;
-    }
 
-    template <typename Ty>
-    Ty peekStack(StackNode<Ty>* _ref)
-    {
-        return _ref->data;
-    }
+        inline void push(StackNode<Ty>* _node)
+        {
+            _node->down = m_head;
+            m_head = _node;
+        }
+
+        inline bool pop(Ty* pData)
+        {
+            if (m_head) {
+                StackNode<Ty>* node = m_head;
+                m_head = node->down;
+                node->down = nullptr;
+                *pData = node->data;
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        inline bool peek(Ty* pData) const
+        {
+            if (m_head) {
+                *pData = m_head->data;
+                return true;
+            } else {
+                return false;
+            }            
+        }
+
+        inline bool isEmpty() const
+        {
+            return m_head == nullptr;
+        }
+
+        inline const StackNode<Ty>* getHead() const
+        {
+            return m_head;
+        }
+
+    private:
+        StackNode<Ty>* m_head;
+    };
 }   // namespace bx

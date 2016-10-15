@@ -47,6 +47,11 @@ struct Fiber
     JobCallback callback;
     JobPriority::Enum priority;
     void* userData;
+
+    Fiber() :
+        lnode(this)
+    {
+    }
 };
 
 class FiberPool
@@ -72,7 +77,7 @@ public:
                     JobCounter* counter);
     void deleteFiber(Fiber* fiber);
 
-    uint16_t getMax() const
+    inline uint16_t getMax() const
     {
         return m_maxFibers;
     }
@@ -109,7 +114,7 @@ struct JobDispatcher
     FiberPool smallFibers;
     FiberPool bigFibers;
 
-    Fiber::LNode* waitList[int(JobPriority::Count)];  // 3 lists for each priority
+    bx::List<Fiber*> waitList[JobPriority::Count];  // 3 lists for each priority
     bx::Lock jobLock;
     bx::Lock counterLock;
     bx::TlsData threadData;
@@ -131,7 +136,6 @@ struct JobDispatcher
         stop = 0;
         dummyCounter = 0;
         numWaits = 0;
-        memset(waitList, 0x00, sizeof(waitList));
         memset(&mainStack, 0x00, sizeof(mainStack));
     }
 };
@@ -264,7 +268,7 @@ Fiber* FiberPool::newFiber(JobCallback callbackFn, void* userData, uint16_t inde
 {
     bx::LockScope lk(m_lock);
     if (m_index > 0) {
-        Fiber* fiber = m_ptrs[--m_index];
+        Fiber* fiber = new(m_ptrs[--m_index]) Fiber();
         fiber->ownerThread = 0;
         fiber->context = make_fcontext(m_stacks[fiber->stackIndex].sptr, m_stacks[fiber->stackIndex].ssize, fiberCallback);
         fiber->callback = callbackFn;
@@ -274,7 +278,6 @@ Fiber* FiberPool::newFiber(JobCallback callbackFn, void* userData, uint16_t inde
         fiber->counter = counter;
         fiber->priority = priority;
         fiber->ownerPool = pool;
-        memset(&fiber->lnode, 0x00, sizeof(Fiber::LNode));
         return fiber;
     } else {
         return nullptr;
@@ -295,22 +298,23 @@ static void jobPusherCallback(fcontext_transfer_t transfer)
     while (!g_dispatcher->stop) {
         Fiber* fiber = nullptr;
         if (g_dispatcher->jobLock.tryLock()) {
-            for (int i = 0; i < int(JobPriority::Count) && !fiber; i++) {
-                Fiber::LNode** list = &g_dispatcher->waitList[i];
-                Fiber::LNode* node = *list;
+            for (int i = 0; i < JobPriority::Count && !fiber; i++) {
+                bx::List<Fiber*>& list = g_dispatcher->waitList[i];
+                Fiber::LNode* node = list.getFirst();
                 while (node && !fiber) {
-                    Fiber* f = node->data;
+                    Fiber* f = list.getFirst()->data;
+                    Fiber::LNode* next = node->next;
                     if (*f->waitCounter == 0) {
                         if (f->ownerThread == 0 || f->ownerThread == data->threadId) {
                             // Job is ready to run, pull it from the wait list
                             fiber = f;
-                            bx::removeListNode<Fiber*>(list, &f->lnode);
+                            list.remove(node);
 
                             std::lock_guard<std::mutex> lk(g_dispatcher->workMutex);
                             bx::atomicFetchAndSub<int32_t>(&g_dispatcher->numWaits, 1);
                         }
                     }
-                    node = node->next;
+                    node = next;
                 }
             }
             g_dispatcher->jobLock.unlock();
@@ -366,7 +370,7 @@ static JobHandle dispatch(const JobDesc* jobs, uint16_t numJobs, FiberPool* pool
         int index = numJobs - i - 1;
         Fiber* fiber = pool->newFiber(jobs[index].callback, jobs[index].userParam, index, jobs[index].priority, pool, counter);
         if (fiber) {
-            bx::addListNode<Fiber*>(&g_dispatcher->waitList[fiber->priority], &fiber->lnode, fiber);
+            g_dispatcher->waitList[fiber->priority].remove(&fiber->lnode);
             c++;
         } else {
             BX_WARN("Exceeded maximum jobs (%d)", pool->getMax());
@@ -415,7 +419,7 @@ void termite::waitJobs(JobHandle handle) T_THREAD_SAFE
             fiber->ownerThread = data->threadId;
 
             g_dispatcher->jobLock.lock();
-            bx::addListNode<Fiber*>(&g_dispatcher->waitList[int(fiber->priority)], &fiber->lnode, fiber);
+            g_dispatcher->waitList[fiber->priority].addToEnd(&fiber->lnode);
             g_dispatcher->jobLock.unlock();
 
             // Notify threads to continue

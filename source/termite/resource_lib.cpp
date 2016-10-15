@@ -3,11 +3,11 @@
 #include "resource_lib.h"
 #include "io_driver.h"
 
-#include "bxx/logger.h"
-#include "bxx/array.h"
-#include "bxx/hash_table.h"
 #include "bx/hash.h"
+#include "bxx/logger.h"
+#include "bxx/hash_table.h"
 #include "bxx/path.h"
+#include "bxx/indexed_pool.h"
 
 #include "../include_common/folder_png.h"
 
@@ -49,14 +49,14 @@ namespace termite
         ResourceLibInitFlag::Bits flags;
         IoDriverApi* driver;
         IoOperationMode opMode;
-        bx::ArrayWithPop<ResourceTypeData> resourceTypes;
-        bx::HashTableInt resourceTypesTable;    // hash(name) -> index in resourceTypes
-        bx::ArrayWithPop<Resource> resources;
-        bx::HashTableInt resourcesTable;        // hash(uri+params) -> index in resources
-        bx::ArrayWithPop<AsyncLoadRequest> asyncLoads;
-        bx::HashTableInt asyncLoadsTable;       // hash(uri) -> index in asyncLoads
-        bx::MultiHashTableInt hotLoadsTable;    // hash(uri) -> list of indexes in resources
-		bx::Pool<bx::MultiHashTableInt::Node> hotLoadsNodePool;
+        bx::IndexedPool resourceTypes;
+        bx::HashTableUint16 resourceTypesTable;    // hash(name) -> handle in resourceTypes
+        bx::IndexedPool resources;
+        bx::HashTableUint16 resourcesTable;        // hash(uri+params) -> handle in resources
+        bx::IndexedPool asyncLoads;
+        bx::HashTableUint16 asyncLoadsTable;       // hash(uri) -> handle in asyncLoads
+        bx::MultiHashTable<uint16_t> hotLoadsTable;    // hash(uri) -> list of handles in resources
+		bx::Pool<bx::MultiHashTable<uint16_t>::Node> hotLoadsNodePool;
         FileModifiedCallback modifiedCallback;
         void* fileModifiedUserParam;
         bx::AllocatorI* alloc;
@@ -106,23 +106,27 @@ termite::ResourceLib* termite::createResourceLib(ResourceLibInitFlag::Bits flags
 	if (resLib->opMode == IoOperationMode::Async)
 		driver->setCallbacks(resLib);
 
-	if (!resLib->resourceTypes.create(20, 20, alloc) || !resLib->resourceTypesTable.create(20, alloc)) {
+    uint32_t resourceTypeSz = sizeof(ResourceTypeData);
+	if (!resLib->resourceTypes.create(&resourceTypeSz, 1, 20, 20, alloc) || !resLib->resourceTypesTable.create(20, alloc)) {
 		destroyResourceLib(resLib);
 		return nullptr;
 	}
 
-	if (!resLib->resources.create(512, 2048, alloc) || !resLib->resourcesTable.create(512, alloc)) {
+    uint32_t resourceSz = sizeof(Resource);
+	if (!resLib->resources.create(&resourceSz, 1, 256, 1024, alloc) || !resLib->resourcesTable.create(256, alloc)) {
 		destroyResourceLib(resLib);
 		return nullptr;
 	}
 
-	if (!resLib->asyncLoads.create(128, 256, alloc) || !resLib->asyncLoadsTable.create(256, alloc)) {
+    uint32_t asyncLoadReqSz = sizeof(AsyncLoadRequest);
+	if (!resLib->asyncLoads.create(&asyncLoadReqSz, 1, 32, 64, alloc) || !resLib->asyncLoadsTable.create(64, alloc)) {
 		destroyResourceLib(resLib);
 		return nullptr;
 	}
 
 	if (!resLib->hotLoadsNodePool.create(128, alloc) ||
-		!resLib->hotLoadsTable.create(128, alloc, &resLib->hotLoadsNodePool)) {
+		!resLib->hotLoadsTable.create(128, alloc, &resLib->hotLoadsNodePool)) 
+    {
         destroyResourceLib(resLib);
         return nullptr;
     }
@@ -172,17 +176,16 @@ ResourceTypeHandle termite::registerResourceType(ResourceLib* resLib, const char
     if (userParamsSize > T_RESOURCE_MAX_USERPARAM_SIZE)
         return ResourceTypeHandle();
 
-    int index;
-    ResourceTypeData* tdata = resLib->resourceTypes.push(&index);
+    uint16_t tHandle = resLib->resourceTypes.newHandle();
+    assert(tHandle != UINT16_MAX);
+    ResourceTypeData* tdata = resLib->resourceTypes.getHandleData<ResourceTypeData>(0, tHandle);
     bx::strlcpy(tdata->name, name, sizeof(tdata->name));
     tdata->callbacks = callbacks;
     tdata->userParamsSize = userParamsSize;
     tdata->failObj = failObj;
     
-    ResourceTypeHandle handle;
-    handle.value = (uint16_t)index;
-
-    resLib->resourceTypesTable.add(bx::hashMurmur2A(tdata->name, (uint32_t)strlen(tdata->name)), index);
+    ResourceTypeHandle handle(tHandle);
+    resLib->resourceTypesTable.add(bx::hashMurmur2A(tdata->name, (uint32_t)strlen(tdata->name)), tHandle);
 
     return handle;
 }
@@ -190,11 +193,12 @@ ResourceTypeHandle termite::registerResourceType(ResourceLib* resLib, const char
 void termite::unregisterResourceType(ResourceLib* resLib, ResourceTypeHandle handle)
 {
     if (handle.isValid()) {
-        ResourceTypeData* tdata = resLib->resourceTypes.pop(handle.value);
+        ResourceTypeData* tdata = resLib->resourceTypes.getHandleData<ResourceTypeData>(0, handle.value);
         
         int index = resLib->resourceTypesTable.find(bx::hashMurmur2A(tdata->name, (uint32_t)strlen(tdata->name)));
         if (index != -1)
             resLib->resourceTypesTable.remove(index);
+        resLib->resourceTypes.freeHandle(handle.value);
     }
 }
 
@@ -211,13 +215,15 @@ inline uint32_t hashResource(const char* uri, const void* userParams, int userPa
 static ResourceHandle newResource(ResourceLib* resLib, ResourceCallbacksI* callbacks, const char* uri, const void* userParams, 
                                     int userParamsSize, uintptr_t obj, uint32_t typeNameHash)
 {
-    int index;
-    Resource* rs = resLib->resources.push(&index);
-    if (!rs)
+    uint16_t rHandle = resLib->resources.newHandle();
+    if (rHandle == UINT16_MAX) {
+        BX_WARN("Out of Memory");
         return ResourceHandle();
+    }
+    Resource* rs = resLib->resources.getHandleData<Resource>(0, rHandle);
     memset(rs, 0x00, sizeof(Resource));
 
-    rs->handle.value = (uint16_t)index;
+    rs->handle = ResourceHandle(rHandle);
     rs->uri = uri;
     rs->refcount = 1;
     rs->callbacks = callbacks;
@@ -229,12 +235,12 @@ static ResourceHandle newResource(ResourceLib* resLib, ResourceCallbacksI* callb
         rs->paramsHash = bx::hashMurmur2A(userParams, userParamsSize);
     }
 
-    resLib->resourcesTable.add(hashResource(uri, userParams, userParamsSize), index);
+    resLib->resourcesTable.add(hashResource(uri, userParams, userParamsSize), rHandle);
 
     // Register for hot-loading
     // A URI may contain several resources (different load params), so we have to reload them all
-    if ((uint8_t)(resLib->flags & ResourceLibInitFlag::HotLoading)) {
-        resLib->hotLoadsTable.add(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)), index);
+    if (resLib->flags & ResourceLibInitFlag::HotLoading) {
+        resLib->hotLoadsTable.add(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)), rHandle);
     }
 
     return rs->handle;
@@ -242,16 +248,16 @@ static ResourceHandle newResource(ResourceLib* resLib, ResourceCallbacksI* callb
 
 static void deleteResource(ResourceLib* resLib, ResourceHandle handle)
 {
-    Resource* rs = resLib->resources.itemPtr(handle.value);
+    Resource* rs = resLib->resources.getHandleData<Resource>(0, handle.value);
 
     // Unregister from hot-loading
-    if ((uint8_t)(resLib->flags & ResourceLibInitFlag::HotLoading)) {
+    if (resLib->flags & ResourceLibInitFlag::HotLoading) {
         int index = resLib->hotLoadsTable.find(bx::hashMurmur2A(rs->uri.cstr(), (uint32_t)rs->uri.getLength()));
         if (index != -1) {
-            bx::MultiHashTableInt::Node* node = resLib->hotLoadsTable.getNode(index);
-            bx::MultiHashTableInt::Node* foundNode = nullptr;
+            bx::MultiHashTable<uint16_t>::Node* node = resLib->hotLoadsTable.getNode(index);
+            bx::MultiHashTable<uint16_t>::Node* foundNode = nullptr;
             while (node) {
-                if (resLib->resources[node->value].paramsHash == rs->paramsHash) {
+                if (resLib->resources.getHandleData<Resource>(0, node->value)->paramsHash == rs->paramsHash) {
                     foundNode = node;
                     break;
                 }
@@ -262,7 +268,7 @@ static void deleteResource(ResourceLib* resLib, ResourceHandle handle)
                 resLib->hotLoadsTable.remove(index, foundNode);
         }
     }
-    resLib->resources.pop(handle.value);
+    resLib->resources.freeHandle(handle.value);
 
     // Unload resource and invalidate the handle (just to set a flag that it's unloaded)
     rs->callbacks->unloadObj(resLib, rs->obj);
@@ -277,7 +283,7 @@ static ResourceHandle addResource(ResourceLib* resLib, ResourceCallbacksI* callb
 {
     ResourceHandle handle = overrideHandle;
     if (handle.isValid()) {
-        Resource* rs = resLib->resources.itemPtr(handle.value);
+        Resource* rs = resLib->resources.getHandleData<Resource>(0, handle.value);
         if (rs->handle.isValid())
             rs->callbacks->unloadObj(resLib, rs->obj);
         
@@ -295,7 +301,7 @@ static ResourceHandle addResource(ResourceLib* resLib, ResourceCallbacksI* callb
 
 static void setResourceLoadFlag(ResourceLib* resLib, ResourceHandle resHandle, ResourceLoadState::Enum flag) 
 {
-    Resource* res = resLib->resources.itemPtr(resHandle.value);
+    Resource* res = resLib->resources.getHandleData<Resource>(0, resHandle.value);
     res->loadState = flag;
 }
 
@@ -312,10 +318,11 @@ static ResourceHandle loadResourceHashed(ResourceLib* resLib, uint32_t nameHash,
         BX_WARN("ResourceType for '%s' not found in DataStore", uri);
         return ResourceHandle();
     }
-    const ResourceTypeData& tdata = resLib->resourceTypes[resLib->resourceTypesTable.getValue(resTypeIdx)];
+    const ResourceTypeData* tdata = resLib->resourceTypes.getHandleData<ResourceTypeData>(0, 
+                                                                    resLib->resourceTypesTable.getValue(resTypeIdx));
 
     // Find the possible already loaded handle by uri+params hash value
-    int rresult = resLib->resourcesTable.find(hashResource(uri, userParams, tdata.userParamsSize));
+    int rresult = resLib->resourcesTable.find(hashResource(uri, userParams, tdata->userParamsSize));
     if (rresult != -1) {
         handle.value = (uint16_t)resLib->resourcesTable.getValue(rresult);
     }
@@ -328,7 +335,7 @@ static ResourceHandle loadResourceHashed(ResourceLib* resLib, uint32_t nameHash,
             handle = ResourceHandle();
         } else {
             // No Reload flag is set, just add the reference count and return
-            resLib->resources[handle.value].refcount++;
+            resLib->resources.getHandleData<Resource>(0, handle.value)->refcount++;
         }
     }
 
@@ -336,21 +343,21 @@ static ResourceHandle loadResourceHashed(ResourceLib* resLib, uint32_t nameHash,
     if (!handle.isValid()) {
         if (resLib->opMode == IoOperationMode::Async) {
             // Add resource with an empty object
-            handle = addResource(resLib, tdata.callbacks, uri, userParams, tdata.userParamsSize,
-                                 tdata.callbacks->getDefaultAsyncObj(resLib), overrideHandle, nameHash);
+            handle = addResource(resLib, tdata->callbacks, uri, userParams, tdata->userParamsSize,
+                                 tdata->callbacks->getDefaultAsyncObj(resLib), overrideHandle, nameHash);
             setResourceLoadFlag(resLib, handle, ResourceLoadState::LoadInProgress);
 
             // Register async request
-            int reqIdx;
-            AsyncLoadRequest* req = resLib->asyncLoads.push(&reqIdx);
-            if (!req) {
+            uint16_t reqHandle = resLib->asyncLoads.newHandle();
+            if (reqHandle == UINT16_MAX) {
                 deleteResource(resLib, handle);
                 return ResourceHandle();
             }
+            AsyncLoadRequest* req = resLib->asyncLoads.getHandleData<AsyncLoadRequest>(0, reqHandle);
             req->resLib = resLib;
             req->handle = handle;
             req->flags = flags;
-            resLib->asyncLoadsTable.add(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)), reqIdx);
+            resLib->asyncLoadsTable.add(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)), reqHandle);
 
             // Load the file, result will be called in onReadComplete
             resLib->driver->read(uri);
@@ -370,21 +377,21 @@ static ResourceHandle loadResourceHashed(ResourceLib* resLib, uint32_t nameHash,
             params.userParams = userParams;
             params.flags = flags;
             uintptr_t obj;
-            bool loaded = tdata.callbacks->loadObj(resLib, mem, params, &obj);
+            bool loaded = tdata->callbacks->loadObj(resLib, mem, params, &obj);
             releaseMemoryBlock(mem);
 
             if (!loaded)    {
                 BX_WARN("Loading resource '%s' failed", uri);
                 BX_WARN(getErrorString());
-                obj = tdata.failObj;
+                obj = tdata->failObj;
             }
 
-            handle = addResource(resLib, tdata.callbacks, uri, userParams, tdata.userParamsSize, obj, overrideHandle, nameHash);
+            handle = addResource(resLib, tdata->callbacks, uri, userParams, tdata->userParamsSize, obj, overrideHandle, nameHash);
             setResourceLoadFlag(resLib, handle, loaded ? ResourceLoadState::LoadOk : ResourceLoadState::LoadFailed);
 
             // Trigger onReload callback
             if (flags & ResourceFlag::Reload) {
-                tdata.callbacks->onReload(resLib, handle);
+                tdata->callbacks->onReload(resLib, handle);
             }
         }
     }
@@ -405,7 +412,8 @@ static ResourceHandle loadResourceHashedInMem(ResourceLib* resLib, uint32_t name
         BX_WARN("ResourceType for '%s' not found in DataStore", uri);
         return ResourceHandle();
     }
-    const ResourceTypeData& tdata = resLib->resourceTypes[resLib->resourceTypesTable.getValue(resTypeIdx)];
+    const ResourceTypeData& tdata = *resLib->resourceTypes.getHandleData<ResourceTypeData>(0, 
+                                                                      resLib->resourceTypesTable.getValue(resTypeIdx));
 
     // Find the possible already loaded handle by uri+params hash value
     int rresult = resLib->resourcesTable.find(hashResource(uri, userParams, tdata.userParamsSize));
@@ -421,7 +429,7 @@ static ResourceHandle loadResourceHashedInMem(ResourceLib* resLib, uint32_t name
             handle = ResourceHandle();
         } else {
             // No Reload flag is set, just add the reference count and return
-            resLib->resources[handle.value].refcount++;
+            resLib->resources.getHandleData<Resource>(0, handle.value)->refcount++;
         }
     }
 
@@ -471,14 +479,14 @@ void termite::unloadResource(ResourceLib* resLib, ResourceHandle handle)
     assert(resLib);
     assert(handle.isValid());
 
-    Resource* rs = resLib->resources.itemPtr(handle.value);
+    Resource* rs = resLib->resources.getHandleData<Resource>(0, handle.value);
     rs->refcount--;
     if (rs->refcount == 0) {
         // Unregister from async loading
         if (resLib->opMode == IoOperationMode::Async) {
             int aIdx = resLib->asyncLoadsTable.find(bx::hashMurmur2A(rs->uri.cstr(), (uint32_t)rs->uri.getLength()));
             if (aIdx != -1) {
-                resLib->asyncLoads.pop(resLib->asyncLoadsTable.getValue(aIdx));
+                resLib->asyncLoads.freeHandle(resLib->asyncLoadsTable.getValue(aIdx));
                 resLib->asyncLoadsTable.remove(aIdx);
             }
         }
@@ -492,15 +500,14 @@ uintptr_t termite::getResourceObj(ResourceLib* resLib, ResourceHandle handle)
     assert(resLib);
     assert(handle.isValid());
 
-    const Resource& rs = resLib->resources[handle.value];
-    return rs.obj;
+    return resLib->resources.getHandleData<Resource>(0, handle.value)->obj;
 }
 
 ResourceLoadState::Enum termite::getResourceLoadState(ResourceLib* resLib, ResourceHandle handle)
 {
     assert(resLib);
     if (handle.isValid())
-        return resLib->resources[handle.value].loadState;
+        return resLib->resources.getHandleData<Resource>(0, handle.value)->loadState;
     else
         return ResourceLoadState::LoadFailed;
 }
@@ -511,7 +518,8 @@ int termite::getResourceParamSize(ResourceLib* resLib, const char* name)
 
     int typeIdx = resLib->resourceTypesTable.find(bx::hashMurmur2A(name, (uint32_t)strlen(name)));
     if (typeIdx != -1)
-        return resLib->resourceTypes[resLib->resourceTypesTable.getValue(typeIdx)].userParamsSize;
+        return resLib->resourceTypes.getHandleData<ResourceTypeData>(0, 
+                                                         resLib->resourceTypesTable.getValue(typeIdx))->userParamsSize;
     else
         return 0;
 }
@@ -521,21 +529,23 @@ void termite::ResourceLib::onOpenError(const char* uri)
 {
     int r = this->asyncLoadsTable.find(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)));
     if (r != -1) {
-        int index = this->asyncLoadsTable.getValue(r);
-        AsyncLoadRequest* areq = this->asyncLoads.pop(index);
+        uint16_t handle = this->asyncLoadsTable.getValue(r);
+        AsyncLoadRequest* areq = this->asyncLoads.getHandleData<AsyncLoadRequest>(0, handle);
         BX_WARN("Opening resource '%s' failed", uri);
 
         if (areq->handle.isValid()) {
             setResourceLoadFlag(areq->resLib, areq->handle, ResourceLoadState::LoadFailed);
 
             // Set fail obj to resource
-            Resource* res = areq->resLib->resources.itemPtr(areq->handle.value);
+            Resource* res = areq->resLib->resources.getHandleData<Resource>(0, areq->handle.value);
             int typeIdx = areq->resLib->resourceTypesTable.find(res->typeNameHash);
             if (typeIdx != -1) {
-                res->obj = areq->resLib->resourceTypes[areq->resLib->resourceTypesTable.getValue(typeIdx)].failObj;
+                res->obj = areq->resLib->resourceTypes.getHandleData<ResourceTypeData>(
+                    0, areq->resLib->resourceTypesTable.getValue(typeIdx))->failObj;
             }
         }
 
+        this->asyncLoads.freeHandle(handle);
         this->asyncLoadsTable.remove(r);
     }
 }
@@ -544,21 +554,23 @@ void termite::ResourceLib::onReadError(const char* uri)
 {
     int r = this->asyncLoadsTable.find(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)));
     if (r != -1) {
-        int index = this->asyncLoadsTable.getValue(r);
-        AsyncLoadRequest* areq = this->asyncLoads.pop(index);
+        uint16_t handle = this->asyncLoadsTable.getValue(r);
+        AsyncLoadRequest* areq = this->asyncLoads.getHandleData<AsyncLoadRequest>(0, handle);
         BX_WARN("Reading resource '%s' failed", uri);
 
         if (areq->handle.isValid()) {
             setResourceLoadFlag(areq->resLib, areq->handle, ResourceLoadState::LoadFailed);
 
             // Set fail obj to resource
-            Resource* res = areq->resLib->resources.itemPtr(areq->handle.value);
+            Resource* res = areq->resLib->resources.getHandleData<Resource>(0, areq->handle.value);
             int typeIdx = areq->resLib->resourceTypesTable.find(res->typeNameHash);
             if (typeIdx != -1) {
-                res->obj = areq->resLib->resourceTypes[areq->resLib->resourceTypesTable.getValue(typeIdx)].failObj;
+                res->obj = areq->resLib->resourceTypes.getHandleData<ResourceTypeData>(
+                    0, areq->resLib->resourceTypesTable.getValue(typeIdx))->failObj;
             }
         }
 
+        this->asyncLoads.freeHandle(handle);
         this->asyncLoadsTable.remove(r);
     }
 }
@@ -567,11 +579,12 @@ void termite::ResourceLib::onReadComplete(const char* uri, MemoryBlock* mem)
 {
     int r = this->asyncLoadsTable.find(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)));
     if (r != -1) {
-        int index = this->asyncLoadsTable.getValue(r);
-        AsyncLoadRequest* areq = this->asyncLoads.pop(index);
+        int handle = this->asyncLoadsTable.getValue(r);
+        AsyncLoadRequest* areq = this->asyncLoads.getHandleData<AsyncLoadRequest>(0, handle);
+        this->asyncLoads.freeHandle(handle);
 
         assert(areq->handle.isValid());
-        Resource* rs = this->resources.itemPtr(areq->handle.value);
+        Resource* rs = this->resources.getHandleData<Resource>(0, areq->handle.value);
 
         // Load using the callback
         ResourceTypeParams params;
@@ -591,7 +604,8 @@ void termite::ResourceLib::onReadComplete(const char* uri, MemoryBlock* mem)
             // Set fail obj to resource
             int typeIdx = areq->resLib->resourceTypesTable.find(rs->typeNameHash);
             if (typeIdx != -1) {
-                rs->obj = areq->resLib->resourceTypes[areq->resLib->resourceTypesTable.getValue(typeIdx)].failObj;
+                rs->obj = areq->resLib->resourceTypes.getHandleData<ResourceTypeData>(
+                    0, areq->resLib->resourceTypesTable.getValue(typeIdx))->failObj;
             }
             return;
         }
@@ -614,10 +628,13 @@ void termite::ResourceLib::onModified(const char* uri)
     // Hot Loading
     int index = this->hotLoadsTable.find(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)));
     if (index != -1) {
-        bx::MultiHashTableInt::Node* node = this->hotLoadsTable.getNode(index);
+        bx::MultiHashTable<uint16_t>::Node* node = this->hotLoadsTable.getNode(index);
         // Recurse resources and reload them with their params
-        const Resource& rs = this->resources[node->value];
-        loadResourceHashed(this, rs.typeNameHash, rs.uri.cstr(), rs.userParams, ResourceFlag::Reload);
+        while (node) {
+            const Resource* rs = this->resources.getHandleData<Resource>(0, node->value);
+            loadResourceHashed(this, rs->typeNameHash, rs->uri.cstr(), rs->userParams, ResourceFlag::Reload);
+            node = node->next;
+        }
     }
 
     // Run callback

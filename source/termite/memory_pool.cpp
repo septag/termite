@@ -24,7 +24,8 @@ struct Page
     bx::LinearAllocator linAlloc;
 
     Page(void* buff, size_t size) :
-        linAlloc(buff, size)
+        linAlloc(buff, size),
+        lnode(this)
     {
         tag = 0;
         owner = nullptr;
@@ -42,6 +43,11 @@ struct Bucket
     int index;
     uint8_t* buffer;
     LNode lnode;
+
+    Bucket() :
+        lnode(this)
+    {
+    }
 };
 
 struct MemoryPool
@@ -50,8 +56,8 @@ struct MemoryPool
     int maxPagesPerBucket;
     volatile int32_t numPages;
     size_t pageSize;
-    Bucket::LNode* buckets;
-    Page::LNode* pages;
+    bx::List<Bucket*> bucketList;
+    bx::List<Page*> pageList;
     bx::Lock lock;
 
     MemoryPool()
@@ -60,8 +66,6 @@ struct MemoryPool
         maxPagesPerBucket = 0;
         numPages = 0;
         pageSize = 0;
-        buckets = nullptr;
-        pages = nullptr;
     }
 };
 
@@ -79,9 +83,9 @@ static Bucket* createBucket(size_t pageSize, int maxPages, bx::AllocatorI* alloc
     if (!buff)
         return nullptr;
     
-    Bucket* bucket = (Bucket*)buff;     buff += sizeof(Bucket);
-    bucket->pages = (Page*)buff;        buff += sizeof(Page)*maxPages;
-    bucket->pagePtrs = (Page**)buff;    buff += sizeof(Page**)*maxPages;
+    Bucket* bucket = new(buff) Bucket();     buff += sizeof(Bucket);
+    bucket->pages = (Page*)buff;             buff += sizeof(Page)*maxPages;
+    bucket->pagePtrs = (Page**)buff;         buff += sizeof(Page**)*maxPages;
     bucket->buffer = buff;
 
     for (int i = 0; i < maxPages; i++) {
@@ -94,7 +98,7 @@ static Bucket* createBucket(size_t pageSize, int maxPages, bx::AllocatorI* alloc
     bucket->index = maxPages;
 
     // Add to bucket list
-    bx::addListNode<Bucket*>(&g_mempool->buckets, &bucket->lnode, bucket);
+    g_mempool->bucketList.add(&bucket->lnode);
 
     return bucket;
 }
@@ -102,8 +106,7 @@ static Bucket* createBucket(size_t pageSize, int maxPages, bx::AllocatorI* alloc
 static void destroyBucket(Bucket* bucket, bx::AllocatorI* alloc)
 {
     // Remove from bucket list
-    bx::removeListNode<Bucket*>(&g_mempool->buckets, &bucket->lnode);
-
+    g_mempool->bucketList.remove(&bucket->lnode);
     BX_FREE(alloc, bucket);
 }
 
@@ -134,7 +137,7 @@ void termite::shutdownMemoryPool()
     }
 
     // Destroy buckets
-    Bucket::LNode* bucket = g_mempool->buckets;
+    Bucket::LNode* bucket = g_mempool->bucketList.getFirst();
     while (bucket) {
         Bucket::LNode* next = bucket->next;
         destroyBucket(bucket->data, g_mempool->alloc);
@@ -149,7 +152,7 @@ static bx::AllocatorI* newPage(Bucket* bucket, uint64_t tag)
 {
     Page* page = bucket->pagePtrs[--bucket->index];
     page->tag = tag;
-    bx::addListNode<Page*>(&g_mempool->pages, &page->lnode, page);
+    g_mempool->pageList.add(&page->lnode);
     bx::atomicFetchAndAdd(&g_mempool->numPages, 1);
     page->linAlloc.reset();
     
@@ -162,23 +165,22 @@ bx::AllocatorI* termite::allocPage(uint64_t tag) T_THREAD_SAFE
 
     bx::LockScope lk(g_mempool->lock);
 
-    Bucket::LNode* node = g_mempool->buckets;
+    Bucket::LNode* node = g_mempool->bucketList.getFirst();
     while (node) {
         Bucket* bucket = node->data;
-        if (bucket->index > 0) {
-            return newPage(bucket, tag);
-        }
+        if (bucket->index > 0)
+            return ::newPage(bucket, tag);
         node = node->next;
     }
     
     // Create a new bucket
     Bucket* bucket = createBucket(g_mempool->pageSize, g_mempool->maxPagesPerBucket, g_mempool->alloc);
     if (!bucket) {
-        BX_WARN("Out of memory");
+        BX_WARN("Out of memory for tag '%d'", tag);
         return nullptr;
     }
 
-    return newPage(bucket, tag);
+    return ::newPage(bucket, tag);
 }
 
 void termite::freeTag(uint64_t tag) T_THREAD_SAFE
@@ -188,7 +190,7 @@ void termite::freeTag(uint64_t tag) T_THREAD_SAFE
     bx::LockScope lk(g_mempool->lock);
 
     // Search all pages for the tag
-    Page::LNode* node = g_mempool->pages;
+    Page::LNode* node = g_mempool->pageList.getFirst();
     while (node) {
         Page::LNode* next = node->next;
         Page* page = node->data;
@@ -201,7 +203,7 @@ void termite::freeTag(uint64_t tag) T_THREAD_SAFE
             bucket->pagePtrs[bucket->index++] = page;
             
             bx::atomicFetchAndSub(&g_mempool->numPages, 1);
-            bx::removeListNode<Page*>(&g_mempool->pages, &page->lnode);
+            g_mempool->pageList.remove(node);
         }
 
         node = next;
@@ -224,7 +226,7 @@ size_t termite::getTagSize(uint64_t tag) T_THREAD_SAFE
     
     size_t pageSize = g_mempool->pageSize;
     size_t sz = 0;
-    Page::LNode* node = g_mempool->pages;
+    Page::LNode* node = g_mempool->pageList.getFirst();
     while (node) {
         Page* page = node->data;
         if (page->tag == tag)

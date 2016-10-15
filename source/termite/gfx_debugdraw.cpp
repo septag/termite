@@ -70,6 +70,13 @@ struct State
 
     typedef bx::StackNode<State*> SNode;
     SNode snode;
+
+    State() :
+        snode(this)
+    {
+    }
+
+    void setDefault(DebugDrawContext* ctx);
 };
 
 namespace termite
@@ -80,12 +87,11 @@ namespace termite
         GfxDriverApi* driver;
         uint8_t viewId;
         bx::FixedPool<State> statePool;
-        State::SNode* stateStack;
+        bx::Stack<State*> stateStack;
         rect_t viewport;
         const Font* defaultFont;
         bool readyToDraw;
         VectorGfxContext* vgCtx;
-        Camera* cam;
         mtx4x4_t billboardMtx;
         mtx4x4_t viewProjMtx;
 
@@ -93,12 +99,10 @@ namespace termite
         {
             driver = nullptr;
             viewId = 0;
-            stateStack = nullptr;
             viewport = rectf(0, 0, 0, 0);
             defaultFont = nullptr;
             readyToDraw = false;
             vgCtx = nullptr;
-            cam = nullptr;
             viewProjMtx = mtx4x4Ident();
             billboardMtx = mtx4x4Ident();
         }
@@ -473,7 +477,7 @@ DebugDrawContext* termite::createDebugDrawContext(uint8_t viewId)
 
     // Push one state into state-stack
     State* state = ctx->statePool.newInstance();
-    bx::pushStackNode<State*>(&ctx->stateStack, &state->snode, state);
+    ctx->stateStack.push(&state->snode);
 
     return ctx;
 }
@@ -490,7 +494,8 @@ void termite::destroyDebugDrawContext(DebugDrawContext* ctx)
     BX_DELETE(ctx->alloc, ctx);
 }
 
-void termite::ddBegin(DebugDrawContext* ctx, float viewWidth, float viewHeight, Camera* cam, VectorGfxContext* vg)
+void termite::ddBegin(DebugDrawContext* ctx, float viewWidth, float viewHeight, const mtx4x4_t& viewMtx, 
+                      const mtx4x4_t& projMtx, VectorGfxContext* vg)
 {
     assert(ctx);
     ctx->viewport = rectf(0, 0, viewWidth, viewHeight);
@@ -499,17 +504,15 @@ void termite::ddBegin(DebugDrawContext* ctx, float viewWidth, float viewHeight, 
     ctx->viewport = rectf(0, 0, viewWidth, viewHeight);
     ctx->readyToDraw = true;
 
-    mtx4x4_t projMtx = camProjMtx(cam, viewWidth / viewHeight);
-    mtx4x4_t viewMtx = camViewMtx(cam);
     bx::mtxMul(ctx->viewProjMtx.f, viewMtx.f, projMtx.f);
-    ctx->cam = cam;    
     ctx->billboardMtx = mtx4x4f3(viewMtx.m11, viewMtx.m21, viewMtx.m31,
                                  viewMtx.m12, viewMtx.m22, viewMtx.m32,
                                  viewMtx.m13, viewMtx.m23, viewMtx.m33,
                                  0.0f, 0.0f, 0.0f);
 
-    if (vg)
+    if (vg) {
         vgBegin(ctx->vgCtx, viewWidth, viewHeight);
+    }
 
     GfxDriverApi* driver = ctx->driver;
     uint8_t viewId = ctx->viewId;
@@ -531,7 +534,9 @@ void termite::ddText(DebugDrawContext* ctx, const vec3_t pos, const char* text)
     if (ctx->vgCtx) {
         vec2_t screenPt;
         if (projectToScreen(&screenPt, pos, ctx->viewport, ctx->viewProjMtx)) {
-            State* state = ctx->stateStack->data;
+            State* state;
+            ctx->stateStack.peek(&state);
+
             vgSetFont(ctx->vgCtx, state->font);
             vec4_t c = state->color;
             vgTextColor(ctx->vgCtx, rgbaf(c.x, c.y, c.z, c.w));
@@ -554,12 +559,22 @@ void termite::ddTextf(DebugDrawContext* ctx, const vec3_t pos, const char* fmt, 
     }
 }
 
+TERMITE_API void termite::ddTextv(DebugDrawContext* ctx, const vec3_t pos, const char* fmt, va_list argList)
+{
+    if (ctx->vgCtx) {
+        char text[MAX_TEXT_SIZE];   text[0] = 0;
+        vsnprintf(text, sizeof(text), fmt, argList);
+        ddText(ctx, pos, text);
+    }
+}
+
 void termite::ddImage(DebugDrawContext* ctx, const vec3_t pos, Texture* image)
 {
     if (ctx->vgCtx) {
         vec2_t screenPt;
         if (projectToScreen(&screenPt, pos, ctx->viewport, ctx->viewProjMtx)) {
-            State* state = ctx->stateStack->data;
+            State* state;
+            ctx->stateStack.peek(&state);
             vec4_t c = state->color;
             vgFillColor(ctx->vgCtx, rgbaf(c.x, c.y, c.z, c.w));
             vgImage(ctx->vgCtx, screenPt.x, screenPt.y, image);
@@ -574,7 +589,8 @@ void termite::ddRect(DebugDrawContext* ctx, const vec3_t& vmin, const vec3_t& vm
         if (projectToScreen(&minPt, vmin, ctx->viewport, ctx->viewProjMtx) &&
             projectToScreen(&maxPt, vmax, ctx->viewport, ctx->viewProjMtx)) 
         {
-            State* state = ctx->stateStack->data;
+            State* state;
+            ctx->stateStack.peek(&state);
             vec4_t c = state->color;
             vgFillColor(ctx->vgCtx, rgbaf(c.x, c.y, c.z, c.w));
             vgRect(ctx->vgCtx, rectv(minPt, maxPt));
@@ -582,13 +598,28 @@ void termite::ddRect(DebugDrawContext* ctx, const vec3_t& vmin, const vec3_t& vm
     }
 }
 
-void termite::ddSnapGridXZ(DebugDrawContext* ctx, float spacing, float boldSpacing, float maxDepth)
+void termite::ddLine(DebugDrawContext* ctx, const vec3_t& startPt, const vec3_t& endPt, const mtx4x4_t* modelMtx /*= nullptr*/)
+{
+    assert(0);
+}
+
+void termite::ddCircle(DebugDrawContext* ctx, const vec3_t& pos, float radius, const mtx4x4_t* modelMtx /*= nullptr*/, bool showDir /*= false*/)
+{
+    assert(0);
+}
+
+void termite::ddRect(DebugDrawContext* ctx, const vec3_t& minpt, const vec3_t& maxpt, const mtx4x4_t* modelMtx /*= nullptr*/)
+{
+    assert(0);
+}
+
+void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spacing, float boldSpacing, float maxDepth)
 {
     spacing = bx::fceil(bx::fclamp(spacing, 1.0f, 20.0f));
 
     vec3_t corners[8];
     float ratio = (ctx->viewport.xmax - ctx->viewport.xmin) / (ctx->viewport.ymax - ctx->viewport.ymin);
-    camCalcFrustumCorners(ctx->cam, corners, ratio, -2.0f, bx::fmin(maxDepth, ctx->cam->ffar));
+    cam.calcFrustumCorners(corners, ratio, -2.0f, bx::fmin(maxDepth, cam.ffar));
 
     mtx4x4_t projToXz;
     mtxProjPlane(&projToXz, vec3f(0, 1.0f, 0));
@@ -630,7 +661,8 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, float spacing, float boldSpaci
     eddVertexPosCoordColor* verts = (eddVertexPosCoordColor*)tvb.data;
 
     color_t color = 0xffffffff;
-    State* state = ctx->stateStack->data;
+    State* state;
+    ctx->stateStack.peek(&state);
     color_t dimColor = rgba(128, 128, 128);
     
     int i = 0;
@@ -684,7 +716,9 @@ void termite::ddBoundingBox(DebugDrawContext* ctx, const aabb_t bb, bool showInf
                center.x, center.y, center.z);
 
     Shape shape = g_dbg->bbShape;
-    State* state = ctx->stateStack->data;
+    State* state;
+    ctx->stateStack.peek(&state);
+
     GfxDriverApi* driver = g_dbg->driver;
     driver->setVertexBuffer(shape.vb);
     driver->setTransform(mtx.f, 1);
@@ -696,7 +730,9 @@ void termite::ddBoundingBox(DebugDrawContext* ctx, const aabb_t bb, bool showInf
     if (showInfo) {
         vec2_t center2d;
         if (projectToScreen(&center2d, center, ctx->viewport, ctx->viewProjMtx)) {
-            State* state = ctx->stateStack->data;
+            State* state;
+            ctx->stateStack.peek(&state);
+
             vgSetFont(ctx->vgCtx, state->font);
             vec4_t c = state->color;
             color_t color = rgbaf(c.x, c.y, c.z, c.w);
@@ -719,7 +755,9 @@ void termite::ddBoundingSphere(DebugDrawContext* ctx, const sphere_t sphere, boo
         sphere.x, sphere.y, sphere.z);
     mtx = ctx->billboardMtx * mtx;
 
-    State* state = ctx->stateStack->data;
+    State* state;
+    ctx->stateStack.peek(&state);
+
     GfxDriverApi* driver = g_dbg->driver;
     Shape shape = g_dbg->bsphereShape;
     driver->setVertexBuffer(shape.vb);
@@ -732,7 +770,6 @@ void termite::ddBoundingSphere(DebugDrawContext* ctx, const sphere_t sphere, boo
     if (showInfo) {
         vec2_t center2d;
         if (projectToScreen(&center2d, sphere.cp, ctx->viewport, ctx->viewProjMtx)) {
-            State* state = ctx->stateStack->data;
             vgSetFont(ctx->vgCtx, state->font);
             vec4_t c = state->color;
             color_t color = rgbaf(c.x, c.y, c.z, c.w);
@@ -761,61 +798,75 @@ void termite::ddAxis(DebugDrawContext* ctx, const vec3_t axis, const mtx4x4_t* m
 
 void termite::ddSetFont(DebugDrawContext* ctx, Font* font)
 {
-    State* state = ctx->stateStack->data;
+    State* state;
+    ctx->stateStack.peek(&state);
+
     state->font = font ? font : ctx->defaultFont;
 }
 
 void termite::ddAlpha(DebugDrawContext* ctx, float alpha)
 {
-    State* state = ctx->stateStack->data;
+    State* state;
+    ctx->stateStack.peek(&state);
+
     state->alpha = alpha;
 }
 
 void termite::ddColor(DebugDrawContext* ctx, const vec4_t& color)
 {
-    State* state = ctx->stateStack->data;
+    State* state;
+    ctx->stateStack.peek(&state);
+
     state->color = color;
 }
 
 void termite::ddTransform(DebugDrawContext* ctx, const mtx4x4_t& mtx)
 {
-    State* state = ctx->stateStack->data;
+    State* state;
+    ctx->stateStack.peek(&state);
+
     state->mtx = mtx;
 }
 
 void termite::ddPushState(DebugDrawContext* ctx)
 {
-    State* curState = bx::peekStack<State*>(ctx->stateStack);;
+    State* curState;
+    ctx->stateStack.peek(&curState);
+
     State* s = ctx->statePool.newInstance();
     if (s) {
-        bx::pushStackNode<State*>(&ctx->stateStack, &s->snode, s);
+        ctx->stateStack.push(&s->snode);
         memcpy(s, curState, sizeof(State));
     }
 }
 
 void termite::ddPopState(DebugDrawContext* ctx)
 {
-    if (ctx->stateStack->down) {
-        State* s = bx::popStack<State*>(&ctx->stateStack);
+    if (ctx->stateStack.getHead()->down) {
+        State* s;
+        ctx->stateStack.pop(&s);
         ctx->statePool.deleteInstance(s);
     }
 }
 
-static void setDefaultState(DebugDrawContext* ctx, State* state)
+
+void State::setDefault(DebugDrawContext* ctx)
 {
-    state->mtx = mtx4x4Ident();
-    state->color = vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-    state->alpha = 1.0f;
-    state->scissor = ctx->viewport;
-    state->font = ctx->defaultFont;
+    mtx = mtx4x4Ident();
+    color = vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+    alpha = 1.0f;
+    scissor = ctx->viewport;
+    font = ctx->defaultFont;
 }
 
 void termite::ddReset(DebugDrawContext* ctx)
 {
-    State::SNode* node = ctx->stateStack;
-    while (node->down) {
-        State* s = bx::popStack<State*>(&ctx->stateStack);
+    while (ctx->stateStack.getHead()->down) {
+        State* s;
+        ctx->stateStack.pop(&s);
         ctx->statePool.deleteInstance(s);
     }
-    setDefaultState(ctx, node->data);
+    State* head;
+    ctx->stateStack.peek(&head);
+    head->setDefault(ctx);
 }

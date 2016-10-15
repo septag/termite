@@ -12,43 +12,80 @@ namespace bx
         QueueNode<Ty>* next;
         Ty data;
 
-        QueueNode()
+        explicit QueueNode(const Ty& _data) :
+            next(nullptr),
+            data(_data)
         {
-            next = nullptr;
         }
     };
 
-    template <typename Ty> 
-    void pushQueueNode(QueueNode<Ty>** _ref, QueueNode<Ty>* _node, const Ty& data)
-    {
-        if (*_ref) {
-            QueueNode<Ty>* last = *_ref;
-            while (last->next)
-                last = last->next;
-            last->next = _node;
-        } else {
-            *_ref = _node;
-        }
-        _node->next = nullptr;
-        _node->data = data;
-    }
-
     template <typename Ty>
-    Ty popQueue(QueueNode<Ty>** _ref)
+    class Queue
     {
-        QueueNode<Ty>* item = *_ref;
-        if (*_ref) {
-            *_ref =(*_ref)->next;
-            item->next = nullptr;
-        } 
-        return item->data;
-    }
+    public:
+        Queue() :
+            m_first(nullptr),
+            m_last(nullptr)
+        {
+        }
 
-    template <typename Ty> 
-    Ty peekQueue(QueueNode<Ty>* _ref)
-    {
-        return _ref->data;
-    }
+        inline void push(QueueNode<Ty>* _node)
+        {
+            if (m_last)
+                m_last->next = _node;
+            m_last = _node;
+
+            if (!m_first)
+                m_first = _node;
+            _node->next = nullptr;
+        }
+
+        inline bool pop(Ty* pData)
+        {
+            if (m_first) {
+                bx::QueueNode<Ty>* first = m_first;
+                if (m_last == first)
+                    m_last = nullptr;
+
+                m_first = first->next;
+                first->next = nullptr;
+                *pData = first->data;
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        inline bool peek(Ty* pData)
+        {
+            assert(pData);
+            if (m_first) {
+                *pData = m_head.data;
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        inline bool isEmpty() const
+        {
+            return m_first == nullptr;
+        }
+
+        inline const QueueNode<Ty>* getFirst() const
+        {
+            return m_first;
+        }
+
+        inline const QueueNode<Ty>* getLast() const
+        {
+            return m_last;
+        }
+
+    private:
+        QueueNode<Ty>* m_first;
+        QueueNode<Ty>* m_last;
+    };
 
     // SpScQueueAlloc and container
     // http://drdobbs.com/article/print?articleId=210604448&siteSectionName=

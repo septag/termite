@@ -79,20 +79,23 @@ namespace termite
         {
         }
 
-        inline void beginGroup(const LoadingScheme& scheme)
+        inline ProgressiveLoaderHelper& beginGroup(const LoadingScheme& scheme)
         {
             termite::beginLoaderGroup(m_loader, scheme);
+            return *this;
         }
 
-        inline void loadResource(ResourceHandle* pHandle, const char* name, const char* uri, const void* userParams,
-                                 ResourceFlag::Bits flags = 0)
+        ProgressiveLoaderHelper& loadResource(ResourceHandle* pHandle, const char* name, const char* uri, 
+                                              const void* userParams, ResourceFlag::Bits flags = 0)
         {
-            return termite::loadResource(m_loader, pHandle, name, uri, userParams, flags);
+            termite::loadResource(m_loader, pHandle, name, uri, userParams, flags);
+            return *this;
         }
 
-        inline void unloadResource(ResourceHandle handle)
+        ProgressiveLoaderHelper& unloadResource(ResourceHandle handle)
         {
             termite::unloadResource(m_loader, handle);
+            return *this;
         }
 
         inline LoaderGroupHandle endGroup()

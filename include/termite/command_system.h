@@ -4,18 +4,18 @@
 
 namespace termite
 {
-    result_t initCommandSystem(uint16_t historySize, bx::AllocatorI* alloc);
-    void shutdownCommandSystem();
-
-    typedef bool(*ExecuteCommandFn)(const void* param);
-    typedef void(*UndoCommandFn)(const void* param);
-    typedef void(*CleanupCommandFn)(void* userData);
-
     struct CommandTypeT {};
     struct CommandT {};
 
     typedef PhantomType<uint32_t, CommandT, UINT32_MAX> CommandHandle;
     typedef PhantomType<uint16_t, CommandTypeT, UINT16_MAX> CommandTypeHandle;
+
+    typedef bool(*ExecuteCommandFn)(const void* param);
+    typedef void(*UndoCommandFn)(const void* param);
+    typedef void(*CleanupCommandFn)(void* userData);
+
+    result_t initCommandSystem(uint16_t historySize, bx::AllocatorI* alloc);
+    void shutdownCommandSystem();
 
     CommandTypeHandle registerCommand(const char* name, ExecuteCommandFn executeFn, UndoCommandFn undoFn, 
                                       CleanupCommandFn cleanupFn /*=nullptr*/, size_t paramSize);

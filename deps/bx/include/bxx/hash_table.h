@@ -56,6 +56,7 @@ namespace bx
         AllocatorI* m_alloc;
     };
     typedef HashTable<int> HashTableInt;
+    typedef HashTable<uint16_t> HashTableUint16;
     
     // MultiHashTables can have multiple values per hash key
     // You should iterate over the list for all values on each search

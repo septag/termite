@@ -23,12 +23,17 @@ struct LoadResourceRequest
     ResourceHandle* pHandle;
 
     LNode lnode;
+
+    LoadResourceRequest() :
+        lnode(this)
+    {
+    }
 };
 
 struct LoaderGroup
 {
     LoadingScheme scheme;
-    LoadResourceRequest::LNode* requestList;
+    bx::List<LoadResourceRequest*> requestList;
 
     float elapsedTime;
     int frameCount;
@@ -105,7 +110,8 @@ bool termite::checkLoaderGroupDone(ProgressiveLoader* loader, LoaderGroupHandle 
     assert(loader);
 
     LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, handle.value);
-    bool done = group->requestList == nullptr;
+    memset(group, 0x00, sizeof(LoaderGroup));
+    bool done = group->requestList.isEmpty();
     if (done) {
         loader->groupPool.freeHandle(handle.value);
     }
@@ -140,7 +146,7 @@ void termite::loadResource(ProgressiveLoader* loader,
     // Add to group
     LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, loader->curGroupHandle.value);
     assert(group);
-    bx::addListNodeToEnd<LoadResourceRequest*>(&group->requestList, &req->lnode, req);
+    group->requestList.addToEnd(&req->lnode);
 }
 
 void termite::unloadResource(ProgressiveLoader* loader, ResourceHandle handle)
@@ -151,7 +157,7 @@ void termite::unloadResource(ProgressiveLoader* loader, ResourceHandle handle)
 
 static LoadResourceRequest* getFirstLoadRequest(ProgressiveLoader* loader, LoaderGroup* group)
 {
-    LoadResourceRequest::LNode* node = group->requestList;
+    LoadResourceRequest::LNode* node = group->requestList.getFirst();
     while (node) {
         LoadResourceRequest* req = node->data;
         LoadResourceRequest::LNode* next = node->next;
@@ -161,7 +167,7 @@ static LoadResourceRequest* getFirstLoadRequest(ProgressiveLoader* loader, Loade
 
         // Remove items that are not in progress
         if (loader->resLib.getResourceLoadState(*req->pHandle) != ResourceLoadState::LoadInProgress) {
-            bx::removeListNode<LoadResourceRequest*>(&group->requestList, &req->lnode);
+            group->requestList.remove(&req->lnode);
             loader->requestPool.deleteInstance(req);
         }
 
@@ -183,7 +189,7 @@ static void stepLoadGroupSequential(ProgressiveLoader* loader, LoaderGroup* grou
         *req->pHandle = loader->resLib.loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
         if (!req->pHandle->isValid()) {
             // Something went wrong, remove the request from the list
-            bx::removeListNode<LoadResourceRequest*>(&group->requestList, &req->lnode);
+            group->requestList.remove(&req->lnode);
             loader->requestPool.deleteInstance(req);
         }
     }
@@ -197,7 +203,7 @@ static void stepLoadGroupDeltaFrame(ProgressiveLoader* loader, LoaderGroup* grou
         *req->pHandle = loader->resLib.loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
         if (!req->pHandle->isValid()) {
             // Something went wrong, remove the request from the list
-            bx::removeListNode<LoadResourceRequest*>(&group->requestList, &req->lnode);
+            group->requestList.remove(&req->lnode);
             loader->requestPool.deleteInstance(req);
         }
 
@@ -213,7 +219,7 @@ static void stepLoadGroupDeltaTime(ProgressiveLoader* loader, LoaderGroup* group
         *req->pHandle = loader->resLib.loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
         if (!req->pHandle->isValid()) {
             // Something went wrong, remove the request from the list
-            bx::removeListNode<LoadResourceRequest*>(&group->requestList, &req->lnode);
+            group->requestList.remove(&req->lnode);
             loader->requestPool.deleteInstance(req);
         }
 
@@ -229,7 +235,7 @@ void termite::stepLoader(ProgressiveLoader* loader, float dt)
         uint16_t groupHandle = loader->groupPool.handleAt(i);
         LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, groupHandle);
 
-        if (group->requestList) {
+        if (!group->requestList.isEmpty()) {
             switch (group->scheme.type) {
             case LoadingScheme::Sequential:
                 stepLoadGroupSequential(loader, group);

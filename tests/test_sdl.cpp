@@ -62,14 +62,17 @@ static void update(float dt)
     termite::getGfxDriver()->touch(0);
     termite::getGfxDriver()->setViewClear(0, termite::GfxClearFlag::Color | termite::GfxClearFlag::Depth, 0x303030ff, 1.0f, 0);
     termite::getGfxDriver()->setViewRectRatio(0, 0, 0, termite::BackbufferRatio::Equal);
-
+    
+    float aspect = float(g_displaySize.x) / float(g_displaySize.y);
+    termite::mtx4x4_t viewMtx = g_cam.getViewMtx();
+    termite::mtx4x4_t projMtx = g_cam.getProjMtx(aspect);
     termite::vgBegin(g_vg, float(g_displaySize.x), float(g_displaySize.y));
     termite::vgTextf(g_vg, 10.0f, 10.0f, "Ft = %f", termite::getFrameTime()*1000.0);
     termite::vgEnd(g_vg);
 
-    termite::ddBegin(g_debug, float(g_displaySize.x), float(g_displaySize.y), &g_cam, g_vg);
+    termite::ddBegin(g_debug, float(g_displaySize.x), float(g_displaySize.y), viewMtx, projMtx, g_vg);
     termite::ddColor(g_debug, termite::vec4f(0, 0.5f, 0, 1.0f));
-    termite::ddSnapGridXZ(g_debug, 1.0f, 5.0f, 50.0f);
+    termite::ddSnapGridXZ(g_debug, g_cam, 1.0f, 5.0f, 50.0f);
     termite::ddColor(g_debug, termite::vec4f(1.0f, 0, 0, 1.0f));
     termite::ddBoundingBox(g_debug, termite::aabbf(-1.0f, -0.5f, -0.5f, 0.5f, 1.5f, 2.5f), true);
     termite::ddBoundingSphere(g_debug, termite::spheref(0, 0, 5.0f, 1.5f), true);

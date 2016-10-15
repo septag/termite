@@ -43,7 +43,7 @@ void termite::camLookAt(Camera* cam, const vec3_t pos, const vec3_t lookat)
     cam->yaw = euler[1];
 }
 
-void termite::camCalcFrustumCorners(Camera* cam, vec3_t result[8], float aspectRatio, 
+void termite::camCalcFrustumCorners(const Camera* cam, vec3_t result[8], float aspectRatio, 
                                     float nearOverride /*= 0*/, float farOverride /*= 0*/)
 {
     const float ffar = farOverride != 0.0f ? farOverride : cam->ffar;
@@ -171,7 +171,7 @@ void termite::camStrafe(Camera* cam, float strafe)
     cam->pos = cam->pos + cam->right*strafe;
 }
 
-mtx4x4_t termite::camViewMtx(Camera* cam)
+mtx4x4_t termite::camViewMtx(const Camera* cam)
 {
     const vec3_t right = cam->right;
     const vec3_t up = cam->up;
@@ -184,7 +184,7 @@ mtx4x4_t termite::camViewMtx(Camera* cam)
                     -bx::vec3Dot(right.f, pos.f), -bx::vec3Dot(up.f, pos.f), -bx::vec3Dot(forward.f, pos.f));
 }
 
-mtx4x4_t termite::camProjMtx(Camera* cam, float aspectRatio)
+mtx4x4_t termite::camProjMtx(const Camera* cam, float aspectRatio)
 {
     float xscale = 1.0f / tanf(bx::toRad(cam->fov)*0.5f);
     float yscale = aspectRatio*xscale;
