@@ -13,7 +13,7 @@ using namespace termite;
 
 struct LoadResourceRequest
 {
-    typedef bx::ListNode<LoadResourceRequest*> LNode;
+    typedef bx::List<LoadResourceRequest*>::Node LNode;
 
     char name[32];
     bx::Path uri;
@@ -44,22 +44,20 @@ namespace termite
     struct ProgressiveLoader
     {
         bx::AllocatorI* alloc;
-        ResourceLibHelper resLib;
         bx::Pool<LoadResourceRequest> requestPool;
         bx::IndexedPool groupPool;
         LoaderGroupHandle curGroupHandle;
 
-        ProgressiveLoader(ResourceLib* _resLib, bx::AllocatorI* _alloc) :
-            alloc(_alloc),
-            resLib(_resLib)
+        ProgressiveLoader(bx::AllocatorI* _alloc) :
+            alloc(_alloc)
         {
         }
     };
 }
 
-ProgressiveLoader* termite::createProgressiveLoader(ResourceLib* resLib, bx::AllocatorI* alloc)
+ProgressiveLoader* termite::createProgressiveLoader(bx::AllocatorI* alloc)
 {
-    ProgressiveLoader* loader = BX_NEW(alloc, ProgressiveLoader)(resLib, alloc);
+    ProgressiveLoader* loader = BX_NEW(alloc, ProgressiveLoader)(alloc);
 
     const uint32_t itemSizes[] = {
         sizeof(LoaderGroup)
@@ -134,7 +132,7 @@ void termite::loadResource(ProgressiveLoader* loader,
 
     bx::strlcpy(req->name, name, sizeof(req->name));
     req->uri = uri;
-    int paramSize = loader->resLib.getResourceParamSize(name);
+    int paramSize = getResourceParamSize(name);
     if (paramSize && userParams) {
         memcpy(req->userParams, userParams, paramSize);
     } else {
@@ -166,7 +164,7 @@ static LoadResourceRequest* getFirstLoadRequest(ProgressiveLoader* loader, Loade
             return req;
 
         // Remove items that are not in progress
-        if (loader->resLib.getResourceLoadState(*req->pHandle) != ResourceLoadState::LoadInProgress) {
+        if (getResourceLoadState(*req->pHandle) != ResourceLoadState::LoadInProgress) {
             group->requestList.remove(&req->lnode);
             loader->requestPool.deleteInstance(req);
         }
@@ -183,10 +181,10 @@ static void stepLoadGroupSequential(ProgressiveLoader* loader, LoaderGroup* grou
     if (req) {
         // check the previous request, it should be loaded in order to proceed to next one
         LoadResourceRequest::LNode* prev = req->lnode.prev;
-        if (prev && loader->resLib.getResourceLoadState(*prev->data->pHandle) == ResourceLoadState::LoadInProgress)
+        if (prev && getResourceLoadState(*prev->data->pHandle) == ResourceLoadState::LoadInProgress)
             return;
 
-        *req->pHandle = loader->resLib.loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
+        *req->pHandle = loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
         if (!req->pHandle->isValid()) {
             // Something went wrong, remove the request from the list
             group->requestList.remove(&req->lnode);
@@ -200,7 +198,7 @@ static void stepLoadGroupDeltaFrame(ProgressiveLoader* loader, LoaderGroup* grou
     group->frameCount++;
     if (group->frameCount >= group->scheme.frameDelta) {
         LoadResourceRequest* req = getFirstLoadRequest(loader, group);
-        *req->pHandle = loader->resLib.loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
+        *req->pHandle = loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
         if (!req->pHandle->isValid()) {
             // Something went wrong, remove the request from the list
             group->requestList.remove(&req->lnode);
@@ -216,7 +214,7 @@ static void stepLoadGroupDeltaTime(ProgressiveLoader* loader, LoaderGroup* group
     group->elapsedTime += dt;
     if (group->elapsedTime >= group->scheme.deltaTime) {
         LoadResourceRequest* req = getFirstLoadRequest(loader, group);
-        *req->pHandle = loader->resLib.loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
+        *req->pHandle = loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
         if (!req->pHandle->isValid()) {
             // Something went wrong, remove the request from the list
             group->requestList.remove(&req->lnode);

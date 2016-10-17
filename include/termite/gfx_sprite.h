@@ -47,10 +47,12 @@ namespace termite
     //
     // localAnchor: Relative to sprite's center. MaxTopLeft(-0.5, 0.5), MaxBottomRight(0.5, -0.5)
     TERMITE_API SpriteHandle createSpriteFromTexture(ResourceHandle textureHandle, const vec2_t halfSize,
+                                                     bool destroyTexture = false, 
                                                      const vec2_t localAnchor = vec2f(0, 0),
                                                      const vec2_t topLeftCoords = vec2f(0, 0),
                                                      const vec2_t bottomRightCoords = vec2f(1.0f, 1.0f));
-    TERMITE_API SpriteHandle createSpriteFromSpritesheet(ResourceHandle spritesheetHandle, const vec2_t halfSize,
+    TERMITE_API SpriteHandle createSpriteFromSpriteSheet(ResourceHandle spritesheetHandle, const vec2_t halfSize,
+                                                         bool destroySpriteSheet = false,
                                                          const vec2_t localAnchor = vec2f(0, 0), int index = -1);
     TERMITE_API void destroySprite(SpriteHandle handle);
 
@@ -91,7 +93,7 @@ namespace termite
     TERMITE_API vec2_t getSpriteSize(SpriteHandle handle);
 
     // Registers "spritesheet" resource type and Loads SpriteSheet object
-    void registerSpriteSheetToResourceLib(ResourceLib* resLib);
+    void registerSpriteSheetToResourceLib();
 
     struct LoadSpriteSheetParams
     {
@@ -164,29 +166,46 @@ namespace termite
             return this->handle.isValid();
         }
 
-        inline bool create(ResourceHandle textureHandle, 
+        inline bool createFromTexture(ResourceHandle textureHandle, 
                            const vec2_t halfSize,
+                           bool destroyTexture,
                            const vec2_t localAnchor = vec2f(0, 0),
                            const vec2_t topLeftCoords = vec2f(0, 0),
                            const vec2_t bottomRightCoords = vec2f(1.0f, 1.0f))
         {
-            this->handle =  createSpriteFromTexture(textureHandle, halfSize, localAnchor, topLeftCoords, bottomRightCoords);
+            this->handle =  createSpriteFromTexture(textureHandle, halfSize, destroyTexture, localAnchor, 
+                                                    topLeftCoords, bottomRightCoords);
             return this->handle.isValid();
         }
 
-        inline bool create(ResourceHandle spritesheetHandle, 
+        inline bool createFromSpriteSheet(ResourceHandle spritesheetHandle, 
                            const vec2_t halfSize,
+                           bool destroySpriteSheet,
                            const vec2_t localAnchor = vec2f(0, 0), 
                            int frameIndex = -1)
         {
-            this->handle = createSpriteFromSpritesheet(spritesheetHandle, halfSize, localAnchor, frameIndex);
+            this->handle = createSpriteFromSpriteSheet(spritesheetHandle, halfSize, destroySpriteSheet, 
+                                                       localAnchor, frameIndex);
             return this->handle.isValid();
         }
 
         inline void destroy()
         {
-            destroySprite(this->handle);
-            this->handle.reset();
+            if (this->handle.isValid()) {
+                destroySprite(this->handle);
+                this->handle.reset();
+            }
+        }
+
+        inline void draw(uint8_t viewId, const vec2_t& pos, float rot = 0, float size = 1.0f, color_t tintColor = 0xffffffff)
+        {
+            assert(this->handle.isValid());
+            drawSprites(viewId, &this->handle, 1, &pos, &rot, &size, &tintColor);
+        }
+
+        inline SpriteHandle getHandle() const
+        {
+            return this->handle;
         }
     };
 

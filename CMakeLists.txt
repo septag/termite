@@ -33,14 +33,17 @@ include(Bgfx)
 
 # options
 option(BUILD_BOX2D "Build Box2D Physics engine" OFF)
-option(BUILD_DIGGER "Build Digger Game Prototype" OFF)
-option(USE_SDL2 "Use SDL2 with the engine" OFF)
+option(BUILD_FISHERBOY "Build Fisherboy Game" OFF)
+option(USE_SDL2 "Use SDL2 with the engine" ON)
 option(BUILD_STATIC "Force Static library builds" OFF)
 
 # Dependencies
 
 # Run find package scripts
-include(FindSDL2)
+if (USE_SDL2)
+    include(FindSDL2)
+endif()
+
 include(FindAssimp)
 include(FindLibuv)
 include(FindBgfx)
@@ -55,7 +58,7 @@ if (WIN32)
         download_package(${DOWNLOAD_URL_ROOT}/libuv_vc140.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
         include(FindLibuv)
     endif()
-    if (NOT SDL2_FOUND)
+    if (USE_SDL2 AND (NOT SDL2_FOUND))
         download_package(${DOWNLOAD_URL_ROOT}/sdl_vc140.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
         include (FindSDL2)
     endif()
@@ -65,8 +68,10 @@ endif()
 if (ANDROID)
     IF (NOT ANDROID_PACKAGES_CACHED)
         download_package(${DOWNLOAD_URL_ROOT}/libuv_android_arm.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
-        download_package(${DOWNLOAD_URL_ROOT}/sdl_android_arm.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
         download_package(${DOWNLOAD_URL_ROOT}/bgfx_android_arm.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
+        if (USE_SDL2)
+            download_package(${DOWNLOAD_URL_ROOT}/sdl_android_arm.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
+        endif()
         set(ANDROID_PACKAGES_CACHED 1 CACHE BOOL "Download prebuilt packages" FORCE)
     endif()
 endif()
@@ -102,15 +107,17 @@ else()
     message(FATAL_ERROR "Libuv library not found")
 endif()
 
-if (SDL2_FOUND)
-    if (WIN32)
-        sdl2_copy_binaries(${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-        message(STATUS "Found SDL2 library")    
+if (USE_SDL2)   
+    if (SDL2_FOUND)
+        if (WIN32)
+            sdl2_copy_binaries(${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+            message(STATUS "Found SDL2 library")    
+        else()
+            message(STATUS "Found SDL2 library: ${SDL2_LIBRARY}")
+        endif()
     else()
-        message(STATUS "Found SDL2 library: ${SDL2_LIBRARY}")
+        message(FATAL_ERROR "SDL2 library not found")
     endif()
-else()
-    message(FATAL_ERROR "SDL2 library not found")
 endif()
 
 if (BGFX_FOUND)
@@ -123,6 +130,7 @@ else()
     message(FATAL_ERROR "Bgfx library not found")
 endif()
 
+################################################################################
 # Compilation flags
 if(MSVC)
     add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
@@ -155,6 +163,10 @@ if (BUILD_STATIC)
 else()
     add_definitions(-Dtermite_SHARED_LIB)
     set(BUILD_LIBRARY_TYPE SHARED)
+endif()
+
+if (USE_SDL2)
+    add_definitions(-Dtermite_SDL2)
 endif()
 
 # copy release flags into profile
@@ -227,8 +239,8 @@ if (WIN32)
 endif()
 
 # Digger
-if (BUILD_DIGGER)
-    add_subdirectory(digger)
+if (BUILD_FISHERBOY)
+    add_subdirectory(fisherboy)
 endif()
 
 

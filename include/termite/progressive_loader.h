@@ -44,7 +44,7 @@ namespace termite
         }
     };
 
-    ProgressiveLoader* createProgressiveLoader(ResourceLib* resLib, bx::AllocatorI* alloc);
+    ProgressiveLoader* createProgressiveLoader(bx::AllocatorI* alloc);
     void destroyProgressiveLoader(ProgressiveLoader* loader);
 
     void beginLoaderGroup(ProgressiveLoader* loader, const LoadingScheme& scheme);

@@ -3,23 +3,23 @@
 namespace bx
 {
     template <typename Ty>
-    struct ListNode
-    {
-        ListNode<Ty>* next;
-        ListNode<Ty>* prev;
-        Ty data;
-
-        explicit ListNode(const Ty& _data) :
-            next(nullptr),
-            prev(nullptr),
-            data(_data)
-        {
-        }
-    };
-
-    template <typename Ty>
     class List
     {
+    public:
+        struct Node
+        {
+            Node* next;
+            Node* prev;
+            Ty data;
+
+            explicit Node(const Ty& _data) :
+                next(nullptr),
+                prev(nullptr),
+                data(_data)
+            {
+            }
+        };
+
     public:
         List() :
             m_first(nullptr),
@@ -27,7 +27,7 @@ namespace bx
         { 
         }
 
-        inline void add(ListNode<Ty>* _node)
+        inline void add(Node* _node)
         {
             _node->next = m_first;
             _node->prev = nullptr;
@@ -38,7 +38,7 @@ namespace bx
                 m_last = _node;
         }
 
-        inline void addToEnd(ListNode<Ty>* _node)
+        inline void addToEnd(Node* _node)
         {
             if (m_last) {
                 m_last->next = _node;
@@ -52,7 +52,7 @@ namespace bx
                 m_first = _node;
         }
 
-        inline void remove(ListNode<Ty>* _node)
+        inline void remove(Node* _node)
         {
             if (_node->next)
                 _node->next->prev = _node->prev;
@@ -65,7 +65,7 @@ namespace bx
             _node->next = _node->prev = nullptr;
         }
 
-        inline void insert(ListNode<Ty>* _insertAfter, ListNode<Ty>* _node)
+        inline void insert(Node* _insertAfter, Node* _node)
         {
             if (_insertAfter->next)
                 _insertAfter->next->prev = _node;
@@ -79,18 +79,18 @@ namespace bx
             return m_first == nullptr;
         }
 
-        inline ListNode<Ty>* getFirst() const
+        inline Node* getFirst() const
         {
             return m_first;
         }
 
-        inline ListNode<Ty>* getLast() const
+        inline Node* getLast() const
         {
             return m_last;
         }
 
     private:
-        ListNode<Ty>* m_first;
-        ListNode<Ty>* m_last;
+        Node* m_first;
+        Node* m_last;
     };
 }

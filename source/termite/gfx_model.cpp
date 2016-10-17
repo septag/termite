@@ -43,10 +43,10 @@ struct ModelImpl
 class ModelLoader : public ResourceCallbacksI
 {
 public:
-    bool loadObj(ResourceLib* resLib, const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) override;
-    void unloadObj(ResourceLib* resLib, uintptr_t obj) override;
-    void onReload(ResourceLib* resLib, ResourceHandle handle) override;
-    uintptr_t getDefaultAsyncObj(ResourceLib* resLib) override;
+    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) override;
+    void unloadObj(uintptr_t obj) override;
+    void onReload(ResourceHandle handle) override;
+    uintptr_t getDefaultAsyncObj() override;
 };
 
 struct ModelManager
@@ -92,10 +92,10 @@ void termite::shutdownModelLoader()
     g_modelMgr = nullptr;
 }
 
-void termite::registerModelToResourceLib(ResourceLib* resLib)
+void termite::registerModelToResourceLib()
 {
     ResourceTypeHandle handle;
-    handle = registerResourceType(resLib, "model", &g_modelMgr->loader, sizeof(LoadModelParams));
+    handle = registerResourceType("model", &g_modelMgr->loader, sizeof(LoadModelParams));
     assert(handle.isValid());
 }
 
@@ -322,7 +322,7 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const R
     return true;
 }
 
-bool ModelLoader::loadObj(ResourceLib* resLib, const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
+bool ModelLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
 {
     bx::Error err;
     bx::MemoryReader reader(mem->data, mem->size);
@@ -345,19 +345,19 @@ bool ModelLoader::loadObj(ResourceLib* resLib, const MemoryBlock* mem, const Res
     }
 }
 
-void ModelLoader::unloadObj(ResourceLib* resLib, uintptr_t obj)
+void ModelLoader::unloadObj(uintptr_t obj)
 {
     assert(g_modelMgr);
 
     unloadModel((ModelImpl*)obj);
 }
 
-void ModelLoader::onReload(ResourceLib* resLib, ResourceHandle handle)
+void ModelLoader::onReload(ResourceHandle handle)
 {
 
 }
 
-uintptr_t ModelLoader::getDefaultAsyncObj(ResourceLib* resLib)
+uintptr_t ModelLoader::getDefaultAsyncObj()
 {
     return 0;
 }

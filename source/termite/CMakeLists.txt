@@ -33,8 +33,8 @@ if (BUILD_STATIC)
 endif()
 
 target_link_libraries(termite 
-    PRIVATE fcontext imgui_impl
-    PUBLIC bx ${STD_LIBS} ${PLUGIN_LIBS})
+    PRIVATE fcontext imgui_impl ${PLUGIN_LIBS}
+    PUBLIC bx ${STD_LIBS})
 
 # 
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)

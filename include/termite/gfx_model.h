@@ -94,7 +94,7 @@ namespace termite
     result_t initModelLoader(GfxDriverApi* driver, bx::AllocatorI* alloc);
     void shutdownModelLoader();
 
-    void registerModelToResourceLib(ResourceLib* resLib);
+    void registerModelToResourceLib();
 
     ModelInstance* createModelInstance(Model* model);
 

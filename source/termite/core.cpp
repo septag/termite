@@ -53,7 +53,10 @@ struct FrameData
     double frameTime;
     double fps;
     double elapsedTime;
+    double avgFrameTime;
     int64_t lastFrameTick;
+    double frameTimes[32];
+    double fpsTime;
 };
 
 struct HeapMemoryImpl
@@ -133,7 +136,6 @@ struct Core
     double hpTimerFreq;
     bx::Pool<HeapMemoryImpl> memPool;
     bx::Lock memPoolLock;
-    ResourceLib* resLib;
     GfxDriverApi* gfxDriver;
     IoDriverDual* ioDriver;
     PageAllocator tempAlloc;
@@ -152,7 +154,6 @@ struct Core
         updateFn = nullptr;
         renderer = nullptr;
         hpTimerFreq = 0;
-        resLib = nullptr;
         ioDriver = nullptr;
         memset(&frameData, 0x00, sizeof(frameData));
     }
@@ -334,8 +335,8 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     }
 
     BX_BEGINP("Initializing Resource Library");
-    g_core->resLib = createResourceLib(BX_ENABLED(termite_DEV) ? ResourceLibInitFlag::HotLoading : 0, g_core->ioDriver->async, g_alloc);
-    if (!g_core->resLib) {
+    if (T_FAILED(initResourceLib(BX_ENABLED(termite_DEV) ? ResourceLibInitFlag::HotLoading : 0, g_core->ioDriver->async, g_alloc))) 
+    {
         T_ERROR("Core init failed: Creating default ResourceLib failed");
         return T_ERR_FAILED;
     }
@@ -393,10 +394,10 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
 
         // Init and Register graphics resource loaders
         initTextureLoader(g_core->gfxDriver, g_alloc);
-        registerTextureToResourceLib(g_core->resLib);
+        registerTextureToResourceLib();
 
         initModelLoader(g_core->gfxDriver, g_alloc);
-        registerModelToResourceLib(g_core->resLib);
+        registerModelToResourceLib();
 
         // Font library
         if (initFontLib(g_alloc, g_core->ioDriver->blocking)) {
@@ -436,7 +437,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
             T_ERROR("Initializing Sprite System failed");
             return T_ERR_FAILED;
         }
-        registerSpriteSheetToResourceLib(g_core->resLib);
+        registerSpriteSheetToResourceLib();
     }
 
     // Job Dispatcher
@@ -508,10 +509,7 @@ void termite::shutdown()
         BX_END_OK();
     }
 
-    if (g_core->resLib) {
-        destroyResourceLib(g_core->resLib);
-        g_core->resLib = nullptr;
-    }
+    shutdownResourceLib();
 
     if (g_core->ioDriver) {
         BX_BEGINP("Shutting down IO Driver");
@@ -535,12 +533,21 @@ void termite::shutdown()
 #endif
 }
 
+static double calcAvgFrameTime(const FrameData& fd)
+{
+    double sum = 0;
+    for (int i = 0; i < BX_COUNTOF(fd.frameTimes); i++) {
+        sum += fd.frameTimes[i];
+    }
+    sum /= double(BX_COUNTOF(fd.frameTimes));
+    return sum;
+}
+
 void termite::doFrame()
 {
-    FrameData& fd = g_core->frameData;
-
     freeTag(T_MID_TEMP);
 
+    FrameData& fd = g_core->frameData;
     if (fd.lastFrameTick == 0)
         fd.lastFrameTick = bx::getHPCounter();
 
@@ -578,8 +585,14 @@ void termite::doFrame()
     fd.frame++;
     fd.elapsedTime += dt;
     fd.frameTime = dt;
-    fd.fps = (double)fd.frame / fd.elapsedTime;
     fd.lastFrameTick = frameTick;
+    int frameTimeIter = fd.frame % BX_COUNTOF(fd.frameTimes);
+    fd.frameTimes[frameTimeIter] = dt;
+    fd.avgFrameTime = calcAvgFrameTime(fd);
+    if (frameTimeIter == 0) {
+        fd.fps = BX_COUNTOF(fd.frameTimes) / (fd.elapsedTime - fd.fpsTime);
+        fd.fpsTime = fd.elapsedTime;
+    }
 }
 
 double termite::getFrameTime()
@@ -596,6 +609,12 @@ double termite::getFps()
 {
     return g_core->frameData.fps;
 }
+
+double termite::getSmoothFrameTime()
+{
+    return g_core->frameData.avgFrameTime;
+}
+
 int64_t termite::getFrameIndex()
 {
     return g_core->frameData.frame;
@@ -786,8 +805,3 @@ const char* termite::getDataDir() T_THREAD_SAFE
     return g_dataDir.cstr();
 }
 
-// Used in resource_lib.cpp
-ResourceLib* getDefaultResourceLibPtr() 
-{
-    return g_core->resLib;
-}

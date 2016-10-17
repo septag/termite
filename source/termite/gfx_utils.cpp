@@ -117,13 +117,13 @@ ProgramHandle termite::loadShaderProgram(GfxDriverApi* gfxDriver, IoDriverApi* i
                                          const char* fsFilepath)
 {
     GfxDriverApi* driver = gfxDriver;
-    MemoryBlock* vso = ioDriver->read(vsFilepath);
+    MemoryBlock* vso = ioDriver->read(vsFilepath, IoPathType::Assets);
     if (!vso) {
         T_ERROR("Opening file '%s' failed", vsFilepath);
         return ProgramHandle();
     }
 
-    MemoryBlock* fso = ioDriver->read(fsFilepath);
+    MemoryBlock* fso = ioDriver->read(fsFilepath, IoPathType::Assets);
     if (!fso) {
         T_ERROR("Opening file '%s' failed", fsFilepath);
         return ProgramHandle();

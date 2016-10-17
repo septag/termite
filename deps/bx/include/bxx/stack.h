@@ -5,28 +5,28 @@
 namespace bx
 {
     template <typename Ty>
-    struct StackNode
-    {
-        StackNode<Ty>* down;
-        Ty data;
-
-        explicit StackNode(const Ty& _value) :
-            down(nullptr),
-            data(_value)
-        {
-        }
-    };
-
-    template <typename Ty>
     class Stack
     {
+    public:
+        struct Node
+        {
+            Node* down;
+            Ty data;
+
+            explicit Node(const Ty& _value) :
+                down(nullptr),
+                data(_value)
+            {
+            }
+        };
+
     public:
         Stack() :
             m_head(nullptr)
         {
         }
 
-        inline void push(StackNode<Ty>* _node)
+        inline void push(Node* _node)
         {
             _node->down = m_head;
             m_head = _node;
@@ -35,7 +35,7 @@ namespace bx
         inline bool pop(Ty* pData)
         {
             if (m_head) {
-                StackNode<Ty>* node = m_head;
+                Node* node = m_head;
                 m_head = node->down;
                 node->down = nullptr;
                 *pData = node->data;
@@ -60,12 +60,12 @@ namespace bx
             return m_head == nullptr;
         }
 
-        inline const StackNode<Ty>* getHead() const
+        inline const Node* getHead() const
         {
             return m_head;
         }
 
     private:
-        StackNode<Ty>* m_head;
+        Node* m_head;
     };
 }   // namespace bx

@@ -70,7 +70,6 @@ namespace termite
         FontGlyph* m_glyphs;
         FontKerning* m_kerns;
         bx::HashTableInt m_charTable;
-        ResourceLibHelper m_resLib;
 
     public:
         Font(bx::AllocatorI* alloc);
@@ -101,7 +100,7 @@ namespace termite
 
         Texture* getTexture() const
         {
-            return m_resLib.getResourcePtr<Texture>(m_textureHandle);
+            return getResourcePtr<Texture>(m_textureHandle);
         }
 
         int findGlyph(uint32_t glyphId) const

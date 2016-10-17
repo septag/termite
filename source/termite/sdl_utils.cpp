@@ -1,8 +1,6 @@
 #include "pch.h"
 
-#ifdef _WIN32
-#  define HAVE_STDINT_H 1
-#endif
+#ifdef termite_SDL2
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <SDL_syswm.h>
@@ -148,3 +146,4 @@ void termite::sdlMapImGuiKeys(Config* conf)
     conf->keymap[ImGuiKey_Y] = SDLK_y;
     conf->keymap[ImGuiKey_Z] = SDLK_z;
 }
+#endif  // if termite_SDL2

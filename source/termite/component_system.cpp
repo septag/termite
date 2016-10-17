@@ -29,7 +29,7 @@ namespace termite
     {
         struct FreeIndex
         {
-            typedef bx::QueueNode<FreeIndex*> QNode;
+            typedef bx::Queue<FreeIndex*>::Node QNode;
 
             uint32_t index;
             QNode qnode;

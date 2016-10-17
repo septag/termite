@@ -26,10 +26,10 @@ class TextureLoaderRaw : public ResourceCallbacksI
 public:
     TextureLoaderRaw();
 
-    bool loadObj(ResourceLib* resLib, const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) override;
-    void unloadObj(ResourceLib* resLib, uintptr_t obj) override;
-    void onReload(ResourceLib* resLib, ResourceHandle handle) override;
-    uintptr_t getDefaultAsyncObj(ResourceLib* resLib) override;
+    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) override;
+    void unloadObj(uintptr_t obj) override;
+    void onReload(ResourceHandle handle) override;
+    uintptr_t getDefaultAsyncObj() override;
 };
 
 // KTX/DDS loader
@@ -38,10 +38,10 @@ class TextureLoaderKTX : public ResourceCallbacksI
 public:
     TextureLoaderKTX();
 
-    bool loadObj(ResourceLib* resLib, const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) override;
-    void unloadObj(ResourceLib* resLib, uintptr_t obj) override;
-    void onReload(ResourceLib* resLib, ResourceHandle handle) override;
-    uintptr_t getDefaultAsyncObj(ResourceLib* resLib) override;
+    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) override;
+    void unloadObj(uintptr_t obj) override;
+    void onReload(ResourceHandle handle) override;
+    uintptr_t getDefaultAsyncObj() override;
 };
 
 struct TextureLoader
@@ -125,14 +125,14 @@ result_t termite::initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc,
     return 0;
 }
 
-void termite::registerTextureToResourceLib(ResourceLib* resLib)
+void termite::registerTextureToResourceLib()
 {
     ResourceTypeHandle handle;
-    handle = registerResourceType(resLib, "image", &g_texLoader->rawLoader, sizeof(LoadTextureParams), 
+    handle = registerResourceType("image", &g_texLoader->rawLoader, sizeof(LoadTextureParams), 
                                   uintptr_t(g_texLoader->failTexture));
     assert(handle.isValid());
 
-    handle = registerResourceType(resLib, "texture", &g_texLoader->loader, sizeof(LoadTextureParams),
+    handle = registerResourceType("texture", &g_texLoader->loader, sizeof(LoadTextureParams),
                                   uintptr_t(g_texLoader->failTexture));
     assert(handle.isValid());
 }
@@ -191,7 +191,7 @@ static void stbCallbackFreeImage(void* ptr, void* userData)
     stbi_image_free(ptr);
 }
 
-bool TextureLoaderRaw::loadObj(ResourceLib* resLib, const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
+bool TextureLoaderRaw::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
 {
     assert(g_texLoader);
     GfxDriverApi* driver = g_texLoader->driver;
@@ -286,7 +286,7 @@ bool TextureLoaderRaw::loadObj(ResourceLib* resLib, const MemoryBlock* mem, cons
     return true;
 }
 
-void TextureLoaderRaw::unloadObj(ResourceLib* resLib, uintptr_t obj)
+void TextureLoaderRaw::unloadObj(uintptr_t obj)
 {
     assert(g_texLoader);
     assert(obj);
@@ -302,11 +302,11 @@ void TextureLoaderRaw::unloadObj(ResourceLib* resLib, uintptr_t obj)
     g_texLoader->texturePool.deleteInstance(texture);
 }
 
-void TextureLoaderRaw::onReload(ResourceLib* resLib, ResourceHandle handle)
+void TextureLoaderRaw::onReload(ResourceHandle handle)
 {
 }
 
-uintptr_t TextureLoaderRaw::getDefaultAsyncObj(ResourceLib* resLib)
+uintptr_t TextureLoaderRaw::getDefaultAsyncObj()
 {
     return uintptr_t(g_texLoader->asyncBlankTexture);
 }
@@ -317,7 +317,7 @@ TextureLoaderKTX::TextureLoaderKTX()
 
 }
 
-bool TextureLoaderKTX::loadObj(ResourceLib* resLib, const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
+bool TextureLoaderKTX::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
 {
     const LoadTextureParams* texParams = (const LoadTextureParams*)params.userParams;
     
@@ -336,7 +336,7 @@ bool TextureLoaderKTX::loadObj(ResourceLib* resLib, const MemoryBlock* mem, cons
     return true;
 }
 
-void TextureLoaderKTX::unloadObj(ResourceLib* resLib, uintptr_t obj)
+void TextureLoaderKTX::unloadObj(uintptr_t obj)
 {
     assert(g_texLoader);
     assert(obj);
@@ -351,11 +351,11 @@ void TextureLoaderKTX::unloadObj(ResourceLib* resLib, uintptr_t obj)
     g_texLoader->texturePool.deleteInstance(texture);
 }
 
-void TextureLoaderKTX::onReload(ResourceLib* resLib, ResourceHandle handle)
+void TextureLoaderKTX::onReload(ResourceHandle handle)
 {
 }
 
-uintptr_t TextureLoaderKTX::getDefaultAsyncObj(ResourceLib* resLib)
+uintptr_t TextureLoaderKTX::getDefaultAsyncObj()
 {
     return uintptr_t(g_texLoader->asyncBlankTexture);
 }

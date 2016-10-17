@@ -163,7 +163,7 @@ namespace termite
         {
             va_list args;
             va_start(args, fmt);
-            vgTextf(m_ctx, x, y, fmt, args);
+            vgTextv(m_ctx, x, y, fmt, args);
             va_end(args);
             return *this;
         }

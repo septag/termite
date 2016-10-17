@@ -1,12 +1,13 @@
-#include <cstddef>
-#ifdef _WIN32
-#  define HAVE_STDINT_H 1
+#ifndef termite_SDL2
+#error "SDL2 support is not enabled. Build termite with -DUSE_SDL2 flag"
 #endif
+
+#include <cstddef>
 #include <SDL.h>
-#include <SDL_syswm.h>
 
 #include "bxx/logger.h"
 #include "bxx/path.h"
+#include <conio.h>
 
 #include "termite/core.h"
 #include "termite/gfx_defines.h"
@@ -22,8 +23,6 @@
 #include "termite/sdl_utils.h"
 
 #include "imgui/imgui.h"
-
-#include <conio.h>
 
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 800

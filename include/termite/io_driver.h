@@ -23,10 +23,25 @@ namespace termite
         virtual void onCloseStream(IoStream* stream) = 0;
     };
 
-    enum IoStreamFlag : uint8_t
+    struct IoStreamFlag
     {
-        WRITE = 0x01,
-        READ = 0x02
+        enum Enum
+        {
+            WRITE = 0x01,
+            READ = 0x02
+        };
+
+        typedef uint8_t Bits;
+    };
+
+    struct IoPathType
+    {
+        enum Enum
+        {
+            Assets,
+            Relative,
+            Absolute
+        };
     };
 
     // Async: All driver operations are done in async mode, and every return value (read, write, openStream, etc...)
@@ -34,10 +49,13 @@ namespace termite
     //        'runAsyncLoop' should also be called in every engine loop iteration
     // Sync: All driver operations are done in blocking mode, callbacks doesn't work, instead the caller should check
     //       For return values of functions
-    enum IoOperationMode
+    struct IoOperationMode
     {
-        Async,
-        Blocking
+        enum Enum
+        {
+            Async,
+            Blocking
+        };
     };
 
     // Backend interface for 
@@ -50,8 +68,8 @@ namespace termite
         void(*setCallbacks)(IoDriverEventsI* callbacks);
         IoDriverEventsI* (*getCallbacks)();
 
-        MemoryBlock* (*read)(const char* uri);
-        size_t(*write)(const char* uri, const MemoryBlock* mem);
+        MemoryBlock* (*read)(const char* uri, IoPathType::Enum pathType/* = IoPathType::Assets*/);
+        size_t(*write)(const char* uri, const MemoryBlock* mem, IoPathType::Enum pathType/* = IoPathType::Assets*/);
 
         IoStream* (*openStream)(const char* uri, IoStreamFlag flags);
         size_t(*writeStream)(IoStream* stream, const MemoryBlock* mem);
@@ -60,7 +78,7 @@ namespace termite
 
         void(*runAsyncLoop)();
 
-        IoOperationMode(*getOpMode)();
+        IoOperationMode::Enum(*getOpMode)();
         const char* (*getUri)();
     };
 

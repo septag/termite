@@ -88,7 +88,7 @@ struct FontItem
     FontFlags::Bits flags;
     Font* font;
     
-    typedef bx::ListNode<FontItem*> LNode;
+    typedef bx::List<FontItem*>::Node LNode;
     LNode lnode;
 
     FontItem() :
@@ -132,7 +132,6 @@ Font* termite::Font::create(const MemoryBlock* mem, const char* fntFilepath, bx:
     Font* font = BX_NEW(alloc, Font)(alloc);
     if (!font)
         return nullptr;
-    font->m_resLib = getDefaultResourceLib();    
 
     // Sign
     char sign[4];
@@ -186,9 +185,9 @@ Font* termite::Font::create(const MemoryBlock* mem, const char* fntFilepath, bx:
     LoadTextureParams texParams;
 
     if (texFilepath.getFileExt().isEqualNoCase("dds"))
-        font->m_textureHandle = font->m_resLib.loadResource("texture", texFilepath.cstr(), &texParams);
+        font->m_textureHandle = loadResource("texture", texFilepath.cstr(), &texParams);
     else
-        font->m_textureHandle = font->m_resLib.loadResource("image", texFilepath.cstr(), &texParams);
+        font->m_textureHandle = loadResource("image", texFilepath.cstr(), &texParams);
 
     if (!font->m_textureHandle.isValid()) {
         T_ERROR("Loading font '%s' failed: Loading texture '%s' failed", fntFilepath, texFilepath.cstr());
@@ -267,7 +266,7 @@ termite::Font::~Font()
         bx::AllocatorI* alloc = m_alloc;
 
         if (m_textureHandle.isValid())
-            m_resLib.unloadResource(m_textureHandle);
+            unloadResource(m_textureHandle);
 
         m_charTable.destroy();
 
@@ -391,7 +390,7 @@ result_t termite::registerFont(const char* fntFilepath, const char* name, uint16
         return T_ERR_ALREADY_EXISTS;
 
     // Load the file into memory
-    MemoryBlock* mem = g_fontLib->ioDriver->read(fntFilepath);
+    MemoryBlock* mem = g_fontLib->ioDriver->read(fntFilepath, IoPathType::Assets);
     if (!mem) {
         T_ERROR("Could not open font file '%s'", fntFilepath);
         return T_ERR_IO_FAILED;

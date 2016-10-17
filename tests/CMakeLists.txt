@@ -18,21 +18,29 @@ if (NOT ANDROID)
     add_executable(test_init "test_init.cpp")
     target_link_libraries(test_init termite)
     set_target_properties(test_init PROPERTIES FOLDER Tests)
-    add_dependencies(test_init ${PLATFORM_PLUGINS})
+
+    if (NOT BUILD_STATIC)
+        add_dependencies(test_init ${PLATFORM_PLUGINS})
+    endif()
 endif()
 
 # test_sdl
-if (NOT ANDROID)
-    add_executable(test_sdl "test_sdl.cpp")
-else()
-    add_library(test_sdl SHARED "test_sdl.cpp" ${SDL2_ANDROID_MAIN_ENTRY})
-    install(TARGETS test_sdl
-        RUNTIME DESTINATION bin
-        ARCHIVE DESTINATION lib
-        LIBRARY DESTINATION lib)
-endif()
+if (USE_SDL2)
+    if (NOT ANDROID)
+        add_executable(test_sdl "test_sdl.cpp")
+    else()
+        add_library(test_sdl SHARED "test_sdl.cpp" ${SDL2_ANDROID_MAIN_ENTRY})
+        install(TARGETS test_sdl
+            RUNTIME DESTINATION bin
+            ARCHIVE DESTINATION lib
+            LIBRARY DESTINATION lib)
+    endif()
 
-target_include_directories(test_sdl PUBLIC ${SDL2_INCLUDE_DIR})
-target_link_libraries(test_sdl ${SDL2_LIBRARY} termite)
-set_target_properties(test_sdl PROPERTIES FOLDER Tests)
-add_dependencies(test_sdl bgfx_driver ${PLATFORM_PLUGINS} ${WIN_DEPS})
+    target_include_directories(test_sdl PUBLIC ${SDL2_INCLUDE_DIR})
+    target_link_libraries(test_sdl ${SDL2_LIBRARY} termite)
+    set_target_properties(test_sdl PROPERTIES FOLDER Tests)
+
+    if (NOT BUILD_STATIC)
+        add_dependencies(test_sdl bgfx_driver ${PLATFORM_PLUGINS} ${WIN_DEPS})
+    endif()
+endif()

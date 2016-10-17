@@ -7,21 +7,21 @@
 namespace bx
 {
     template <typename Ty>
-    struct QueueNode
-    {
-        QueueNode<Ty>* next;
-        Ty data;
-
-        explicit QueueNode(const Ty& _data) :
-            next(nullptr),
-            data(_data)
-        {
-        }
-    };
-
-    template <typename Ty>
     class Queue
     {
+    public:
+        struct Node
+        {
+            Node* next;
+            Ty data;
+
+            explicit Node(const Ty& _data) :
+                next(nullptr),
+                data(_data)
+            {
+            }
+        };
+
     public:
         Queue() :
             m_first(nullptr),
@@ -29,7 +29,7 @@ namespace bx
         {
         }
 
-        inline void push(QueueNode<Ty>* _node)
+        inline void push(Node* _node)
         {
             if (m_last)
                 m_last->next = _node;
@@ -43,7 +43,7 @@ namespace bx
         inline bool pop(Ty* pData)
         {
             if (m_first) {
-                bx::QueueNode<Ty>* first = m_first;
+                Node* first = m_first;
                 if (m_last == first)
                     m_last = nullptr;
 
@@ -72,19 +72,19 @@ namespace bx
             return m_first == nullptr;
         }
 
-        inline const QueueNode<Ty>* getFirst() const
+        inline const Node* getFirst() const
         {
             return m_first;
         }
 
-        inline const QueueNode<Ty>* getLast() const
+        inline const Node* getLast() const
         {
             return m_last;
         }
 
     private:
-        QueueNode<Ty>* m_first;
-        QueueNode<Ty>* m_last;
+        Node* m_first;
+        Node* m_last;
     };
 
     // SpScQueueAlloc and container

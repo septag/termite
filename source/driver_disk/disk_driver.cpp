@@ -68,6 +68,25 @@ struct AsyncDiskDriver
 
 static AsyncDiskDriver g_async;
 
+static bx::Path resolvePath(const char* uri, const bx::Path& rootDir, IoPathType::Enum pathType)
+{
+    bx::Path filepath;
+    switch (pathType) {
+    case IoPathType::Assets:
+        filepath = rootDir;
+        filepath.join("assets").join(uri);
+        break;
+    case IoPathType::Relative:
+        filepath = rootDir;
+        filepath.join(uri);
+        break;
+    case IoPathType::Absolute:
+        filepath = uri;
+        break;
+    }
+    return filepath;
+}
+
 static void uvCallbackFsEvent(uv_fs_event_t* handle, const char* filename, int events, int status)
 {
     static bx::Path lastModFile;
@@ -225,11 +244,9 @@ static void uvCallbackOpenForRead(uv_fs_t* req)
     }
 }
 
-static MemoryBlock* asyncRead(const char* uri)
+static MemoryBlock* asyncRead(const char* uri, IoPathType::Enum pathType)
 {
-    bx::Path filepath(g_async.rootDir);
-    filepath.join(uri);
-
+    bx::Path filepath = resolvePath(uri, g_async.rootDir, pathType);
     DiskFileRequest* req = g_async.fsReqPool.newInstance();
 
     if (!req) {
@@ -284,11 +301,9 @@ static void uvCallbackOpenForWrite(uv_fs_t* req)
     }
 }
 
-static size_t asyncWrite(const char* uri, const MemoryBlock* mem)
+static size_t asyncWrite(const char* uri, const MemoryBlock* mem, IoPathType::Enum pathType)
 {
-    bx::Path filepath(g_async.rootDir);
-    filepath.join(uri);
-
+    bx::Path filepath = resolvePath(uri, g_async.rootDir, pathType);
     DiskFileRequest* req = g_async.fsReqPool.newInstance();
 
     if (!req) {
@@ -311,7 +326,7 @@ static size_t asyncWrite(const char* uri, const MemoryBlock* mem)
     return 0;
 }
 
-static IoOperationMode asyncGetOpMode()
+static IoOperationMode::Enum asyncGetOpMode()
 {
     return IoOperationMode::Async;
 }
@@ -364,10 +379,9 @@ static IoDriverEventsI* blockGetCallbacks()
     return nullptr;
 }
 
-static MemoryBlock* blockRead(const char* uri)
+static MemoryBlock* blockRead(const char* uri, IoPathType::Enum pathType)
 {
-    bx::Path filepath(g_blocking.rootDir);
-    filepath.join(uri);
+    bx::Path filepath = resolvePath(uri, g_blocking.rootDir, pathType);
 
     bx::CrtFileReader file;
     bx::Error err;
@@ -392,10 +406,9 @@ static MemoryBlock* blockRead(const char* uri)
     return mem;
 }
 
-static size_t blockWrite(const char* uri, const MemoryBlock* mem)
+static size_t blockWrite(const char* uri, const MemoryBlock* mem, IoPathType::Enum pathType)
 {
-    bx::Path filepath(g_blocking.rootDir);
-    filepath.join(uri);
+    bx::Path filepath = resolvePath(uri, g_blocking.rootDir, pathType);
 
     bx::CrtFileWriter file;
     bx::Error err;
@@ -414,7 +427,7 @@ static void blockRunAsyncLoop()
 {
 }
 
-static IoOperationMode blockGetOpMode()
+static IoOperationMode::Enum blockGetOpMode()
 {
     return IoOperationMode::Blocking;
 }
@@ -423,7 +436,6 @@ static const char* blockGetUri()
 {
     return g_blocking.rootDir.cstr();
 }
-
 
 PluginDesc* getDiskDriverDesc()
 {

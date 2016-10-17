@@ -49,6 +49,7 @@ namespace termite
         vec2_t topLeft;
         vec2_t bottomRight;
         int frameIdx;               // initial Frame Index 
+        bool destroyResource;
     };
 }
 
@@ -82,10 +83,10 @@ VertexDecl SpriteVertex::Decl;
 
 class SpriteSheetLoader : public ResourceCallbacksI
 {
-    bool loadObj(ResourceLib* resLib, const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) override;
-    void unloadObj(ResourceLib* resLib, uintptr_t obj) override;
-    void onReload(ResourceLib* resLib, ResourceHandle handle) override;
-    uintptr_t getDefaultAsyncObj(ResourceLib* resLib) override;
+    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) override;
+    void unloadObj(uintptr_t obj) override;
+    void onReload(ResourceHandle handle) override;
+    uintptr_t getDefaultAsyncObj() override;
 };
 
 struct SpriteAnimEvent
@@ -230,6 +231,7 @@ void termite::shutdownSpriteSystem()
 }
 
 SpriteHandle termite::createSpriteFromTexture(ResourceHandle textureHandle, const vec2_t halfSize, 
+                                              bool destroyTexture,
                                               const vec2_t localAnchor /*= vec2f(0, 0)*/, 
                                               const vec2_t topLeftCoords /*= vec2f(0, 0)*/, 
                                               const vec2_t bottomRightCoords /*= vec2f(1.0f, 1.0f)*/)
@@ -247,11 +249,13 @@ SpriteHandle termite::createSpriteFromTexture(ResourceHandle textureHandle, cons
     sprite->topLeft = topLeftCoords;
     sprite->bottomRight = bottomRightCoords;
     sprite->frameIdx = 0;
+    sprite->destroyResource = destroyTexture;
     
     return handle;
 }
 
-SpriteHandle termite::createSpriteFromSpritesheet(ResourceHandle spritesheetHandle, const vec2_t halfSize, 
+SpriteHandle termite::createSpriteFromSpriteSheet(ResourceHandle spritesheetHandle, const vec2_t halfSize, 
+                                                  bool destroySpriteSheet,
                                                   const vec2_t localAnchor /*= vec2f(0, 0)*/, int index /*= -1*/)
 {
     if (!spritesheetHandle.isValid())
@@ -262,7 +266,8 @@ SpriteHandle termite::createSpriteFromSpritesheet(ResourceHandle spritesheetHand
     sprite->resHandle = spritesheetHandle;
     sprite->halfSize = halfSize;
     sprite->localAnchor = localAnchor;
-    
+    sprite->destroyResource = destroySpriteSheet;
+
     if (index == -1)
         index = 0;
     sprite->frameIdx = index;
@@ -273,6 +278,10 @@ SpriteHandle termite::createSpriteFromSpritesheet(ResourceHandle spritesheetHand
 void termite::destroySprite(SpriteHandle handle)
 {
     assert(handle.isValid());
+
+    SpriteImpl* sprite = g_sprite->spritePool.getHandleData<SpriteImpl>(0, handle.value);
+    if (sprite->resHandle.isValid())
+        unloadResource(sprite->resHandle);
 
     g_sprite->spritePool.freeHandle(handle.value);
 }
@@ -305,7 +314,6 @@ void termite::drawSprites(uint8_t viewId, const SpriteHandle* sprites, int numSp
         return;
 
     GfxDriverApi* driver = g_sprite->driver;
-    ResourceLibHelper resLib = getDefaultResourceLib();
 
     TransientVertexBuffer tvb;
     TransientIndexBuffer tib;
@@ -374,9 +382,9 @@ void termite::drawSprites(uint8_t viewId, const SpriteHandle* sprites, int numSp
 
         // Resolve sprite bounds
         if (sprite->base == SpriteBase::FromSpriteSheet) {
-            SpriteSheet* sheet = resLib.getResourcePtr<SpriteSheet>(sprite->resHandle);
+            SpriteSheet* sheet = getResourcePtr<SpriteSheet>(sprite->resHandle);
             if (sheet) {
-                Texture* texture = resLib.getResourcePtr<Texture>(sheet->textureHandle);
+                Texture* texture = getResourcePtr<Texture>(sheet->textureHandle);
                 vec4_t frame = sheet->frames[sprite->frameIdx];
                 sprite->topLeft = vec2f(frame.x, frame.y);
                 sprite->bottomRight = vec2f(frame.z, frame.w);
@@ -389,7 +397,7 @@ void termite::drawSprites(uint8_t viewId, const SpriteHandle* sprites, int numSp
                     halfSize.y = halfSize.x / ratio;
             }
         } else if (sprite->base == SpriteBase::FromTexture) {
-            Texture* texture = resLib.getResourcePtr<Texture>(sprite->resHandle);
+            Texture* texture = getResourcePtr<Texture>(sprite->resHandle);
             if (halfSize.x == 0)
                 halfSize.x = texture->ratio*halfSize.y;
             if (halfSize.y == 0)
@@ -485,11 +493,11 @@ void termite::drawSprites(uint8_t viewId, const SpriteHandle* sprites, int numSp
         if (sprite->resHandle.isValid()) {
             TextureHandle texHandle;
             if (sprite->base == SpriteBase::FromTexture) {
-                texHandle = resLib.getResourcePtr<Texture>(sprite->resHandle)->handle;
+                texHandle = getResourcePtr<Texture>(sprite->resHandle)->handle;
             } else if (sprite->base == SpriteBase::FromSpriteSheet) {
-                SpriteSheet* sheet = resLib.getResourcePtr<SpriteSheet>(sprite->resHandle);
+                SpriteSheet* sheet = getResourcePtr<SpriteSheet>(sprite->resHandle);
                 if (sheet)
-                    texHandle = resLib.getResourcePtr<Texture>(sheet->textureHandle)->handle;
+                    texHandle = getResourcePtr<Texture>(sheet->textureHandle)->handle;
                 else
                     texHandle = getWhiteTexture1x1();
             }
@@ -579,7 +587,7 @@ void termite::stepSpriteAnim(SpriteAnimHandle handle, float dt)
     if (sprite->base != SpriteBase::FromSpriteSheet)
         return;
 
-    SpriteSheet* ss = getDefaultResourceLib().getResourcePtr<SpriteSheet>(sprite->resHandle);
+    SpriteSheet* ss = getResourcePtr<SpriteSheet>(sprite->resHandle);
     if (!ss)
         return;
 
@@ -773,10 +781,10 @@ vec2_t termite::getSpriteSize(SpriteHandle handle)
     return sprite->halfSize;
 }
 
-void termite::registerSpriteSheetToResourceLib(ResourceLib* resLib)
+void termite::registerSpriteSheetToResourceLib()
 {
     ResourceTypeHandle handle;
-    handle = registerResourceType(resLib, "spritesheet", &g_sprite->loader, sizeof(LoadSpriteSheetParams));
+    handle = registerResourceType("spritesheet", &g_sprite->loader, sizeof(LoadSpriteSheetParams));
     assert(handle.isValid());
 }
 
@@ -785,7 +793,7 @@ void termite::drawSprites(uint8_t viewId, SpriteCache* spriteCache)
 
 }
 
-bool SpriteSheetLoader::loadObj(ResourceLib* resLib, const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
+bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
 {
     const LoadSpriteSheetParams* ssParams = (const LoadSpriteSheetParams*)params.userParams;
     
@@ -808,9 +816,9 @@ bool SpriteSheetLoader::loadObj(ResourceLib* resLib, const MemoryBlock* mem, con
     texParams.skipMips = ssParams->skipMips;
     ResourceHandle textureHandle;
     if (texExt.isEqualNoCase("dds") || texExt.isEqualNoCase("ktx")) {
-        textureHandle = loadResource(resLib, "texture", texFilepath.cstr(), &texParams, params.flags);
+        textureHandle = loadResource("texture", texFilepath.cstr(), &texParams, params.flags);
     } else {
-        textureHandle = loadResource(resLib, "image", texFilepath.cstr(), &texParams, params.flags);
+        textureHandle = loadResource("image", texFilepath.cstr(), &texParams, params.flags);
     }
 
     if (!textureHandle.isValid())
@@ -856,24 +864,24 @@ bool SpriteSheetLoader::loadObj(ResourceLib* resLib, const MemoryBlock* mem, con
     return true;
 }
 
-void SpriteSheetLoader::unloadObj(ResourceLib* resLib, uintptr_t obj)
+void SpriteSheetLoader::unloadObj(uintptr_t obj)
 {
     assert(g_sprite);
     assert(obj);
 
     SpriteSheet* sheet = (SpriteSheet*)obj;
     if (sheet->textureHandle.isValid()) {
-        unloadResource(resLib, sheet->textureHandle);
+        unloadResource(sheet->textureHandle);
     }
     memset(sheet, 0x00, sizeof(SpriteSheet));
     sheet->textureHandle.reset();
 }
 
-void SpriteSheetLoader::onReload(ResourceLib* resLib, ResourceHandle handle)
+void SpriteSheetLoader::onReload(ResourceHandle handle)
 {
 }
 
-uintptr_t SpriteSheetLoader::getDefaultAsyncObj(ResourceLib* resLib)
+uintptr_t SpriteSheetLoader::getDefaultAsyncObj()
 {
     return 0;
 }

@@ -31,7 +31,7 @@ class FiberPool;
 
 struct Fiber
 {
-    typedef bx::ListNode<Fiber*> LNode;
+    typedef bx::List<Fiber*>::Node LNode;
 
     uint32_t ownerThread;    // by default, owner thread is 0, which indicates that thread owns this fiber
                              // If we wait on a job (fiber), owner thread gets a valid value

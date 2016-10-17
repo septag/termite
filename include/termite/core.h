@@ -114,6 +114,7 @@ namespace termite
     TERMITE_API double getFrameTime();
     TERMITE_API double getElapsedTime();
     TERMITE_API double getFps();
+    TERMITE_API double getSmoothFrameTime();
     TERMITE_API int64_t getFrameIndex();
 
     TERMITE_API MemoryBlock* createMemoryBlock(uint32_t size, bx::AllocatorI* alloc = nullptr);
