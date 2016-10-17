@@ -261,7 +261,7 @@ static MemoryBlock* asyncRead(const char* uri, IoPathType::Enum pathType)
     // Start Open for read
     if (uv_fs_open(&g_async.loop, &req->openReq, filepath.cstr(), 0, O_RDONLY, uvCallbackOpenForRead)) {
         if (g_async.callbacks)
-            g_async.callbacks->onOpenError(filepath.cstr());
+            g_async.callbacks->onOpenError(uri);
         return nullptr;
     }
 
@@ -319,7 +319,7 @@ static size_t asyncWrite(const char* uri, const MemoryBlock* mem, IoPathType::En
     // Start Open for write
     if (uv_fs_open(&g_async.loop, &req->openReq, filepath.cstr(), 0, O_CREAT | O_WRONLY | O_TRUNC, uvCallbackOpenForWrite)) {
         if (g_async.callbacks)
-            g_async.callbacks->onOpenError(filepath.cstr());
+            g_async.callbacks->onOpenError(uri);
         return 0;
     }
 

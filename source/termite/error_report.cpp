@@ -5,6 +5,7 @@
 #include <string>
 
 #include "bx/string.h"
+#include "bx/mutex.h"
 
 struct ErrorItem
 {
@@ -16,6 +17,7 @@ struct ErrorItem
 struct ErrorReport
 {
     bx::AllocatorI* alloc;
+    bx::Mutex mtx;
     ErrorItem* reports[T_ERROR_MAX_STACK_SIZE];
     int numReports;
     char* fullString;
@@ -29,17 +31,17 @@ struct ErrorReport
     }
 };
 
-static ErrorReport* gErr = nullptr;
+static ErrorReport* g_err = nullptr;
 
 int termite::initErrorReport(bx::AllocatorI* alloc)
 {
-    if (gErr) {
+    if (g_err) {
         assert(false);
         return T_ERR_ALREADY_INITIALIZED;
     }
 
-    gErr = BX_NEW(alloc, ErrorReport)(alloc);
-    if (!gErr)
+    g_err = BX_NEW(alloc, ErrorReport)(alloc);
+    if (!g_err)
         return T_ERR_OUTOFMEM;
 
     return 0;
@@ -47,31 +49,35 @@ int termite::initErrorReport(bx::AllocatorI* alloc)
 
 void termite::shutdownErrorReport()
 {
-    if (!gErr) {
+    if (!g_err) {
         assert(false);
         return;
     }
 
-    bx::AllocatorI* alloc = gErr->alloc;
+    bx::AllocatorI* alloc = g_err->alloc;
     assert(alloc);
 
     for (int i = 0; i < T_ERROR_MAX_STACK_SIZE; i++) {
-        if (gErr->reports[i])
-            BX_FREE(alloc, gErr->reports[i]);
+        if (g_err->reports[i])
+            BX_FREE(alloc, g_err->reports[i]);
     }
 
-    if (gErr->fullString)
-        BX_FREE(alloc, gErr->fullString);
+    if (g_err->fullString)
+        BX_FREE(alloc, g_err->fullString);
 
-    BX_FREE(alloc, gErr);
-    gErr = nullptr;
+    BX_FREE(alloc, g_err);
+    g_err = nullptr;
 }
 
 void termite::reportError(const char* source, int line, const char* desc)
 {
-    if (!gErr || gErr->numReports == T_ERROR_MAX_STACK_SIZE)
+    if (!g_err)
         return;
-    bx::AllocatorI* alloc = gErr->alloc;
+    bx::MutexScope mtx(g_err->mtx);
+
+    if (g_err->numReports == T_ERROR_MAX_STACK_SIZE)
+        return;
+    bx::AllocatorI* alloc = g_err->alloc;
 
     size_t totalSize =
         sizeof(ErrorItem) +
@@ -98,7 +104,7 @@ void termite::reportError(const char* source, int line, const char* desc)
         }
 
         report->line = line;
-        gErr->reports[gErr->numReports++] = report;
+        g_err->reports[g_err->numReports++] = report;
     }
 }
 
@@ -120,63 +126,75 @@ void termite::reportErrorf(const char* source, int line, const char* fmt, ...)
 
 const char* termite::getErrorCallstack()
 {
-    if (!gErr || !gErr->numReports)
+    if (!g_err)
+        return "";
+
+    bx::MutexScope mtx(g_err->mtx);
+    if (!g_err->numReports)
         return "";
 
     size_t size = 0;
-    for (int i = gErr->numReports - 1; i >= 0; i--) {
-        const ErrorItem* r = gErr->reports[i];
+    for (int i = g_err->numReports - 1; i >= 0; i--) {
+        const ErrorItem* r = g_err->reports[i];
 
         char line[256];
         bx::snprintf(line, sizeof(line), "- %s (Line:%d)\n", r->source ? r->source : "", r->line);
         size += strlen(line) + 1;
 
-        gErr->fullString = (char*)BX_REALLOC(gErr->alloc, gErr->fullString, size);
-        if (!gErr->fullString) {
+        g_err->fullString = (char*)BX_REALLOC(g_err->alloc, g_err->fullString, size);
+        if (!g_err->fullString) {
             assert(false);
             return "";
         }
 
-        if (i == gErr->numReports - 1)
-            strcpy(gErr->fullString, line);
+        if (i == g_err->numReports - 1)
+            strcpy(g_err->fullString, line);
         else
-            strcat(gErr->fullString, line);
+            strcat(g_err->fullString, line);
     }
 
-    return gErr->fullString;
+    return g_err->fullString;
 }
 
 const char* termite::getErrorString()
 {
-    if (!gErr || !gErr->numReports)
+    if (!g_err)
+        return "";
+
+    bx::MutexScope mtx(g_err->mtx);
+    if (!g_err->numReports)
         return "";
 
     size_t size = 0;
-    for (int i = gErr->numReports - 1; i >= 0; i--) {
-        const ErrorItem* r = gErr->reports[i];
+    for (int i = g_err->numReports - 1; i >= 0; i--) {
+        const ErrorItem* r = g_err->reports[i];
 
         std::string line = std::string("- ") + (r->desc ? r->desc : "") + std::string("\n");
 
         size += line.length() + 1;
 
-        gErr->fullString = (char*)BX_REALLOC(gErr->alloc, gErr->fullString, size);
-        if (!gErr->fullString) {
+        g_err->fullString = (char*)BX_REALLOC(g_err->alloc, g_err->fullString, size);
+        if (!g_err->fullString) {
             assert(0);
             return "";
         }
-        if (i == gErr->numReports - 1)
-            strcpy(gErr->fullString, line.c_str());
+        if (i == g_err->numReports - 1)
+            strcpy(g_err->fullString, line.c_str());
         else
-            strcat(gErr->fullString, line.c_str());
+            strcat(g_err->fullString, line.c_str());
     }
 
-    return gErr->fullString;
+    return g_err->fullString;
 }
 
 const char* termite::getLastErrorString()
 {
-    if (gErr && gErr->numReports) {
-        return gErr->reports[gErr->numReports - 1]->desc ? gErr->reports[gErr->numReports - 1]->desc : "";
+    if (!g_err)
+        return "";
+
+    bx::MutexScope mtx(g_err->mtx);
+    if (g_err->numReports) {
+        return g_err->reports[g_err->numReports - 1]->desc ? g_err->reports[g_err->numReports - 1]->desc : "";
     } else {
         return "";
     }
@@ -184,13 +202,14 @@ const char* termite::getLastErrorString()
 
 void termite::clearErrors()
 {
-    if (!gErr)
+    if (!g_err)
         return;
+    bx::MutexScope mtx(g_err->mtx);
 
-    for (int i = 0; i < gErr->numReports; i++) {
-        BX_FREE(gErr->alloc, gErr->reports[i]);
-        gErr->reports[i] = nullptr;
+    for (int i = 0; i < g_err->numReports; i++) {
+        BX_FREE(g_err->alloc, g_err->reports[i]);
+        g_err->reports[i] = nullptr;
     }
-    gErr->numReports = 0;
+    g_err->numReports = 0;
 }
 

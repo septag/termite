@@ -136,14 +136,12 @@ struct TextureItem
 struct TextureDatabase
 {
     bx::Array<TextureItem> textures;
-    termite::ResourceLibHelper resLib;
     int loadedIdx;
     termite::ResourceHandle folderImg;
 
-    TextureDatabase(termite::ResourceLibHelper _resLib)
+    TextureDatabase() :
+        loadedIdx(0)
     {
-        resLib = _resLib;
-        loadedIdx = 0;
     }
 };
 
@@ -213,7 +211,7 @@ static void recurseTextureDirectories(TextureDatabase* db, const char* baseDir, 
     closedir(d);   
 }
 
-static TextureDatabase* createTextureDatabase(const char* baseDir, const char* rootDir, termite::ResourceLibHelper resLib)
+static TextureDatabase* createTextureDatabase(const char* baseDir, const char* rootDir)
 {
     bx::AllocatorI* alloc = termite::getHeapAlloc();
     bx::Path fullDir(baseDir);
@@ -223,13 +221,13 @@ static TextureDatabase* createTextureDatabase(const char* baseDir, const char* r
     if (!d)
         return nullptr;
 
-    TextureDatabase* db = BX_NEW(alloc, TextureDatabase)(resLib);
+    TextureDatabase* db = BX_NEW(alloc, TextureDatabase)();
     if (!db->textures.create(256, 512, alloc))
         return nullptr;
 
     termite::LoadTextureParams tparams;
-    db->folderImg = db->resLib.loadResourceFromMem("image", "folder_png", 
-                                                   termite::refMemoryBlockPtr(folder_png, sizeof(folder_png)), &tparams);
+    db->folderImg = loadResourceFromMem("image", "folder_png", 
+                                        termite::refMemoryBlockPtr(folder_png, sizeof(folder_png)), &tparams);
     
     dirent* ent;
     while ((ent = readdir(d)) != nullptr) {
@@ -253,7 +251,7 @@ static TextureDatabase* createTextureDatabase(const char* baseDir, const char* r
 
 static void loadTextureInDirectory(TextureDatabase* db, const char* rootDir, bx::Array<int>* textureIndices)
 {
-    termite::IoDriverApi* ioDriver = db->resLib.getResourceLibIoDriver();
+    termite::IoDriverApi* ioDriver = termite::getResourceLibIoDriver();
     const char* baseDir = ioDriver->getUri();    
 
     bx::Path fullDir(baseDir);
@@ -318,8 +316,6 @@ static void destroyProject(SheetProject* project)
 
 static void loadTexturesIterative(TextureDatabase* db)
 {
-    termite::ResourceLibHelper resLib = db->resLib;
-
     int index = db->loadedIdx;
     if (index == db->textures.getCount())
         return;
@@ -329,7 +325,7 @@ static void loadTexturesIterative(TextureDatabase* db)
         if (item->type == TextureItemType::Image) {
             termite::LoadTextureParams params;
             params.flags |= termite::TextureFlag::MipPoint;
-            item->handle = resLib.loadResource("image", item->filepath, &params);
+            item->handle = loadResource("image", item->filepath, &params);
         }
     }
     db->loadedIdx++;
@@ -340,16 +336,13 @@ static void destroyTextureDatabase(TextureDatabase* db)
     bx::AllocatorI* alloc = termite::getHeapAlloc();
 
     // Release all textures
-    termite::ResourceLibHelper resLib = db->resLib;
-    if (resLib.isValid()) {
-        if (db->folderImg.isValid())
-            resLib.unloadResource(db->folderImg);
+    if (db->folderImg.isValid())
+        unloadResource(db->folderImg);
 
-        for (int i = 0; i < db->textures.getCount(); i++) {
-            TextureItem* item = db->textures.itemPtr(i);
-            if (item->type == TextureItemType::Image && item->handle.isValid()) {
-                resLib.unloadResource(item->handle);
-            }
+    for (int i = 0; i < db->textures.getCount(); i++) {
+        TextureItem* item = db->textures.itemPtr(i);
+        if (item->type == TextureItemType::Image && item->handle.isValid()) {
+            unloadResource(item->handle);
         }
     }
     db->textures.destroy();
@@ -451,7 +444,7 @@ static bool saveSpriteSheet(const char* filepath, const SpriteSheet* sheetInfo, 
 
     // Write to file
     termite::MemoryBlock* block = termite::refMemoryBlockPtr(mem.more(), (uint32_t)writer.seek());
-    bool r = io->write(filepath, block) > 0 ? true : false;
+    bool r = io->write(filepath, block, termite::IoPathType::Relative) > 0;
     termite::releaseMemoryBlock(block);
 
     return r;
@@ -477,7 +470,7 @@ static void generateSpriteSheet(Sprite* sprites, int numSprites, int width, int 
     for (int i = 0; i < numSprites; i++) {
         const Sprite& sprite = sprites[i];
         const TextureItem& tex = theApp.textureDb->textures[sprite.textureItem];
-        termite::Texture* t = theApp.textureDb->resLib.getResourcePtr<termite::Texture>(tex.handle);
+        termite::Texture* t = termite::getResourcePtr<termite::Texture>(tex.handle);
 
         rects[i].id = i;
         rects[i].w = t->info.width;
@@ -502,7 +495,7 @@ static void generateSpriteSheet(Sprite* sprites, int numSprites, int width, int 
 
         const Sprite& sprite = sprites[i];
         const TextureItem& tex = theApp.textureDb->textures[sprite.textureItem];
-        termite::Texture* t = theApp.textureDb->resLib.getResourcePtr<termite::Texture>(tex.handle);
+        termite::Texture* t = termite::getResourcePtr<termite::Texture>(tex.handle);
 
         sprites[i].tx0 = float(rects[i].x) / float(width);
         sprites[i].ty0 = float(rects[i].y) / float(height);
@@ -511,7 +504,7 @@ static void generateSpriteSheet(Sprite* sprites, int numSprites, int width, int 
         
         // Load image data
         termite::IoDriverApi* io = termite::getBlockingIoDriver();
-        termite::MemoryBlock* imageData = io->read(tex.filepath);
+        termite::MemoryBlock* imageData = io->read(tex.filepath, termite::IoPathType::Relative);
         if (imageData) {
             int srcWidth, srcHeight, comp;
             stbi_uc* srcPixels = stbi_load_from_memory(imageData->data, imageData->size, &srcWidth, &srcHeight, &comp, 4);
@@ -555,7 +548,7 @@ static int showTexturesPopup(const char* popupName)
 
                 const TextureItem& tex = theApp.textureDb->textures[textureIdx];
                 if (tex.handle.isValid()) {
-                    termite::TextureHandle* handle = &theApp.textureDb->resLib.getResourcePtr<termite::Texture>(tex.handle)->handle;
+                    termite::TextureHandle* handle = &termite::getResourcePtr<termite::Texture>(tex.handle)->handle;
                     theApp.gui->pushIDInt(textureIdx);
                     if (theApp.gui->imageButton((ImTextureID)handle, ImVec2(64, 64), ImVec2(0, 0),
                                                 ImVec2(1.0f, 1.0f), 1, ImVec4(0, 0, 0, 0), ImVec4(1.0f, 1.0f, 1.0f, 1.0f))) 
@@ -694,7 +687,7 @@ static void renderGui(float dt)
             if (theApp.gui->isItemHovered() && theApp.project->selectedSprite != -1) {
                 const Sprite& sprite = sheet->sprites[theApp.project->selectedSprite];
                 const TextureItem& texItem = theApp.textureDb->textures[sprite.textureItem];
-                termite::Texture* tex = theApp.textureDb->resLib.getResourcePtr<termite::Texture>(texItem.handle);
+                termite::Texture* tex = termite::getResourcePtr<termite::Texture>(texItem.handle);
                 termite::TextureHandle* handle = &tex->handle;
                 float ratio = float(tex->info.width) / float(tex->info.height);
 
@@ -919,7 +912,7 @@ static void showHelp()
     puts("");
 }
 
-static void onFileModified(termite::ResourceLib* resLib, const char* uri, void* userParam)
+static void onFileModified(const char* uri, void* userParam)
 {
     BX_VERBOSE("File changed: %s", uri);
 }
@@ -984,14 +977,13 @@ int main(int argc, char* argv[])
     // Initialize sheetmaker stuff
     bx::AllocatorI* alloc = termite::getHeapAlloc();
     termite::IoDriverApi* io = termite::getAsyncIoDriver();
-    termite::ResourceLibHelper resLib = termite::getDefaultResourceLib();
 
-    resLib.setFileModifiedCallback(onFileModified, nullptr);
+    termite::setFileModifiedCallback(onFileModified, nullptr);
 
     theApp.gui = (termite::ImGuiApi_v0*)termite::getEngineApi(uint16_t(termite::ApiId::ImGui), 0);    
     theApp.nvg = nvgCreate(1, 254, termite::getGfxDriver(), 
                            (termite::GfxApi_v0*)termite::getEngineApi(uint16_t(termite::ApiId::Gfx), 0), alloc);
-    theApp.textureDb = createTextureDatabase(io->getUri(), "library/sprites", resLib);
+    theApp.textureDb = createTextureDatabase(io->getUri(), "library/sprites");
     theApp.vg = termite::createVectorGfxContext(1);
     
     if (!theApp.textureDb) {

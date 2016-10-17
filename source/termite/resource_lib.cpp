@@ -651,7 +651,11 @@ void termite::ResourceLib::onReadComplete(const char* uri, MemoryBlock* mem)
 void termite::ResourceLib::onModified(const char* uri)
 {
     // Hot Loading
-    int index = this->hotLoadsTable.find(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)));
+    // strip "assets/" from the begining of uri
+    size_t uriOffset = 0;
+    if (strstr(uri, "assets/") == uri)
+        uriOffset = strlen("assets/");
+    int index = this->hotLoadsTable.find(bx::hashMurmur2A(uri + uriOffset, (uint32_t)strlen(uri + uriOffset)));
     if (index != -1) {
         bx::MultiHashTable<uint16_t>::Node* node = this->hotLoadsTable.getNode(index);
         // Recurse resources and reload them with their params
@@ -662,7 +666,7 @@ void termite::ResourceLib::onModified(const char* uri)
         }
     }
 
-    // Run callback
+    // Run user callback
     if (this->modifiedCallback)
         this->modifiedCallback(uri, this->fileModifiedUserParam);
 }
