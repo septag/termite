@@ -702,6 +702,83 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spaci
     driver->submit(ctx->viewId, g_dbg->program, 0, false);
 }
 
+void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spacing, float boldSpacing)
+{
+    spacing = bx::fceil(bx::fclamp(spacing, 1.0f, 20.0f));
+
+    float ratio = (ctx->viewport.xmax - ctx->viewport.xmin) / (ctx->viewport.ymax - ctx->viewport.ymin);
+    rect_t rc = cam.getRect();
+
+    // Snap grid bounds to 'spacing'
+    // Example: spacing = 5, snap bounds to -5, 0, 5, ...
+    int nspace = (int)spacing;
+
+    vec2_t& minpt = rc.vmin;
+    vec2_t& maxpt = rc.vmax;
+    rect_t snapRect = rectf(float(int(minpt.x) - int(minpt.x) % nspace) - spacing,
+                            float(int(minpt.y) - int(minpt.y) % nspace) - spacing,
+                            float(int(maxpt.x) - int(maxpt.x) % nspace) + spacing,
+                            float(int(maxpt.y) - int(maxpt.y) % nspace) + spacing);
+
+    float w = snapRect.xmax - snapRect.xmin;
+    float h = snapRect.ymax - snapRect.ymin;
+    if (bx::fequal(w, 0, 0.00001f) || bx::fequal(h, 0, 0.00001f))
+        return;
+
+    int xlines = int(w) / nspace + 1;
+    int ylines = int(h) / nspace + 1;
+    int numVerts = (xlines + ylines) * 2;
+
+    // Draw
+    GfxDriverApi* driver = ctx->driver;
+    if (!driver->checkAvailTransientVertexBuffer(numVerts, eddVertexPosCoordColor::Decl))
+        return;
+    TransientVertexBuffer tvb;
+    driver->allocTransientVertexBuffer(&tvb, numVerts, eddVertexPosCoordColor::Decl);
+    eddVertexPosCoordColor* verts = (eddVertexPosCoordColor*)tvb.data;
+
+    color_t color = 0xffffffff;
+    DebugDrawState* state;
+    ctx->stateStack.peek(&state);
+    color_t dimColor = rgba(128, 128, 128);
+
+    int i = 0;
+    for (float yoffset = snapRect.ymin; yoffset <= snapRect.ymax; yoffset += spacing, i += 2) {
+        verts[i].x = snapRect.xmin;
+        verts[i].y = yoffset;
+        verts[i].z = 0;
+
+        int ni = i + 1;
+        verts[ni].x = snapRect.xmax;
+        verts[ni].y = yoffset;
+        verts[ni].z = 0;
+
+        verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(yoffset, boldSpacing), 0.0f, 0.0001f) ? dimColor : color;
+    }
+
+    for (float xoffset = snapRect.xmin; xoffset <= snapRect.xmax; xoffset += spacing, i += 2) {
+        verts[i].x = xoffset;
+        verts[i].y = snapRect.ymin;
+        verts[i].z = 0;
+
+        int ni = i + 1;
+        verts[ni].x = xoffset;
+        verts[ni].y = snapRect.ymax;
+        verts[ni].z = 0;
+
+        verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(xoffset, boldSpacing), 0.0f, 0.0001f) ? dimColor : color;
+    }
+
+    mtx4x4_t ident = mtx4x4Ident();
+
+    driver->setTransientVertexBuffer(&tvb);
+    driver->setTransform(ident.f, 1);
+    driver->setState(GfxState::RGBWrite | GfxState::DepthTestLess | GfxState::PrimitiveLines, 0);
+    driver->setUniform(g_dbg->uColor, state->color.f, 1);
+    driver->setTexture(0, g_dbg->uTexture, g_dbg->whiteTexture, TextureFlag::FromTexture);
+    driver->submit(ctx->viewId, g_dbg->program, 0, false);
+}
+
 void termite::ddBoundingBox(DebugDrawContext* ctx, const aabb_t bb, bool showInfo /*= false*/)
 {
     vec3_t center = (bb.vmin + bb.vmax)*0.5f;
