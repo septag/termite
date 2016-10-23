@@ -13,7 +13,7 @@ namespace termite
     {
         float tx0, ty0;
         float tx1, ty1;
-        uint32_t tag; // 0 or hashed name value
+        uint64_t tag; // 0 or hashed name value
     };
 
     struct tsAnimation

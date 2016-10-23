@@ -6,25 +6,24 @@
 
 if (ANDROID)
     set(LIBUV_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/libuv_android_arm CACHE PATH "Libuv root directory")
-    set(LIBUV_LIBRARY ${LIBUV_ROOT_DIR}/lib/libuv.a)
-    set(LIBUV_INCLUDE_DIR ${LIBUV_ROOT_DIR}/include)
-    set(LIBUV_FOUND TRUE)
-    return()
+    set(FIND_EXTRA_FLAG NO_CMAKE_FIND_ROOT_PATH)
+else()
+    set(LIBUV_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/libuv CACHE PATH "Libuv root directory")
 endif()
 
-if (WIN32)
-    set(LIBUV_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/libuv CACHE PATH "Libuv root directory")
-
+if (LIBUV_ROOT_DIR)
     # Find path of each library
     find_path(LIBUV_INCLUDE_DIR
         NAMES uv.h
-        HINTS ${LIBUV_ROOT_DIR}/include)
+        HINTS ${LIBUV_ROOT_DIR}/include
+        ${FIND_EXTRA_FLAG})
 
     find_path(LIBUV_LIBRARY_DIR
-        NAMES uv.lib libuv.lib libuv.so
-        HINTS ${LIBUV_ROOT_DIR}/lib)
+        NAMES uv.lib libuv.lib libuv.so libuv.a
+        HINTS ${LIBUV_ROOT_DIR}/lib
+        ${FIND_EXTRA_FLAG})
 
-    find_library(LIBUV_LIBRARY_RELEASE uv PATHS ${LIBUV_LIBRARY_DIR})
+    find_library(LIBUV_LIBRARY_RELEASE uv PATHS ${LIBUV_LIBRARY_DIR} ${FIND_EXTRA_FLAG})
 
     set(LIBUV_LIBRARY ${LIBUV_LIBRARY_RELEASE})
 

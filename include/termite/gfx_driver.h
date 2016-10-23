@@ -7,7 +7,7 @@
 
 namespace termite
 {
-    VertexDecl* vdeclBegin(VertexDecl* vdecl, RendererType::Enum _type = RendererType::Null);
+    VertexDecl* vdeclBegin(VertexDecl* vdecl, RendererType::Enum _type = RendererType::Noop);
     void vdeclEnd(VertexDecl* vdecl);
     VertexDecl* vdeclAdd(VertexDecl* vdecl, VertexAttrib::Enum _attrib, uint8_t _num, VertexAttribType::Enum _type, 
                          bool _normalized = false, bool _asInt = false);
@@ -34,7 +34,7 @@ namespace termite
         {
         }
 
-        inline VertexDeclHelper& begin(RendererType::Enum _type = RendererType::Null)
+        inline VertexDeclHelper& begin(RendererType::Enum _type = RendererType::Noop)
         {
             vdeclBegin(m_decl, _type);
             return *this;

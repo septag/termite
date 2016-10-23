@@ -12,7 +12,6 @@
 #include "bxx/linked_list.h"
 #include "bxx/pool.h"
 #include "bxx/logger.h"
-#include "bx/hash.h"
 
 #include "../include_common/sprite_format.h"
 #include "shaders_h/sprite.vso"
@@ -91,7 +90,7 @@ class SpriteSheetLoader : public ResourceCallbacksI
 
 struct SpriteAnimEvent
 {
-    uint32_t tagNameHash;
+    size_t tagNameHash;
     SpriteAnimCallback inCallback;
     SpriteAnimCallback outCallback;
     void* userData;
@@ -110,7 +109,7 @@ struct SpriteAnimEvent
 
 struct SpriteAnimAction
 {
-    uint32_t clipNameHash;
+    size_t clipNameHash;
     bool reverse;
     bool looped;
     SpriteAnimCallback finishCallback;
@@ -134,7 +133,7 @@ struct SpriteAnimImpl
     float t;
     float speed;
     float resumeSpeed;
-    uint32_t clipNameHash;
+    size_t clipNameHash;
     SpriteAnimAction* action;
     SpriteAnimEvent* events;
     SpriteAnimEvent* lastCalledEvent;
@@ -539,7 +538,7 @@ void termite::destroySpriteAnim(SpriteAnimHandle handle)
     g_sprite->animPool.freeHandle(handle.value);
 }
 
-inline SpriteAnimClip* searchClips(SpriteSheet* ss, uint32_t nameHash)
+inline SpriteAnimClip* searchClips(SpriteSheet* ss, size_t nameHash)
 {
     for (int i = 0, c = ss->numAnimClips; i < c; i++) {
         if (ss->clips[i].nameHash = nameHash)
@@ -562,7 +561,7 @@ static void processSpriteAnimEvents(SpriteAnimHandle handle, SpriteSheet* sheet,
     assert(frameIdx < sheet->numFrames);
 
     SpriteAnimImpl* anim = g_sprite->animPool.getHandleData<SpriteAnimImpl>(0, handle.value);
-    uint32_t tag = sheet->tags[frameIdx];
+    size_t tag = sheet->tags[frameIdx];
 
     SpriteAnimEvent* ev = anim->events;
     while (ev) {
@@ -645,7 +644,7 @@ void termite::queueSpriteAnim(SpriteAnimHandle handle, const char* clipName, boo
     SpriteAnimImpl* anim = g_sprite->animPool.getHandleData<SpriteAnimImpl>(0, handle.value);
     SpriteAnimAction* action = g_sprite->actionPool.newInstance();
     if (action) {
-        action->clipNameHash = bx::hashMurmur2A(clipName, (uint32_t)strlen(clipName));
+        action->clipNameHash = tinystl::hash_string(clipName, strlen(clipName));
         action->looped = looped;
         action->reverse = reverse;
         action->finishCallback = finishedCallback;
@@ -669,7 +668,7 @@ void termite::addSpriteAnimEvent(SpriteAnimHandle handle, const char* tagName, S
 {
     assert(handle.isValid());
 
-    uint32_t tagNameHash = bx::hashMurmur2A(tagName, (uint32_t)strlen(tagName));
+    size_t tagNameHash = tinystl::hash_string(tagName, strlen(tagName));
     SpriteAnimImpl* anim = g_sprite->animPool.getHandleData<SpriteAnimImpl>(0, handle.value);
 
     // Search in previous events, must not be duplicate
@@ -831,7 +830,7 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
     // Load Descriptor
     if (header.numSprites) {
         ss->frames = (vec4_t*)BX_ALLOC(&g_sprite->allocStub, sizeof(vec4_t)*header.numSprites);
-        ss->tags = (uint32_t*)BX_ALLOC(&g_sprite->allocStub, sizeof(uint32_t)*header.numSprites);
+        ss->tags = (size_t*)BX_ALLOC(&g_sprite->allocStub, sizeof(size_t)*header.numSprites);
         if (!ss->frames || !ss->tags)
             return false;
         ss->numFrames = header.numSprites;
@@ -839,7 +838,7 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
             tsSprite sprite;
             reader.read(&sprite, sizeof(sprite), &err);
             ss->frames[i] = vec4f(sprite.tx0, sprite.ty0, sprite.tx1, sprite.ty1);
-            ss->tags[i] = sprite.tag;
+            ss->tags[i] = (size_t)sprite.tag;
         }
     }
 
@@ -852,7 +851,7 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
             tsAnimation anim;
             reader.read(&anim, sizeof(anim), &err);
             bx::strlcpy(ss->clips[i].name, anim.name, sizeof(ss->clips[i].name));
-            ss->clips[i].nameHash = bx::hashMurmur2A(anim.name, (uint32_t)strlen(anim.name));
+            ss->clips[i].nameHash = tinystl::hash_string(anim.name, strlen(anim.name));
             ss->clips[i].startFrame = anim.startFrame;
             ss->clips[i].endFrame = anim.endFrame;
             ss->clips[i].totalTime = float(anim.endFrame - anim.startFrame) / float(anim.fps);

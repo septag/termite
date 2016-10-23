@@ -220,7 +220,7 @@ CommandTypeHandle termite::findCommand(const char* name)
 {
     assert(g_cmdSys);
 
-    int r = g_cmdSys->commandTypeTable.find(bx::hashMurmur2A(name, (uint32_t)strlen(name)));
+    int r = g_cmdSys->commandTypeTable.find(tinystl::hash_string(name, strlen(name)));
     if (r != -1) {
         int index = g_cmdSys->commandTypeTable.getValue(r);
         return CommandTypeHandle(uint16_t(index));

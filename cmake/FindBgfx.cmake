@@ -5,15 +5,10 @@
 
 if (ANDROID)    
     set(BGFX_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/bgfx_android_arm CACHE PATH "BGFX root directory")
-    set(BGFX_LIBRARY 
-        optimized ${BGFX_ROOT_DIR}/lib/libbgfxRelease.a 
-        debug ${BGFX_ROOT_DIR}/lib/libbgfxDebug.a)
-    set(BGFX_INCLUDE_DIR ${BGFX_ROOT_DIR}/include)
-    set(BGFX_FOUND TRUE)
-    return()
+    set(FIND_EXTRA_FLAG NO_CMAKE_FIND_ROOT_PATH)
+else()
+    set(BGFX_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/bgfx CACHE PATH "BGFX root directory")
 endif()
-
-set(BGFX_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/bgfx CACHE PATH "BGFX root directory")
 
 # Find path of each library
 find_path(BGFX_INCLUDE_DIR
@@ -21,10 +16,11 @@ find_path(BGFX_INCLUDE_DIR
 		bgfx/bgfx.h
 	HINTS
 		${BGFX_ROOT_DIR}/include
+    ${FIND_EXTRA_FLAG}
 )
 
-find_library(BGFX_LIBRARY_RELEASE bgfxRelease PATHS ${BGFX_ROOT_DIR}/lib)
-find_library(BGFX_LIBRARY_DEBUG	bgfxDebug PATHS ${BGFX_ROOT_DIR}/lib)
+find_library(BGFX_LIBRARY_RELEASE bgfxRelease PATHS ${BGFX_ROOT_DIR}/lib ${FIND_EXTRA_FLAG})
+find_library(BGFX_LIBRARY_DEBUG	bgfxDebug PATHS ${BGFX_ROOT_DIR}/lib ${FIND_EXTRA_FLAG})
 
 set(BGFX_LIBRARY 
 	optimized 	${BGFX_LIBRARY_RELEASE}

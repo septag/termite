@@ -418,7 +418,7 @@ static bool saveSpriteSheet(const char* filepath, const SpriteSheet* sheetInfo, 
             // Tag
             if (sprite.tag != -1 && sprite.tag < sheetInfo->numTags) {
                 const FrameTag& tag = sheetInfo->tags[sprite.tag];
-                tsprite.tag = bx::hashMurmur2A(tag.name, (uint32_t)strlen(tag.name));
+                tsprite.tag = tinystl::hash_string(tag.name, strlen(tag.name));
             } else {
                 tsprite.tag = 0;
             }

@@ -101,7 +101,7 @@ struct FontLibrary
 {
     IoDriverApi* ioDriver;
     bx::AllocatorI* alloc;
-    bx::HashTable<FontItem*> fontTable;
+    bx::HashTable<FontItem*, uint32_t> fontTable;
     bx::List<FontItem*> fontList;
     bx::Pool<FontItem> fontItemPool;
 
@@ -212,7 +212,7 @@ Font* termite::Font::create(const MemoryBlock* mem, const char* fntFilepath, bx:
     memset(font->m_glyphs, 0x00, sizeof(FontGlyph)*numChars);
 
     uint32_t charWidth = 0;
-    for (int i = 0; i < (int)numChars; i++) {
+    for (int i = 0; i < int(numChars); i++) {
         ms.read(&ch, sizeof(ch), &err);
         font->m_glyphs[i].glyphId = ch.id;
         font->m_glyphs[i].width = (float)ch.width;
@@ -223,7 +223,7 @@ Font* termite::Font::create(const MemoryBlock* mem, const char* fntFilepath, bx:
         font->m_glyphs[i].xoffset = (float)ch.xoffset;
         font->m_glyphs[i].yoffset = (float)ch.yoffset;
 
-        font->m_charTable.add(ch.id, i);
+        font->m_charTable.add(uint16_t(ch.id), i);
 
         charWidth = bx::uint32_max(charWidth, ch.xadvance);
     }

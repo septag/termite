@@ -2,7 +2,6 @@
 
 #include "../bx/allocator.h"
 #include "../bx/string.h"
-#include "../bx/hash.h"
 #include "pool.h"
 
 #include <cassert>
@@ -18,7 +17,7 @@ namespace bx
     };
 
     // Normal hash table
-    template <typename Ty, typename Ky = uint32_t>
+    template <typename Ty, typename Ky = size_t>
     class HashTable
     {
     public:
@@ -60,7 +59,7 @@ namespace bx
     
     // MultiHashTables can have multiple values per hash key
     // You should iterate over the list for all values on each search
-    template <typename Ty, typename Ky = uint32_t>
+    template <typename Ty, typename Ky = size_t>
     class MultiHashTable
     {
     public:

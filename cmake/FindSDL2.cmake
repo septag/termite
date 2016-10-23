@@ -65,17 +65,11 @@
 # (To distribute this file outside of CMake, substitute the full
 #  License text for the above reference.)
 
-if (WIN32)
-	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/sdl CACHE PATH "SDL2 root directory")
-endif()
-
 if (ANDROID)
 	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/sdl_android_arm CACHE PATH "SDL2 root directory")
-    set(SDL2_LIBRARY ${SDL2_PATH}/lib/armeabi-v7a/libSDL2.so)
-    set(SDL2_INCLUDE_DIR ${SDL2_PATH}/include/SDL2)
-    set(SDL2_FOUND TRUE)
-    set(SDL2_ANDROID_MAIN_ENTRY ${SDL2_PATH}/src/main/android/SDL_android_main.c)
-    return()
+    set(FIND_EXTRA_FLAG NO_CMAKE_FIND_ROOT_PATH)
+elseif (WIN32)
+	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/sdl CACHE PATH "SDL2 root directory")
 endif()
 
 SET(SDL2_SEARCH_PATHS
@@ -96,14 +90,16 @@ FIND_PATH(SDL2_INCLUDE_DIR SDL.h
 	$ENV{SDL2DIR}
 	PATH_SUFFIXES include/SDL2 include
 	PATHS ${SDL2_SEARCH_PATHS}
+    ${FIND_EXTRA_FLAG}
 )
 
 if (MSVC)
-  FIND_PATH(SDL2_BIN_DIR SDL2.dll
+    FIND_PATH(SDL2_BIN_DIR SDL2.dll
 	HINTS
 	$ENV{SDL2DIR}
 	PATH_SUFFIXES bin bin64 lib lib64
 	PATHS ${SDL2_SEARCH_PATHS}
+    ${FIND_EXTRA_FLAG}
 	)
 endif()
 
@@ -111,8 +107,9 @@ FIND_LIBRARY(SDL2_LIBRARY_TEMP
 	NAMES SDL2
 	HINTS
 	$ENV{SDL2DIR}
-	PATH_SUFFIXES lib64 lib
+	PATH_SUFFIXES lib64 lib lib/armeabi-v7a lib/x86
 	PATHS ${SDL2_SEARCH_PATHS}
+    ${FIND_EXTRA_FLAG}
 )
 
 IF(NOT SDL2_BUILDING_LIBRARY)
@@ -127,6 +124,7 @@ IF(NOT SDL2_BUILDING_LIBRARY)
 			$ENV{SDL2DIR}
 			PATH_SUFFIXES lib64 lib
 			PATHS ${SDL2_SEARCH_PATHS}
+            ${FIND_EXTRA_FLAG}
 		)
 	ENDIF(NOT ${SDL2_INCLUDE_DIR} MATCHES ".framework")
 ENDIF(NOT SDL2_BUILDING_LIBRARY)
@@ -198,4 +196,3 @@ if (SDL2_FOUND AND WIN32)
         VERBATIM)
     endfunction()  	
 endif()
-

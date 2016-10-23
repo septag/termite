@@ -273,7 +273,7 @@ namespace
 			gl->u_halfTexel.reset();
 		}
 
-		gl->gfxApi->vdeclBegin(&s_nvgDecl, termite::RendererType::Null);
+		gl->gfxApi->vdeclBegin(&s_nvgDecl, termite::RendererType::Noop);
 		gl->gfxApi->vdeclAdd(&s_nvgDecl, termite::VertexAttrib::Position, 2, termite::VertexAttribType::Float, false, false);
 		gl->gfxApi->vdeclAdd(&s_nvgDecl, termite::VertexAttrib::TexCoord0, 2, termite::VertexAttribType::Float, false, false);
 		gl->gfxApi->vdeclEnd(&s_nvgDecl);

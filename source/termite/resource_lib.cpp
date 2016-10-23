@@ -3,7 +3,6 @@
 #include "resource_lib.h"
 #include "io_driver.h"
 
-#include "bx/hash.h"
 #include "bxx/logger.h"
 #include "bxx/hash_table.h"
 #include "bxx/path.h"
@@ -29,7 +28,7 @@ struct Resource
     bx::Path uri;
     uint32_t refcount;
     uintptr_t obj;
-    uint32_t typeNameHash;
+    size_t typeNameHash;
     uint32_t paramsHash;
     ResourceLoadState::Enum loadState;
 };
@@ -193,7 +192,7 @@ ResourceTypeHandle termite::registerResourceType(const char* name, ResourceCallb
     tdata->failObj = failObj;
     
     ResourceTypeHandle handle(tHandle);
-    resLib->resourceTypesTable.add(bx::hashMurmur2A(tdata->name, (uint32_t)strlen(tdata->name)), tHandle);
+    resLib->resourceTypesTable.add(tinystl::hash_string(tdata->name, strlen(tdata->name)), tHandle);
 
     return handle;
 }
@@ -206,7 +205,7 @@ void termite::unregisterResourceType(ResourceTypeHandle handle)
     if (handle.isValid()) {
         ResourceTypeData* tdata = resLib->resourceTypes.getHandleData<ResourceTypeData>(0, handle.value);
         
-        int index = resLib->resourceTypesTable.find(bx::hashMurmur2A(tdata->name, (uint32_t)strlen(tdata->name)));
+        int index = resLib->resourceTypesTable.find(tinystl::hash_string(tdata->name, strlen(tdata->name)));
         if (index != -1)
             resLib->resourceTypesTable.remove(index);
         resLib->resourceTypes.freeHandle(handle.value);
@@ -224,7 +223,7 @@ inline uint32_t hashResource(const char* uri, const void* userParams, int userPa
 }
 
 static ResourceHandle newResource(ResourceCallbacksI* callbacks, const char* uri, const void* userParams, 
-                                  int userParamsSize, uintptr_t obj, uint32_t typeNameHash)
+                                  int userParamsSize, uintptr_t obj, size_t typeNameHash)
 {
     ResourceLib* resLib = g_resLib;
 
@@ -253,7 +252,7 @@ static ResourceHandle newResource(ResourceCallbacksI* callbacks, const char* uri
     // Register for hot-loading
     // A URI may contain several resources (different load params), so we have to reload them all
     if (resLib->flags & ResourceLibInitFlag::HotLoading) {
-        resLib->hotLoadsTable.add(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)), rHandle);
+        resLib->hotLoadsTable.add(tinystl::hash_string(uri, strlen(uri)), rHandle);
     }
 
     return rs->handle;
@@ -266,7 +265,7 @@ static void deleteResource(ResourceHandle handle)
 
     // Unregister from hot-loading
     if (resLib->flags & ResourceLibInitFlag::HotLoading) {
-        int index = resLib->hotLoadsTable.find(bx::hashMurmur2A(rs->uri.cstr(), (uint32_t)rs->uri.getLength()));
+        int index = resLib->hotLoadsTable.find(tinystl::hash_string(rs->uri.cstr(), rs->uri.getLength()));
         if (index != -1) {
             bx::MultiHashTable<uint16_t>::Node* node = resLib->hotLoadsTable.getNode(index);
             bx::MultiHashTable<uint16_t>::Node* foundNode = nullptr;
@@ -293,7 +292,7 @@ static void deleteResource(ResourceHandle handle)
 }
 
 static ResourceHandle addResource(ResourceCallbacksI* callbacks, const char* uri, const void* userParams,
-                                  int userParamsSize, uintptr_t obj, ResourceHandle overrideHandle, uint32_t typeNameHash)
+                                  int userParamsSize, uintptr_t obj, ResourceHandle overrideHandle, size_t typeNameHash)
 {
     ResourceLib* resLib = g_resLib;
     ResourceHandle handle = overrideHandle;
@@ -321,7 +320,7 @@ static void setResourceLoadFlag(ResourceHandle resHandle, ResourceLoadState::Enu
     res->loadState = flag;
 }
 
-static ResourceHandle loadResourceHashed(uint32_t nameHash, const char* uri, const void* userParams, ResourceFlag::Bits flags)
+static ResourceHandle loadResourceHashed(size_t nameHash, const char* uri, const void* userParams, ResourceFlag::Bits flags)
 {
     ResourceLib* resLib = g_resLib;
     assert(resLib);
@@ -372,7 +371,7 @@ static ResourceHandle loadResourceHashed(uint32_t nameHash, const char* uri, con
             AsyncLoadRequest* req = resLib->asyncLoads.getHandleData<AsyncLoadRequest>(0, reqHandle);
             req->handle = handle;
             req->flags = flags;
-            resLib->asyncLoadsTable.add(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)), reqHandle);
+            resLib->asyncLoadsTable.add(tinystl::hash_string(uri, strlen(uri)), reqHandle);
 
             // Load the file, result will be called in onReadComplete
             resLib->driver->read(uri, IoPathType::Assets);
@@ -414,7 +413,7 @@ static ResourceHandle loadResourceHashed(uint32_t nameHash, const char* uri, con
     return handle;
 }
 
-static ResourceHandle loadResourceHashedInMem(uint32_t nameHash, const char* uri, const MemoryBlock* mem, 
+static ResourceHandle loadResourceHashedInMem(size_t nameHash, const char* uri, const MemoryBlock* mem, 
                                               const void* userParams, ResourceFlag::Bits flags)
 {
     ResourceLib* resLib = g_resLib;
@@ -481,13 +480,13 @@ static ResourceHandle loadResourceHashedInMem(uint32_t nameHash, const char* uri
 ResourceHandle termite::loadResource(const char* name, const char* uri, const void* userParams,
                                      ResourceFlag::Bits flags)
 {
-    return loadResourceHashed(bx::hashMurmur2A(name, (uint32_t)strlen(name)), uri, userParams, flags);
+    return loadResourceHashed(tinystl::hash_string(name, strlen(name)), uri, userParams, flags);
 }
 
 ResourceHandle termite::loadResourceFromMem(const char* name, const char* uri, const MemoryBlock* mem, 
                                             const void* userParams /*= nullptr*/, ResourceFlag::Bits flags /*= ResourceFlag::None*/)
 {
-    return loadResourceHashedInMem(bx::hashMurmur2A(name, (uint32_t)strlen(name)), uri, mem, userParams, flags);
+    return loadResourceHashedInMem(tinystl::hash_string(name, strlen(name)), uri, mem, userParams, flags);
 }
 
 void termite::unloadResource(ResourceHandle handle)
@@ -536,7 +535,7 @@ int termite::getResourceParamSize(const char* name)
     ResourceLib* resLib = g_resLib;
     assert(resLib);
 
-    int typeIdx = resLib->resourceTypesTable.find(bx::hashMurmur2A(name, (uint32_t)strlen(name)));
+    int typeIdx = resLib->resourceTypesTable.find(tinystl::hash_string(name, strlen(name)));
     if (typeIdx != -1)
         return resLib->resourceTypes.getHandleData<ResourceTypeData>(0, 
                                                          resLib->resourceTypesTable.getValue(typeIdx))->userParamsSize;
@@ -549,7 +548,7 @@ void termite::ResourceLib::onOpenError(const char* uri)
 {
     ResourceLib* resLib = g_resLib;
 
-    int r = this->asyncLoadsTable.find(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)));
+    int r = this->asyncLoadsTable.find(tinystl::hash_string(uri, strlen(uri)));
     if (r != -1) {
         uint16_t handle = this->asyncLoadsTable.getValue(r);
         AsyncLoadRequest* areq = this->asyncLoads.getHandleData<AsyncLoadRequest>(0, handle);
@@ -576,7 +575,7 @@ void termite::ResourceLib::onReadError(const char* uri)
 {
     ResourceLib* resLib = g_resLib;
 
-    int r = this->asyncLoadsTable.find(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)));
+    int r = this->asyncLoadsTable.find(tinystl::hash_string(uri, strlen(uri)));
     if (r != -1) {
         uint16_t handle = this->asyncLoadsTable.getValue(r);
         AsyncLoadRequest* areq = this->asyncLoads.getHandleData<AsyncLoadRequest>(0, handle);
@@ -602,7 +601,7 @@ void termite::ResourceLib::onReadError(const char* uri)
 void termite::ResourceLib::onReadComplete(const char* uri, MemoryBlock* mem)
 {
     ResourceLib* resLib = g_resLib;
-    int r = this->asyncLoadsTable.find(bx::hashMurmur2A(uri, (uint32_t)strlen(uri)));
+    int r = this->asyncLoadsTable.find(tinystl::hash_string(uri, strlen(uri)));
     if (r != -1) {
         int handle = this->asyncLoadsTable.getValue(r);
         AsyncLoadRequest* areq = this->asyncLoads.getHandleData<AsyncLoadRequest>(0, handle);
@@ -655,7 +654,7 @@ void termite::ResourceLib::onModified(const char* uri)
     size_t uriOffset = 0;
     if (strstr(uri, "assets/") == uri)
         uriOffset = strlen("assets/");
-    int index = this->hotLoadsTable.find(bx::hashMurmur2A(uri + uriOffset, (uint32_t)strlen(uri + uriOffset)));
+    int index = this->hotLoadsTable.find(tinystl::hash_string(uri + uriOffset, strlen(uri + uriOffset)));
     if (index != -1) {
         bx::MultiHashTable<uint16_t>::Node* node = this->hotLoadsTable.getNode(index);
         // Recurse resources and reload them with their params

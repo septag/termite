@@ -203,9 +203,8 @@ static MemoryBlock* blockReadRaw(const char* uri, IoPathType::Enum pathType, Asy
         file.close();
     }
 
-    if (!mem) {
+    if (!mem)
         *pRes = AsyncResponse::RequestReadFailed;
-    }
     return mem;
 }
 
@@ -297,7 +296,7 @@ static int32_t asyncThread(void* userData)
             }
 
             if (request.type == AsyncRequest::Read) {
-                MemoryBlock* mem = blockReadRaw(request.uri.cstr(), request.pathType. &response.type);
+                MemoryBlock* mem = blockReadRaw(request.uri.cstr(), request.pathType, &response.type);
                 response.uri = request.uri;
                 response.mem = mem;
                 driver->responseQueue->push(response);

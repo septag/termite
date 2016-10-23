@@ -189,10 +189,11 @@ namespace termite
     {
         enum Enum
         {
-            Null = 0,
+            Noop,
             Direct3D9,
             Direct3D11,
             Direct3D12,
+            Gnm,
             Metal,
             OpenGLES,
             OpenGL,
@@ -297,22 +298,24 @@ namespace termite
         uint64_t gpuTimerFreq;
     };
 
-    struct GpuEyeDesc
-    {
-        float rotation[4];
-        float translation[3];
-        float fov[4];
-        float viewOffset[3];
-    };
-
     struct HMDDesc
     {
+        struct Eye
+        {
+            float rotation[4];
+            float translation[3];
+            float fov[4];
+            float viewOffset[3];
+            float projection[16];
+            float pixelsPerTanAngle[2];
+        };
+
+        Eye eye[2];
         uint16_t width;
         uint16_t height;
         uint32_t deviceWidth;
         uint32_t deviceHeight;
         uint8_t flags;
-        GpuEyeDesc eye[2];
     };
 
     struct RenderFrameType
@@ -670,8 +673,8 @@ namespace termite
     {
         uint32_t hash;
         uint16_t stride;
-        uint16_t offset[int(VertexAttrib::Count)];
-        uint16_t attribs[int(VertexAttrib::Count)];
+        uint16_t offset[VertexAttrib::Count];
+        uint16_t attribs[VertexAttrib::Count];
     };
 
     struct GfxAttachment
@@ -783,7 +786,7 @@ namespace termite
             return "OpenGL";
         case RendererType::Vulkan:
             return "Vulcan";
-        case RendererType::Null:
+        case RendererType::Noop:
             return "Null";
         }
         return "Unknown";

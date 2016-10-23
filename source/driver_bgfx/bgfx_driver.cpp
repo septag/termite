@@ -8,6 +8,7 @@
 
 #include <cstdarg>
 #include <cstdio>
+#include <assert.h>
 
 using namespace termite;
 
@@ -192,10 +193,10 @@ static const GfxCaps& getCaps()
     const bgfx::Caps* caps = bgfx::getCaps();
     g_bgfx.caps.deviceId = caps->deviceId;
     g_bgfx.caps.supported = caps->supported;
-    g_bgfx.caps.maxDrawCalls = caps->maxDrawCalls;
-    g_bgfx.caps.maxFBAttachments = caps->maxFBAttachments;
-    g_bgfx.caps.maxTextureSize = caps->maxTextureSize;
-    g_bgfx.caps.maxViews = caps->maxViews;
+    g_bgfx.caps.maxDrawCalls = caps->limits.maxDrawCalls;
+    g_bgfx.caps.maxFBAttachments = caps->limits.maxFBAttachments;
+    g_bgfx.caps.maxTextureSize = caps->limits.maxTextureSize;
+    g_bgfx.caps.maxViews = caps->limits.maxViews;
     g_bgfx.caps.numGPUs = caps->numGPUs;
     g_bgfx.caps.type = (RendererType::Enum)caps->rendererType;
     g_bgfx.caps.vendorId = caps->vendorId;
@@ -1105,8 +1106,27 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.dbgTextPrintf = dbgTextPrintf;
     api.dbgTextImage = dbgTextImage;
 
-    // TODO: put some assertions for enum matching between ours and bgfx
-    assert(int(termite::TextureFormat::D0S8) == bgfx::TextureFormat::D0S8);
+    // Some assertions for enum matching between ours and bgfx
+    static_assert(RendererType::Count == bgfx::RendererType::Count, "RendererType mismatch");
+    static_assert(RendererType::Vulkan == bgfx::RendererType::Vulkan, "RendererType mismatch");
+    static_assert(GpuAccessFlag::Count == bgfx::Access::Count, "AccessFlag mismatch");
+    static_assert(VertexAttrib::TexCoord7  == bgfx::Attrib::TexCoord7, "VertexAttrib Mismatch");
+    static_assert(VertexAttribType::Float == bgfx::AttribType::Float, "VertexAttribType mismatch");
+    static_assert(TextureFormat::Unknown == bgfx::TextureFormat::Unknown, "TextureFormat mismatch");
+    static_assert(TextureFormat::R11G11B10F == bgfx::TextureFormat::R11G11B10F, "TextureFormat mismatch");
+    static_assert(TextureFormat::Count == bgfx::TextureFormat::Count, "TextureFormat mismatch");
+    static_assert(UniformType::Count == bgfx::UniformType::Count, "UniformType mismatch");
+    static_assert(BackbufferRatio::Count == bgfx::BackbufferRatio::Count, "BackbufferRatio mismatch");
+    static_assert(OcclusionQueryResult::Count == bgfx::OcclusionQueryResult::Count, "OcclusionQueryResult mismatch");
+    static_assert(sizeof(TransientIndexBuffer) == sizeof(bgfx::TransientIndexBuffer), "TransientIndexBuffer mismatch");
+    static_assert(sizeof(TransientVertexBuffer) == sizeof(bgfx::TransientVertexBuffer), "TransientVertexBuffer mismatch");
+    static_assert(sizeof(InstanceDataBuffer) == sizeof(bgfx::InstanceDataBuffer), "InstanceDataBuffer mismatch");
+    static_assert(sizeof(TextureInfo) == sizeof(bgfx::TextureInfo), "TextureInfo mismatch");
+    static_assert(sizeof(GfxAttachment) == sizeof(bgfx::Attachment), "GfxAttachment mismatch");
+    static_assert(sizeof(GpuTransform) == sizeof(bgfx::Transform), "GpuTransform mismatch");
+    static_assert(sizeof(HMDDesc) == sizeof(bgfx::HMD), "HMD mismatch");
+    static_assert(sizeof(VertexDecl) == sizeof(bgfx::VertexDecl), "VertexDecl mismatch");
+    static_assert(sizeof(GfxMemory) == sizeof(bgfx::Memory), "Memory mismatch");
 
     return &api;
 }

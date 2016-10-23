@@ -69,7 +69,7 @@ namespace termite
         uint32_t m_charWidth;    // fixed width fonts
         FontGlyph* m_glyphs;
         FontKerning* m_kerns;
-        bx::HashTableInt m_charTable;
+        bx::HashTable<int, uint16_t> m_charTable;
 
     public:
         Font(bx::AllocatorI* alloc);
@@ -103,7 +103,7 @@ namespace termite
             return getResourcePtr<Texture>(m_textureHandle);
         }
 
-        int findGlyph(uint32_t glyphId) const
+        int findGlyph(uint16_t glyphId) const
         {
             int index = m_charTable.find(glyphId);
             return index != -1 ? m_charTable.getValue(index) : -1;

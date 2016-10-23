@@ -19,7 +19,7 @@ namespace termite
     struct SpriteAnimClip
     {
         char name[32];
-        uint32_t nameHash;
+        size_t nameHash;
         int startFrame;
         int endFrame;
         float fps;
@@ -32,7 +32,7 @@ namespace termite
         int numFrames;
         int numAnimClips;
         vec4_t* frames; // count = numFrames
-        uint32_t* tags; // count = numFrames (hashed value of tag name)
+        size_t* tags; // count = numFrames (hashed value of tag name)
         SpriteAnimClip* clips;
     };
 

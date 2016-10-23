@@ -6,48 +6,49 @@
 
 using namespace termite;
 
-static const uint8_t gAttribTypeSizeDx9[(int)VertexAttribType::Count][4] =
+static const uint8_t gAttribTypeSizeDx9[VertexAttribType::Count][4] =
 {
-    { 4,  4,  4,  4 }, // Uint8
-    { 4,  4,  4,  4 }, // Uint10
-    { 4,  4,  8,  8 }, // Int16
-    { 4,  4,  8,  8 }, // Half
-    { 4,  8, 12, 16 }, // Float
+    {4,  4,  4,  4}, // Uint8
+    {4,  4,  4,  4}, // Uint10
+    {4,  4,  8,  8}, // Int16
+    {4,  4,  8,  8}, // Half
+    {4,  8, 12, 16}, // Float
 };
 
-static const uint8_t gAttribTypeSizeDx1x[(int)VertexAttribType::Count][4] =
+static const uint8_t gAttribTypeSizeDx1x[VertexAttribType::Count][4] =
 {
-    { 1,  2,  4,  4 }, // Uint8
-    { 4,  4,  4,  4 }, // Uint10
-    { 2,  4,  8,  8 }, // Int16
-    { 2,  4,  8,  8 }, // Half
-    { 4,  8, 12, 16 }, // Float
+    {1,  2,  4,  4}, // Uint8
+    {4,  4,  4,  4}, // Uint10
+    {2,  4,  8,  8}, // Int16
+    {2,  4,  8,  8}, // Half
+    {4,  8, 12, 16}, // Float
 };
 
-static const uint8_t gAttribTypeSizeGl[(int)VertexAttribType::Count][4] =
+static const uint8_t gAttribTypeSizeGl[VertexAttribType::Count][4] =
 {
-    { 1,  2,  4,  4 }, // Uint8
-    { 4,  4,  4,  4 }, // Uint10
-    { 2,  4,  6,  8 }, // Int16
-    { 2,  4,  6,  8 }, // Half
-    { 4,  8, 12, 16 }, // Float
+    {1,  2,  4,  4}, // Uint8
+    {4,  4,  4,  4}, // Uint10
+    {2,  4,  6,  8}, // Int16
+    {2,  4,  6,  8}, // Half
+    {4,  8, 12, 16}, // Float
 };
 
-static const uint8_t(*gAttribTypeSize[])[(int)VertexAttribType::Count][4] =
+static const uint8_t(*gAttribTypeSize[])[VertexAttribType::Count][4] =
 {
     &gAttribTypeSizeDx9,  // Null
     &gAttribTypeSizeDx9,  // Direct3D9
     &gAttribTypeSizeDx1x, // Direct3D11
     &gAttribTypeSizeDx1x, // Direct3D12
+    &gAttribTypeSizeGl,   // Gnm
     &gAttribTypeSizeGl,   // Metal
     &gAttribTypeSizeGl,   // OpenGLES
     &gAttribTypeSizeGl,   // OpenGL
     &gAttribTypeSizeGl,   // Vulkan
     &gAttribTypeSizeDx9,  // Count
 };
-BX_STATIC_ASSERT(BX_COUNTOF(gAttribTypeSize) == (int)RendererType::Count + 1);
+BX_STATIC_ASSERT(BX_COUNTOF(gAttribTypeSize) == RendererType::Count + 1);
 
-VertexDecl* termite::vdeclBegin(VertexDecl* vdecl, RendererType::Enum _type /*= RendererType::Null*/)
+VertexDecl* termite::vdeclBegin(VertexDecl* vdecl, RendererType::Enum _type /*= RendererType::Noop*/)
 {
     vdecl->hash = (uint32_t)_type;
     vdecl->stride = 0;

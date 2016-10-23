@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "bx/allocator.h"
+#include "tinystl/hash.h"
 
 // Windows
 #if BX_PLATFORM_WINDOWS

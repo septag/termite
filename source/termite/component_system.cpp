@@ -25,6 +25,8 @@ using namespace termite;
 
 namespace termite
 {
+    typedef bx::MultiHashTable<int, uint32_t> DestroyHashTable;
+
     struct EntityManager
     {
         struct FreeIndex
@@ -45,8 +47,8 @@ namespace termite
         uint32_t freeIndexSize;
         bx::Array<uint16_t> generations;
         bx::AllocatorI* alloc;
-        bx::MultiHashTableInt destroyTable; // keep a multi-hash for all components that entity has to destroy
-		bx::Pool<bx::MultiHashTableInt::Node> nodePool;
+        DestroyHashTable destroyTable; // keep a multi-hash for all components that entity has to destroy
+		bx::Pool<DestroyHashTable::Node> nodePool;
         
         EntityManager(bx::AllocatorI* _alloc) : 
             alloc(_alloc),
@@ -66,7 +68,7 @@ struct ComponentType
     ComponentFlag::Bits flags;
     uint32_t dataSize;
     bx::IndexedPool dataPool;
-    bx::HashTableInt entTable;  // Entity -> ComponentHandle
+    bx::HashTable<int, uint32_t> entTable;  // Entity -> ComponentHandle
     ComponentHandle* cachedHandles; // Keep cached component handles (lifetime is one frame only)
 
     ComponentType() : 
@@ -85,7 +87,7 @@ struct ComponentSystem
 {
     bx::Array<ComponentType> components;
     bx::HashTableInt nameTable;
-    bx::HashTableInt idTable;
+    bx::HashTable<int, uint32_t> idTable;
     bx::AllocatorI* alloc;
 
     ComponentSystem(bx::AllocatorI* _alloc) : 
@@ -171,9 +173,9 @@ void termite::destroyEntity(EntityManager* emgr, Entity ent)
     // And destroy all components registered to entity
     int entIdx = emgr->destroyTable.find(ent.id);
     if (entIdx != -1) {
-        bx::MultiHashTableInt::Node* node = emgr->destroyTable.getNode(entIdx);
+        DestroyHashTable::Node* node = emgr->destroyTable.getNode(entIdx);
         while (node) {
-            bx::MultiHashTableInt::Node* next = node->next;
+            DestroyHashTable::Node* next = node->next;
             ComponentHandle component(uint32_t(node->value));
             destroyComponentNoImmDestroy(emgr, ent, component);
 
@@ -267,7 +269,7 @@ ComponentTypeHandle termite::registerComponentType(const char* name, uint32_t id
     // Add to ComponentType database
     int index = g_csys->components.getCount() - 1;
     g_csys->idTable.add(id, index);
-    g_csys->nameTable.add(bx::hashMurmur2A(name, (uint32_t)strlen(name)), index);
+    g_csys->nameTable.add(tinystl::hash_string(name, strlen(name)), index);
 
     ComponentTypeHandle handle = ComponentTypeHandle(uint16_t(index));
     ctype->myHandle = handle;
@@ -336,7 +338,7 @@ void termite::destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle 
     if (ctype.flags & ComponentFlag::ImmediateDestroy) {
         int r = emgr->destroyTable.find(ent.id);
         if (r != -1) {
-            bx::MultiHashTableInt::Node* node = emgr->destroyTable.getNode(r);
+            DestroyHashTable::Node* node = emgr->destroyTable.getNode(r);
             while (node) {
                 if (node->value == int(handle.value)) {
                     emgr->destroyTable.remove(r, node);
@@ -420,7 +422,7 @@ void termite::resetComponentUpdateCache()
 
 ComponentTypeHandle termite::findComponentTypeByName(const char* name)
 {
-    int index = g_csys->nameTable.find(bx::hashMurmur2A(name, (uint32_t)strlen(name)));
+    int index = g_csys->nameTable.find(tinystl::hash_string(name, strlen(name)));
     if (index != -1)
         return ComponentTypeHandle(uint16_t(g_csys->nameTable.getValue(index)));
     else

@@ -43,6 +43,7 @@ int main(int argc, char* argv[])
     termite::Config conf;
     bx::Path pluginPath(argv[0]);
     strcpy(conf.gfxName, "");
+    strcpy(conf.pluginPath, pluginPath.getDirectory().cstr());
 
     if (termite::initialize(conf, nullptr)) {
         BX_FATAL(termite::getErrorString());

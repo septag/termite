@@ -60,7 +60,7 @@ namespace bx
         {
             assert(pData);
             if (m_first) {
-                *pData = m_head.data;
+                *pData = m_first->data;
                 return true;
             } else {
                 return false;
