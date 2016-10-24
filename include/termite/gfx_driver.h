@@ -142,6 +142,7 @@ namespace termite
                                 GfxViewFlag::Bits flags/* = GfxViewFlag::Stereo*/, const void* projRight/* = nullptr*/);
         void(*setViewRemap)(uint8_t id, uint8_t num, const void* remap);
         void(*setViewFrameBuffer)(uint8_t id, FrameBufferHandle handle);
+        void(*resetView)(uint8_t id);
 
         // Draw
         void(*setMarker)(const char* marker);

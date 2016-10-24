@@ -173,6 +173,11 @@ static void resetBgfx(uint32_t width, uint32_t height, GfxResetFlag::Bits flags)
     bgfx::reset(width, height, flags);
 }
 
+static void resetView(uint8_t viewId)
+{
+    bgfx::resetView(viewId);
+}
+
 static uint32_t frame()
 {
     return bgfx::frame();
@@ -1011,6 +1016,7 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.setViewTransform = setViewTransform;
     api.setViewRemap = setViewRemap;
     api.setViewFrameBuffer = setViewFrameBuffer;
+    api.resetView = resetView;
     api.setMarker = setMarker;
     api.setState = setState;
     api.setStencil = setStencil;

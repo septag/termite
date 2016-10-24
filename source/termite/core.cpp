@@ -134,6 +134,7 @@ struct Core
     RendererApi* renderer;
     FrameData frameData;
     double hpTimerFreq;
+    double timeMultiplier;
     bx::Pool<HeapMemoryImpl> memPool;
     bx::Lock memPoolLock;
     GfxDriverApi* gfxDriver;
@@ -155,6 +156,7 @@ struct Core
         renderer = nullptr;
         hpTimerFreq = 0;
         ioDriver = nullptr;
+        timeMultiplier = 1.0;
         memset(&frameData, 0x00, sizeof(frameData));
     }
 };
@@ -552,7 +554,7 @@ void termite::doFrame()
         fd.lastFrameTick = bx::getHPCounter();
 
     int64_t frameTick = bx::getHPCounter();
-    double dt = double(frameTick - fd.lastFrameTick)/g_core->hpTimerFreq;
+    double dt = g_core->timeMultiplier * double(frameTick - fd.lastFrameTick)/g_core->hpTimerFreq;
 
     if (g_core->gfxDriver) {
         ImGui::GetIO().DeltaTime = float(dt);
@@ -589,10 +591,21 @@ void termite::doFrame()
     int frameTimeIter = fd.frame % BX_COUNTOF(fd.frameTimes);
     fd.frameTimes[frameTimeIter] = dt;
     fd.avgFrameTime = calcAvgFrameTime(fd);
-    if (frameTimeIter == 0) {
-        fd.fps = BX_COUNTOF(fd.frameTimes) / (fd.elapsedTime - fd.fpsTime);
+    double fpsTime = fd.elapsedTime - fd.fpsTime;
+    if (frameTimeIter == 0 && fpsTime != 0) {
+        fd.fps = BX_COUNTOF(fd.frameTimes) / fpsTime;
         fd.fpsTime = fd.elapsedTime;
     }
+}
+
+void termite::pause()
+{
+    g_core->timeMultiplier = 0;
+}
+
+void termite::resume()
+{
+    g_core->timeMultiplier = 1.0;
 }
 
 double termite::getFrameTime()

@@ -111,6 +111,8 @@ namespace termite
                                     const GfxPlatformData* platformData = nullptr);
     TERMITE_API void shutdown();
     TERMITE_API void doFrame();
+    TERMITE_API void pause();
+    TERMITE_API void resume();
 
     TERMITE_API double getFrameTime();
     TERMITE_API double getElapsedTime();

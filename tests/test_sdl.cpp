@@ -137,8 +137,7 @@ int main(int argc, char* argv[])
     
     SDL_Event ev;
     while (true) {
-        if (SDL_PollEvent(&ev)) {
-            termite::sdlHandleEvent(ev);
+        if (termite::sdlHandleEvent(&ev)) {
             if (ev.type == SDL_QUIT)
                 break;
             if (ev.type == SDL_WINDOWEVENT) {
@@ -146,9 +145,11 @@ int main(int argc, char* argv[])
                     BX_VERBOSE("Resume");
                     termite::sdlGetNativeWindowHandle(g_window, &platformData.nwh);
                     termite::getGfxDriver()->setPlatformData(platformData);
-                    //termite::getGfxDriver()->reset(g_displaySize.x, g_displaySize.y, 0);
+                    termite::getGfxDriver()->reset(g_displaySize.x, g_displaySize.y, 0);
+                    termite::resume();
                 } else if (ev.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                     BX_VERBOSE("Pause");
+                    termite::pause();
                 }
             }
         }

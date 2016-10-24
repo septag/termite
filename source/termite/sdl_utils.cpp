@@ -65,60 +65,65 @@ void termite::sdlGetNativeWindowHandle(SDL_Window* window, void** pWndHandle, vo
 #endif // BX_PLATFORM_
 }
 
-bool termite::sdlHandleEvent(const SDL_Event& ev)
+bool termite::sdlHandleEvent(SDL_Event* ev, bool wait)
 {
-    switch (ev.type) {
-    case SDL_MOUSEWHEEL:
-    {
-        if (ev.wheel.y > 0)
-            g_input.mouseWheel = 1.0f;
-        else if (ev.wheel.y < 0)
-            g_input.mouseWheel = -1.0f;
-        inputSendMouse(g_input.mousePos, g_input.mouseButtons, g_input.mouseWheel);
-        return true;
-    }
+    int r = !wait ? SDL_PollEvent(ev) : SDL_WaitEvent(ev);
+    if (r) {
+        switch (ev->type) {
+            case SDL_MOUSEWHEEL:
+            {
+                if (ev->wheel.y > 0)
+                    g_input.mouseWheel = 1.0f;
+                else if (ev->wheel.y < 0)
+                    g_input.mouseWheel = -1.0f;
+                inputSendMouse(g_input.mousePos, g_input.mouseButtons, g_input.mouseWheel);
+                break;
+            }
 
-    case SDL_MOUSEBUTTONDOWN:
-    {
-        if (ev.button.button == SDL_BUTTON_LEFT) g_input.mouseButtons[0] = 1;
-        if (ev.button.button == SDL_BUTTON_RIGHT) g_input.mouseButtons[1] = 1;
-        if (ev.button.button == SDL_BUTTON_MIDDLE) g_input.mouseButtons[2] = 1;
-        inputSendMouse(g_input.mousePos, g_input.mouseButtons, 0);
-        return true;
-    }
+            case SDL_MOUSEBUTTONDOWN:
+            {
+                if (ev->button.button == SDL_BUTTON_LEFT) g_input.mouseButtons[0] = 1;
+                if (ev->button.button == SDL_BUTTON_RIGHT) g_input.mouseButtons[1] = 1;
+                if (ev->button.button == SDL_BUTTON_MIDDLE) g_input.mouseButtons[2] = 1;
+                inputSendMouse(g_input.mousePos, g_input.mouseButtons, 0);
+                break;
+            }
 
-    case SDL_MOUSEBUTTONUP:
-    {
-        if (ev.button.button == SDL_BUTTON_LEFT) g_input.mouseButtons[0] = 0;
-        if (ev.button.button == SDL_BUTTON_RIGHT) g_input.mouseButtons[1] = 0;
-        if (ev.button.button == SDL_BUTTON_MIDDLE) g_input.mouseButtons[2] = 0;
-        inputSendMouse(g_input.mousePos, g_input.mouseButtons, 0);
-        return true;
-    }
+            case SDL_MOUSEBUTTONUP:
+            {
+                if (ev->button.button == SDL_BUTTON_LEFT) g_input.mouseButtons[0] = 0;
+                if (ev->button.button == SDL_BUTTON_RIGHT) g_input.mouseButtons[1] = 0;
+                if (ev->button.button == SDL_BUTTON_MIDDLE) g_input.mouseButtons[2] = 0;
+                inputSendMouse(g_input.mousePos, g_input.mouseButtons, 0);
+                break;
+            }
 
-    case SDL_MOUSEMOTION:
-    {
-        g_input.mousePos[0] = float(ev.motion.x);
-        g_input.mousePos[1] = float(ev.motion.y);
-        inputSendMouse(g_input.mousePos, g_input.mouseButtons, 0);
-        return true;
-    }
+            case SDL_MOUSEMOTION:
+            {
+                g_input.mousePos[0] = float(ev->motion.x);
+                g_input.mousePos[1] = float(ev->motion.y);
+                inputSendMouse(g_input.mousePos, g_input.mouseButtons, 0);
+                break;
+            }
 
-    case SDL_TEXTINPUT:
-        inputSendChars(ev.text.text);
-        return true;
+            case SDL_TEXTINPUT:
+            inputSendChars(ev->text.text);
+            break;
 
-    case SDL_KEYDOWN:
-    case SDL_KEYUP:
-    {
-        int key = ev.key.keysym.sym & ~SDLK_SCANCODE_MASK;
-        g_input.keysDown[key] = (ev.type == SDL_KEYDOWN);
-        g_input.keyShift = (SDL_GetModState() & KMOD_SHIFT) != 0;
-        g_input.keyCtrl = (SDL_GetModState() & KMOD_CTRL) != 0;
-        g_input.keyAlt = (SDL_GetModState() & KMOD_ALT) != 0;
-        inputSendKeys(g_input.keysDown, g_input.keyShift, g_input.keyAlt, g_input.keyCtrl);
+            case SDL_KEYDOWN:
+            case SDL_KEYUP:
+            {
+                int key = ev->key.keysym.sym & ~SDLK_SCANCODE_MASK;
+                g_input.keysDown[key] = (ev->type == SDL_KEYDOWN);
+                g_input.keyShift = (SDL_GetModState() & KMOD_SHIFT) != 0;
+                g_input.keyCtrl = (SDL_GetModState() & KMOD_CTRL) != 0;
+                g_input.keyAlt = (SDL_GetModState() & KMOD_ALT) != 0;
+                inputSendKeys(g_input.keysDown, g_input.keyShift, g_input.keyAlt, g_input.keyCtrl);
+                break;
+            }
+        }
+
         return true;
-    }
     }
 
     return false;
