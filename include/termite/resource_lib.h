@@ -57,10 +57,9 @@ namespace termite
     class BX_NO_VTABLE ResourceCallbacksI
     {
     public:
-        virtual bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) = 0;
-        virtual void unloadObj(uintptr_t obj) = 0;
-        virtual void onReload(ResourceHandle handle) = 0;
-        virtual uintptr_t getDefaultAsyncObj() = 0;
+        virtual bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc) = 0;
+        virtual void unloadObj(uintptr_t obj, bx::AllocatorI* alloc) = 0;
+        virtual void onReload(ResourceHandle handle, bx::AllocatorI* alloc) = 0;
     };
 
     typedef void(*FileModifiedCallback)(const char* uri, void* userParam);
@@ -71,16 +70,22 @@ namespace termite
     TERMITE_API IoDriverApi* getResourceLibIoDriver();
 
     TERMITE_API ResourceTypeHandle registerResourceType(const char* name, ResourceCallbacksI* callbacks, 
-                                                        int userParamsSize = 0, uintptr_t failObj = 0);
+                                                        int userParamsSize = 0, uintptr_t failObj = 0, 
+                                                        uintptr_t asyncProgressObj = 0);
     TERMITE_API void unregisterResourceType(ResourceTypeHandle handle);
     TERMITE_API ResourceHandle loadResource(const char* name, const char* uri,
-                                            const void* userParams, ResourceFlag::Bits flags = ResourceFlag::None);
+                                            const void* userParams, ResourceFlag::Bits flags = ResourceFlag::None,
+                                            bx::AllocatorI* objAlloc = nullptr);
     TERMITE_API ResourceHandle loadResourceFromMem(const char* name, const char* uri, const MemoryBlock* mem, 
-                                                   const void* userParams = nullptr, ResourceFlag::Bits flags = ResourceFlag::None);
+                                                   const void* userParams = nullptr, ResourceFlag::Bits flags = ResourceFlag::None,
+                                                   bx::AllocatorI* objAlloc = nullptr);
     TERMITE_API void unloadResource(ResourceHandle handle);
     TERMITE_API uintptr_t getResourceObj(ResourceHandle handle);
     TERMITE_API ResourceLoadState::Enum getResourceLoadState(ResourceHandle handle);
     TERMITE_API int getResourceParamSize(const char* name);
+    TERMITE_API const char* getResourceUri(ResourceHandle handle);
+    TERMITE_API ResourceHandle getResourceFailHandle(const char* name);
+    TERMITE_API ResourceHandle getResourceAsyncHandle(const char* name);
 
     template <typename Ty>
     Ty* getResourcePtr(ResourceHandle handle)

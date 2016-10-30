@@ -44,55 +44,69 @@ namespace termite
         }
     };
 
-    ProgressiveLoader* createProgressiveLoader(bx::AllocatorI* alloc);
-    void destroyProgressiveLoader(ProgressiveLoader* loader);
+    TERMITE_API ProgressiveLoader* createProgressiveLoader(bx::AllocatorI* alloc);
+    TERMITE_API void destroyProgressiveLoader(ProgressiveLoader* loader);
 
-    void beginLoaderGroup(ProgressiveLoader* loader, const LoadingScheme& scheme);
-    LoaderGroupHandle endLoaderGroup(ProgressiveLoader* loader);
+    TERMITE_API void beginLoaderGroup(ProgressiveLoader* loader, const LoadingScheme& scheme = LoadingScheme());
+    TERMITE_API LoaderGroupHandle endLoaderGroup(ProgressiveLoader* loader);
 
     // Note: Removes the group if it's done loading
     //       This function should be called after creating all groups, actually that is the purpose of ProgressiveLoader
     //       After the function returns true, handle is no longer valid, so it should be handled by caller
-    bool checkLoaderGroupDone(ProgressiveLoader* loader, LoaderGroupHandle handle);
+    TERMITE_API bool checkLoaderGroupDone(ProgressiveLoader* loader, LoaderGroupHandle handle);
 
     // Receives a handle to Resource, which will be filled later
-    void loadResource(ProgressiveLoader* loader, ResourceHandle* pHandle, 
-                      const char* name, const char* uri, const void* userParams, 
-                      ResourceFlag::Bits flags = 0);
-    void unloadResource(ProgressiveLoader* loader, ResourceHandle handle);
+    TERMITE_API void loadResource(ProgressiveLoader* loader, ResourceHandle* pHandle,
+                                  const char* name, const char* uri, const void* userParams, 
+                                  ResourceFlag::Bits flags = 0);
+    TERMITE_API void unloadResource(ProgressiveLoader* loader, ResourceHandle handle);
 
-    void stepLoader(ProgressiveLoader* loader, float dt);
+    TERMITE_API void stepLoader(ProgressiveLoader* loader, float dt);
 
-    class ProgressiveLoaderHelper
+    class CProgressiveLoader
     {
     private:
         ProgressiveLoader* m_loader;
 
     public:
-        ProgressiveLoaderHelper() :
+        CProgressiveLoader() :
             m_loader(nullptr)
         {
         }
 
-        explicit ProgressiveLoaderHelper(ProgressiveLoader* loader) :
+        explicit CProgressiveLoader(ProgressiveLoader* loader) :
             m_loader(loader)
         {
         }
 
-        inline ProgressiveLoaderHelper& beginGroup(const LoadingScheme& scheme)
+        inline bool create(bx::AllocatorI* alloc)
+        {
+            m_loader = createProgressiveLoader(alloc);
+            return m_loader != nullptr;
+        }
+
+        inline void destroy()
+        {
+            if (m_loader) {
+                destroyProgressiveLoader(m_loader);
+                m_loader = nullptr;
+            }
+        }
+
+        inline CProgressiveLoader& beginGroup(const LoadingScheme& scheme = LoadingScheme())
         {
             termite::beginLoaderGroup(m_loader, scheme);
             return *this;
         }
 
-        ProgressiveLoaderHelper& loadResource(ResourceHandle* pHandle, const char* name, const char* uri, 
+        CProgressiveLoader& loadResource(ResourceHandle* pHandle, const char* name, const char* uri, 
                                               const void* userParams, ResourceFlag::Bits flags = 0)
         {
             termite::loadResource(m_loader, pHandle, name, uri, userParams, flags);
             return *this;
         }
 
-        ProgressiveLoaderHelper& unloadResource(ResourceHandle handle)
+        CProgressiveLoader& unloadResource(ResourceHandle handle)
         {
             termite::unloadResource(m_loader, handle);
             return *this;

@@ -838,6 +838,11 @@ namespace termite
         return vec2f(v.x*k, v.y*k);
     }
 
+    inline vec2_t operator*(const vec2_t& v0, const vec2_t& v1)
+    {
+        return vec2f(v0.x*v1.x, v0.y*v1.y);
+    }
+
     inline vec3_t operator+(const vec3_t& v1, const vec3_t& v2)
     {
         vec3_t r;
@@ -894,4 +899,5 @@ namespace termite
                      bx::fpow(c.z, 2.2f),
                      c.w);
     }
+
 } // namespace termite

@@ -43,10 +43,9 @@ struct ModelImpl
 class ModelLoader : public ResourceCallbacksI
 {
 public:
-    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) override;
-    void unloadObj(uintptr_t obj) override;
-    void onReload(ResourceHandle handle) override;
-    uintptr_t getDefaultAsyncObj() override;
+    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc) override;
+    void unloadObj(uintptr_t obj, bx::AllocatorI* alloc) override;
+    void onReload(ResourceHandle handle, bx::AllocatorI* alloc) override;
 };
 
 struct ModelManager
@@ -322,7 +321,7 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const R
     return true;
 }
 
-bool ModelLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
+bool ModelLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
 {
     bx::Error err;
     bx::MemoryReader reader(mem->data, mem->size);
@@ -345,19 +344,14 @@ bool ModelLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams& para
     }
 }
 
-void ModelLoader::unloadObj(uintptr_t obj)
+void ModelLoader::unloadObj(uintptr_t obj, bx::AllocatorI* alloc)
 {
     assert(g_modelMgr);
 
     unloadModel((ModelImpl*)obj);
 }
 
-void ModelLoader::onReload(ResourceHandle handle)
+void ModelLoader::onReload(ResourceHandle handle, bx::AllocatorI* alloc)
 {
 
-}
-
-uintptr_t ModelLoader::getDefaultAsyncObj()
-{
-    return 0;
 }

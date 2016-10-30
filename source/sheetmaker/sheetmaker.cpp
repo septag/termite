@@ -226,7 +226,7 @@ static TextureDatabase* createTextureDatabase(const char* baseDir, const char* r
         return nullptr;
 
     termite::LoadTextureParams tparams;
-    db->folderImg = loadResourceFromMem("image", "folder_png", 
+    db->folderImg = loadResourceFromMem("texture", "folder_png", 
                                         termite::refMemoryBlockPtr(folder_png, sizeof(folder_png)), &tparams);
     
     dirent* ent;
@@ -325,7 +325,7 @@ static void loadTexturesIterative(TextureDatabase* db)
         if (item->type == TextureItemType::Image) {
             termite::LoadTextureParams params;
             params.flags |= termite::TextureFlag::MipPoint;
-            item->handle = loadResource("image", item->filepath, &params);
+            item->handle = loadResource("texture", item->filepath, &params);
         }
     }
     db->loadedIdx++;
@@ -997,10 +997,9 @@ int main(int argc, char* argv[])
 
     SDL_Event e;
     while (true) {
-        if (SDL_PollEvent(&e)) {
+        if (termite::sdlHandleEvent(&e)) {
             if (e.type == SDL_QUIT)
                 break;
-            termite::sdlHandleEvent(e);
         }
         termite::doFrame();
     }

@@ -17,38 +17,24 @@
 #include "bxx/linear_allocator.h"
 #include "bxx/leakcheck_allocator.h"
 #include "bxx/proxy_allocator.h"
+#include "bxx/path.h"
 
 using namespace termite;
 
-// JPG, PNG, TGA, ...
-class TextureLoaderRaw : public ResourceCallbacksI
+class TextureLoaderAll : public ResourceCallbacksI
 {
 public:
-    TextureLoaderRaw();
+    TextureLoaderAll() {}
 
-    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) override;
-    void unloadObj(uintptr_t obj) override;
-    void onReload(ResourceHandle handle) override;
-    uintptr_t getDefaultAsyncObj() override;
-};
-
-// KTX/DDS loader
-class TextureLoaderKTX : public ResourceCallbacksI
-{
-public:
-    TextureLoaderKTX();
-
-    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj) override;
-    void unloadObj(uintptr_t obj) override;
-    void onReload(ResourceHandle handle) override;
-    uintptr_t getDefaultAsyncObj() override;
+    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc) override;
+    void unloadObj(uintptr_t obj, bx::AllocatorI* alloc) override;
+    void onReload(ResourceHandle handle, bx::AllocatorI* alloc) override;
 };
 
 struct TextureLoader
 {
     bx::Pool<Texture> texturePool;
-    TextureLoaderRaw rawLoader;
-    TextureLoaderKTX loader;
+    TextureLoaderAll loader;
     bx::AllocatorI* alloc;
     Texture* whiteTexture;
     Texture* asyncBlankTexture;
@@ -128,12 +114,8 @@ result_t termite::initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc,
 void termite::registerTextureToResourceLib()
 {
     ResourceTypeHandle handle;
-    handle = registerResourceType("image", &g_texLoader->rawLoader, sizeof(LoadTextureParams), 
-                                  uintptr_t(g_texLoader->failTexture));
-    assert(handle.isValid());
-
     handle = registerResourceType("texture", &g_texLoader->loader, sizeof(LoadTextureParams),
-                                  uintptr_t(g_texLoader->failTexture));
+                                  uintptr_t(g_texLoader->failTexture), uintptr_t(g_texLoader->asyncBlankTexture));
     assert(handle.isValid());
 }
 
@@ -181,17 +163,13 @@ bool termite::blitRawPixels(uint8_t* dest, int destX, int destY, int destWidth, 
     return true;
 }
 
-TextureLoaderRaw::TextureLoaderRaw()
-{
-
-}
 
 static void stbCallbackFreeImage(void* ptr, void* userData)
 {
     stbi_image_free(ptr);
 }
 
-bool TextureLoaderRaw::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
+static bool loadUncompressed(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
 {
     assert(g_texLoader);
     GfxDriverApi* driver = g_texLoader->driver;
@@ -202,7 +180,11 @@ bool TextureLoaderRaw::loadObj(const MemoryBlock* mem, const ResourceTypeParams&
     if (!pixels)
         return false;
     
-    Texture* texture = g_texLoader->texturePool.newInstance();
+    Texture* texture;
+    if (alloc)
+        texture = BX_NEW(alloc, Texture)();
+    else
+        texture = g_texLoader->texturePool.newInstance();
     if (!texture) {
         stbi_image_free(pixels);
         return false;
@@ -237,7 +219,10 @@ bool TextureLoaderRaw::loadObj(const MemoryBlock* mem, const ResourceTypeParams&
         gmem = driver->alloc(sizeBytes);
         if (!gmem) {
             stbi_image_free(pixels);
-            g_texLoader->texturePool.deleteInstance(texture);
+            if (alloc)
+                BX_DELETE(alloc, texture);
+            else
+                g_texLoader->texturePool.deleteInstance(texture);
             return false;
         }
 
@@ -286,42 +271,15 @@ bool TextureLoaderRaw::loadObj(const MemoryBlock* mem, const ResourceTypeParams&
     return true;
 }
 
-void TextureLoaderRaw::unloadObj(uintptr_t obj)
-{
-    assert(g_texLoader);
-    assert(obj);
-
-    Texture* texture = (Texture*)obj;
-    if (texture == g_texLoader->asyncBlankTexture)
-        return;
-
-    if (texture->handle.isValid()) {
-        g_texLoader->driver->destroyTexture(texture->handle);
-    }
-
-    g_texLoader->texturePool.deleteInstance(texture);
-}
-
-void TextureLoaderRaw::onReload(ResourceHandle handle)
-{
-}
-
-uintptr_t TextureLoaderRaw::getDefaultAsyncObj()
-{
-    return uintptr_t(g_texLoader->asyncBlankTexture);
-}
-
-
-TextureLoaderKTX::TextureLoaderKTX()
-{
-
-}
-
-bool TextureLoaderKTX::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj)
+static bool loadCompressed(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
 {
     const LoadTextureParams* texParams = (const LoadTextureParams*)params.userParams;
     
-    Texture* texture = g_texLoader->texturePool.newInstance();
+    Texture* texture;
+    if (alloc)
+        texture = BX_NEW(alloc, Texture)();
+    else
+        texture = g_texLoader->texturePool.newInstance();
     if (!texture)
         return false;
 
@@ -336,26 +294,41 @@ bool TextureLoaderKTX::loadObj(const MemoryBlock* mem, const ResourceTypeParams&
     return true;
 }
 
-void TextureLoaderKTX::unloadObj(uintptr_t obj)
+
+bool TextureLoaderAll::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj,
+                               bx::AllocatorI* alloc)
+{
+    bx::Path path(params.uri);
+    bx::Path ext = path.getFileExt();
+    ext.toLower();
+    if (ext.isEqual("ktx") || ext.isEqual("dds")) {
+        return loadCompressed(mem, params, obj, alloc);
+    } else if (ext.isEqual("png") || ext.isEqual("tga") || ext.isEqual("jpg") || ext.isEqual("bmp") ||
+               ext.isEqual("jpeg") || ext.isEqual("psd") || ext.isEqual("hdr") || ext.isEqual("gif"))
+    {
+        return loadUncompressed(mem, params, obj, alloc);
+    } else {
+        return false;
+    }
+}
+
+void TextureLoaderAll::unloadObj(uintptr_t obj, bx::AllocatorI* alloc)
 {
     assert(g_texLoader);
     assert(obj);
 
     Texture* texture = (Texture*)obj;
-    if (texture == g_texLoader->asyncBlankTexture)
-        return;
-
     if (texture->handle.isValid())
         g_texLoader->driver->destroyTexture(texture->handle);
 
-    g_texLoader->texturePool.deleteInstance(texture);
+    if (alloc)
+        BX_DELETE(alloc, texture);
+    else
+        g_texLoader->texturePool.deleteInstance(texture);
 }
 
-void TextureLoaderKTX::onReload(ResourceHandle handle)
+void TextureLoaderAll::onReload(ResourceHandle handle, bx::AllocatorI* alloc)
 {
+
 }
 
-uintptr_t TextureLoaderKTX::getDefaultAsyncObj()
-{
-    return uintptr_t(g_texLoader->asyncBlankTexture);
-}

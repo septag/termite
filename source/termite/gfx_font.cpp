@@ -181,19 +181,10 @@ Font* termite::Font::create(const MemoryBlock* mem, const char* fntFilepath, bx:
     ms.read(&block, sizeof(block), &err);
     ms.read(page.path, block.size, &err);
     bx::Path texFilepath = bx::Path(fntFilepath).getDirectory();
-    texFilepath.join(page.path).toUnix();
+    texFilepath.joinUnix(page.path);
+
     LoadTextureParams texParams;
-
-    if (texFilepath.getFileExt().isEqualNoCase("dds"))
-        font->m_textureHandle = loadResource("texture", texFilepath.cstr(), &texParams);
-    else
-        font->m_textureHandle = loadResource("image", texFilepath.cstr(), &texParams);
-
-    if (!font->m_textureHandle.isValid()) {
-        T_ERROR("Loading font '%s' failed: Loading texture '%s' failed", fntFilepath, texFilepath.cstr());
-        BX_DELETE(alloc, font);
-        return nullptr;
-    }
+    font->m_textureHandle = loadResource("texture", texFilepath.cstr(), &texParams);
 
     // Characters
     fntChar_t ch;

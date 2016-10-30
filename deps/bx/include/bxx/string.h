@@ -42,6 +42,8 @@ namespace bx
         String<_Size>& format(const char* fmt, ...);
         String<_Size>& trimWhitespace();
         String<_Size>& replace(char replace_char, char with_char);
+        String<_Size>& toLower();
+        String<_Size>& toUpper();
 
         char& operator[](int index)
         {
@@ -221,6 +223,22 @@ namespace bx
             if (c == replace_char)     this->text[i] = with_char;
             i++;
         }
+        return *this;
+    }
+
+    template <int _Size>
+    bx::String<_Size>& bx::String<_Size>::toUpper()
+    {
+        for (int i = 0; this->text[i]; i++) 
+            this->text[i] = toupper(this->text[i]);
+        return *this;
+    }
+
+    template <int _Size>
+    bx::String<_Size>& bx::String<_Size>::toLower()
+    {
+        for (int i = 0; this->text[i]; i++)
+            this->text[i] = tolower(this->text[i]);
         return *this;
     }
 

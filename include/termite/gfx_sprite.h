@@ -1,100 +1,150 @@
 #pragma once
 
+//
+// Issues: 
+//   1 - Rotatable sprite sheets are buggy, For now they can be used with no-animation sprites
+//   2 - Aligning of transform and pivot points may be buggy
+
 #include "bx/bx.h"
 
 #include "gfx_driver.h"
 #include "resource_lib.h"
 #include "vec_math.h"
 
-#define T_SPRITE_MEMORY_TAG 0x24c7a709645feb5b 
-
 namespace termite
 {
-    struct Camera2D;
-    struct SpriteT;
-    struct SpriteAnimT;
-    typedef PhantomType<uint16_t, SpriteT, UINT16_MAX> SpriteHandle;
-    typedef PhantomType<uint16_t, SpriteAnimT, UINT16_MAX> SpriteAnimHandle;
-
-    struct SpriteAnimClip
-    {
-        char name[32];
-        size_t nameHash;
-        int startFrame;
-        int endFrame;
-        float fps;
-        float totalTime;
-    };
-
-    struct SpriteSheet
-    {
-        ResourceHandle textureHandle;
-        int numFrames;
-        int numAnimClips;
-        vec4_t* frames; // count = numFrames
-        size_t* tags; // count = numFrames (hashed value of tag name)
-        SpriteAnimClip* clips;
-    };
-
-    typedef void(*SetSpriteStateCallback)(GfxDriverApi* driver);
-
-    // SpriteCache is usually used with static sprites
+    struct Sprite;
     struct SpriteCache;
 
-    result_t initSpriteSystem(GfxDriverApi* driver, bx::AllocatorI* alloc, uint16_t poolSize = 256);
+    // Callback for setting custom states when drawing sprites
+    typedef void(*SetSpriteStateCallback)(GfxDriverApi* driver);
+    // Callback for animation frames
+    typedef void(*SpriteFrameCallback)(Sprite* sprite, void* userData);
+
+    // Represent simple 2D transform for drawing sprites
+    struct SpriteTransform
+    {
+        float x, y;
+        float rot;
+        float scale;
+
+        SpriteTransform()
+        {
+            x = 0;  y = 0;  rot = 0;    scale = 1.0f;
+        }
+
+        explicit SpriteTransform(const vec2_t& _pos, float _rot = 0, float _scale = 1.0f)
+        {
+            x = _pos.x;     y = _pos.y;     rot = _rot;     scale = _scale;
+        }
+
+        SpriteTransform(float _x, float _y, float _rot = 0, float _scale = 1.0f)
+        {
+            x = _x;     y = _y;     rot = _rot;     scale = _scale;
+        }
+    };
+
+    // Allocator can be heap, it's used to created memory pools and initial buffers
+    result_t initSpriteSystem(GfxDriverApi* driver, bx::AllocatorI* alloc);
     void shutdownSpriteSystem();
 
-    //
-    // localAnchor: Relative to sprite's center. MaxTopLeft(-0.5, 0.5), MaxBottomRight(0.5, -0.5)
-    TERMITE_API SpriteHandle createSpriteFromTexture(ResourceHandle textureHandle, const vec2_t halfSize,
-                                                     bool destroyTexture = false, 
-                                                     const vec2_t localAnchor = vec2f(0, 0),
-                                                     const vec2_t topLeftCoords = vec2f(0, 0),
-                                                     const vec2_t bottomRightCoords = vec2f(1.0f, 1.0f));
-    TERMITE_API SpriteHandle createSpriteFromSpriteSheet(ResourceHandle spritesheetHandle, const vec2_t halfSize,
-                                                         bool destroySpriteSheet = false,
-                                                         const vec2_t localAnchor = vec2f(0, 0), int index = -1);
-    TERMITE_API void destroySprite(SpriteHandle handle);
+    TERMITE_API Sprite* createSprite(bx::AllocatorI* alloc, const vec2_t halfSize);
+    TERMITE_API void destroySprite(Sprite* sprite);
 
+    // Pivot: Relative to sprite's center. MaxTopLeft(-0.5, 0.5), MaxBottomRight(0.5, -0.5)
+    TERMITE_API void addSpriteFrameTexture(Sprite* sprite,
+                                           ResourceHandle texHandle,
+                                           bool destroy = false,
+                                           const vec2_t pivot = vec2f(0, 0),
+                                           const vec2_t topLeftCoords = vec2f(0, 0),
+                                           const vec2_t bottomRightCoords = vec2f(1.0f, 1.0f),
+                                           const char* frameTag = nullptr);
+    TERMITE_API void addSpriteFrameSpritesheet(Sprite* sprite,
+                                               ResourceHandle ssHandle, 
+                                               const char* name,
+                                               bool destroy = false,
+                                               const char* frameTag = nullptr);
+    TERMITE_API void addSpriteFrameAll(Sprite* sprite, ResourceHandle ssHandle, bool destroy = false);
 
-    TERMITE_API SpriteCache* createSpriteCache(int maxSprites);
-    TERMITE_API void destroySpriteCache(SpriteCache* spriteCache);
-    TERMITE_API void updateSpriteCache(const SpriteHandle* sprites, int numSprites, const vec2_t* posBuffer,
-                                       const float* rotBuffer, const color_t* tintColors);
+    inline Sprite* createSpriteFromTexture(bx::AllocatorI* alloc,
+                                           const vec2_t& halfSize, 
+                                           ResourceHandle texHandle, 
+                                           bool destroy = false,
+                                           const vec2_t& pivot = vec2f(0, 0),
+                                           const vec2_t& topLeftCoords = vec2f(0, 0),
+                                           const vec2_t& bottomRightCoords = vec2f(1.0f, 1.0f))
+    {
+        Sprite* s = createSprite(alloc, halfSize);
+        if (s)
+            addSpriteFrameTexture(s, texHandle, destroy, pivot, topLeftCoords, bottomRightCoords);
+        return s;
+    }
 
-    TERMITE_API void drawSprites(uint8_t viewId, const SpriteHandle* sprites, int numSprites,
-                                 const vec2_t* posBuffer, const float* rotBuffer = nullptr, const float* sizeBuffer = nullptr,
-                                 const color_t* tintColors = nullptr,
-                                 ProgramHandle prog = ProgramHandle(), SetSpriteStateCallback stateFunc = nullptr);
-    TERMITE_API void drawSprites(uint8_t viewId, SpriteCache* spriteCache);
+    inline Sprite* createSpriteFromSpritesheet(bx::AllocatorI* alloc,
+                                               const vec2_t& halfSize, 
+                                               ResourceHandle ssHandle,
+                                               const char* name,
+                                               bool destroy = false)
+    {
+        Sprite* s = createSprite(alloc, halfSize);
+        if (s)
+            addSpriteFrameSpritesheet(s, ssHandle, name, destroy);
+        return s;
+    }
 
-    // Sprite Animation API
-    typedef void(*SpriteAnimCallback)(SpriteAnimHandle handle, void* userData);
+    // Animate sprites in loop
+    TERMITE_API void animateSprites(Sprite** sprites, uint16_t numSprites, float dt);
+    inline void animateSprite(Sprite* sprite, float dt)
+    {
+        animateSprites(&sprite, 1, dt);
+    }
+    TERMITE_API void invertSpriteAnim(Sprite* sprite);
+    TERMITE_API void setSpriteAnimSpeed(Sprite* sprite, float speed);
+    TERMITE_API float getSpriteAnimSpeed(Sprite* sprite);
+    TERMITE_API void pauseSpriteAnim(Sprite* sprite);
+    TERMITE_API void resumeSpriteAnim(Sprite* sprite);
+    TERMITE_API void stopSpriteAnim(Sprite* sprite);
 
-    TERMITE_API SpriteAnimHandle createSpriteAnim(SpriteHandle sprite);
-    TERMITE_API void destroySpriteAnim(SpriteAnimHandle handle);
-    TERMITE_API void stepSpriteAnim(SpriteAnimHandle handle, float dt);
-    TERMITE_API void queueSpriteAnim(SpriteAnimHandle handle, const char* clipName, bool looped, 
-                                     bool reverse = false, SpriteAnimCallback finishedCallback = nullptr, 
-                                     void* userData = nullptr);
-    TERMITE_API void addSpriteAnimEvent(SpriteAnimHandle handle, const char* tagName, SpriteAnimCallback tagInCallback,
-                                        void* userData = nullptr, SpriteAnimCallback tagOutCallback = nullptr);
-    TERMITE_API void resetSpriteAnim(SpriteAnimHandle handle);
-    TERMITE_API void stopSpriteAnim(SpriteAnimHandle handle);
-    TERMITE_API void setSpriteAnimPlaybackSpeed(SpriteAnimHandle handle, float speed);
-    TERMITE_API float getSpriteAnimPlaybackSpeed(SpriteAnimHandle handle);
-    TERMITE_API void playSpriteAnim(SpriteAnimHandle handle);
+    // Set frame callbacks: Frame callbacks are called when sprite animation reaches them
+    TERMITE_API void setSpriteFrameCallbackByTag(Sprite* sprite, const char* frameTag, SpriteFrameCallback callback,
+                                                 void* userData);
+    TERMITE_API void setSpriteFrameCallbackByName(Sprite* sprite, const char* name, SpriteFrameCallback callback,
+                                                  void* userData);
+    TERMITE_API void setSpriteFrameCallbackByIndex(Sprite* sprite, int frameIdx, SpriteFrameCallback callback,
+                                                   void* userData);
 
-    TERMITE_API void setSpriteFrame(SpriteHandle handle, int frameIdx);
-    TERMITE_API int getSpriteFrame(SpriteHandle handle);
-    TERMITE_API void setSpriteAnchor(SpriteHandle handle, const vec2_t localAnchor);
-    TERMITE_API vec2_t getSpriteAnchor(SpriteHandle handle);
-    TERMITE_API void setSpriteSize(SpriteHandle handle, const vec2_t halfSize);
-    TERMITE_API vec2_t getSpriteSize(SpriteHandle handle);
+    // Goes from current sprite frame to the next specified tag/name or frameIdx
+    TERMITE_API void gotoSpriteFrameIndex(Sprite* sprite, int frameIdx);
+    TERMITE_API void gotoSpriteFrameName(Sprite* sprite, const char* name);
+    TERMITE_API void gotoSpriteFrameTag(Sprite* sprite, const char* frameTag);
+    TERMITE_API int getSpriteFrameIndex(Sprite* sprite);
+
+    // Set/Get tint color for the sprite
+    TERMITE_API void setSpriteTintColor(Sprite* sprite, color_t color);
+    TERMITE_API color_t getSpriteTintColor(Sprite* sprite);
+
+    // Dynamically draw sprites
+    TERMITE_API void drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
+                                 const SpriteTransform* transforms,
+                                 ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr);
+    inline void drawSprite(uint8_t viewId, Sprite* sprite, const SpriteTransform& transform,
+                           ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr)
+    {
+        assert(sprite);
+        drawSprites(viewId, &sprite, 1, &transform, progOverride, stateCallback);
+    }
+
+    // SpriteCache contains static sprite rendering data
+    // When filled 'fillSpriteCache', the rendering data is saved in GPU buffer for consistant use
+    // Call 'updateSpriteCache' if current sprites inside the cache needs to be updated (like animation frames)
+    TERMITE_API SpriteCache* createSpriteCache(uint16_t maxSprites);
+    TERMITE_API void destroySpriteCache(SpriteCache* scache);
+    TERMITE_API void fillSpriteCache(SpriteCache* scache, Sprite** sprites, uint16_t numSprites,
+                                     const SpriteTransform* transforms, 
+                                     ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr);
+    TERMITE_API void updateSpriteCache(SpriteCache* scache);
 
     // Registers "spritesheet" resource type and Loads SpriteSheet object
-    void registerSpriteSheetToResourceLib();
-
     struct LoadSpriteSheetParams
     {
         bool generateMips;
@@ -105,189 +155,187 @@ namespace termite
         {
             generateMips = false;
             skipMips = 0;
-            flags = TextureFlag::U_Clamp | TextureFlag::V_Clamp |
-                    TextureFlag::MinPoint | TextureFlag::MagPoint;
+            flags = TextureFlag::U_Clamp | TextureFlag::V_Clamp;
         }
     };
 
-    // Helper Wrappers
-    class Sprite
+    void registerSpriteSheetToResourceLib();
+
+    // Thin wrapper around SpriteHandle
+    // Mainly used to get cleaner API for single sprites
+    class CSprite
     {
-    public:
-        SpriteHandle handle;
+    private:
+        Sprite* m_sprite;
 
     public:
-        inline Sprite()
+        inline CSprite() :
+            m_sprite(nullptr)
         {
         }
 
-        explicit inline Sprite(SpriteHandle _handle) : 
-            handle(_handle)
+        explicit inline CSprite(Sprite* _sprite) :
+            m_sprite(_sprite)
         {
         }
 
-        inline ~Sprite()
+        inline bool create(bx::AllocatorI* alloc, const vec2_t& halfSize)
         {
-            assert(!handle.isValid());
+            m_sprite = createSprite(alloc, halfSize);
+            return m_sprite != nullptr;
         }
 
-        inline void setFrame(int index)
+        inline bool create(bx::AllocatorI* alloc,
+                           const vec2_t& halfSize,
+                           ResourceHandle texHandle,
+                           bool destroy = false,
+                           const vec2_t pivot = vec2f(0, 0),
+                           const vec2_t topLeftCoords = vec2f(0, 0),
+                           const vec2_t bottomRightCoords = vec2f(1.0f, 1.0f))
         {
-            setSpriteFrame(this->handle, index);
+            m_sprite = createSpriteFromTexture(alloc, halfSize, texHandle, destroy, pivot, topLeftCoords, bottomRightCoords);
+            return m_sprite != nullptr;
         }
 
-        inline int getFrame() const 
+        inline bool create(bx::AllocatorI* alloc,
+                           const vec2_t& halfSize,
+                           ResourceHandle ssHandle,
+                           const char* name,
+                           bool destroy = false)
         {
-            return getSpriteFrame(this->handle);
+            m_sprite = createSpriteFromSpritesheet(alloc, halfSize, ssHandle, name, destroy);
         }
 
-        inline void setSize(const vec2_t& halfSize)
+        inline CSprite& addFrame(ResourceHandle texHandle, bool destroy = false,
+                                 const vec2_t& pivot = vec2f(0, 0),
+                                 const vec2_t& topLeftCoords = vec2f(0, 0),
+                                 const vec2_t& bottomRightCoords = vec2f(1.0f, 1.0f),
+                                 const char* frameTag = nullptr)
         {
-            setSpriteSize(this->handle, halfSize);
+            addSpriteFrameTexture(m_sprite, texHandle, destroy, pivot, topLeftCoords, bottomRightCoords, frameTag);
+            return *this;
         }
 
-        inline vec2_t getSize() const
+        inline CSprite& addFrame(ResourceHandle ssHandle, const char* name, bool destroy = false, const char* frameTag = nullptr)
         {
-            return getSpriteSize(this->handle);
+            addSpriteFrameSpritesheet(m_sprite, ssHandle, name, destroy, frameTag);
+            return *this;
         }
 
-        inline void setLocalAnchor(const vec2_t& anchor)
+        inline CSprite& addAllFrames(ResourceHandle ssHandle, bool destroy = false)
         {
-            setSpriteAnchor(this->handle, anchor);
+            addSpriteFrameAll(m_sprite, ssHandle, destroy);
+            return *this;
         }
 
-        inline vec2_t getLocalAnchor() const
+        inline void animate(float dt)
         {
-            return getSpriteAnchor(this->handle);
+            animateSprite(m_sprite, dt);
+        }
+
+        inline void pause()
+        {
+            pauseSpriteAnim(m_sprite);
+        }
+
+        inline void resume()
+        {
+            resumeSpriteAnim(m_sprite);
+        }
+
+        inline void stop()
+        {
+            stopSpriteAnim(m_sprite);
+        }
+
+        inline void invertAnimation()
+        {
+            invertSpriteAnim(m_sprite);
+        }
+
+        inline void setSpeed(float speed)
+        {
+            setSpriteAnimSpeed(m_sprite, speed);
+        }
+
+        inline float getSpeed() const
+        {
+            return getSpriteAnimSpeed(m_sprite);
+        }
+
+        inline void destroy()
+        {
+            if (m_sprite != nullptr) {
+                destroySprite(m_sprite);
+                m_sprite = nullptr;
+            }
+        }
+
+        inline void setFrameCallbackByTag(const char* frameTag, SpriteFrameCallback callback, void* userData)
+        {
+            setSpriteFrameCallbackByTag(m_sprite, frameTag, callback, userData);
+        }
+
+        inline void setFrameCallbackByName(const char* name, SpriteFrameCallback callback, void* userData)
+        {
+            setSpriteFrameCallbackByName(m_sprite, name, callback, userData);
+        }
+
+        inline void setFrameCallbackByIndex(int index, SpriteFrameCallback callback, void* userData)
+        {
+            setSpriteFrameCallbackByIndex(m_sprite, index, callback, userData);
+        }
+
+        inline void gotoFrameIndex(int frameIdx)
+        {
+            gotoSpriteFrameIndex(m_sprite, frameIdx);
+        }
+
+        inline void gotoFrameName(const char* name)
+        {
+            gotoSpriteFrameName(m_sprite, name);
+        }
+
+        inline void gotoFrameTag(const char* frameTag)
+        {
+            gotoSpriteFrameTag(m_sprite, frameTag);
+        }
+
+        inline int getFrameIndex() const
+        {
+            return getSpriteFrameIndex(m_sprite);
+        }
+
+        inline void setTintColor(color_t color)
+        {
+            setSpriteTintColor(m_sprite, color);
+        }
+
+        inline color_t getTintColor() const
+        {
+            return getSpriteTintColor(m_sprite);
+        }
+
+        inline void draw(uint8_t viewId, const SpriteTransform& transform,
+                         ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr)
+        {
+            drawSprite(viewId, m_sprite, transform, progOverride, stateCallback);
         }
 
         inline bool isValid() const
         {
-            return this->handle.isValid();
+            return m_sprite != nullptr;
         }
 
-        inline bool createFromTexture(ResourceHandle textureHandle, 
-                           const vec2_t halfSize,
-                           bool destroyTexture,
-                           const vec2_t localAnchor = vec2f(0, 0),
-                           const vec2_t topLeftCoords = vec2f(0, 0),
-                           const vec2_t bottomRightCoords = vec2f(1.0f, 1.0f))
+        inline operator Sprite*()
         {
-            this->handle =  createSpriteFromTexture(textureHandle, halfSize, destroyTexture, localAnchor, 
-                                                    topLeftCoords, bottomRightCoords);
-            return this->handle.isValid();
+            return m_sprite;
         }
 
-        inline bool createFromSpriteSheet(ResourceHandle spritesheetHandle, 
-                           const vec2_t halfSize,
-                           bool destroySpriteSheet,
-                           const vec2_t localAnchor = vec2f(0, 0), 
-                           int frameIndex = -1)
+        inline operator const Sprite*() const
         {
-            this->handle = createSpriteFromSpriteSheet(spritesheetHandle, halfSize, destroySpriteSheet, 
-                                                       localAnchor, frameIndex);
-            return this->handle.isValid();
+            return m_sprite;
         }
-
-        inline void destroy()
-        {
-            if (this->handle.isValid()) {
-                destroySprite(this->handle);
-                this->handle.reset();
-            }
-        }
-
-        inline void draw(uint8_t viewId, const vec2_t& pos, float rot = 0, float size = 1.0f, color_t tintColor = 0xffffffff)
-        {
-            assert(this->handle.isValid());
-            drawSprites(viewId, &this->handle, 1, &pos, &rot, &size, &tintColor);
-        }
-
-        inline SpriteHandle getHandle() const
-        {
-            return this->handle;
-        }
-    };
-
-    class SpriteAnim
-    {
-    public:
-        SpriteAnimHandle handle;
-
-    public:
-        inline SpriteAnim()
-        {
-        }
-
-        explicit inline SpriteAnim(SpriteAnimHandle _handle) :
-            handle(_handle)
-        {
-        }
-
-        inline ~SpriteAnim()
-        {
-            assert(!handle.isValid());
-        }
-
-        inline bool create(const Sprite& sprite)
-        {
-            this->handle = createSpriteAnim(sprite.handle);
-            return this->handle.isValid();
-        }
-
-        inline void destroy()
-        {
-            destroySpriteAnim(this->handle);
-            this->handle.reset();
-        }
-
-        inline void step(float dt)
-        {
-            stepSpriteAnim(this->handle, dt);
-        }
-
-        inline SpriteAnim& stop()
-        {
-            stopSpriteAnim(this->handle);
-            return *this;
-        }
-
-        inline SpriteAnim& queue(const char* clipName, bool looped, bool reverse = false,
-                                 SpriteAnimCallback finishCallback = nullptr, void* userData = nullptr)
-        {
-            queueSpriteAnim(this->handle, clipName, looped, reverse, finishCallback, userData);
-            return *this;
-        }
-
-        inline SpriteAnim& play()
-        {
-            playSpriteAnim(this->handle);
-            return *this;
-        }
-
-        inline SpriteAnim& reset()
-        {
-            resetSpriteAnim(this->handle);
-            return *this;
-        }
-
-        inline SpriteAnim& addEvent(const char* tagName, SpriteAnimCallback tagInCallback,
-                                    void* userData = nullptr, SpriteAnimCallback tagOutCallback = nullptr)
-        {
-            addSpriteAnimEvent(this->handle, tagName, tagInCallback, userData, tagOutCallback);
-            return *this;
-        }
-
-        inline void setPlaySpeed(float speedMult)
-        {
-            setSpriteAnimPlaybackSpeed(this->handle, speedMult);
-        }
-
-        inline float getPlaySpeed() const
-        {
-            return getSpriteAnimPlaybackSpeed(this->handle);
-        }
-
     };
 
 } // namespace termite

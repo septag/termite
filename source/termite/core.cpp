@@ -9,6 +9,8 @@
 #include "bxx/pool.h"
 #include "bxx/lock.h"
 #include "bx/crtimpl.h"
+#define BX_IMPLEMENT_JSON
+#include "bxx/json.h"
 
 #include "gfx_defines.h"
 #include "gfx_font.h"
@@ -25,6 +27,7 @@
 #include "memory_pool.h"
 #include "plugin_system.h"
 #include "component_system.h"
+#include "event_dispatcher.h"
 
 #include "../imgui_impl/imgui_impl.h"
 
@@ -140,7 +143,6 @@ struct Core
     GfxDriverApi* gfxDriver;
     IoDriverDual* ioDriver;
     PageAllocator tempAlloc;
-	PageAllocator componentAlloc;
     GfxDriverEvents gfxDriverEvents;
 
     std::random_device randDevice;
@@ -148,7 +150,6 @@ struct Core
 
     Core() :
         tempAlloc(T_MID_TEMP),
-		componentAlloc(T_MID_COMPONENT),
         randEngine(randDevice())
     {
         gfxDriver = nullptr;
@@ -459,12 +460,20 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
 
 	// Component System
 	BX_BEGINP("Initializing Component System");
-	if (T_FAILED(initComponentSystem(&g_core->componentAlloc))) {
-		T_ERROR("Core init failed: Could not initialize component-system");
+	if (T_FAILED(initComponentSystem(g_alloc))) {
+		T_ERROR("Core init failed: Could not initialize Component-System");
 		BX_END_FATAL();
 		return T_ERR_FAILED;
 	}
 	BX_END_OK();
+
+    BX_BEGINP("Initializing Event Dispatcher");
+    if (T_FAILED(initEventDispatcher(g_alloc))) {
+        T_ERROR("Core init fialed: Could not initialize Event Dispatcher");
+        BX_END_FATAL();
+        return T_ERR_FAILED;
+    }
+    BX_END_OK();
 
     g_core->hpTimerFreq = bx::getHPFrequency();
 
@@ -477,6 +486,10 @@ void termite::shutdown()
         assert(false);
         return;
     }
+
+    BX_BEGINP("Shutting down Event Dispatcher");
+    shutdownEventDispatcher();
+    BX_END_OK();
 
 	BX_BEGINP("Shutting down Component System");
 	shutdownComponentSystem();
@@ -555,16 +568,19 @@ void termite::doFrame()
 
     int64_t frameTick = bx::getHPCounter();
     double dt = g_core->timeMultiplier * double(frameTick - fd.lastFrameTick)/g_core->hpTimerFreq;
+    float fdt = float(dt);
 
     if (g_core->gfxDriver) {
-        ImGui::GetIO().DeltaTime = float(dt);
+        ImGui::GetIO().DeltaTime = fdt;
         ImGui::NewFrame();
     }
 
     callComponentUpdates(ComponentUpdateStage::PreUpdate, float(dt));
 
     if (g_core->updateFn)
-        g_core->updateFn(float(dt));
+        g_core->updateFn(fdt);
+    
+    runEventDispatcher(fdt);
     callComponentUpdates(ComponentUpdateStage::Update, float(dt));
 
     callComponentUpdates(ComponentUpdateStage::PostUpdate, float(dt));

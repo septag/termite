@@ -1,15 +1,15 @@
-$input a_position, a_texcoord0, a_transform, a_color0
-$output v_texcoord0, v_color0
+$input a_position, a_offsetpivot, a_texcoord, a_color0
+$output v_texcoord, v_color0
 
 #include <bgfx_shader.sh>
 
 void main()
 {
+    vec3 pos = vec3(a_position.xy, 0);
 	float rot = radians(a_position.z);
-	float size = a_position.w;
-    vec2 posOffset = a_transform.xy;
-    vec2 anchor = a_transform.zw;
-	vec3 pos = vec3(a_position.xy, 0);
+	float scale = a_position.w;
+    vec2 posOffset = a_offsetpivot.xy;
+    vec2 anchor = a_offsetpivot.zw;
 
     // Rotate
 	float s, c;
@@ -26,12 +26,12 @@ void main()
 	mr[2] = vec3(0, 0, 1.0);
 
 	pos.xy -= anchor;
-	pos *= size;
+	pos.xy *= scale;
 	pos = mul(mr, pos);
     pos.xy += posOffset;
 
     gl_Position = mul(u_viewProj, vec4(pos, 1.0));
-    v_texcoord0 = a_texcoord0;
+    v_texcoord = a_texcoord;
 
     v_color0 = a_color0;
 }

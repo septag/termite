@@ -5,7 +5,7 @@
 #include "bxx/array.h"
 #include "bxx/pool.h"
 #include "bxx/queue.h"
-#include "bxx/indexed_pool.h"
+#include "bxx/handle_pool.h"
 #include "bxx/hash_table.h"
 #include "bxx/logger.h"
 #include "bxx/linear_allocator.h"
@@ -67,7 +67,7 @@ struct ComponentType
     ComponentCallbacks callbacks;
     ComponentFlag::Bits flags;
     uint32_t dataSize;
-    bx::IndexedPool dataPool;
+    bx::HandlePool dataPool;
     bx::HashTable<int, uint32_t> entTable;  // Entity -> ComponentHandle
     ComponentHandle* cachedHandles; // Keep cached component handles (lifetime is one frame only)
 
@@ -238,6 +238,8 @@ void termite::shutdownComponentSystem()
     g_csys->components.destroy();
     g_csys->nameTable.destroy();
     g_csys->idTable.destroy();
+
+    BX_DELETE(g_csys->alloc, g_csys);
 }
 
 ComponentTypeHandle termite::registerComponentType(const char* name, uint32_t id, const ComponentCallbacks* callbacks, 

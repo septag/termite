@@ -62,6 +62,11 @@ namespace termite
             value = _Invalid;
         }
 
+        inline operator Tx() const
+        {
+            return value;
+        }
+
         Tx value;
     };
 } // namespace termite

@@ -3,7 +3,7 @@
 
 #include "bxx/array.h"
 #include "bxx/hash_table.h"
-#include "bxx/indexed_pool.h"
+#include "bxx/handle_pool.h"
 
 using namespace termite;
 
@@ -22,7 +22,7 @@ namespace termite
 {
     struct MaterialLib
     {
-        bx::IndexedPool materials;
+        bx::HandlePool materials;
     };
 
     MaterialDecl::MaterialDecl()

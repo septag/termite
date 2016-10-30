@@ -5,7 +5,7 @@
 #include "bxx/path.h"
 #include "bxx/linked_list.h"
 #include "bxx/pool.h"
-#include "bxx/indexed_pool.h"
+#include "bxx/handle_pool.h"
 
 #define REQUEST_POOL_SIZE 128
 
@@ -45,7 +45,7 @@ namespace termite
     {
         bx::AllocatorI* alloc;
         bx::Pool<LoadResourceRequest> requestPool;
-        bx::IndexedPool groupPool;
+        bx::HandlePool groupPool;
         LoaderGroupHandle curGroupHandle;
 
         ProgressiveLoader(bx::AllocatorI* _alloc) :
@@ -87,7 +87,7 @@ void termite::beginLoaderGroup(ProgressiveLoader* loader, const LoadingScheme& s
     assert(loader);
     LoaderGroupHandle handle = LoaderGroupHandle(loader->groupPool.newHandle());
     assert(handle.isValid());
-    LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, handle.value);
+    LoaderGroup* group = new(loader->groupPool.getHandleData(0, handle)) LoaderGroup();
     memcpy(&group->scheme, &scheme, sizeof(scheme));
     group->frameCount = 0;
     group->elapsedTime = 0;
@@ -99,6 +99,7 @@ LoaderGroupHandle termite::endLoaderGroup(ProgressiveLoader* loader)
 {
     assert(loader);
     LoaderGroupHandle handle = loader->curGroupHandle;
+
     loader->curGroupHandle = LoaderGroupHandle();
     return handle;
 }
@@ -107,12 +108,10 @@ bool termite::checkLoaderGroupDone(ProgressiveLoader* loader, LoaderGroupHandle 
 {
     assert(loader);
 
-    LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, handle.value);
-    memset(group, 0x00, sizeof(LoaderGroup));
+    LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, handle);
     bool done = group->requestList.isEmpty();
-    if (done) {
-        loader->groupPool.freeHandle(handle.value);
-    }
+    if (done)
+        loader->groupPool.freeHandle(handle);
     return done;
 }
 

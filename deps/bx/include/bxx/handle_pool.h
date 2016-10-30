@@ -11,18 +11,18 @@
 
 namespace bx
 {
-    class IndexedPool
+    class HandlePool
     {
-        BX_CLASS(IndexedPool
+        BX_CLASS(HandlePool
             , NO_COPY
             , NO_ASSIGNMENT
         );
 
     public:
-        IndexedPool();
+        HandlePool();
         bool create(const uint32_t* itemSizes, int numBuffers, uint16_t maxItems, uint16_t growSize, AllocatorI* alloc);
         void destroy();
-        ~IndexedPool();
+        ~HandlePool();
 
         uint16_t newHandle();
         void freeHandle(uint16_t handle);
@@ -69,7 +69,7 @@ namespace bx
         uint16_t m_partition;
     };
 
-    inline IndexedPool::IndexedPool()
+    inline HandlePool::HandlePool()
     {
         m_alloc = nullptr;
         m_indices = nullptr;
@@ -81,7 +81,7 @@ namespace bx
         m_numBuffers = 0;
     }
 
-    inline bool IndexedPool::create(const uint32_t* itemSizes, int numBuffers, uint16_t maxItems, uint16_t growSize, AllocatorI* alloc)
+    inline bool HandlePool::create(const uint32_t* itemSizes, int numBuffers, uint16_t maxItems, uint16_t growSize, AllocatorI* alloc)
     {
         assert(numBuffers <= BX_INDEXED_POOL_MAX_BUFFERS);
         assert(numBuffers > 0);
@@ -118,7 +118,7 @@ namespace bx
         return true;
     }
 
-    inline void IndexedPool::destroy()
+    inline void HandlePool::destroy()
     {
         if (m_indices) {
             assert(m_alloc);
@@ -132,13 +132,13 @@ namespace bx
         memset(m_itemSizes, 0x00, sizeof(uint32_t)*BX_INDEXED_POOL_MAX_BUFFERS);
     }
 
-    inline IndexedPool::~IndexedPool()
+    inline HandlePool::~HandlePool()
     {
         assert(m_indices == nullptr);
         assert(m_revIndices == nullptr);
     }
 
-    inline uint16_t IndexedPool::newHandle()
+    inline uint16_t HandlePool::newHandle()
     {
         // Grow buffer if needed
         if (m_partition == m_maxItems) {
@@ -174,7 +174,7 @@ namespace bx
         return m_indices[m_partition++];
     }
 
-    inline void IndexedPool::freeHandle(uint16_t handle)
+    inline void HandlePool::freeHandle(uint16_t handle)
     {
         assert(handle < m_maxItems);
 
@@ -191,13 +191,13 @@ namespace bx
         m_partition--;
     }
 
-    inline void* IndexedPool::getData(int bufferIdx)
+    inline void* HandlePool::getData(int bufferIdx)
     {
         assert(bufferIdx < m_numBuffers);
         return m_buffers[bufferIdx];
     }
 
-    inline void* IndexedPool::getHandleData(int bufferIdx, uint16_t handle)
+    inline void* HandlePool::getHandleData(int bufferIdx, uint16_t handle)
     {
         assert(bufferIdx < m_numBuffers);
         assert(handle < m_maxItems);

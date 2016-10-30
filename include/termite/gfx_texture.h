@@ -20,8 +20,7 @@ namespace termite
         {
             generateMips = false;
             skipMips = 0;
-            flags = TextureFlag::U_Clamp | TextureFlag::V_Clamp | 
-                    TextureFlag::MinPoint | TextureFlag::MagPoint;
+            flags = 0;
         }
     };
 
@@ -38,7 +37,7 @@ namespace termite
         }
     };
 
-    result_t initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc, int texturePoolSize = 128);
+    result_t initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc, int texturePoolSize = 64);
     void shutdownTextureLoader();
     void registerTextureToResourceLib();
     TextureHandle getWhiteTexture1x1();

@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "command_system.h"
 
-#include "bxx/indexed_pool.h"
+#include "bxx/handle_pool.h"
 #include "bxx/array.h"
 #include "bxx/hash_table.h"
 #include "bxx/stack.h"
@@ -44,7 +44,7 @@ struct CommandType
     UndoCommandFn undoFn;
     CleanupCommandFn cleanupFn;
     size_t paramSize;
-    bx::IndexedPool paramPool;
+    bx::HandlePool paramPool;
 
     CommandType()
     {
@@ -78,7 +78,7 @@ struct Command
 struct CommandSystem
 {
     bx::Array<CommandType> commandTypes;
-    bx::IndexedPool commandPool;
+    bx::HandlePool commandPool;
     uint16_t maxSize;
     bx::AllocatorI* alloc;
     bx::HashTableInt commandTypeTable;
