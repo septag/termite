@@ -370,7 +370,7 @@ static JobHandle dispatch(const JobDesc* jobs, uint16_t numJobs, FiberPool* pool
         int index = numJobs - i - 1;
         Fiber* fiber = pool->newFiber(jobs[index].callback, jobs[index].userParam, index, jobs[index].priority, pool, counter);
         if (fiber) {
-            g_dispatcher->waitList[fiber->priority].remove(&fiber->lnode);
+            g_dispatcher->waitList[fiber->priority].add(&fiber->lnode);
             c++;
         } else {
             BX_WARN("Exceeded maximum jobs (%d)", pool->getMax());

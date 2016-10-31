@@ -235,7 +235,7 @@ namespace bx
         {
 #if BX_PLATFORM_WINDOWS || BX_PLATFORM_XBOX360 || BX_PLATFORM_XBOXONE || BX_PLATFORM_WINRT
             SetThreadAffinityMask(m_handle, (DWORD_PTR)mask);
-#elif BX_PLATFORM_LINUX || BX_PLATFORM_OSX
+#elif BX_PLATFORM_LINUX
             cpu_set_t cpuset;
             CPU_ZERO(&cpuset);
             for (int i = 0; i < 64; i++) {

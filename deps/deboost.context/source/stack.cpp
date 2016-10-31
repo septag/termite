@@ -109,8 +109,8 @@ fcontext_stack_t create_fcontext_stack(size_t size)
 
     if (size == 0)
         size = getDefaultSize();
-
-    assert(size >= getMinSize());
+    if (size <= getMinSize())
+        size = getMinSize();
     assert(size <= getMaxSize());
 
     pages = (size_t)floorf(float(size) / float(getPageSize()));

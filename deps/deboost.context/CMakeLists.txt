@@ -74,7 +74,5 @@ target_include_directories(fcontext
     PRIVATE include/fcontext
     INTERFACE include)
 
-message(${CMAKE_CXX_FLAGS})
-
 #install(TARGETS fcontext DESTINATION lib)
 #install(FILES ${HEADER} DESTINATION include/fcontext)

@@ -165,8 +165,8 @@ namespace bx
 
 }
 
-
 #ifdef BX_IMPLEMENT_JSON
+#undef BX_IMPLEMENT_JSON
 
 #include <algorithm>
 #include <cstdlib>

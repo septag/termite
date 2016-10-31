@@ -9,7 +9,7 @@ if(WIN32)
 	# Find path of each library
 	find_path(ASSIMP_INCLUDE_DIR
 		NAMES
-			assimp/anim.h
+			assimp/assimp.h
 		HINTS
 			${ASSIMP_ROOT_DIR}/include
 	)
@@ -52,8 +52,8 @@ if(WIN32)
 else(WIN32)
 	find_path(
 	  ASSIMP_INCLUDE_DIR
-	  NAMES postprocess.h scene.h version.h config.h cimport.h
-	  PATHS /usr/local/include/ /usr/local/include/assimp /usr/include /usr/include/assimp 
+	  NAMES assimp/assimp.h assimp.h
+	  HINTS /usr/local/include/ /usr/include 
 	)
 
 	find_library(

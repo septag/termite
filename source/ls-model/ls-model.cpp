@@ -1,17 +1,17 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
+#include "Importer.hpp"
+#include "scene.h"
 
 #include "bx/commandline.h"
 #include "bxx/path.h"
 
-#define BX_IMPLEMENT_LOGGER
-#include "bxx/logger.h"
-
 #define BX_IMPLEMENT_JSON
 #include "bxx/json.h"
+
+#define BX_IMPLEMENT_LOGGER
+#include "bxx/logger.h"
 
 #include "../tools_common/log_format_proxy.h"
 #include "bx/crtimpl.h"

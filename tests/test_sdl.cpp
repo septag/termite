@@ -66,7 +66,7 @@ static void update(float dt)
     termite::mtx4x4_t viewMtx = g_cam.getViewMtx();
     termite::mtx4x4_t projMtx = g_cam.getProjMtx(aspect);
     termite::vgBegin(g_vg, float(g_displaySize.x), float(g_displaySize.y));
-    termite::vgTextf(g_vg, 10.0f, 10.0f, "Ft = %f", termite::getFrameTime()*1000.0);
+    termite::vgTextf(g_vg, 10.0f, 10.0f, "Ft = %f", termite::getSmoothFrameTime()*1000.0);
     termite::vgEnd(g_vg);
 
     termite::ddBegin(g_debug, float(g_displaySize.x), float(g_displaySize.y), viewMtx, projMtx, g_vg);

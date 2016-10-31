@@ -5,6 +5,10 @@
 #include "../bx/platform.h"
 #include "terminal_colors.h"
 
+#if __APPLE__
+#include <time.h>
+#endif
+
 #ifdef BX_TRACE
 #   undef BX_TRACE
 #endif

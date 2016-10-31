@@ -65,15 +65,6 @@ int main(int argc, char* argv[])
     JobHandle handle = dispatchSmallJobs(jobs, 3);
     waitJobs(handle);
 
-    while (true) {
-        if (_kbhit()) {
-            if (_getch() == 27)
-                break;
-        }
-
-        termite::doFrame();
-    }
-
     termite::shutdown();
 
     return 0;

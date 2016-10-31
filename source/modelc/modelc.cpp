@@ -15,9 +15,9 @@
 #define BX_IMPLEMENT_LOGGER
 #include "bxx/logger.h"
 
-#include "assimp/Importer.hpp"
-#include "assimp/scene.h"
-#include "assimp/postprocess.h"
+#include "Importer.hpp"
+#include "scene.h"
+#include "postprocess.h"
 
 #include "../include_common/t3d_format.h"
 #include "../include_common/coord_convert.h"
