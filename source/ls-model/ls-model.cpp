@@ -1,8 +1,8 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "Importer.hpp"
-#include "scene.h"
+#include "assimp/Importer.hpp"
+#include "assimp/scene.h"
 
 #include "bx/commandline.h"
 #include "bxx/path.h"

@@ -19,6 +19,8 @@ if(WIN32)
 	elseif(MSVC14)	
 		set(ASSIMP_MSVC_VERSION "vc140")
 	endif(MSVC12)
+
+    message(${ASSIMP_INCLUDE_DIR})
 	
 	if(MSVC12 OR MSVC14)
 	

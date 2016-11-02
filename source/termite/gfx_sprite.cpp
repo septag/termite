@@ -21,24 +21,19 @@ using namespace termite;
 
 struct SpriteVertex
 {
-    float x;
-    float y;
-    float rot;
-    float scale;
-    float offsetx;
-    float offsety;
-    float pivotx;
-    float pivoty;
-    float tx;
-    float ty;
+    vec2_t pos;
+    vec3_t transform1;
+    vec3_t transform2;
+    vec2_t coords;
     uint32_t color;
 
     static void init()
     {
         vdeclBegin(&Decl);
-        vdeclAdd(&Decl, VertexAttrib::Position, 4, VertexAttribType::Float);        // pos
-        vdeclAdd(&Decl, VertexAttrib::TexCoord0, 4, VertexAttribType::Float);       // offset/pivot
-        vdeclAdd(&Decl, VertexAttrib::TexCoord1, 2, VertexAttribType::Float);       // texture coords
+        vdeclAdd(&Decl, VertexAttrib::Position, 2, VertexAttribType::Float);        // pos
+        vdeclAdd(&Decl, VertexAttrib::TexCoord0, 3, VertexAttribType::Float);       // transform mat (part 1)
+        vdeclAdd(&Decl, VertexAttrib::TexCoord1, 3, VertexAttribType::Float);       // transform mat (part 2)
+        vdeclAdd(&Decl, VertexAttrib::TexCoord2, 2, VertexAttribType::Float);       // texture coords
         vdeclAdd(&Decl, VertexAttrib::Color0, 4, VertexAttribType::Uint8, true);    // color
         vdeclEnd(&Decl);
     }
@@ -295,12 +290,10 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
         const bx::JsonNode* jpivotY = jpivot->findChild("y");
         float pivotx = jpivotX->getType() == bx::JsonType::Float ?  jpivotX->valueFloat() : float(jpivotX->valueInt());
         float pivoty = jpivotY->getType() == bx::JsonType::Float ?  jpivotX->valueFloat() : float(jpivotY->valueInt());
-        pivotx = pivoty = 0.5f;
         frame.pivot = vec2f(pivotx - 0.5f, -pivoty + 0.5f);     // convert to our coordinates
 
-        vec2_t srcPivot = vec2f( (srcx + 0.5f*srcw)/frame.sourceSize.x - 0.5f,
-                                -(srcy + 0.5f*srch)/frame.sourceSize.y + 0.5f);
-        frame.posOffset = srcPivot;
+        vec2_t srcOffset = vec2f((srcx + srcw*0.5f)/frame.sourceSize.x - 0.5f, -(srcy + srch*0.5f)/frame.sourceSize.y + 0.5f);
+        frame.posOffset = srcOffset;
     }
 
     jroot->destroy();
@@ -731,11 +724,11 @@ color_t termite::getSpriteTintColor(Sprite* sprite)
     return sprite->tint;
 }
 
-void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const SpriteTransform* transforms,
+void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,
                           ProgramHandle progOverride /*= ProgramHandle()*/, SetSpriteStateCallback stateCallback /*= nullptr*/)
 {
     assert(sprites);
-    assert(transforms);
+    assert(mats);
 
     if (numSprites <= 0)
         return;
@@ -781,7 +774,7 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     int vertexIdx = 0;
     for (int i = 0; i < numSprites; i++) {
         const SortedSprite& ss = sortedSprites[i];
-        const SpriteTransform transform = transforms[ss.index];
+        const mtx3x3_t& mat = mats[ss.index];
         const SpriteFrame& frame = ss.sprite->getCurFrame();
         vec2_t halfSize = ss.sprite->halfSize;
         rect_t texRect = frame.frame;
@@ -792,15 +785,17 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
         else if (halfSize.x <= 0)
             halfSize.x = halfSize.y * pixelRatio;
 
-        vec2_t fullSize = vec2f(halfSize.x*2.0f, halfSize.y*2.0f);
-        float scale = transform.scale;
-        float rot = frame.rotOffset + transform.rot;
-        vec2_t offset = frame.posOffset * fullSize;
-        vec2_t pos = vec2f(transform.x, transform.y) + offset;
-        vec2_t pivot = frame.pivot;
+        // Encode transform matrix into vertices
+        vec3_t transform1 = vec3f(mat.m11, mat.m12, mat.m21);
+        vec3_t transform2 = vec3f(mat.m22, mat.m31, mat.m32);
 
-        pivot = pivot * halfSize * 2.0f;
+        // calculate final pivot offset to make geometry
+        vec2_t fullSize = halfSize * 2.0f;
+        vec2_t pivot = frame.pivot * fullSize;
+
+        // shrink and offset to match the image inside sprite
         halfSize = halfSize * frame.sizeOffset;
+        vec2_t offset = frame.posOffset * fullSize;
 
         SpriteVertex& v0 = verts[vertexIdx];
         SpriteVertex& v1 = verts[vertexIdx + 1];
@@ -808,33 +803,23 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
         SpriteVertex& v3 = verts[vertexIdx + 3];
 
         // Top-Left
-        v0.x = -halfSize.x;       v0.y = halfSize.y;
-        v0.rot = rot;             v0.scale = scale;
-        v0.offsetx = pos.x;       v0.offsety = pos.y;
-        v0.pivotx = pivot.x;      v0.pivoty = pivot.y;
-        v0.tx = texRect.xmin;     v0.ty = texRect.ymin;
+        v0.pos = vec2f(-halfSize.x - pivot.x + offset.x, halfSize.y - pivot.y + offset.y);
+        v0.coords = texRect.vmin;
 
         // Top-Right
-        v1.x = halfSize.x;        v1.y = halfSize.y;
-        v1.rot = rot;             v1.scale = scale;
-        v1.offsetx = pos.x;       v1.offsety = pos.y;
-        v1.pivotx = pivot.x;      v1.pivoty = pivot.y;
-        v1.tx = texRect.xmax;     v1.ty = texRect.ymin;
+        v1.pos = vec2f(halfSize.x - pivot.x + offset.x, halfSize.y - pivot.y + offset.y);
+        v1.coords = vec2f(texRect.xmax, texRect.ymin);
 
         // Bottom-Left
-        v2.x = -halfSize.x;       v2.y = -halfSize.y;
-        v2.rot = rot;             v2.scale = scale;
-        v2.offsetx = pos.x;       v2.offsety = pos.y;
-        v2.pivotx = pivot.x;      v2.pivoty = pivot.y;
-        v2.tx = texRect.xmin;     v2.ty = texRect.ymax;
+        v2.pos = vec2f(-halfSize.x - pivot.x + offset.x, -halfSize.y - pivot.y + offset.y);
+        v2.coords = vec2f(texRect.xmin, texRect.ymax);
 
         // Bottom-Right
-        v3.x = halfSize.x;        v3.y = -halfSize.y;
-        v3.rot = rot;             v3.scale = scale;
-        v3.offsetx = pos.x;       v3.offsety = pos.y;
-        v3.pivotx = pivot.x;      v3.pivoty = pivot.y;
-        v3.tx = texRect.xmax;     v3.ty = texRect.ymax;
+        v3.pos = vec2f(halfSize.x - pivot.x + offset.x, -halfSize.y - pivot.y + offset.y);
+        v3.coords = texRect.vmax;
 
+        v0.transform1 = v1.transform1 = v2.transform1 = v3.transform1 = transform1;
+        v0.transform2 = v1.transform2 = v2.transform2 = v3.transform2 = transform2;
         v0.color = v1.color = v2.color = v3.color = ss.sprite->tint;
 
         // Make a quad from 4 verts

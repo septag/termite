@@ -3,7 +3,6 @@
 //
 // Issues: 
 //   1 - Rotatable sprite sheets are buggy, For now they can be used with no-animation sprites
-//   2 - Aligning of transform and pivot points may be buggy
 
 #include "bx/bx.h"
 
@@ -20,29 +19,6 @@ namespace termite
     typedef void(*SetSpriteStateCallback)(GfxDriverApi* driver);
     // Callback for animation frames
     typedef void(*SpriteFrameCallback)(Sprite* sprite, void* userData);
-
-    // Represent simple 2D transform for drawing sprites
-    struct SpriteTransform
-    {
-        float x, y;
-        float rot;
-        float scale;
-
-        SpriteTransform()
-        {
-            x = 0;  y = 0;  rot = 0;    scale = 1.0f;
-        }
-
-        explicit SpriteTransform(const vec2_t& _pos, float _rot = 0, float _scale = 1.0f)
-        {
-            x = _pos.x;     y = _pos.y;     rot = _rot;     scale = _scale;
-        }
-
-        SpriteTransform(float _x, float _y, float _rot = 0, float _scale = 1.0f)
-        {
-            x = _x;     y = _y;     rot = _rot;     scale = _scale;
-        }
-    };
 
     // Allocator can be heap, it's used to created memory pools and initial buffers
     result_t initSpriteSystem(GfxDriverApi* driver, bx::AllocatorI* alloc);
@@ -124,14 +100,13 @@ namespace termite
     TERMITE_API color_t getSpriteTintColor(Sprite* sprite);
 
     // Dynamically draw sprites
-    TERMITE_API void drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
-                                 const SpriteTransform* transforms,
+    TERMITE_API void drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,
                                  ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr);
-    inline void drawSprite(uint8_t viewId, Sprite* sprite, const SpriteTransform& transform,
+    inline void drawSprite(uint8_t viewId, Sprite* sprite, const mtx3x3_t& mat,
                            ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr)
     {
         assert(sprite);
-        drawSprites(viewId, &sprite, 1, &transform, progOverride, stateCallback);
+        drawSprites(viewId, &sprite, 1, &mat, progOverride, stateCallback);
     }
 
     // SpriteCache contains static sprite rendering data
@@ -140,7 +115,7 @@ namespace termite
     TERMITE_API SpriteCache* createSpriteCache(uint16_t maxSprites);
     TERMITE_API void destroySpriteCache(SpriteCache* scache);
     TERMITE_API void fillSpriteCache(SpriteCache* scache, Sprite** sprites, uint16_t numSprites,
-                                     const SpriteTransform* transforms, 
+                                     const mtx3x3_t* mats,
                                      ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr);
     TERMITE_API void updateSpriteCache(SpriteCache* scache);
 
@@ -316,10 +291,10 @@ namespace termite
             return getSpriteTintColor(m_sprite);
         }
 
-        inline void draw(uint8_t viewId, const SpriteTransform& transform,
+        inline void draw(uint8_t viewId, const mtx3x3_t& mat,
                          ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr)
         {
-            drawSprite(viewId, m_sprite, transform, progOverride, stateCallback);
+            drawSprite(viewId, m_sprite, mat, progOverride, stateCallback);
         }
 
         inline bool isValid() const
