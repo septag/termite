@@ -28,6 +28,11 @@ if (APPLE)
     set(EXTRA_LIBS ${FOUNDATION_LIBRARY} ${METAL_LIBRARY} ${COCOA_LIBRARY} ${QUARTZ_LIBRARY})
 endif()
 
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # ignore some compiler specific warnings
+    add_compile_options(-Wno-enum-compare)
+endif()
+
 add_library(bgfx_driver ${BUILD_LIBRARY_TYPE} ${SOURCE_FILES})
 
 target_include_directories(bgfx_driver PRIVATE ${BGFX_INCLUDE_DIR})

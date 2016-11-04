@@ -30,11 +30,6 @@ include(PrecompiledHeader)
 include(Utility)
 include(DownloadPackage)
 include(Bgfx)
-include(FindWindowsSDK)
-
-message(${WINDOWSSDK_PREFERRED_FIRST_DIRS})
-get_windowssdk_library_dirs(${WINDOWSSDK_PREFERRED_DIR} SDK_INCLUDE_DIR)
-message(${SDK_INCLUDE_DIR})
 
 # options
 option(BUILD_BOX2D "Build Box2D Physics engine" OFF)
@@ -71,8 +66,14 @@ endif()
 
 # Download dependencies that doesn't have packages on any platform
 if (NOT BGFX_FOUND)
-    if (MSVC)
+    if (ANDROID)
+        download_package(${DOWNLOAD_URL_ROOT}/bgfx_android_arm.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
+    elseif (MSVC)
         download_package(${DOWNLOAD_URL_ROOT}/bgfx_vc140.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
+    elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+        download_package(${DOWNLOAD_URL_ROOT}/bgfx_linux64.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
+    elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+        download_package(${DOWNLOAD_URL_ROOT}/bgfx_osx64.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
     endif()
 
     include(FindBgfx)
@@ -176,7 +177,6 @@ add_compile_options("$<$<CONFIG:Profile>:${PROFILE_COMPILE_OPTIONS}>")
 set(RELEASE_COMPILE_OPTIONS "-Dtermite_DEV=0")
 add_compile_options("$<$<CONFIG:Release>:${RELEASE_COMPILE_OPTIONS}>")
 
-
 # Common include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
@@ -215,7 +215,6 @@ if (NOT ANDROID)
     add_subdirectory(source/ls-model)
     add_subdirectory(source/modelc)
     add_subdirectory(source/animc)
-    add_subdirectory(source/sheetmaker)
 endif()
 
 # tests

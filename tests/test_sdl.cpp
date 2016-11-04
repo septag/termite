@@ -114,7 +114,7 @@ int main(int argc, char* argv[])
     termite::sdlMapImGuiKeys(&conf);
 
     termite::GfxPlatformData platformData;
-    termite::sdlGetNativeWindowHandle(g_window, &platformData.nwh);
+    termite::sdlGetNativeWindowHandle(g_window, &platformData.nwh, &platformData.ndt);
     
     if (termite::initialize(conf, update, &platformData) ||
         T_FAILED(termite::registerFont("fonts/fixedsys.fnt", "fixedsys")))

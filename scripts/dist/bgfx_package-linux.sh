@@ -4,7 +4,7 @@ curdir=$(pwd)
 
 echo "Configuring Bgfx ..."
 cd ../bgfx
-genie --with-tools --with-dynamic-runtime --gcc=linux-gcc gmake
+genie --with-tools --with-dynamic-runtime --with-shared-lib --gcc=linux-gcc gmake
 
 echo "Building Debug64 ..." 
 make linux-debug64
@@ -24,8 +24,8 @@ cp ../bgfx/.build/linux64_gcc/bin/texturecRelease bgfx/bin/texturec
 cp ../bgfx/.build/linux64_gcc/bin/shadercRelease bgfx/bin/shaderc
 cp ../bgfx/.build/linux64_gcc/bin/texturevRelease bgfx/bin/texturev
 
-cp ../bgfx/.build/linux64_gcc/bin/libbgfxRelease.a bgfx/lib
-cp ../bgfx/.build/linux64_gcc/bin/libbgfxDebug.a bgfx/lib
+cp ../bgfx/.build/linux64_gcc/bin/libbgfx-shared-libRelease.so bgfx/lib/libbgfxRelease.so
+cp ../bgfx/.build/linux64_gcc/bin/libbgfx-shared-libDebug.so bgfx/lib/libbgfxDebug.so
 
 cp -r ../bgfx/include/bgfx bgfx/include
 cp ../bgfx/src/*.sh bgfx/include/shader

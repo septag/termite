@@ -534,10 +534,14 @@ void termite::shutdown()
         BX_END_OK();
     }
 
+    BX_BEGINP("Shutting down Plugin system");
     shutdownPluginSystem();
+    BX_END_OK();
 
+    BX_BEGINP("Destroying Memory pools");
     g_core->memPool.destroy();
     shutdownMemoryPool();
+    BX_END_OK();
 
     shutdownErrorReport();
     BX_DELETE(g_alloc, g_core);
