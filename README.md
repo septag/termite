@@ -1,7 +1,7 @@
 # Termite: A Lightweight multiplatform game library
 v0.3
 
-_termite_ is a collection of multiplatform tools and libraries that can be used to make games and realtime applications. Currently it can not be defined as _engine_, It's more of a framework for making simple games. It's rather low-level, fast, memory and cache efficient and runs of different platforms.  
+_termite_ is a collection of multiplatform tools and libraries that can be used to make games and realtime applications. Currently it can not be defined as _engine_, It's more of a framework for making simple games. It's rather low-level, fast, memory and cache efficient and runs in different platforms.  
 
 ## Features and Components
 - A Fast Multiplatform Base library (mostly from _bx_), various memory allocators, containers, hash tables, threading, vector math, SIMD math, sockets, logger, json parsing, etc..
@@ -63,10 +63,15 @@ Before that download and install _Android NDK_ and _Android SDK_. Define Environ
 ```
 mkdir .build  
 cd .build  
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/android.toolchain.cmake -DANDROID_ABI="armeabi-v7a with NEON" -DANDROID_NATIVE_API_LEVEL=android-19 -GNinja -DANDROID_STL=gnustl_shared -DANDROID_STL_FORCE_FEATURES=0 -DCMAKE_BUILD_TYPE=Release  
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/android.toolchain.cmake -DANDROID_ABI="armeabi-v7a with NEON" -DANDROID_NATIVE_API_LEVEL=android-19 -DANDROID_STL=gnustl_shared -DANDROID_STL_FORCE_FEATURES=0 -DCMAKE_BUILD_TYPE=Release -GNinja
 ```
 
-In the example above, I built for _armv7a_ architecture. ```-DANDROID_NATIVE_API_LEVEL=android-19``` defines the API version number, which in here I used kitkat 4.4 (19) API. ```-DCMAKE_BUILD_TYPE=Release``` defines that we want to build with Release compile flags. See Above for other configuration names.
+In the example above, I built for _armv7a_ architecture in ```-DANDROID_ABI="armeabi-v7a with NEON"```.  
+
+```-DANDROID_NATIVE_API_LEVEL=android-19``` defines the API version number, which in here I used kitkat 4.4 (19) API.  
+```-DCMAKE_BUILD_TYPE=Release``` defines that we want to build with Release compile flags. See Above for other configuration names.  
+```-GNinja``` Defines that we want to use _Ninja_ build system. which the executable also resides in ```deps/bx/tools/bin```. You can use different build systems.  
+For more info on android build, read [this](https://github.com/taka-no-me/android-cmake).
 
 ## Test
 Currently there are two test apps and sources are under ```tests``` directory:
