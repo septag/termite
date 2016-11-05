@@ -16,6 +16,7 @@ namespace termite {
         typedef bx::List<Event*>::Node LNode;
         RunEventCallback runCallback;
         TriggerEventCallback triggerCallback;
+        bool destroyOnTrigger;
         void* triggerUserData;
         size_t paramsSize;
         uint8_t runParams[MAX_PARAM_SIZE];
@@ -26,7 +27,8 @@ namespace termite {
             triggerCallback(nullptr),
             triggerUserData(nullptr),
             paramsSize(0),
-            lnode(this)
+            lnode(this),
+            destroyOnTrigger(true)
         {
         }
     };
@@ -40,6 +42,18 @@ struct EventDispatcher
     
     EventDispatcher(bx::AllocatorI* _alloc) :
         alloc(_alloc)
+    {
+    }
+};
+
+struct TimerEvent
+{
+    float elapsed;
+    float interval;
+
+    TimerEvent() :
+        elapsed(0),
+        interval(0)
     {
     }
 };
@@ -83,15 +97,17 @@ void termite::runEventDispatcher(float dt)
 
         if (ev->runCallback(ev->paramsSize > 0 ? ev->runParams : nullptr, dt)) {
             ev->triggerCallback(ev->triggerUserData);
-            g_evDispatch->eventList.remove(node);
-            g_evDispatch->eventPool.deleteInstance(ev);
+            if (ev->destroyOnTrigger) {
+                g_evDispatch->eventList.remove(node);
+                g_evDispatch->eventPool.deleteInstance(ev);
+            }
         }
 
         node = next;
     }
 }
 
-Event* termite::registerEvent(RunEventCallback runCallback, TriggerEventCallback triggerCallback, 
+Event* termite::registerEvent(RunEventCallback runCallback, TriggerEventCallback triggerCallback, bool destroyOnTrigger,
                             const void* runParams, size_t paramsSize, void* triggerUserData)
 {
     assert(paramsSize < MAX_PARAM_SIZE);
@@ -110,9 +126,26 @@ Event* termite::registerEvent(RunEventCallback runCallback, TriggerEventCallback
     ev->triggerCallback = triggerCallback;
     ev->triggerUserData = triggerUserData;
 
+    ev->destroyOnTrigger = destroyOnTrigger;
+
     g_evDispatch->eventList.add(&ev->lnode);
     
     return ev;
+}
+
+Event* termite::registerTimerEvent(TriggerEventCallback callback, float interval, bool runOnce, void* userData)
+{
+    TimerEvent evParams;
+    evParams.interval = interval;
+    return registerEvent<TimerEvent>(
+    [](void* params, float dt) {
+        TimerEvent* timer = (TimerEvent*)params;
+        timer->elapsed += dt;
+        if (timer->elapsed < timer->interval)
+            return false;
+        timer->elapsed -= timer->interval;
+        return true;
+    }, callback, runOnce, &evParams, userData);
 }
 
 void termite::unregisterEvent(Event* ev)

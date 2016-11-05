@@ -21,15 +21,18 @@ namespace termite
     void runEventDispatcher(float dt);
 
     TERMITE_API Event* registerEvent(RunEventCallback runCallback, TriggerEventCallback triggerCallback, 
+                                     bool destroyOnTrigger = true,
                                      const void* runParams = nullptr, size_t paramsSize = 0, void* triggerUserData = nullptr);
     TERMITE_API void unregisterEvent(Event* ev);
 
     template <typename Ty>
-    void registerEvent(RunEventCallback runCallback, TriggerEventCallback triggerCallback, 
+    Event* registerEvent(RunEventCallback runCallback, TriggerEventCallback triggerCallback, bool destroyOnTrigger = true,
                        const Ty* runParams = nullptr, void* triggerUserData = nullptr)
     {
-        registerEvent(runCallback, triggerCallback, runParams, sizeof(Ty), triggerUserData);
+        return registerEvent(runCallback, triggerCallback, destroyOnTrigger, runParams, sizeof(Ty), triggerUserData);
     }
+
     
+    TERMITE_API Event* registerTimerEvent(TriggerEventCallback callback, float interval, bool runOnce, void* userData = nullptr);
 } // namespace termite
 

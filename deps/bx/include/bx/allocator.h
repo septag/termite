@@ -91,16 +91,16 @@ namespace bx
 	{
 		size_t total = _size + _align;
 		uint8_t* ptr = (uint8_t*)alloc(_allocator, total, 0, _file, _line);
-		uint8_t* aligned = (uint8_t*)alignPtr(ptr, sizeof(uint32_t), _align);
-		uint32_t* header = (uint32_t*)aligned - 1;
-		*header = uint32_t(aligned - ptr);
+		uint8_t* aligned = (uint8_t*)alignPtr(ptr, sizeof(uint8_t), _align);
+		uint8_t* header = aligned - 1;
+		*header = uint8_t(aligned - ptr);
 		return aligned;
 	}
 
 	static inline void alignedFree(AllocatorI* _allocator, void* _ptr, size_t /*_align*/, const char* _file = NULL, uint32_t _line = 0)
 	{
 		uint8_t* aligned = (uint8_t*)_ptr;
-		uint32_t* header = (uint32_t*)aligned - 1;
+		uint8_t* header = aligned - 1;
 		uint8_t* ptr = aligned - *header;
 		free(_allocator, ptr, 0, _file, _line);
 	}
@@ -113,11 +113,11 @@ namespace bx
 		}
 
 		uint8_t* aligned = (uint8_t*)_ptr;
-		uint32_t offset = *( (uint32_t*)aligned - 1);
+		uint8_t offset = *(aligned - 1);
 		uint8_t* ptr = aligned - offset;
 		size_t total = _size + _align;
 		ptr = (uint8_t*)realloc(_allocator, ptr, total, 0, _file, _line);
-		uint8_t* newAligned = (uint8_t*)alignPtr(ptr, sizeof(uint32_t), _align);
+		uint8_t* newAligned = (uint8_t*)alignPtr(ptr, sizeof(uint8_t), _align);
 
 		if (newAligned == aligned)
 		{
@@ -126,8 +126,8 @@ namespace bx
 
 		aligned = ptr + offset;
 		::memmove(newAligned, aligned, _size);
-		uint32_t* header = (uint32_t*)newAligned - 1;
-		*header = uint32_t(newAligned - ptr);
+		uint8_t* header = newAligned - 1;
+		*header = uint8_t(newAligned - ptr);
 		return newAligned;
 	}
 

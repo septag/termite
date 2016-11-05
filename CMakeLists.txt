@@ -30,11 +30,6 @@ include(PrecompiledHeader)
 include(Utility)
 include(DownloadPackage)
 include(Bgfx)
-include(FindWindowsSDK)
-
-message(${WINDOWSSDK_PREFERRED_FIRST_DIRS})
-get_windowssdk_library_dirs(${WINDOWSSDK_PREFERRED_DIR} SDK_INCLUDE_DIR)
-message(${SDK_INCLUDE_DIR})
 
 # options
 option(BUILD_BOX2D "Build Box2D Physics engine" OFF)
