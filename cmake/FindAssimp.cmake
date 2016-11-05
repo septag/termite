@@ -54,10 +54,9 @@ if(WIN32)
 else(WIN32)
 	find_path(
 	  ASSIMP_INCLUDE_DIR
-	  NAMES assimp/assimp.h assimp.h
-	  HINTS /usr/local/include/ /usr/include 
-	)
-
+	  NAMES assimp/scene.h assimp/Importer.hpp
+	  HINTS /usr/local/include/ /usr/include)
+    
 	find_library(
 	  ASSIMP_LIBRARY
 	  NAMES assimp

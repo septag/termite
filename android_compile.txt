@@ -1,1 +1,0 @@
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/android.toolchain.cmake -DANDROID_ABI="armeabi-v7a with NEON" -DANDROID_NATIVE_API_LEVEL=android-19 -GNinja -DANDROID_STL=gnustl_shared -DANDROID_STL_FORCE_FEATURES=0 -DCMAKE_BUILD_TYPE=Release

@@ -22,6 +22,13 @@ elseif (UNIX)
     set(STD_LIBS pthread dl)
 endif()
 
+if (CMAKE_COMPILER_IS_GNUCC)
+    if (${CMAKE_CXX_COMPILER_VERSION} LESS "6.5.0")
+        message(WARNING "Using -lgcc -lgcc_s workaround for gcc bug")
+        set(PRIVATE_LIBS gcc gcc_s)        
+    endif()
+endif()
+
 # statically linked plugin libraries
 if (BUILD_STATIC)
     if (ANDROID)
@@ -33,7 +40,7 @@ if (BUILD_STATIC)
 endif()
 
 target_link_libraries(termite 
-    PRIVATE fcontext imgui_impl ${PLUGIN_LIBS}
+    PRIVATE fcontext imgui_impl ${PLUGIN_LIBS} ${PRIVATE_LIBS}
     PUBLIC bx ${STD_LIBS})
 
 # 
