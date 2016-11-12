@@ -43,10 +43,8 @@ namespace bx
             if (m_last) {
                 m_last->next = _node;
                 _node->prev = m_last;
-                m_last = _node;
-            } else {
-                m_last = _node;
             }
+            m_last = _node;
 
             if (!m_first)
                 m_first = _node;

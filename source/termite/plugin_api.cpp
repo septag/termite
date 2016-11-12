@@ -4,6 +4,7 @@
 #define T_GFX_API
 #define T_IMGUI_API
 #define T_COMPONENT_API
+#define T_CAMERA_API
 #include "plugin_api.h"
 
 #include "gfx_utils.h"
@@ -233,6 +234,14 @@ static void* getImGuiApi0()
 	api.isMouseHoveringWindow = ImGui::IsMouseHoveringWindow;
     api.isItemHovered = ImGui::IsItemHovered;
 
+    api.isOverGuizmo = ImGuizmo::IsOver;
+    api.isUsingGuizmo = ImGuizmo::IsUsing;
+    api.enableGuizmo = ImGuizmo::Enable;
+    api.decomposeMatrixToComponents = ImGuizmo::DecomposeMatrixToComponents;
+    api.recomposeMatrixFromComponents = ImGuizmo::RecomposeMatrixFromComponents;
+    api.manipulateGuizmo = ImGuizmo::Manipulate;
+    api.drawCubeGuizmo = ImGuizmo::DrawCube;
+
 	return &api;
 }
 
@@ -259,6 +268,37 @@ static void* getComponentApi(uint32_t version)
 	}
 }
 
+static void* getCameraApi(uint32_t version)
+{
+    static CameraApi_v0 api;
+    memset(&api, 0x00, sizeof(api));
+
+    switch (version) {
+    case 0:
+        api.camInit = camInit;
+        api.camLookAt = camLookAt;
+        api.camCalcFrustumCorners = camCalcFrustumCorners;
+        api.camCalcFrustumPlanes = camCalcFrustumPlanes;
+        api.camPitch = camPitch;
+        api.camYaw = camYaw;
+        api.camPitchYaw = camPitchYaw;
+        api.camRoll = camRoll;
+        api.camForward = camForward;
+        api.camStrafe = camStrafe;
+        api.camViewMtx = camViewMtx;
+        api.camProjMtx = camProjMtx;
+        api.cam2dInit = cam2dInit;
+        api.cam2dPan = cam2dPan;
+        api.cam2dZoom = cam2dZoom;
+        api.cam2dViewMtx = cam2dViewMtx;
+        api.cam2dProjMtx = cam2dProjMtx;
+        api.cam2dGetRect = cam2dGetRect;
+        return &api;
+    default:
+        return nullptr;
+    }
+}
+
 void* termite::getEngineApi(uint16_t apiId, uint32_t version)
 {
     if (apiId == ApiId::Core && version == 0) {
@@ -279,6 +319,10 @@ void* termite::getEngineApi(uint16_t apiId, uint32_t version)
         core0.getConfig = getConfig;
         core0.getEngineVersion = getEngineVersion;
         core0.getTempAlloc = getTempAlloc;
+        core0.getGfxDriver = getGfxDriver;
+        core0.getAsyncIoDriver = getAsyncIoDriver;
+        core0.getBlockingIoDriver = getBlockingIoDriver;
+        core0.getPhys2dDriver = getPhys2dDriver;
 
         return &core0;
     } else if (apiId == ApiId::Gfx && version == 0) {
@@ -297,7 +341,9 @@ void* termite::getEngineApi(uint16_t apiId, uint32_t version)
         return &gfx0;
 	} else if (apiId == ApiId::ImGui && version == 0) {
 		return getImGuiApi0();
-	}
+    } else if (apiId == ApiId::Camera) {
+        return getCameraApi(version);
+    }
 
     return nullptr;
 }

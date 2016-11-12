@@ -15,11 +15,11 @@ namespace termite
     {
         switch (zaxis) {
         case ZAxis::Unknown:
-            return vec3f(v.x, v.y, v.z);
+            return vec3_t(v.x, v.y, v.z);
         case ZAxis::Up:
-            return vec3f(v.x, v.z, v.y);
+            return vec3_t(v.x, v.z, v.y);
         case ZAxis::GL:
-            return vec3f(v.x, v.y, -v.z);
+            return vec3_t(v.x, v.y, -v.z);
         default:
             return vec3_t();
         }
@@ -37,11 +37,11 @@ namespace termite
     {
         switch (zaxis)  {
         case ZAxis::Unknown:
-            return quatf(q.x, q.y, q.z, q.w);
+            return quat_t(q.x, q.y, q.z, q.w);
         case ZAxis::Up:
-            return quatf(q.x, q.y, q.z, q.w);   // TODO: this is wrong, we have to flip the rotation axis
+            return quat_t(q.x, q.y, q.z, q.w);   // TODO: this is wrong, we have to flip the rotation axis
         case ZAxis::GL:
-            return quatf(-q.x, -q.y, q.z, q.w);
+            return quat_t(-q.x, -q.y, q.z, q.w);
         default:
             return quatIdent();
         }

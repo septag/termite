@@ -258,13 +258,13 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
         if (rotated)
             std::swap<float>(frameWidth, frameHeight);
 
-        frame.frame = rectfwh(float(jframeFrame->findChild("x")->valueInt()) / imgWidth,
+        frame.frame = rectwh(float(jframeFrame->findChild("x")->valueInt()) / imgWidth,
                               float(jframeFrame->findChild("y")->valueInt()) / imgHeight,
                               frameWidth / imgWidth,
                               frameHeight / imgHeight);
 
         const bx::JsonNode* jsourceSize = jframe->findChild("sourceSize");
-        frame.sourceSize = vec2f(float(jsourceSize->findChild("w")->valueInt()),
+        frame.sourceSize = vec2_t(float(jsourceSize->findChild("w")->valueInt()),
                                  float(jsourceSize->findChild("h")->valueInt()));
 
         // Normalize pos/size offsets (0~1)
@@ -275,7 +275,7 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
         float srcw = float(jssFrame->findChild("w")->valueInt());
         float srch = float(jssFrame->findChild("h")->valueInt());
 
-        frame.sizeOffset = vec2f(srcw / frame.sourceSize.x, srch / frame.sourceSize.y);
+        frame.sizeOffset = vec2_t(srcw / frame.sourceSize.x, srch / frame.sourceSize.y);
 
         if (!rotated) {
             frame.rotOffset = 0;
@@ -290,9 +290,9 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
         const bx::JsonNode* jpivotY = jpivot->findChild("y");
         float pivotx = jpivotX->getType() == bx::JsonType::Float ?  jpivotX->valueFloat() : float(jpivotX->valueInt());
         float pivoty = jpivotY->getType() == bx::JsonType::Float ?  jpivotX->valueFloat() : float(jpivotY->valueInt());
-        frame.pivot = vec2f(pivotx - 0.5f, -pivoty + 0.5f);     // convert to our coordinates
+        frame.pivot = vec2_t(pivotx - 0.5f, -pivoty + 0.5f);     // convert to our coordinates
 
-        vec2_t srcOffset = vec2f((srcx + srcw*0.5f)/frame.sourceSize.x - 0.5f, -(srcy + srch*0.5f)/frame.sourceSize.y + 0.5f);
+        vec2_t srcOffset = vec2_t((srcx + srcw*0.5f)/frame.sourceSize.x - 0.5f, -(srcy + srch*0.5f)/frame.sourceSize.y + 0.5f);
         frame.posOffset = srcOffset;
     }
 
@@ -342,11 +342,11 @@ void SpriteSheetLoader::onReload(ResourceHandle handle, bx::AllocatorI* alloc)
             } else {
                 frame.texHandle = getResourceFailHandle("texture");
                 Texture* tex = getResourcePtr<Texture>(frame.texHandle);
-                frame.pivot = vec2f(0, 0);
-                frame.frame = rectf(0, 0, 1.0f, 1.0f);
-                frame.sourceSize = vec2f(float(tex->info.width), float(tex->info.height));
-                frame.posOffset = vec2f(0, 0);
-                frame.sizeOffset = vec2f(1.0f, 1.0f);
+                frame.pivot = vec2_t(0, 0);
+                frame.frame = rect_t(0, 0, 1.0f, 1.0f);
+                frame.sourceSize = vec2_t(float(tex->info.width), float(tex->info.height));
+                frame.posOffset = vec2_t(0, 0);
+                frame.sizeOffset = vec2_t(1.0f, 1.0f);
                 frame.rotOffset = 0;
                 frame.pixelRatio = 1.0f;
             }
@@ -377,11 +377,11 @@ static SpriteSheet* createDummySpriteSheet(ResourceHandle texHandle, bx::Allocat
     float imgHeight = float(tex->info.height);
 
     ss->frames[0].filenameHash = 0;
-    ss->frames[0].frame = rectf(0, 0, 1.0f, 1.0f);
-    ss->frames[0].pivot = vec2f(0, 0);
-    ss->frames[0].posOffset = vec2f(0, 0);
-    ss->frames[0].sizeOffset = vec2f(1.0f, 1.0f);
-    ss->frames[0].sourceSize = vec2f(imgWidth, imgHeight);
+    ss->frames[0].frame = rect_t(0, 0, 1.0f, 1.0f);
+    ss->frames[0].pivot = vec2_t(0, 0);
+    ss->frames[0].posOffset = vec2_t(0, 0);
+    ss->frames[0].sizeOffset = vec2_t(1.0f, 1.0f);
+    ss->frames[0].sourceSize = vec2_t(imgWidth, imgHeight);
     ss->frames[0].rotOffset = 0;
     
     return ss;
@@ -486,8 +486,8 @@ void termite::shutdownSpriteSystem()
 }
 
 void termite::addSpriteFrameTexture(Sprite* sprite, 
-                                    ResourceHandle texHandle, bool destroy /*= false*/, const vec2_t pivot /*= vec2f(0, 0)*/, 
-                                    const vec2_t topLeftCoords /*= vec2f(0, 0)*/, const vec2_t bottomRightCoords /*= vec2f(1.0f, 1.0f)*/, 
+                                    ResourceHandle texHandle, bool destroy /*= false*/, const vec2_t pivot /*= vec2_t(0, 0)*/, 
+                                    const vec2_t topLeftCoords /*= vec2_t(0, 0)*/, const vec2_t bottomRightCoords /*= vec2_t(1.0f, 1.0f)*/, 
                                     const char* frameTag /*= nullptr*/)
 {
     if (texHandle.isValid()) {
@@ -498,13 +498,13 @@ void termite::addSpriteFrameTexture(Sprite* sprite,
             frame->texHandle = texHandle;
             frame->destroyResource = destroy;
             frame->pivot = pivot;
-            frame->frame = rectv(topLeftCoords, bottomRightCoords);
+            frame->frame = rect_t(topLeftCoords, bottomRightCoords);
             frame->tagHash = !frameTag ? 0 : tinystl::hash_string(frameTag, strlen(frameTag)) ;
 
             Texture* tex = getResourcePtr<Texture>(texHandle);
-            frame->sourceSize = vec2f(float(tex->info.width), float(tex->info.height));
-            frame->posOffset = vec2f(0, 0);
-            frame->sizeOffset = vec2f(1.0f, 1.0f);
+            frame->sourceSize = vec2_t(float(tex->info.width), float(tex->info.height));
+            frame->posOffset = vec2_t(0, 0);
+            frame->sizeOffset = vec2_t(1.0f, 1.0f);
             frame->rotOffset = 0;
             frame->pixelRatio = ((bottomRightCoords.x - topLeftCoords.x)*frame->sourceSize.x) /
                 ((bottomRightCoords.y - topLeftCoords.y)*frame->sourceSize.y);
@@ -546,11 +546,11 @@ void termite::addSpriteFrameSpritesheet(Sprite* sprite,
             } else {
                 frame->texHandle = getResourceFailHandle("texture");
                 Texture* tex = getResourcePtr<Texture>(frame->texHandle);
-                frame->pivot = vec2f(0, 0);
-                frame->frame = rectf(0, 0, 1.0f, 1.0f);
-                frame->sourceSize = vec2f(float(tex->info.width), float(tex->info.height));
-                frame->posOffset = vec2f(0, 0);
-                frame->sizeOffset = vec2f(1.0f, 1.0f);
+                frame->pivot = vec2_t(0, 0);
+                frame->frame = rect_t(0, 0, 1.0f, 1.0f);
+                frame->sourceSize = vec2_t(float(tex->info.width), float(tex->info.height));
+                frame->posOffset = vec2_t(0, 0);
+                frame->sizeOffset = vec2_t(1.0f, 1.0f);
                 frame->rotOffset = 0;
                 frame->pixelRatio = 1.0f;
             }
@@ -786,8 +786,8 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
             halfSize.x = halfSize.y * pixelRatio;
 
         // Encode transform matrix into vertices
-        vec3_t transform1 = vec3f(mat.m11, mat.m12, mat.m21);
-        vec3_t transform2 = vec3f(mat.m22, mat.m31, mat.m32);
+        vec3_t transform1 = vec3_t(mat.m11, mat.m12, mat.m21);
+        vec3_t transform2 = vec3_t(mat.m22, mat.m31, mat.m32);
 
         // calculate final pivot offset to make geometry
         vec2_t fullSize = halfSize * 2.0f;
@@ -803,19 +803,19 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
         SpriteVertex& v3 = verts[vertexIdx + 3];
 
         // Top-Left
-        v0.pos = vec2f(-halfSize.x - pivot.x + offset.x, halfSize.y - pivot.y + offset.y);
+        v0.pos = vec2_t(-halfSize.x - pivot.x + offset.x, halfSize.y - pivot.y + offset.y);
         v0.coords = texRect.vmin;
 
         // Top-Right
-        v1.pos = vec2f(halfSize.x - pivot.x + offset.x, halfSize.y - pivot.y + offset.y);
-        v1.coords = vec2f(texRect.xmax, texRect.ymin);
+        v1.pos = vec2_t(halfSize.x - pivot.x + offset.x, halfSize.y - pivot.y + offset.y);
+        v1.coords = vec2_t(texRect.xmax, texRect.ymin);
 
         // Bottom-Left
-        v2.pos = vec2f(-halfSize.x - pivot.x + offset.x, -halfSize.y - pivot.y + offset.y);
-        v2.coords = vec2f(texRect.xmin, texRect.ymax);
+        v2.pos = vec2_t(-halfSize.x - pivot.x + offset.x, -halfSize.y - pivot.y + offset.y);
+        v2.coords = vec2_t(texRect.xmin, texRect.ymax);
 
         // Bottom-Right
-        v3.pos = vec2f(halfSize.x - pivot.x + offset.x, -halfSize.y - pivot.y + offset.y);
+        v3.pos = vec2_t(halfSize.x - pivot.x + offset.x, -halfSize.y - pivot.y + offset.y);
         v3.coords = texRect.vmax;
 
         v0.transform1 = v1.transform1 = v2.transform1 = v3.transform1 = transform1;

@@ -168,13 +168,13 @@ namespace termite
             return *this;
         }
 
-        VectorGfx& rectf(float x, float y, float width, float height)
+        VectorGfx& rectangle(float x, float y, float width, float height)
         {
             vgRectf(m_ctx, x, y, width, height);
             return *this;
         }
 
-        VectorGfx& rect(const rect_t& rc)
+        VectorGfx& rectangle(const rect_t& rc)
         {
             vgRect(m_ctx, rc);
             return *this;

@@ -2,12 +2,16 @@
 
 #include "../bx/allocator.h"
 #include <cassert>
+#include <functional>
 
 namespace bx
 {
     template <typename Ty>
     class Array
     {
+    public:
+        typedef std::function<bool(const Ty& value)> FindMatchFunc;
+
     public:
         Array();
         ~Array();
@@ -24,6 +28,7 @@ namespace bx
         Ty* detach(int* _count, AllocatorI** _palloc = nullptr);
 
         int find(const Ty& _item) const;
+        int find(FindMatchFunc matchFn) const;
 
         Ty* itemPtr(int _index)  {   assert(_index < m_numItems); return &m_buff[_index];   }
         const Ty& operator[](int _index) const   {   assert(_index < m_numItems);  return m_buff[_index]; }
@@ -36,7 +41,7 @@ namespace bx
         int m_maxItems;
         int m_numExpand;
     };
-    
+
     // Implementation
     template <typename Ty>
     Array<Ty>::Array()
@@ -141,5 +146,15 @@ namespace bx
         m_numExpand = 0;
         m_alloc = nullptr;
         return buff;
+    }
+
+    template <typename Ty>
+    int bx::Array<Ty>::find(FindMatchFunc matchFn) const
+    {
+        for (int i = 0, c = m_numItems; i < c; i++) {
+            if (matchFn(m_buff[i]))
+                return i;
+        }
+        return -1;
     }
 }

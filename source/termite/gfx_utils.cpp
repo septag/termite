@@ -94,7 +94,7 @@ void termite::calcGaussKernel(vec4_t* kernel, int kernelSize, float stdDevSqr, f
         float x = p / (float)hk;
         float w = expf(-(x*x) / (2.0f*stdDevSqr)) / sqrtf(2.0f*bx::pi*stdDevSqr);
         sum += w;
-        kernel[i] = vec4f(
+        kernel[i] = vec4_t(
             direction == 0 ? (w_stride*p) : 0.0f,
             direction == 1 ? (h_stride*p) : 0.0f,
             w,
@@ -150,7 +150,7 @@ void termite::drawFullscreenQuad(uint8_t viewId, ProgramHandle prog)
     driver->submit(viewId, prog, 0, false);
 }
 
-vec2int_t termite::getRelativeDisplaySize(int refWidth, int refHeight, int targetWidth, int targetHeight, 
+vec2i_t termite::getRelativeDisplaySize(int refWidth, int refHeight, int targetWidth, int targetHeight, 
                                           DisplayPolicy::Enum policy)
 {
     float w, h;
@@ -167,5 +167,5 @@ vec2int_t termite::getRelativeDisplaySize(int refWidth, int refHeight, int targe
         break;
     }
 
-    return vec2i(int(w), int(h));
+    return vec2i_t(int(w), int(h));
 }

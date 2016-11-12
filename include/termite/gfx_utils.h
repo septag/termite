@@ -28,7 +28,7 @@ namespace termite
                                                 const char* fsFilepath);
     TERMITE_API void drawFullscreenQuad(uint8_t viewId, ProgramHandle prog);
 
-    TERMITE_API vec2int_t getRelativeDisplaySize(int refWidth, int refHeight, int targetWidth, int targetHeight, 
+    TERMITE_API vec2i_t getRelativeDisplaySize(int refWidth, int refHeight, int targetWidth, int targetHeight, 
                                                  DisplayPolicy::Enum policy);
 } // namespace termite
 

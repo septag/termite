@@ -18,5 +18,6 @@ source_group(shaders\\compiled FILES ${SHADER_GEN_FILES})
 
 # ImGui Drawing for termite
 add_library(nanovg STATIC ${SOURCE_FILES} ${INCLUDE_FILES} ${SHADER_SOURCES} ${SHADER_GEN_FILES})
+target_include_directories(nanovg INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(nanovg PRIVATE bx)
 

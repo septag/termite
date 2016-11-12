@@ -1,6 +1,7 @@
 #pragma once
 
 #include "imgui.h"
+#include "ImGuizmo.h"
 
 namespace termite
 {

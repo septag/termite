@@ -40,7 +40,7 @@ namespace termite
 
     // Camera2D
     TERMITE_API void cam2dInit(Camera2D* cam, float refWidth, float refHeight, 
-                               DisplayPolicy::Enum policy, float zoom = 1.0f, const vec2_t pos = vec2f(0, 0));
+                               DisplayPolicy::Enum policy, float zoom = 1.0f, const vec2_t pos = vec2_t(0, 0));
     TERMITE_API void cam2dPan(Camera2D* cam, vec2_t pan);
     TERMITE_API void cam2dZoom(Camera2D* cam, float zoom);
     TERMITE_API mtx4x4_t cam2dViewMtx(const Camera2D& cam);
@@ -132,7 +132,7 @@ namespace termite
         DisplayPolicy::Enum policy;
 
         inline void init(float _refWidth, float _refHeight, DisplayPolicy::Enum _policy, 
-                         float _zoom = 1.0f, const vec2_t _pos = vec2f(0, 0))
+                         float _zoom = 1.0f, const vec2_t _pos = vec2_t(0, 0))
         {
             cam2dInit(this, _refWidth, _refHeight, _policy, _zoom, _pos);
         }

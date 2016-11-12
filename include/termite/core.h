@@ -28,6 +28,7 @@ namespace termite
     struct GfxDriverApi;
     struct IoDriverApi;
     struct RendererApi;
+    struct PhysDriver2DApi;
 
     struct InitEngineFlags
     {
@@ -50,6 +51,7 @@ namespace termite
         char rendererName[32];
         char gfxName[32];
         char uiIniFilename[32];
+        char phys2dName[32];    // Physics2D Driver name
 
         // Graphics
         uint16_t gfxDeviceId;
@@ -70,6 +72,9 @@ namespace termite
         uint32_t pageSize;          // in Kb
         int maxPagesPerPool;
 
+        // Developer
+        uint16_t cmdHistorySize;
+
         Config()
         {
             strcpy(pluginPath, "");
@@ -78,6 +83,7 @@ namespace termite
             strcpy(dataUri, "");
             strcpy(gfxName, "Bgfx");
             strcpy(uiIniFilename, "");
+            strcpy(phys2dName, "Box2D");
 
             gfxWidth = 0;
             gfxHeight = 0;
@@ -92,6 +98,7 @@ namespace termite
 
             pageSize = 0;
             maxPagesPerPool = 0;
+            cmdHistorySize = 32;
         }
     };
 
@@ -140,12 +147,14 @@ namespace termite
     TERMITE_API IoDriverApi* getBlockingIoDriver() T_THREAD_SAFE;
     TERMITE_API IoDriverApi* getAsyncIoDriver() T_THREAD_SAFE;
     TERMITE_API RendererApi* getRenderer() T_THREAD_SAFE;
+    TERMITE_API PhysDriver2DApi* getPhys2dDriver() T_THREAD_SAFE;
     TERMITE_API uint32_t getEngineVersion() T_THREAD_SAFE;
     TERMITE_API bx::AllocatorI* getHeapAlloc() T_THREAD_SAFE;
     TERMITE_API bx::AllocatorI* getTempAlloc() T_THREAD_SAFE;
     TERMITE_API const Config& getConfig() T_THREAD_SAFE;
     TERMITE_API const char* getCacheDir() T_THREAD_SAFE;
     TERMITE_API const char* getDataDir() T_THREAD_SAFE;
+    TERMITE_API void dumpGfxLog() T_THREAD_SAFE;
 } // namespace termite
 
 

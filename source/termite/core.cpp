@@ -28,6 +28,13 @@
 #include "plugin_system.h"
 #include "component_system.h"
 #include "event_dispatcher.h"
+#include "physics_2d.h"
+#include "command_system.h"
+
+#ifdef termite_SDL2
+#  include <SDL.h>
+#  include "sdl_utils.h"
+#endif
 
 #include "../imgui_impl/imgui_impl.h"
 
@@ -47,6 +54,8 @@
 
 #define MEM_POOL_BUCKET_SIZE 256
 #define IMGUI_VIEWID 255
+#define NANOVG_VIEWID 254
+#define LOG_STRING_SIZE 256
 
 using namespace termite;
 //
@@ -80,23 +89,8 @@ struct HeapMemoryImpl
 class GfxDriverEvents : public GfxDriverEventsI
 {
 public:
-    void onFatal(GfxFatalType::Enum type, const char* str) override
-    {
-        char strTrimed[2048];
-        bx::strlcpy(strTrimed, str, sizeof(strTrimed));
-        strTrimed[strlen(strTrimed) - 1] = 0;
-
-        BX_FATAL("Graphics Driver: %s", strTrimed);
-    }
-
-    void onTraceVargs(const char* filepath, int line, const char* format, va_list argList) override
-    {
-        char text[2048];
-        vsnprintf(text, sizeof(text), format, argList);
-
-        text[strlen(text) - 1] = 0;
-        BX_VERBOSE("Graphics Driver: %s", text);
-    }
+    void onFatal(GfxFatalType::Enum type, const char* str) override;
+    void onTraceVargs(const char* filepath, int line, const char* format, va_list argList) override;
 
     uint32_t onCacheReadSize(uint64_t id) override
     {
@@ -130,6 +124,12 @@ public:
     }
 };
 
+struct LogCache
+{
+    bx::LogType::Enum type;
+    char text[LOG_STRING_SIZE];
+};
+
 struct Core
 {
     UpdateCallback updateFn;
@@ -142,22 +142,30 @@ struct Core
     bx::Lock memPoolLock;
     GfxDriverApi* gfxDriver;
     IoDriverDual* ioDriver;
+    PhysDriver2DApi* phys2dDriver;
     PageAllocator tempAlloc;
     GfxDriverEvents gfxDriverEvents;
+    LogCache* gfxLogCache;
+    int numGfxLogCache;
 
     std::random_device randDevice;
     std::mt19937 randEngine;
+    bool init;
 
     Core() :
         tempAlloc(T_MID_TEMP),
         randEngine(randDevice())
     {
         gfxDriver = nullptr;
+        phys2dDriver = nullptr;
         updateFn = nullptr;
         renderer = nullptr;
         hpTimerFreq = 0;
         ioDriver = nullptr;
         timeMultiplier = 1.0;
+        gfxLogCache = nullptr;
+        numGfxLogCache = 0;
+        init = false;
         memset(&frameData, 0x00, sizeof(frameData));
     }
 };
@@ -368,7 +376,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
         }
 
         if (!g_core->gfxDriver) {
-            T_ERROR("Core init failed: Could not detect Graphics driver");
+            T_ERROR("Core init failed: Could not detect Graphics driver: %s", conf.gfxName);
             return T_ERR_FAILED;
         }
 
@@ -379,10 +387,12 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
             g_core->gfxDriver->setPlatformData(*platform);
         if (T_FAILED(g_core->gfxDriver->init(conf.gfxDeviceId, &g_core->gfxDriverEvents, g_alloc))) {
             BX_END_FATAL();
+            dumpGfxLog();
             T_ERROR("Core init failed: Could not initialize Graphics driver");
             return T_ERR_FAILED;
         }
         BX_END_OK();
+        dumpGfxLog();
 
         // Initialize Renderer with Gfx Driver
         if (g_core->renderer) {
@@ -443,6 +453,31 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
         registerSpriteSheetToResourceLib();
     }
 
+    // Physics2D Driver
+    if (conf.phys2dName[0] != 0) {
+        r = findPluginByName(conf.phys2dName, 0, &pluginHandle, 1, PluginType::Physics2dDriver);
+        if (r > 0) {
+            g_core->phys2dDriver = (PhysDriver2DApi*)initPlugin(pluginHandle, g_alloc);
+        }
+
+        if (!g_core->phys2dDriver) {
+            T_ERROR("Core init failed: Could not detect Physics driver: %s", conf.phys2dName);
+            return T_ERR_FAILED;
+        }
+
+        const PluginDesc& desc = getPluginDesc(pluginHandle);
+        BX_BEGINP("Initializing Physics2D Driver: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version),
+                  T_VERSION_MINOR(desc.version));
+        if (T_FAILED(g_core->phys2dDriver->init(g_alloc, BX_ENABLED(termite_DEV) ? PhysFlags2D::EnableDebug : 0,
+                                                NANOVG_VIEWID))) 
+        {
+            BX_END_FATAL();
+            T_ERROR("Core init failed: Could not initialize Physics2D driver");
+            return T_ERR_FAILED;
+        }
+        BX_END_OK();
+    }
+
     // Job Dispatcher
     if ((conf.engineFlags & InitEngineFlags::EnableJobDispatcher) == InitEngineFlags::EnableJobDispatcher) {
         BX_BEGINP("Initializing Job Dispatcher");
@@ -475,7 +510,28 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     }
     BX_END_OK();
 
+#ifdef termite_SDL2
+    BX_BEGINP("Initializing SDL2 utils");
+    if (T_FAILED(initSdlUtils(g_alloc))) {
+        T_ERROR("Core init failed: Could not initialize SDL2 utils");
+        BX_END_FATAL();
+        return T_ERR_FAILED;
+    }
+    BX_END_OK();
+#endif
+
+#if termite_DEV
+    BX_BEGINP("Initializing Command System");
+    if (T_FAILED(initCommandSystem(conf.cmdHistorySize, g_alloc))) {
+        T_ERROR("Core init failed: Could not initialize Command System");
+        BX_END_FATAL();
+        return T_ERR_FAILED;
+    }
+    BX_END_OK();
+#endif
+
     g_core->hpTimerFreq = bx::getHPFrequency();
+    g_core->init = true;
 
     return 0;
 }
@@ -486,6 +542,18 @@ void termite::shutdown()
         assert(false);
         return;
     }
+
+#if termite_DEV
+    BX_BEGINP("Shutting down Command System");
+    shutdownCommandSystem();
+    BX_END_OK();
+#endif
+
+#ifdef termite_SDL2
+    BX_BEGINP("Shutting down SDL2 utils");
+    shutdownSdlUnits();
+    BX_END_OK();
+#endif
 
     BX_BEGINP("Shutting down Event Dispatcher");
     shutdownEventDispatcher();
@@ -498,6 +566,13 @@ void termite::shutdown()
 	BX_BEGINP("Shutting down Job Dispatcher");
     shutdownJobDispatcher();
 	BX_END_OK();
+
+    if (g_core->phys2dDriver) {
+        BX_BEGINP("Shutting down Physics2D Driver");
+        g_core->phys2dDriver->shutdown();
+        g_core->phys2dDriver = nullptr;
+        BX_END_OK();
+    }
 
     BX_BEGINP("Shutting down Graphics Subsystems");
     shutdownSpriteSystem();
@@ -538,6 +613,9 @@ void termite::shutdown()
     shutdownPluginSystem();
     BX_END_OK();
 
+    if (g_core->gfxLogCache)
+        BX_FREE(g_alloc, g_core->gfxLogCache);
+
     BX_BEGINP("Destroying Memory pools");
     g_core->memPool.destroy();
     shutdownMemoryPool();
@@ -577,6 +655,7 @@ void termite::doFrame()
     if (g_core->gfxDriver) {
         ImGui::GetIO().DeltaTime = fdt;
         ImGui::NewFrame();
+        ImGuizmo::BeginFrame();
     }
 
     callComponentUpdates(ComponentUpdateStage::PreUpdate, float(dt));
@@ -808,6 +887,11 @@ RendererApi* termite::getRenderer()
     return g_core->renderer;
 }
 
+PhysDriver2DApi* termite::getPhys2dDriver() T_THREAD_SAFE
+{
+    return g_core->phys2dDriver;
+}
+
 uint32_t termite::getEngineVersion()
 {
     return T_MAKE_VERSION(0, 1);
@@ -838,3 +922,36 @@ const char* termite::getDataDir() T_THREAD_SAFE
     return g_dataDir.cstr();
 }
 
+void termite::dumpGfxLog() T_THREAD_SAFE
+{
+    if (g_core->gfxLogCache) {
+        for (int i = 0, c = g_core->numGfxLogCache; i < c; i++) {
+            const LogCache& l = g_core->gfxLogCache[i];
+            bx::logPrint(__FILE__, __LINE__, l.type, l.text);
+        }
+
+        BX_FREE(g_alloc, g_core->gfxLogCache);
+        g_core->gfxLogCache = nullptr;
+    }
+}
+
+void GfxDriverEvents::onFatal(GfxFatalType::Enum type, const char* str)
+{
+    char strTrimed[LOG_STRING_SIZE];
+    bx::strlcpy(strTrimed, str, sizeof(strTrimed));
+    strTrimed[strlen(strTrimed) - 1] = 0;
+
+    g_core->gfxLogCache = (LogCache*)BX_REALLOC(g_alloc, g_core->gfxLogCache, sizeof(LogCache) * (++g_core->numGfxLogCache));
+    g_core->gfxLogCache[g_core->numGfxLogCache-1].type = bx::LogType::Fatal;
+    strcpy(g_core->gfxLogCache[g_core->numGfxLogCache-1].text, strTrimed);
+}
+
+void GfxDriverEvents::onTraceVargs(const char* filepath, int line, const char* format, va_list argList)
+{
+    char text[LOG_STRING_SIZE];
+    vsnprintf(text, sizeof(text), format, argList);
+    text[strlen(text) - 1] = 0;
+    g_core->gfxLogCache = (LogCache*)BX_REALLOC(g_alloc, g_core->gfxLogCache, sizeof(LogCache) * (++g_core->numGfxLogCache));
+    g_core->gfxLogCache[g_core->numGfxLogCache-1].type = bx::LogType::Verbose;
+    strcpy(g_core->gfxLogCache[g_core->numGfxLogCache-1].text, text);
+}

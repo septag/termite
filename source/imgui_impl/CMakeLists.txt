@@ -13,6 +13,11 @@ set(IMGUI_SOURCES
     ${DEP_ROOT_DIR}/imgui/imgui_internal.h)
 source_group(ImGui FILES ${IMGUI_SOURCES})
 
+set(IMGUIZMO_SOURCES
+    ${DEP_ROOT_DIR}/ImGuizmo/ImGuizmo.h 
+    ${DEP_ROOT_DIR}/ImGuizmo/ImGuizmo.cpp)
+source_group(ImGuizmo FILES ${IMGUIZMO_SOURCES})
+
 set(SHADER_SOURCES imgui.vsc imgui.fsc)
 source_group(shaders FILES ${SHADER_SOURCES})
 
@@ -20,8 +25,8 @@ bgfx_add_shaders("${SHADER_SOURCES}" IGNORE IGNORE "shaders_h" TRUE IGNORE SHADE
 source_group(shaders\\compiled FILES ${SHADER_GEN_FILES})
 
 # ImGui itself
-add_library(imgui STATIC ${IMGUI_SOURCES})
-target_include_directories(imgui PUBLIC ${DEP_ROOT_DIR}/imgui)
+add_library(imgui STATIC ${IMGUI_SOURCES} ${IMGUIZMO_SOURCES})
+target_include_directories(imgui PUBLIC ${DEP_ROOT_DIR}/imgui ${DEP_ROOT_DIR}/ImGuizmo)
 set_target_properties(imgui PROPERTIES FOLDER Deps)
 
 # ImGui Drawing for termite

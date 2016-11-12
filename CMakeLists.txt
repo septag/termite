@@ -32,7 +32,7 @@ include(DownloadPackage)
 include(Bgfx)
 
 # options
-option(BUILD_BOX2D "Build Box2D Physics engine" OFF)
+option(USE_BOX2D "Build Box2D Physics engine" ON)
 option(BUILD_FISHERBOY "Build Fisherboy Game" OFF)
 option(USE_SDL2 "Use SDL2 with the engine" ON)
 option(BUILD_STATIC "Force Static library builds" OFF)
@@ -185,15 +185,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_subdirectory(deps/deboost.context)
 add_subdirectory(deps/bx)
 add_subdirectory(deps/nvg)
-add_subdirectory(deps/Box2D)
 set_target_properties(fcontext PROPERTIES FOLDER Deps)
 set_target_properties(nanovg PROPERTIES FOLDER Deps)
-set_target_properties(Box2D PROPERTIES FOLDER Deps)
-
-if (termite_BUILD_BOX2D)
-    add_subdirectory(deps/Box2D)
-    set_target_properties(Box2D PROPERTIES FOLDER Deps)
-endif()
 
 # common
 add_subdirectory(source/imgui_impl)
@@ -208,7 +201,15 @@ if (ANDROID)
 else()
     add_subdirectory(source/driver_disk)
 endif()
-add_subdirectory(source/render_stock)
+
+if (USE_BOX2D)
+    add_subdirectory(deps/Box2D)
+    set_target_properties(Box2D PROPERTIES FOLDER Deps)
+
+    add_subdirectory(source/driver_box2d)
+endif()
+
+#add_subdirectory(source/render_stock)
 
 # tools
 if (NOT ANDROID)

@@ -31,8 +31,10 @@ namespace termite
     TERMITE_API void ddTextf(DebugDrawContext* ctx, const vec3_t pos, const char* fmt, ...);
     TERMITE_API void ddTextv(DebugDrawContext* ctx, const vec3_t pos, const char* fmt, va_list argList);
     TERMITE_API void ddImage(DebugDrawContext* ctx, const vec3_t pos, Texture* image);
-    TERMITE_API void ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spacing, float boldSpacing, float maxDepth);
-    TERMITE_API void ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spacing, float boldSpacing);
+    TERMITE_API void ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spacing, float boldSpacing, float maxDepth,
+                                  color_t color = 0xff808080, color_t boldColor = 0xffffffff);
+    TERMITE_API void ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spacing, float boldSpacing,
+                                  color_t color = 0xff808080, color_t boldColor = 0xffffffff);
     TERMITE_API void ddBoundingBox(DebugDrawContext* ctx, const aabb_t bb, bool showInfo = false);
     TERMITE_API void ddBoundingSphere(DebugDrawContext* ctx, const sphere_t sphere, bool showInfo = false);
     TERMITE_API void ddBox(DebugDrawContext* ctx, const aabb_t aabb, const mtx4x4_t* modelMtx = nullptr);
@@ -117,15 +119,17 @@ namespace termite
             return *this;
         }
 
-        inline DebugDraw& snapGridXZ(const Camera& cam, float spacing, float boldSpacing, float maxDepth)
+        inline DebugDraw& snapGridXZ(const Camera& cam, float spacing, float boldSpacing, float maxDepth,
+                                     color_t color = 0xff808080, color_t boldColor = 0xffffffff)
         {
-            ddSnapGridXZ(m_ctx, cam, spacing, boldSpacing, maxDepth);
+            ddSnapGridXZ(m_ctx, cam, spacing, boldSpacing, maxDepth, color, boldColor);
             return *this;
         }
 
-        inline DebugDraw& snapGridXY(const Camera2D& cam, float spacing, float boldSpacing)
+        inline DebugDraw& snapGridXY(const Camera2D& cam, float spacing, float boldSpacing,
+                                     color_t color = 0xff808080, color_t boldColor = 0xffffffff)
         {
-            ddSnapGridXY(m_ctx, cam, spacing, boldSpacing);
+            ddSnapGridXY(m_ctx, cam, spacing, boldSpacing, color, boldColor);
             return *this;
         }
 

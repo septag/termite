@@ -9,7 +9,7 @@ if(WIN32)
 	# Find path of each library
 	find_path(ASSIMP_INCLUDE_DIR
 		NAMES
-			assimp/assimp.h
+			assimp/scene.h assimp/Importer.hpp
 		HINTS
 			${ASSIMP_ROOT_DIR}/include
 	)
@@ -20,8 +20,6 @@ if(WIN32)
 		set(ASSIMP_MSVC_VERSION "vc140")
 	endif(MSVC12)
 
-    message(${ASSIMP_INCLUDE_DIR})
-	
 	if(MSVC12 OR MSVC14)
 	
 		find_path(ASSIMP_LIBRARY_DIR

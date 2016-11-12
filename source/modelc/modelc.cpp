@@ -659,17 +659,17 @@ static int importMesh(const aiScene* scene, ModelData* model, unsigned int* ames
 
 static aabb_t calcGeoBoundsNoSkin(const ModelData::Geometry& geo)
 {
-    aabb_t bb = aabb();
+    aabb_t bb;
     for (int i = 0; i < geo.g.numVerts; i++) {
         const float* poss = (const float*)((uint8_t*)geo.verts + i*geo.g.vertStride);
-        aabbPushPoint(&bb, vec3f(poss[0], poss[1], poss[2]));
+        aabbPushPoint(&bb, vec3_t(poss[0], poss[1], poss[2]));
     }
     return bb;
 }
 
 static aabb_t calcGeoBoundsSkin(const ModelData::Geometry& geo)
 {
-    aabb_t bb = aabb();
+    aabb_t bb;
     int numJoints = geo.g.skel.numJoints;
 
     mtx4x4_t* skinMtxs = (mtx4x4_t*)alloca(sizeof(mtx4x4_t)*numJoints);
@@ -706,8 +706,8 @@ static aabb_t calcGeoBoundsSkin(const ModelData::Geometry& geo)
         const int* indices = (const int*)((uint8_t*)geo.verts + i*geo.g.vertStride + indicesOffset);
         const float* weights = (const float*)((uint8_t*)geo.verts + i*geo.g.vertStride + weightOffset);
 
-        vec3_t pos = vec3f(poss[0], poss[1], poss[2]);
-        vec3_t skinned = vec3f(0, 0, 0);
+        vec3_t pos = vec3_t(poss[0], poss[1], poss[2]);
+        vec3_t skinned = vec3_t(0, 0, 0);
 
         for (int c = 0; c < 4; c++) {
             const mtx4x4_t& mtx = skinMtxs[indices[c]];
@@ -758,7 +758,7 @@ static int importNodeRecursive(const aiScene* scene, aiNode* anode, ModelData* m
     saveMtx(localMtx, node->n.xformMtx);
 
     // Import meshes (Geo/Material) and calculate bounding box
-    aabb_t bb = aabb();
+    aabb_t bb;
     if (anode->mNumMeshes > 0) {
         node->n.mesh = importMesh(scene, model, anode->mMeshes, anode->mNumMeshes, parent == -1, conf, rootMtx);
         if (node->n.mesh == -1) {

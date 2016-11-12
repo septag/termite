@@ -31,9 +31,9 @@ namespace termite
     TERMITE_API void addSpriteFrameTexture(Sprite* sprite,
                                            ResourceHandle texHandle,
                                            bool destroy = false,
-                                           const vec2_t pivot = vec2f(0, 0),
-                                           const vec2_t topLeftCoords = vec2f(0, 0),
-                                           const vec2_t bottomRightCoords = vec2f(1.0f, 1.0f),
+                                           const vec2_t pivot = vec2_t(0, 0),
+                                           const vec2_t topLeftCoords = vec2_t(0, 0),
+                                           const vec2_t bottomRightCoords = vec2_t(1.0f, 1.0f),
                                            const char* frameTag = nullptr);
     TERMITE_API void addSpriteFrameSpritesheet(Sprite* sprite,
                                                ResourceHandle ssHandle, 
@@ -46,9 +46,9 @@ namespace termite
                                            const vec2_t& halfSize, 
                                            ResourceHandle texHandle, 
                                            bool destroy = false,
-                                           const vec2_t& pivot = vec2f(0, 0),
-                                           const vec2_t& topLeftCoords = vec2f(0, 0),
-                                           const vec2_t& bottomRightCoords = vec2f(1.0f, 1.0f))
+                                           const vec2_t& pivot = vec2_t(0, 0),
+                                           const vec2_t& topLeftCoords = vec2_t(0, 0),
+                                           const vec2_t& bottomRightCoords = vec2_t(1.0f, 1.0f))
     {
         Sprite* s = createSprite(alloc, halfSize);
         if (s)
@@ -164,9 +164,9 @@ namespace termite
                            const vec2_t& halfSize,
                            ResourceHandle texHandle,
                            bool destroy = false,
-                           const vec2_t pivot = vec2f(0, 0),
-                           const vec2_t topLeftCoords = vec2f(0, 0),
-                           const vec2_t bottomRightCoords = vec2f(1.0f, 1.0f))
+                           const vec2_t pivot = vec2_t(0, 0),
+                           const vec2_t topLeftCoords = vec2_t(0, 0),
+                           const vec2_t bottomRightCoords = vec2_t(1.0f, 1.0f))
         {
             m_sprite = createSpriteFromTexture(alloc, halfSize, texHandle, destroy, pivot, topLeftCoords, bottomRightCoords);
             return m_sprite != nullptr;
@@ -182,9 +182,9 @@ namespace termite
         }
 
         inline CSprite& addFrame(ResourceHandle texHandle, bool destroy = false,
-                                 const vec2_t& pivot = vec2f(0, 0),
-                                 const vec2_t& topLeftCoords = vec2f(0, 0),
-                                 const vec2_t& bottomRightCoords = vec2f(1.0f, 1.0f),
+                                 const vec2_t& pivot = vec2_t(0, 0),
+                                 const vec2_t& topLeftCoords = vec2_t(0, 0),
+                                 const vec2_t& bottomRightCoords = vec2_t(1.0f, 1.0f),
                                  const char* frameTag = nullptr)
         {
             addSpriteFrameTexture(m_sprite, texHandle, destroy, pivot, topLeftCoords, bottomRightCoords, frameTag);

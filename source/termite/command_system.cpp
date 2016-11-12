@@ -5,6 +5,7 @@
 #include "bxx/array.h"
 #include "bxx/hash_table.h"
 #include "bxx/stack.h"
+#include "bxx/logger.h"
 
 using namespace termite;
 
@@ -13,9 +14,9 @@ static const uint32_t kCommandIndexMask = (1 << kCommandIndexBits) - 1;
 static const uint32_t kCommandTypeHandleBits = 16;
 static const uint32_t kCommandTypeHandleMask = (1 << kCommandTypeHandleBits) - 1;
 
-#define COMMAND_INSTANCE_INDEX(_Handle) uint16_t(_Handle.value & kCommandIndexBits)
+#define COMMAND_INSTANCE_INDEX(_Handle) uint16_t(_Handle.value & kCommandIndexMask)
 #define COMMAND_TYPE_INDEX(_Handle) uint16_t((_Handle.value >> kCommandIndexBits) & kCommandTypeHandleMask)
-#define COMMAND_MAKE_HANDLE(_CTypeIdx, _CIdx) CommandHandle((uint32_t(_CTypeIdx) << kCommandTypeHandleBits) | uint32_t(_CIdx))
+#define COMMAND_MAKE_HANDLE(_CTypeIdx, _CIdx) CommandHandle((uint32_t(_CTypeIdx & kCommandTypeHandleMask) << kCommandIndexBits) | uint32_t(_CIdx & kCommandIndexMask))
 
 struct CommandMode
 {
@@ -31,9 +32,9 @@ struct CommandState
 {
     enum Enum
     {
-        None = 0,
-        Execute,
-        Undo
+        None = 0,   // Command is just added
+        Execute,    // Command is executed
+        Undo        // Command is Unexecuted
     };
 };
 
@@ -92,6 +93,7 @@ struct CommandSystem
         commandTypeTable(bx::HashTableType::Mutable)
     {
         maxSize = 0;
+        numCommands = 0;
     }
 };
 
@@ -131,12 +133,16 @@ inline Command* getCommand(CommandHandle handle)
     return g_cmdSys->commandPool.getHandleData<Command>(0, COMMAND_INSTANCE_INDEX(handle));
 }
 
-static void removeCommand(CommandHandle handle)
+static void removeCommand(CommandHandle handle, bool recursive)
 {
     assert(handle.isValid());
-
-    // Remove children
     Command* cmd = getCommand(handle);
+
+    // Remove next recursively
+    if (recursive && cmd->nextHandle.isValid())
+        removeCommand(cmd->nextHandle, true);
+    
+    // Remove children
     if (cmd->childHandle.isValid()) {
         CommandHandle childHandle = cmd->childHandle;
         while (childHandle.isValid()) {
@@ -165,11 +171,8 @@ void termite::shutdownCommandSystem()
         return;
 
     // Cleanup command list
-    CommandHandle cmdHandle = g_cmdSys->lastCommand;
-    while (cmdHandle.isValid()) {
-        removeCommand(cmdHandle);
-        cmdHandle = getCommand(cmdHandle)->prevHandle;
-    }
+    if (g_cmdSys->firstCommand.isValid())
+        removeCommand(g_cmdSys->firstCommand, true);
 
     // Destroy all registered command types
     for (int i = 0; i < g_cmdSys->commandTypes.getCount(); i++) {
@@ -213,7 +216,7 @@ CommandTypeHandle termite::registerCommand(const char* name, ExecuteCommandFn ex
             return CommandTypeHandle();
     }
 
-    return CommandTypeHandle(uint16_t(g_cmdSys->commandPool.getCount() - 1));
+    return CommandTypeHandle(uint16_t(g_cmdSys->commandTypes.getCount() - 1));
 }
 
 CommandTypeHandle termite::findCommand(const char* name)
@@ -235,10 +238,13 @@ static CommandHandle popFromMainList()
 
     CommandHandle handle = g_cmdSys->firstCommand;
     CommandHandle nextHandle = getCommand(handle)->nextHandle;
-    if (nextHandle.isValid()) {
+    if (nextHandle.isValid())
         getCommand(nextHandle)->prevHandle.reset();
-        g_cmdSys->firstCommand = nextHandle;
-    }
+    g_cmdSys->firstCommand = nextHandle;
+
+    if (g_cmdSys->lastCommand == handle)
+        g_cmdSys->lastCommand = getCommand(handle)->prevHandle;
+
     g_cmdSys->numCommands--;
 
     return handle;
@@ -249,13 +255,21 @@ static void pushToMainList(CommandHandle handle)
     assert(handle.isValid());
 
     if (g_cmdSys->lastCommand.isValid()) {
-        getCommand(g_cmdSys->lastCommand)->nextHandle = handle;
+        // Remove commands after the last one (recursive)
+        Command* lastc = getCommand(g_cmdSys->lastCommand);
+        if (lastc->nextHandle.isValid())
+            removeCommand(lastc->nextHandle, true);
+
+        lastc->nextHandle = handle;
         getCommand(handle)->prevHandle = g_cmdSys->lastCommand;
+    } else if (g_cmdSys->firstCommand.isValid()) {
+        removeCommand(g_cmdSys->firstCommand, true);
+        g_cmdSys->firstCommand.reset();
     }
+    g_cmdSys->lastCommand = handle;
+
     if (!g_cmdSys->firstCommand.isValid())
         g_cmdSys->firstCommand = handle;
-
-    g_cmdSys->lastCommand = handle;
 
     g_cmdSys->numCommands++;
 }
@@ -297,7 +311,7 @@ CommandHandle termite::addCommand(CommandTypeHandle handle, const void* param, c
 
     // Remove from the first item
     if (g_cmdSys->numCommands > g_cmdSys->maxSize) {
-        removeCommand(popFromMainList());
+        removeCommand(popFromMainList(), false);
     }
         
     return cmdHandle;
@@ -375,7 +389,7 @@ CommandHandle termite::endCommandChain()
         g_cmdSys->curChain.reset();
 
         if (g_cmdSys->numCommands > g_cmdSys->maxSize) {
-            removeCommand(popFromMainList());
+            removeCommand(popFromMainList(), false);
         }
     }
     return handle;
@@ -390,7 +404,7 @@ void termite::executeCommand(CommandHandle handle)
     if (cmd->state == CommandState::Execute)
         return;
 
-    // Run all commands that are not executed before this one (from first to current)
+    // Run all commands that are not executed before this one (first (unexecuted) to current order)
     if (cmd->prevHandle.isValid()) {
         if (getCommand(cmd->prevHandle)->state != CommandState::Execute)
             executeCommand(cmd->prevHandle);
@@ -417,6 +431,9 @@ void termite::executeCommand(CommandHandle handle)
         break;
     }
     }
+
+    cmd->state = CommandState::Execute;
+    BX_TRACE("Execute: %d", handle.value);
 }
 
 void termite::undoCommand(CommandHandle handle)
@@ -428,7 +445,7 @@ void termite::undoCommand(CommandHandle handle)
     if (cmd->state == CommandState::Undo)
         return;
 
-    // Undo all commands that are not Undo(d) after this one (from the end to current)
+    // Undo all commands that are not Undo(d) after this one (end to current order)
     if (cmd->nextHandle.isValid()) {
         if (getCommand(cmd->nextHandle)->state != CommandState::Undo)
             undoCommand(cmd->nextHandle);
@@ -472,11 +489,46 @@ void termite::undoCommand(CommandHandle handle)
         break;
     }
     }
+
+    cmd->state = CommandState::Undo;
+    BX_TRACE("Undo: %d", handle.value);
 }
 
-CommandHandle termite::getCommandHistory()
+void termite::undoLastCommand()
+{
+    CommandHandle lastCommand = g_cmdSys->lastCommand;
+
+    if (lastCommand.isValid() && getCommand(lastCommand)->state != CommandState::Undo) {
+        Command* cmd = getCommand(lastCommand);
+        undoCommand(lastCommand);
+        g_cmdSys->lastCommand = cmd->prevHandle;
+    }
+}
+
+void termite::redoLastCommand()
+{
+    CommandHandle lastCommand = g_cmdSys->lastCommand;
+    if (lastCommand.isValid()) {
+        Command* cmd = getCommand(lastCommand);
+        if (cmd->nextHandle.isValid() && getCommand(cmd->nextHandle)->state != CommandState::Execute) {
+            executeCommand(cmd->nextHandle);
+            g_cmdSys->lastCommand = cmd->nextHandle;
+        }
+    } else if (g_cmdSys->firstCommand.isValid()) {
+        if (getCommand(g_cmdSys->firstCommand)->state != CommandState::Execute)
+            executeCommand(g_cmdSys->firstCommand);
+        g_cmdSys->lastCommand = g_cmdSys->firstCommand;
+    }
+}
+
+CommandHandle termite::getLastCommand()
 {
     return g_cmdSys->lastCommand;
+}
+
+CommandHandle termite::getFirstCommand()
+{
+    return g_cmdSys->firstCommand;
 }
 
 CommandHandle termite::getPrevCommand(CommandHandle curHandle)
@@ -485,6 +537,14 @@ CommandHandle termite::getPrevCommand(CommandHandle curHandle)
     assert(curHandle.isValid());
 
     return g_cmdSys->commandPool.getHandleData<Command>(0, COMMAND_INSTANCE_INDEX(curHandle))->prevHandle;
+}
+
+CommandHandle termite::getNextCommand(CommandHandle curHandle)
+{
+    assert(g_cmdSys);
+    assert(curHandle.isValid());
+
+    return g_cmdSys->commandPool.getHandleData<Command>(0, COMMAND_INSTANCE_INDEX(curHandle))->nextHandle;
 }
 
 const char* termite::getCommandName(CommandHandle handle)

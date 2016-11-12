@@ -15,6 +15,7 @@ source_group(shaders\\compiled FILES ${SHADER_GEN_FILES})
 
 add_library(termite ${BUILD_LIBRARY_TYPE} ${SOURCE_FILES} ${INCLUDE_FILES} ${SHADER_SOURCES} ${SHADER_GEN_FILES})
 
+# STD_LIBS
 # libraries for unix/posix
 if (ANDROID)
     set(STD_LIBS log dl GLESv2 EGL android)
@@ -22,8 +23,9 @@ elseif (UNIX)
     set(STD_LIBS pthread dl)
 endif()
 
+# PRIVATE_LIBS
 if (CMAKE_COMPILER_IS_GNUCC)
-    if (${CMAKE_CXX_COMPILER_VERSION} LESS "6.5.0")
+    if (${CMAKE_CXX_COMPILER_VERSION} LESS "6.0.0")
         message(WARNING "Using -lgcc -lgcc_s workaround for gcc bug")
         set(PRIVATE_LIBS gcc gcc_s)        
     endif()

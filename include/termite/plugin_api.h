@@ -30,7 +30,8 @@ namespace termite
             Core = 0,
             Plugin,
             Gfx,
-            ImGui
+            ImGui,
+            Camera
         };
 
         typedef uint16_t Type;
@@ -47,7 +48,8 @@ namespace termite
             Unknown = 0,
             GraphicsDriver,
             IoDriver,
-            Renderer
+            Renderer,
+            Physics2dDriver
         };
     };
 
@@ -94,6 +96,10 @@ namespace termite {
         const Config& (*getConfig)();
         uint32_t(*getEngineVersion)();
         bx::AllocatorI* (*getTempAlloc)();
+        GfxDriverApi* (*getGfxDriver)();
+        IoDriverApi* (*getBlockingIoDriver)();
+        IoDriverApi* (*getAsyncIoDriver)();
+        PhysDriver2DApi* (*getPhys2dDriver)();
     };
 }
 #endif
@@ -127,6 +133,7 @@ namespace termite {
 
 #ifdef T_IMGUI_API
 #include "imgui/imgui.h"
+#include "ImGuizmo/ImGuizmo.h"
 namespace termite
 {
 	struct ImGuiApi_v0
@@ -373,6 +380,16 @@ namespace termite
 		bool (*isMouseHoveringWindow)();
 		bool (*isMouseHoveringAnyWindow)();
         bool (*isItemHovered)();
+
+        // ImGuizmo
+        bool (*isOverGuizmo)();
+        bool (*isUsingGuizmo)();
+        void (*enableGuizmo)(bool enable);
+        void (*decomposeMatrixToComponents)(const float *matrix, float *translation, float *rotation, float *scale);
+        void (*recomposeMatrixFromComponents)(const float *translation, const float *rotation, const float *scale, float *matrix);
+        void (*manipulateGuizmo)(const float *view, const float *projection, ImGuizmo::OPERATION operation, ImGuizmo::MODE mode, 
+                               float *matrix, float *deltaMatrix/* = 0*/, float *snap/* = 0*/);
+        void (*drawCubeGuizmo)(const float *view, const float *projection, float *matrix);
 	};
 }
 #endif
@@ -405,4 +422,36 @@ namespace termite
 		void (*garbageCollectComponents)(EntityManager* emgr);
 	};
 } // namespace termite
+#endif
+
+#ifdef T_CAMERA_API
+#include "camera.h"
+namespace termite
+{
+    struct CameraApi_v0
+    {
+        void(*camInit)(Camera* cam, float fov/* = 60.0f*/, float fnear/* = 0.1f*/, float ffar/* = 100.0f*/);
+        void(*camLookAt)(Camera* cam, const vec3_t pos, const vec3_t lookat);
+        void(*camCalcFrustumCorners)(const Camera* cam, vec3_t result[8], float aspectRatio,
+                                     float nearOverride/* = 0*/, float farOverride/* = 0*/);
+        void(*camCalcFrustumPlanes)(plane_t result[CameraPlane::Count], const mtx4x4_t& viewProjMtx);
+        void(*camPitch)(Camera* cam, float pitch);
+        void(*camYaw)(Camera* cam, float yaw);
+        void(*camPitchYaw)(Camera* cam, float pitch, float yaw);
+        void(*camRoll)(Camera* cam, float roll);
+        void(*camForward)(Camera* cam, float fwd);
+        void(*camStrafe)(Camera* cam, float strafe);
+        mtx4x4_t(*camViewMtx)(const Camera* cam);
+        mtx4x4_t(*camProjMtx)(const Camera* cam, float aspectRatio);
+
+        // Camera2D
+        void(*cam2dInit)(Camera2D* cam, float refWidth, float refHeight,
+                         DisplayPolicy::Enum policy, float zoom/* = 1.0f*/, const vec2_t pos/* = vec2_t(0, 0)*/);
+        void(*cam2dPan)(Camera2D* cam, vec2_t pan);
+        void(*cam2dZoom)(Camera2D* cam, float zoom);
+        mtx4x4_t(*cam2dViewMtx)(const Camera2D& cam);
+        mtx4x4_t(*cam2dProjMtx)(const Camera2D& cam);
+        rect_t(*cam2dGetRect)(const Camera2D& cam);
+    };
+}
 #endif

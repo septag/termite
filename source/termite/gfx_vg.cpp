@@ -132,7 +132,7 @@ namespace termite
             maxVerts = maxBatches = 0;
             numVerts = numBatches = 0;
             numIndices = maxIndices = 0;
-            viewport = rectf(0, 0, 0, 0);
+            viewport = rect_t(0, 0, 0, 0);
         }
     };
 } // namespace termite
@@ -202,9 +202,9 @@ static VgMgr* g_vg = nullptr;
 void VgState::setDefault(VectorGfxContext* ctx)
 {
     mtx = mtx3x3Ident();
-    textColor = rgba(0, 255, 0);
-    strokeColor = rgba(0, 0, 0);
-    fillColor = rgba(255, 255, 255);
+    textColor = color_t(0, 255, 0);
+    strokeColor = color_t(0, 0, 0);
+    fillColor = color_t(255, 255, 255);
     alpha = 1.0f;
     scissor = ctx->viewport;
     font = ctx->defaultFont;
@@ -456,7 +456,7 @@ void termite::vgBegin(VectorGfxContext* ctx, float viewWidth, float viewHeight,
     if (ctx->readyToDraw)
         return;
 
-    ctx->viewport = rectf(0, 0, viewWidth, viewHeight);
+    ctx->viewport = rect_t(0, 0, viewWidth, viewHeight);
     vgReset(ctx);
     ctx->numVerts = 0;
     ctx->numBatches = 0;
@@ -504,9 +504,9 @@ void termite::vgText(VectorGfxContext* ctx, float x, float y, const char* text)
     bx::strlcpy(textParams.text, text, sizeof(textParams.text));
     textParams.mtx = state->mtx;
     textParams.scissor = state->scissor;
-    textParams.color = premultiplyAlpha(state->textColor, state->alpha);
+    textParams.color = colorPremultiplyAlpha(state->textColor, state->alpha);
     textParams.font = state->font;
-    textParams.pos = vec2f(x, y);
+    textParams.pos = vec2_t(x, y);
 
     pushBatch(ctx, &g_vg->textHandler, &textParams, sizeof(textParams));
 }
@@ -540,7 +540,7 @@ void termite::vgRectf(VectorGfxContext* ctx, float x, float y, float width, floa
 {
     if (!ctx->readyToDraw)
         return;
-    vgRect(ctx, rectfwh(x, y, width, height));
+    vgRect(ctx, rectwh(x, y, width, height));
 }
 
 void termite::vgRect(VectorGfxContext* ctx, const rect_t& rect)
@@ -553,7 +553,7 @@ void termite::vgRect(VectorGfxContext* ctx, const rect_t& rect)
     RectParams rectParams;
     rectParams.mtx = state->mtx;
     rectParams.scissor = state->scissor;
-    rectParams.color = premultiplyAlpha(state->fillColor, state->alpha);
+    rectParams.color = colorPremultiplyAlpha(state->fillColor, state->alpha);
     rectParams.image = nullptr;
     rectParams.rect = rect;
 
@@ -567,7 +567,7 @@ void termite::vgImage(VectorGfxContext* ctx, float x, float y, const Texture* im
     if (!image)
         return;
     
-    vgImageRect(ctx, rectfwh(x, y, image->info.width, image->info.height), image);
+    vgImageRect(ctx, rectwh(x, y, image->info.width, image->info.height), image);
 }
 
 void termite::vgImageRect(VectorGfxContext* ctx, const rect_t& rect, const Texture* image)
@@ -583,7 +583,7 @@ void termite::vgImageRect(VectorGfxContext* ctx, const rect_t& rect, const Textu
     RectParams rectParams;
     rectParams.mtx = state->mtx;
     rectParams.scissor = state->scissor;
-    rectParams.color = premultiplyAlpha(state->fillColor, state->alpha);
+    rectParams.color = colorPremultiplyAlpha(state->fillColor, state->alpha);
     rectParams.image = image;
     rectParams.rect = rect;
 
