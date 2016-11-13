@@ -343,6 +343,8 @@ void* termite::getEngineApi(uint16_t apiId, uint32_t version)
 		return getImGuiApi0();
     } else if (apiId == ApiId::Camera) {
         return getCameraApi(version);
+    } else if (apiId == ApiId::Component) {
+        return getComponentApi(version);
     }
 
     return nullptr;

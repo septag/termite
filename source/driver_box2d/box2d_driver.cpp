@@ -231,7 +231,7 @@ static result_t initBox2d(bx::AllocatorI* alloc, PhysFlags2D::Bits flags, uint8_
     if (!g_box2d.emitterTable.create(30, alloc))
         return T_ERR_OUTOFMEM;
 
-    if (flags & PhysFlags2D::EnableDebug) {
+    if ((flags & PhysFlags2D::EnableDebug)	 && g_coreApi->getGfxDriver()) {
         g_box2d.nvg = nvgCreate(0, debugViewId, g_coreApi->getGfxDriver(), g_gfxApi, alloc);
         if (!g_box2d.nvg) {
             BX_WARN_API(g_coreApi, "Initializing NanoVg for Debugging Physics failed");
@@ -841,6 +841,7 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.createBody = createBodyBox2d;
     api.destroyBody = destroyBodyBox2d;
     api.createBoxShape = createBoxShapeBox2d;
+    api.createPolyShape = createPolyShapeBox2d;
     api.createArbitaryBoxShape = createArbitaryBoxShapeBox2d;
     api.createCircleShape = createCircleShapeBox2d;
     api.stepScene = stepSceneBox2d;

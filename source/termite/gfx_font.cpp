@@ -115,8 +115,8 @@ struct FontLibrary
 static FontLibrary* g_fontLib = nullptr;
 
 termite::Font::Font(bx::AllocatorI* alloc) :
-    m_charTable(bx::HashTableType::Immutable),
-    m_alloc(alloc)
+    m_alloc(alloc),
+    m_charTable(bx::HashTableType::Immutable)
 {
     m_name[0] = 0;
     m_numChars = m_numKerns = m_lineHeight = m_baseValue = m_fsize = m_charWidth = 0;

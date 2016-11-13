@@ -4,10 +4,7 @@
 # LIBUV_INCLUDE_DIR
 # function: libuv_copy_binaries (win32)
 
-if (ANDROID)
-    set(LIBUV_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/libuv_android_arm CACHE PATH "Libuv root directory")
-    set(FIND_EXTRA_FLAG NO_CMAKE_FIND_ROOT_PATH)
-else()
+if(WIN32)
     set(LIBUV_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/libuv CACHE PATH "Libuv root directory")
 endif()
 

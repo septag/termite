@@ -840,7 +840,7 @@ void termite::inputSendChars(const char* chars)
 	int i = 0;
 	char c;
 	while ((c = chars[i++]) > 0) {
-        if (c > 0 && c <  0x10000)
+        if (c > 0 && c <  0x7f)
 		    io.AddInputCharacter((ImWchar)c);
 		i++;
 	}

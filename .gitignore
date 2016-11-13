@@ -21,8 +21,7 @@ Lib
 ipch
 __pycache__
 Thumbs.db
-.build
-.build_android
+.build*
 
 # Gradle
 .gradle
@@ -31,7 +30,6 @@ Thumbs.db
 /.idea/libraries
 /build
 /captures
-
 
 
 # Generated files
@@ -50,6 +48,8 @@ deps/sdl
 deps/sdl_android_arm
 deps/libuv_android_arm
 deps/bgfx_android_arm
+deps/bgfx_ios_arm
+deps/sdl2_ios_arm
 
 # Compiled binaries
 *.so

@@ -68,11 +68,16 @@
 if (ANDROID)
 	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/sdl_android_arm CACHE PATH "SDL2 root directory")
     set(FIND_EXTRA_FLAG NO_CMAKE_FIND_ROOT_PATH)
+elseif (IOS)
+	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/sdl2_ios_arm CACHE PATH "SDL2 root directory")
+	set(FIND_EXTRA_FLAG NO_CMAKE_FIND_ROOT_PATH NO_DEFAULT_PATH)
+	set(SDL2_BUILDING_LIBRARY 1)
 elseif (WIN32)
 	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/sdl CACHE PATH "SDL2 root directory")
 endif()
 
 SET(SDL2_SEARCH_PATHS
+	${SDL2_PATH}
 	~/Library/Frameworks
 	/Library/Frameworks
 	/usr/local
@@ -82,7 +87,6 @@ SET(SDL2_SEARCH_PATHS
 	/opt/local # DarwinPorts
 	/opt/csw # Blastwave
 	/opt
-	${SDL2_PATH}
 )
 
 FIND_PATH(SDL2_INCLUDE_DIR SDL.h
@@ -158,9 +162,9 @@ IF(SDL2_LIBRARY_TEMP)
 	# I think it has something to do with the CACHE STRING.
 	# So I use a temporary variable until the end so I can set the
 	# "real" variable in one-shot.
-	IF(APPLE)
+	IF(APPLE AND NOT IOS)
 		SET(SDL2_LIBRARY_TEMP ${SDL2_LIBRARY_TEMP} "-framework Cocoa")
-	ENDIF(APPLE)
+	ENDIF()
 
 	# For threads, as mentioned Apple doesn't need this.
 	# In fact, there seems to be a problem if I used the Threads package

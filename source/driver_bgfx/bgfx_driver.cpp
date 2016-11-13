@@ -1081,6 +1081,7 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.createDynamicIndexBuffer = createDynamicIndexBuffer;
     api.createDynamicVertexBufferMem = createDynamicVertexBufferMem;
     api.updateDynamicIndexBuffer = updateDynamicIndexBuffer;
+    api.createDynamicIndexBufferMem = createDynamicIndexBufferMem;
     api.destroyIndexBuffer = destroyIndexBuffer;
     api.destroyDynamicIndexBuffer = destroyDynamicIndexBuffer;
     api.destroyDynamicVertexBuffer = destroyDynamicVertexBuffer;

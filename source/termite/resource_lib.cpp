@@ -75,6 +75,10 @@ namespace termite
             modifiedCallback = nullptr;
             fileModifiedUserParam = nullptr;
         }
+        
+        virtual ~ResourceLib()
+        {
+        }
 
         void onOpenError(const char* uri) override;
         void onReadError(const char* uri) override;
@@ -465,7 +469,6 @@ ResourceHandle termite::getResourceFailHandle(const char* name)
     const ResourceTypeData* tdata = 
         resLib->resourceTypes.getHandleData<ResourceTypeData>(0, resLib->resourceTypesTable.getValue(resTypeIdx));
 
-    const char* uri = "[FAIL]";
     return getResourceHandleInPlace(tdata, typeNameHash, "[FAIL]", tdata->failObj);
 }
 
@@ -484,7 +487,6 @@ ResourceHandle termite::getResourceFailHandle(const char* name)
      const ResourceTypeData* tdata =
          resLib->resourceTypes.getHandleData<ResourceTypeData>(0, resLib->resourceTypesTable.getValue(resTypeIdx));
 
-     const char* uri = "[FAIL]";
      return getResourceHandleInPlace(tdata, typeNameHash, "[ASYNC]", tdata->asyncProgressObj);
 }
 

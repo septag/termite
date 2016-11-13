@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.3)
 file(GLOB SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.c*")
 source_group(source FILES ${SOURCE_FILES})
 
-if (APPLE)
+if (APPLE AND NOT IOS)
     find_library(FOUNDATION_LIBRARY Foundation)
     if (NOT FOUNDATION_LIBRARY)
         message(FATAL_ERROR "Foundation Library not found")

@@ -71,10 +71,10 @@ struct SpriteFrame
     void* frameCallbackUserData;
 
     SpriteFrame() :
-        frameCallback(nullptr),
-        frameCallbackUserData(nullptr),
         nameHash(0),
-        tagHash(0)
+        tagHash(0),
+        frameCallback(nullptr),
+        frameCallbackUserData(nullptr)
     {
     }
 };
@@ -99,11 +99,11 @@ namespace termite
 
         Sprite(bx::AllocatorI* _alloc) :
             alloc(_alloc),
+            curFrameIdx(0),
             animTm(0),
             playReverse(false),
             playSpeed(30.0f),
             resumeSpeed(30.0f),
-            curFrameIdx(0),
             tint(0xffffffff),
             lnode(this)
         {
@@ -153,8 +153,8 @@ struct SpriteSystem
     bx::List<Sprite*> spriteList;       // keep a list of sprites for proper shutdown and sheet reloading
 
     SpriteSystem(bx::AllocatorI* _alloc) : 
-        alloc(_alloc),
         driver(nullptr),
+        alloc(_alloc),
         failSheet(nullptr),
         asyncSheet(nullptr)
     {

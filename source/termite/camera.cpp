@@ -238,6 +238,9 @@ static vec2_t calcCam2dHalfSize(const Camera2D& cam)
     } else if (cam.policy == DisplayPolicy::FitToWidth) {
         hh = 1.0f;
         hw = ratio * hh;
+    } else {
+        hh = 1.0f;
+        hw = 1.0f;
     }
     
     return vec2_t(hw*s, hh*s);

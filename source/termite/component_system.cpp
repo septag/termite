@@ -42,18 +42,18 @@ namespace termite
             }
         };
 
+        bx::AllocatorI* alloc;
         bx::Pool<FreeIndex> freeIndexPool;
         bx::Queue<FreeIndex*> freeIndexQueue;
         uint32_t freeIndexSize;
         bx::Array<uint16_t> generations;
-        bx::AllocatorI* alloc;
         DestroyHashTable destroyTable; // keep a multi-hash for all components that entity has to destroy
 		bx::Pool<DestroyHashTable::Node> nodePool;
         
         EntityManager(bx::AllocatorI* _alloc) : 
             alloc(_alloc),
-            destroyTable(bx::HashTableType::Mutable),
-            freeIndexSize(0)
+            freeIndexSize(0),
+            destroyTable(bx::HashTableType::Mutable)
         {
         }
     };
@@ -85,10 +85,10 @@ struct ComponentType
 
 struct ComponentSystem
 {
+    bx::AllocatorI* alloc;
     bx::Array<ComponentType> components;
     bx::HashTableInt nameTable;
     bx::HashTable<int, uint32_t> idTable;
-    bx::AllocatorI* alloc;
 
     ComponentSystem(bx::AllocatorI* _alloc) : 
         alloc(_alloc),

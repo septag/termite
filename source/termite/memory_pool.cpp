@@ -24,8 +24,8 @@ struct MemoryPage
     bx::LinearAllocator linAlloc;
 
     MemoryPage(void* buff, size_t size) :
-        linAlloc(buff, size),
-        lnode(this)
+        lnode(this),
+        linAlloc(buff, size)
     {
         tag = 0;
         owner = nullptr;

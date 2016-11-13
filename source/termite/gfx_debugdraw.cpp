@@ -706,7 +706,6 @@ void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spa
 {
     spacing = bx::fceil(bx::fclamp(spacing, 1.0f, 20.0f));
 
-    float ratio = (ctx->viewport.xmax - ctx->viewport.xmin) / (ctx->viewport.ymax - ctx->viewport.ymin);
     rect_t rc = cam.getRect();
 
     // Snap grid bounds to 'spacing'

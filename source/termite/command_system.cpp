@@ -276,7 +276,6 @@ static void pushToMainList(CommandHandle handle)
 
 static void addToParent(CommandHandle handle, CommandHandle parentHandle)
 {
-    Command* cmd = getCommand(handle);
     Command* parent = getCommand(parentHandle);
 
     if (parent->childHandle.isValid()) {

@@ -5,6 +5,10 @@
 #include <float.h>
 #include <cassert>
 
+#ifdef __clang__
+#  include <limits.h>
+#endif
+
 namespace termite
 {
     union vec4_t

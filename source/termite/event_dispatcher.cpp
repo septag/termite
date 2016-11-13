@@ -25,10 +25,10 @@ namespace termite {
         Event() :
             runCallback(nullptr),
             triggerCallback(nullptr),
+            destroyOnTrigger(true),
             triggerUserData(nullptr),
             paramsSize(0),
-            lnode(this),
-            destroyOnTrigger(true)
+            lnode(this)
         {
         }
     };

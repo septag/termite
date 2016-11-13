@@ -31,7 +31,8 @@ namespace termite
             Plugin,
             Gfx,
             ImGui,
-            Camera
+            Camera,
+            Component
         };
 
         typedef uint16_t Type;

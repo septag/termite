@@ -264,11 +264,11 @@ namespace termite
                                  float _gravityScale = 1.0f, int _maxCount = 0, 
                                  PhysEmitterFlags2D::Bits _flags = PhysEmitterFlags2D::DestroyByAge,
                                  void* _userData = nullptr) :
-            density(_density),
-            radius(_radius),
-            gravityScale(_gravityScale),
-            maxCount(_maxCount),
             flags(_flags),
+            density(_density),
+            gravityScale(_gravityScale),
+            radius(_radius),
+            maxCount(_maxCount),
             userData(_userData)
         {
             pressureStrength = 0.05f;

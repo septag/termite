@@ -179,6 +179,7 @@ namespace termite
                            bool destroy = false)
         {
             m_sprite = createSpriteFromSpritesheet(alloc, halfSize, ssHandle, name, destroy);
+            return m_sprite != nullptr;
         }
 
         inline CSprite& addFrame(ResourceHandle texHandle, bool destroy = false,

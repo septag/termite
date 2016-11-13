@@ -6,8 +6,6 @@ if (NOT CMAKE_MODULE_PATH)
     set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 endif()
 
-#option(ANDROID_ARM_BUILD "Crosscompile for Android ARM" OFF)
-
 if (MSVC)
     enable_language(CXX ASM_MASM)
 else()
@@ -22,8 +20,6 @@ add_definitions(-DBOOST_CONTEXT_EXPORT=)
 
 set(HEADER "include/fcontext/fcontext.h")
 set(SOURCES "source/stack.cpp")
-
-# Currently no cross-compiling or ARM configs are supported
 
 # OS
 if (UNIX)
@@ -42,6 +38,13 @@ if (UNIX)
             set(CPU_ARCH "x86_64")
             set(ASM_EXT "sysv_elf_gas.S")
         endif()
+    elseif(IOS)
+        if (CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
+            set(CPU_ARCH "arm64")
+        else()
+            set(CPU_ARCH "arm")
+        endif()
+        set(ASM_EXT "aapcs_macho_gas.S")
     else()
         # PC (x86/x64)
         if (CMAKE_SIZEOF_VOID_P EQUAL 8)

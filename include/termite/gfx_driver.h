@@ -66,7 +66,7 @@ namespace termite
 
         inline bool has(VertexAttrib::Enum attrib) const
         {
-            vdeclHas(m_decl, attrib);
+            return vdeclHas(m_decl, attrib);
         }
 
         inline uint32_t getSize(uint32_t num) const
