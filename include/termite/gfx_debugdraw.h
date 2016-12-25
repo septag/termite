@@ -16,12 +16,13 @@ namespace termite
     result_t initDebugDraw(bx::AllocatorI* alloc, GfxDriverApi* driver);
     void shutdownDebugDraw();
 
-    TERMITE_API DebugDrawContext* createDebugDrawContext(uint8_t viewId);
+    TERMITE_API DebugDrawContext* createDebugDrawContext();
     TERMITE_API void destroyDebugDrawContext(DebugDrawContext* ctx);
 
     // Automatically 'Begin's the VectorGfx if provided in arguments
     // VectorGfx will be set to screen-space 2d coordinates
-    TERMITE_API void ddBegin(DebugDrawContext* ctx, float viewWidth, float viewHeight, 
+    TERMITE_API void ddBegin(DebugDrawContext* ctx, uint8_t viewId, 
+                             float viewWidth, float viewHeight, 
                              const mtx4x4_t& viewMtx, const mtx4x4_t& projMtx, 
                              VectorGfxContext* vg = nullptr);
     TERMITE_API void ddEnd(DebugDrawContext* ctx);
@@ -32,9 +33,9 @@ namespace termite
     TERMITE_API void ddTextv(DebugDrawContext* ctx, const vec3_t pos, const char* fmt, va_list argList);
     TERMITE_API void ddImage(DebugDrawContext* ctx, const vec3_t pos, Texture* image);
     TERMITE_API void ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spacing, float boldSpacing, float maxDepth,
-                                  color_t color = 0xff808080, color_t boldColor = 0xffffffff);
+                                  color_t color = color1n(0xff808080), color_t boldColor = color1n(0xffffffff));
     TERMITE_API void ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spacing, float boldSpacing,
-                                  color_t color = 0xff808080, color_t boldColor = 0xffffffff);
+                                  color_t color = color1n(0xff808080), color_t boldColor = color1n(0xffffffff));
     TERMITE_API void ddBoundingBox(DebugDrawContext* ctx, const aabb_t bb, bool showInfo = false);
     TERMITE_API void ddBoundingSphere(DebugDrawContext* ctx, const sphere_t sphere, bool showInfo = false);
     TERMITE_API void ddBox(DebugDrawContext* ctx, const aabb_t aabb, const mtx4x4_t* modelMtx = nullptr);
@@ -72,10 +73,10 @@ namespace termite
         {
         }
 
-        inline bool createContext(uint8_t viewId)
+        inline bool createContext()
         {
             assert(!m_ctx);
-            m_ctx = createDebugDrawContext(viewId);
+            m_ctx = createDebugDrawContext();
             return m_ctx != nullptr;
         }
 
@@ -86,10 +87,11 @@ namespace termite
             m_ctx = nullptr;
         }
 
-        inline DebugDraw& begin(float viewWidth, float viewHeight, const mtx4x4_t& viewMtx, const mtx4x4_t& projMtx,
+        inline DebugDraw& begin(uint8_t viewId, float viewWidth, float viewHeight,
+                                const mtx4x4_t& viewMtx, const mtx4x4_t& projMtx,
                                 VectorGfxContext* vg = nullptr)
         {
-            ddBegin(m_ctx, viewWidth, viewHeight, viewMtx, projMtx, vg);
+            ddBegin(m_ctx, viewId, viewWidth, viewHeight, viewMtx, projMtx, vg);
             return *this;
         }
 
@@ -120,14 +122,14 @@ namespace termite
         }
 
         inline DebugDraw& snapGridXZ(const Camera& cam, float spacing, float boldSpacing, float maxDepth,
-                                     color_t color = 0xff808080, color_t boldColor = 0xffffffff)
+                                     color_t color = color1n(0xff808080), color_t boldColor = color1n(0xffffffff))
         {
             ddSnapGridXZ(m_ctx, cam, spacing, boldSpacing, maxDepth, color, boldColor);
             return *this;
         }
 
         inline DebugDraw& snapGridXY(const Camera2D& cam, float spacing, float boldSpacing,
-                                     color_t color = 0xff808080, color_t boldColor = 0xffffffff)
+                                     color_t color = color1n(0xff808080), color_t boldColor = color1n(0xffffffff))
         {
             ddSnapGridXY(m_ctx, cam, spacing, boldSpacing, color, boldColor);
             return *this;

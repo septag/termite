@@ -21,6 +21,7 @@ namespace bx
 
         Ty* push();
         Ty* pushMany(int _count);
+        Ty* pop();
 
         int getCount() const    {   return m_numItems;  }
         Ty* getBuffer() const   {   return m_buff;      }
@@ -101,16 +102,25 @@ namespace bx
             m_maxItems = newsz;
         }
 
-        Ty* item = &m_buff[m_numItems];
-        m_numItems++;
+        Ty* item = &m_buff[m_numItems++];
         return item;
+    }
+
+    template <typename Ty>
+    Ty* bx::Array<Ty>::pop()
+    {
+        if (m_numItems > 0) {
+            return &m_buff[--m_numItems];
+        } else {
+            return nullptr;
+        }
     }
 
     template <typename Ty>
     Ty* Array<Ty>::pushMany(int _count)
     {
         if (m_maxItems < m_numItems + _count) {
-            int newsz = BX_ALIGN_MASK((_count + m_numItems), m_numExpand);
+            int newsz = BX_ALIGN_MASK((_count + m_numItems), m_numExpand-1);
             m_buff = (Ty*)BX_REALLOC(m_alloc, m_buff, sizeof(Ty)*newsz);
             if (!m_buff)
                 return nullptr;
@@ -126,7 +136,9 @@ namespace bx
     int Array<Ty>::find(const Ty& _item) const
     {
         for (int i = 0, c = m_numItems; i < c; i++)  {
-            if (_item == m_buff[i])
+            if (_item != m_buff[i])
+                continue;
+            else
                 return i;
         }
         return -1;
@@ -152,7 +164,9 @@ namespace bx
     int bx::Array<Ty>::find(FindMatchFunc matchFn) const
     {
         for (int i = 0, c = m_numItems; i < c; i++) {
-            if (matchFn(m_buff[i]))
+            if (!matchFn(m_buff[i]))
+                continue;
+            else
                 return i;
         }
         return -1;

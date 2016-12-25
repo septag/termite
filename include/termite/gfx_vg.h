@@ -12,10 +12,10 @@ namespace termite
     result_t initVectorGfx(bx::AllocatorI* alloc, GfxDriverApi* driver);
     void shutdownVectorGfx();
 
-    TERMITE_API VectorGfxContext* createVectorGfxContext(uint8_t viewId, int maxVerts = 0, int maxBatches = 0);
+    TERMITE_API VectorGfxContext* createVectorGfxContext(int maxVerts = 0, int maxBatches = 0);
     TERMITE_API void destroyVectorGfxContext(VectorGfxContext* ctx);
 
-    TERMITE_API void vgBegin(VectorGfxContext* ctx, float viewWidth, float viewHeight,
+    TERMITE_API void vgBegin(VectorGfxContext* ctx, uint8_t viewId, float viewWidth, float viewHeight,
                              const mtx4x4_t* viewMtx = nullptr, const mtx4x4_t* projMtx = nullptr);
     TERMITE_API void vgEnd(VectorGfxContext* ctx);
 
@@ -59,9 +59,9 @@ namespace termite
         {
         }
 
-        inline bool createContext(uint8_t viewId, int maxVerts = 0, int maxBatches = 0)
+        inline bool createContext(int maxVerts = 0, int maxBatches = 0)
         {
-            m_ctx = createVectorGfxContext(viewId, maxVerts, maxBatches);
+            m_ctx = createVectorGfxContext(maxVerts, maxBatches);
             return m_ctx != nullptr;
         }
 
@@ -72,10 +72,10 @@ namespace termite
             m_ctx = nullptr;
         }
 
-        inline VectorGfx& begin(float viewWidth, float viewHeight,
-                         const mtx4x4_t* viewMtx = nullptr, const mtx4x4_t* projMtx = nullptr)
+        inline VectorGfx& begin(uint8_t viewId, float viewWidth, float viewHeight,
+                                const mtx4x4_t* viewMtx = nullptr, const mtx4x4_t* projMtx = nullptr)
         {
-            vgBegin(m_ctx, viewWidth, viewHeight, viewMtx, projMtx);
+            vgBegin(m_ctx, viewId, viewWidth, viewHeight, viewMtx, projMtx);
             return *this;
         }
 

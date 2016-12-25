@@ -11,7 +11,6 @@
 #include "bxx/logger.h"
 #include "bxx/json.h"
 
-#include "../include_common/sprite_format.h"
 #include "shaders_h/sprite.vso"
 #include "shaders_h/sprite.fso"
 
@@ -54,7 +53,7 @@ struct SpriteFrame
 {
     ResourceHandle texHandle;   // Handle to spritesheet/texture resource
     ResourceHandle ssHandle;    // For spritesheets we have spritesheet handle
-    bool destroyResource;
+    SpriteFlag::Bits flags;
 
     size_t nameHash;
     size_t tagHash;
@@ -104,9 +103,9 @@ namespace termite
             playReverse(false),
             playSpeed(30.0f),
             resumeSpeed(30.0f),
-            tint(0xffffffff),
             lnode(this)
         {
+            tint = color1n(0xffffffff);
         }
 
         inline const SpriteFrame& getCurFrame() const
@@ -264,7 +263,7 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
                               frameHeight / imgHeight);
 
         const bx::JsonNode* jsourceSize = jframe->findChild("sourceSize");
-        frame.sourceSize = vec2_t(float(jsourceSize->findChild("w")->valueInt()),
+        frame.sourceSize = vec2f(float(jsourceSize->findChild("w")->valueInt()),
                                  float(jsourceSize->findChild("h")->valueInt()));
 
         // Normalize pos/size offsets (0~1)
@@ -275,7 +274,7 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
         float srcw = float(jssFrame->findChild("w")->valueInt());
         float srch = float(jssFrame->findChild("h")->valueInt());
 
-        frame.sizeOffset = vec2_t(srcw / frame.sourceSize.x, srch / frame.sourceSize.y);
+        frame.sizeOffset = vec2f(srcw / frame.sourceSize.x, srch / frame.sourceSize.y);
 
         if (!rotated) {
             frame.rotOffset = 0;
@@ -290,9 +289,9 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
         const bx::JsonNode* jpivotY = jpivot->findChild("y");
         float pivotx = jpivotX->getType() == bx::JsonType::Float ?  jpivotX->valueFloat() : float(jpivotX->valueInt());
         float pivoty = jpivotY->getType() == bx::JsonType::Float ?  jpivotX->valueFloat() : float(jpivotY->valueInt());
-        frame.pivot = vec2_t(pivotx - 0.5f, -pivoty + 0.5f);     // convert to our coordinates
+        frame.pivot = vec2f(pivotx - 0.5f, -pivoty + 0.5f);     // convert to our coordinates
 
-        vec2_t srcOffset = vec2_t((srcx + srcw*0.5f)/frame.sourceSize.x - 0.5f, -(srcy + srch*0.5f)/frame.sourceSize.y + 0.5f);
+        vec2_t srcOffset = vec2f((srcx + srcw*0.5f)/frame.sourceSize.x - 0.5f, -(srcy + srch*0.5f)/frame.sourceSize.y + 0.5f);
         frame.posOffset = srcOffset;
     }
 
@@ -342,11 +341,11 @@ void SpriteSheetLoader::onReload(ResourceHandle handle, bx::AllocatorI* alloc)
             } else {
                 frame.texHandle = getResourceFailHandle("texture");
                 Texture* tex = getResourcePtr<Texture>(frame.texHandle);
-                frame.pivot = vec2_t(0, 0);
-                frame.frame = rect_t(0, 0, 1.0f, 1.0f);
-                frame.sourceSize = vec2_t(float(tex->info.width), float(tex->info.height));
-                frame.posOffset = vec2_t(0, 0);
-                frame.sizeOffset = vec2_t(1.0f, 1.0f);
+                frame.pivot = vec2f(0, 0);
+                frame.frame = rectf(0, 0, 1.0f, 1.0f);
+                frame.sourceSize = vec2f(float(tex->info.width), float(tex->info.height));
+                frame.posOffset = vec2f(0, 0);
+                frame.sizeOffset = vec2f(1.0f, 1.0f);
                 frame.rotOffset = 0;
                 frame.pixelRatio = 1.0f;
             }
@@ -377,11 +376,11 @@ static SpriteSheet* createDummySpriteSheet(ResourceHandle texHandle, bx::Allocat
     float imgHeight = float(tex->info.height);
 
     ss->frames[0].filenameHash = 0;
-    ss->frames[0].frame = rect_t(0, 0, 1.0f, 1.0f);
-    ss->frames[0].pivot = vec2_t(0, 0);
-    ss->frames[0].posOffset = vec2_t(0, 0);
-    ss->frames[0].sizeOffset = vec2_t(1.0f, 1.0f);
-    ss->frames[0].sourceSize = vec2_t(imgWidth, imgHeight);
+    ss->frames[0].frame = rectf(0, 0, 1.0f, 1.0f);
+    ss->frames[0].pivot = vec2f(0, 0);
+    ss->frames[0].posOffset = vec2f(0, 0);
+    ss->frames[0].sizeOffset = vec2f(1.0f, 1.0f);
+    ss->frames[0].sourceSize = vec2f(imgWidth, imgHeight);
     ss->frames[0].rotOffset = 0;
     
     return ss;
@@ -440,7 +439,7 @@ void termite::destroySprite(Sprite* sprite)
     // Destroy frames
     for (int i = 0, c = sprite->frames.getCount(); i < c; i++) {
         SpriteFrame& frame = sprite->frames[i];
-        if (frame.destroyResource) {
+        if (frame.flags & SpriteFlag::DestroyResource) {
             if (frame.ssHandle.isValid())
                 unloadResource(frame.ssHandle);
             else
@@ -486,7 +485,7 @@ void termite::shutdownSpriteSystem()
 }
 
 void termite::addSpriteFrameTexture(Sprite* sprite, 
-                                    ResourceHandle texHandle, bool destroy /*= false*/, const vec2_t pivot /*= vec2_t(0, 0)*/, 
+                                    ResourceHandle texHandle, SpriteFlag::Bits flags, const vec2_t pivot /*= vec2_t(0, 0)*/, 
                                     const vec2_t topLeftCoords /*= vec2_t(0, 0)*/, const vec2_t bottomRightCoords /*= vec2_t(1.0f, 1.0f)*/, 
                                     const char* frameTag /*= nullptr*/)
 {
@@ -496,15 +495,15 @@ void termite::addSpriteFrameTexture(Sprite* sprite,
         SpriteFrame* frame = new(sprite->frames.push()) SpriteFrame();
         if (frame) {
             frame->texHandle = texHandle;
-            frame->destroyResource = destroy;
+            frame->flags = flags;
             frame->pivot = pivot;
-            frame->frame = rect_t(topLeftCoords, bottomRightCoords);
+            frame->frame = rectv(topLeftCoords, bottomRightCoords);
             frame->tagHash = !frameTag ? 0 : tinystl::hash_string(frameTag, strlen(frameTag)) ;
 
             Texture* tex = getResourcePtr<Texture>(texHandle);
-            frame->sourceSize = vec2_t(float(tex->info.width), float(tex->info.height));
-            frame->posOffset = vec2_t(0, 0);
-            frame->sizeOffset = vec2_t(1.0f, 1.0f);
+            frame->sourceSize = vec2f(float(tex->info.width), float(tex->info.height));
+            frame->posOffset = vec2f(0, 0);
+            frame->sizeOffset = vec2f(1.0f, 1.0f);
             frame->rotOffset = 0;
             frame->pixelRatio = ((bottomRightCoords.x - topLeftCoords.x)*frame->sourceSize.x) /
                 ((bottomRightCoords.y - topLeftCoords.y)*frame->sourceSize.y);
@@ -513,7 +512,7 @@ void termite::addSpriteFrameTexture(Sprite* sprite,
 }
 
 void termite::addSpriteFrameSpritesheet(Sprite* sprite,
-                                        ResourceHandle ssHandle, const char* name, bool destroy /*= false*/, 
+                                        ResourceHandle ssHandle, const char* name, SpriteFlag::Bits flags, 
                                         const char* frameTag /*= nullptr*/)
 {
     assert(name);
@@ -530,7 +529,7 @@ void termite::addSpriteFrameSpritesheet(Sprite* sprite,
             const SpriteSheetFrame* sheetFrame = findSpritesheetFrame(sheet, nameHash);
 
             frame->nameHash = nameHash;
-            frame->destroyResource = destroy;
+            frame->flags = flags;
             frame->tagHash = !frameTag ? 0 : tinystl::hash_string(frameTag, strlen(frameTag));
 
             // If not found fill dummy data
@@ -546,11 +545,11 @@ void termite::addSpriteFrameSpritesheet(Sprite* sprite,
             } else {
                 frame->texHandle = getResourceFailHandle("texture");
                 Texture* tex = getResourcePtr<Texture>(frame->texHandle);
-                frame->pivot = vec2_t(0, 0);
-                frame->frame = rect_t(0, 0, 1.0f, 1.0f);
-                frame->sourceSize = vec2_t(float(tex->info.width), float(tex->info.height));
-                frame->posOffset = vec2_t(0, 0);
-                frame->sizeOffset = vec2_t(1.0f, 1.0f);
+                frame->pivot = vec2f(0, 0);
+                frame->frame = rectf(0, 0, 1.0f, 1.0f);
+                frame->sourceSize = vec2f(float(tex->info.width), float(tex->info.height));
+                frame->posOffset = vec2f(0, 0);
+                frame->sizeOffset = vec2f(1.0f, 1.0f);
                 frame->rotOffset = 0;
                 frame->pixelRatio = 1.0f;
             }
@@ -558,7 +557,7 @@ void termite::addSpriteFrameSpritesheet(Sprite* sprite,
     }
 }
 
-void termite::addSpriteFrameAll(Sprite* sprite, ResourceHandle ssHandle, bool destroy)
+void termite::addSpriteFrameAll(Sprite* sprite, ResourceHandle ssHandle, SpriteFlag::Bits flags)
 {
     if (ssHandle.isValid()) {
         assert(getResourceLoadState(ssHandle) != ResourceLoadState::LoadInProgress);
@@ -573,7 +572,7 @@ void termite::addSpriteFrameAll(Sprite* sprite, ResourceHandle ssHandle, bool de
             frame->ssHandle = ssHandle;
             frame->nameHash = sheetFrame.filenameHash;
             frame->tagHash = 0;
-            frame->destroyResource = destroy;
+            frame->flags = flags;
             frame->pivot = sheetFrame.pivot;
             frame->frame = sheetFrame.frame;
             frame->sourceSize = sheetFrame.sourceSize;
@@ -735,17 +734,18 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
 
     GfxDriverApi* driver = g_spriteSys->driver;
     bx::AllocatorI* tmpAlloc = getTempAlloc();
+
     TransientVertexBuffer tvb;
     TransientIndexBuffer tib;
     const int numVerts = numSprites * 4;
     const int numIndices = numSprites * 6;
     GfxState::Bits baseState = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::CullCCW;
 
-    if (!driver->checkAvailTransientVertexBuffer(numVerts, SpriteVertex::Decl))
+    if (!driver->getAvailTransientVertexBuffer(numVerts, SpriteVertex::Decl))
         return;
     driver->allocTransientVertexBuffer(&tvb, numVerts, SpriteVertex::Decl);
 
-    if (!driver->checkAvailTransientIndexBuffer(numIndices))
+    if (!driver->getAvailTransientIndexBuffer(numIndices))
         return;
     driver->allocTransientIndexBuffer(&tib, numIndices);
 
@@ -786,8 +786,8 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
             halfSize.x = halfSize.y * pixelRatio;
 
         // Encode transform matrix into vertices
-        vec3_t transform1 = vec3_t(mat.m11, mat.m12, mat.m21);
-        vec3_t transform2 = vec3_t(mat.m22, mat.m31, mat.m32);
+        vec3_t transform1 = vec3f(mat.m11, mat.m12, mat.m21);
+        vec3_t transform2 = vec3f(mat.m22, mat.m31, mat.m32);
 
         // calculate final pivot offset to make geometry
         vec2_t fullSize = halfSize * 2.0f;
@@ -803,24 +803,34 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
         SpriteVertex& v3 = verts[vertexIdx + 3];
 
         // Top-Left
-        v0.pos = vec2_t(-halfSize.x - pivot.x + offset.x, halfSize.y - pivot.y + offset.y);
-        v0.coords = texRect.vmin;
+        v0.pos = vec2f(-halfSize.x - pivot.x + offset.x, halfSize.y - pivot.y + offset.y);
+        v0.coords = vec2f(texRect.xmin, texRect.ymin);
 
         // Top-Right
-        v1.pos = vec2_t(halfSize.x - pivot.x + offset.x, halfSize.y - pivot.y + offset.y);
-        v1.coords = vec2_t(texRect.xmax, texRect.ymin);
+        v1.pos = vec2f(halfSize.x - pivot.x + offset.x, halfSize.y - pivot.y + offset.y);
+        v1.coords = vec2f(texRect.xmax, texRect.ymin);
 
         // Bottom-Left
-        v2.pos = vec2_t(-halfSize.x - pivot.x + offset.x, -halfSize.y - pivot.y + offset.y);
-        v2.coords = vec2_t(texRect.xmin, texRect.ymax);
+        v2.pos = vec2f(-halfSize.x - pivot.x + offset.x, -halfSize.y - pivot.y + offset.y);
+        v2.coords = vec2f(texRect.xmin, texRect.ymax);
 
         // Bottom-Right
-        v3.pos = vec2_t(halfSize.x - pivot.x + offset.x, -halfSize.y - pivot.y + offset.y);
-        v3.coords = texRect.vmax;
+        v3.pos = vec2f(halfSize.x - pivot.x + offset.x, -halfSize.y - pivot.y + offset.y);
+        v3.coords = vec2f(texRect.xmax, texRect.ymax);
 
         v0.transform1 = v1.transform1 = v2.transform1 = v3.transform1 = transform1;
         v0.transform2 = v1.transform2 = v2.transform2 = v3.transform2 = transform2;
-        v0.color = v1.color = v2.color = v3.color = ss.sprite->tint;
+        v0.color = v1.color = v2.color = v3.color = ss.sprite->tint.n;
+
+        if (frame.flags & SpriteFlag::FlipX) {
+            std::swap<float>(v0.coords.x, v1.coords.x);
+            std::swap<float>(v2.coords.x, v3.coords.x);
+        }
+
+        if (frame.flags & SpriteFlag::FlipY) {
+            std::swap<float>(v0.coords.y, v1.coords.y);
+            std::swap<float>(v2.coords.y, v3.coords.y);
+        }
 
         // Make a quad from 4 verts
         indices[indexIdx] = vertexIdx;
@@ -848,7 +858,7 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     for (int i = 0; i < numSprites; i++) {
         Sprite* sprite = sortedSprites[i].sprite;
         ResourceHandle curHandle = sprite->getCurFrame().texHandle;
-        if (curHandle.value != prevHandle.value) {
+        if (curHandle != prevHandle) {
             curBatch = batches.push();
             curBatch->index = i;
             curBatch->count = 0;

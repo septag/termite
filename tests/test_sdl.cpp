@@ -31,7 +31,7 @@ static SDL_Window* g_window = nullptr;
 static termite::VectorGfxContext* g_vg = nullptr;
 static termite::DebugDrawContext* g_debug = nullptr;
 static termite::Camera g_cam;
-static termite::vec2i_t g_displaySize(WINDOW_WIDTH, WINDOW_HEIGHT);
+static termite::vec2i_t g_displaySize = termite::vec2i(WINDOW_WIDTH, WINDOW_HEIGHT);
 
 static void update(float dt)
 {
@@ -65,16 +65,16 @@ static void update(float dt)
     float aspect = float(g_displaySize.x) / float(g_displaySize.y);
     termite::mtx4x4_t viewMtx = g_cam.getViewMtx();
     termite::mtx4x4_t projMtx = g_cam.getProjMtx(aspect);
-    termite::vgBegin(g_vg, float(g_displaySize.x), float(g_displaySize.y));
+    termite::vgBegin(g_vg, 101, float(g_displaySize.x), float(g_displaySize.y));
     termite::vgTextf(g_vg, 10.0f, 10.0f, "Ft = %f", termite::getSmoothFrameTime()*1000.0);
     termite::vgEnd(g_vg);
 
-    termite::ddBegin(g_debug, float(g_displaySize.x), float(g_displaySize.y), viewMtx, projMtx, g_vg);
-    termite::ddColor(g_debug, termite::vec4_t(0, 0.5f, 0, 1.0f));
+    termite::ddBegin(g_debug, 100, float(g_displaySize.x), float(g_displaySize.y), viewMtx, projMtx, g_vg);
+    termite::ddColor(g_debug, termite::vec4f(0, 0.5f, 0, 1.0f));
     termite::ddSnapGridXZ(g_debug, g_cam, 1.0f, 5.0f, 50.0f);
-    termite::ddColor(g_debug, termite::vec4_t(1.0f, 0, 0, 1.0f));
-    termite::ddBoundingBox(g_debug, termite::aabb_t(-1.0f, -0.5f, -0.5f, 0.5f, 1.5f, 2.5f), true);
-    termite::ddBoundingSphere(g_debug, termite::sphere_t(0, 0, 5.0f, 1.5f), true);
+    termite::ddColor(g_debug, termite::vec4f(1.0f, 0, 0, 1.0f));
+    termite::ddBoundingBox(g_debug, termite::aabbf(-1.0f, -0.5f, -0.5f, 0.5f, 1.5f, 2.5f), true);
+    termite::ddBoundingSphere(g_debug, termite::spheref(0, 0, 5.0f, 1.5f), true);
     termite::ddEnd(g_debug);
 }
 
@@ -127,10 +127,10 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    g_vg = termite::createVectorGfxContext(101);
-    g_debug = termite::createDebugDrawContext(100);
+    g_vg = termite::createVectorGfxContext();
+    g_debug = termite::createDebugDrawContext();
     termite::camInit(&g_cam);
-    termite::camLookAt(&g_cam, termite::vec3_t(0, 1.0f, -12.0f), termite::vec3_t(0, 0, 0));
+    termite::camLookAt(&g_cam, termite::vec3f(0, 1.0f, -12.0f), termite::vec3f(0, 0, 0));
 
     // reset graphics driver
     termite::getGfxDriver()->reset(g_displaySize.x, g_displaySize.y, 0);

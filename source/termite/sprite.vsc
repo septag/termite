@@ -1,5 +1,5 @@
-$input a_position, a_transform1, a_transform2, a_texcoord, a_color
-$output v_texcoord, v_color
+$input a_position, a_texcoord0, a_texcoord1, a_texcoord2, a_color0
+$output v_texcoord0, v_color0
 
 #include <bgfx_shader.sh>
 
@@ -8,13 +8,20 @@ void main()
     vec3 pos = vec3(a_position, 0);
 
     // decode from vertex data to column major matrix
-    mat4 m = mat4(vec4(a_transform1[0], a_transform1[2], 0, a_transform2[1]),
-                  vec4(a_transform1[1], a_transform2[0], 0, a_transform2[2]),
+#if BGFX_SHADER_LANGUAGE_HLSL
+    mat4 m = mat4(vec4(a_texcoord0[0], a_texcoord0[2], 0, a_texcoord1[1]),
+                  vec4(a_texcoord0[1], a_texcoord1[0], 0, a_texcoord1[2]),
                   vec4(0, 0, 1.0, 0),
                   vec4(0, 0, 0, 1.0));
+#else
+    mat4 m = mat4(vec4(a_texcoord0[0], a_texcoord0[1], 0, 0),
+                  vec4(a_texcoord0[2], a_texcoord1[0], 0, 0),
+                  vec4(0, 0, 1.0, 0),
+                  vec4(a_texcoord1[1], a_texcoord1[2], 0, 1.0));
+#endif
+
     vec4 worldPos = mul(m, vec4(pos, 1.0));
     gl_Position = mul(u_viewProj, worldPos);
-    v_texcoord = a_texcoord;
-
-    v_color = a_color;
+    v_texcoord0 = a_texcoord2;
+    v_color0 = a_color0;
 }

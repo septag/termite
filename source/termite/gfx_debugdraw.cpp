@@ -99,7 +99,7 @@ namespace termite
         {
             driver = nullptr;
             viewId = 0;
-            viewport = rect_t(0, 0, 0, 0);
+            viewport = rectf(0, 0, 0, 0);
             defaultFont = nullptr;
             readyToDraw = false;
             vgCtx = nullptr;
@@ -156,7 +156,7 @@ static bool projectToScreen(vec2_t* result, const vec3_t point, const rect_t& re
     float hh = h*0.5f;
 
     vec4_t proj;
-    bx::vec4MulMtx(proj.f, vec4_t(point.x, point.y, point.z, 1.0f).f, viewProjMtx.f);
+    bx::vec4MulMtx(proj.f, vec4f(point.x, point.y, point.z, 1.0f).f, viewProjMtx.f);
     bx::vec3Mul(proj.f, proj.f, 1.0f / proj.w);     proj.w = 1.0f;
     
     float x = bx::ffloor(proj.x*wh + wh + 0.5f);
@@ -166,7 +166,7 @@ static bool projectToScreen(vec2_t* result, const vec3_t point, const rect_t& re
     if (proj.z < 0.0f || proj.z > 1.0f)
         return false;
 
-    *result = vec2_t(x, y);
+    *result = vec2f(x, y);
     return true;
 }
 
@@ -176,8 +176,8 @@ static Shape createSolidAABB()
     vec3_t pts[8];
 
     const int numVerts = 36;
-    aabbPushPoint(&box, vec3_t(-0.5f, -0.5f, -0.5f));
-    aabbPushPoint(&box, vec3_t(0.5f, 0.5f, 0.5f));
+    aabbPushPoint(&box, vec3f(-0.5f, -0.5f, -0.5f));
+    aabbPushPoint(&box, vec3f(0.5f, 0.5f, 0.5f));
     for (int i = 0; i < 8; i++)
         pts[i] = aabbGetCorner(box, i);
 
@@ -216,8 +216,8 @@ static Shape createAABB()
     vec3_t pts[8];
 
     const int numVerts = 24;
-    aabbPushPoint(&box, vec3_t(-0.5f, -0.5f, -0.5f));
-    aabbPushPoint(&box, vec3_t(0.5f, 0.5f, 0.5f));
+    aabbPushPoint(&box, vec3f(-0.5f, -0.5f, -0.5f));
+    aabbPushPoint(&box, vec3f(0.5f, 0.5f, 0.5f));
     for (int i = 0; i < 8; i++)
         pts[i] = aabbGetCorner(box, i);
 
@@ -293,8 +293,8 @@ static Shape createSphere(int numSegsX, int numSegsY)
     const int numVerts = numSegsX * 3 * 2 + (numSegsY - 3) * 3 * 2 * numSegsX;
 
     /* set extreme points (radius = 1.0f) */
-    vec3_t y_max = vec3_t(0.0f, 1.0f, 0.0f);
-    vec3_t y_min = vec3_t(0.0f, -1.0f, 0.0f);
+    vec3_t y_max = vec3f(0.0f, 1.0f, 0.0f);
+    vec3_t y_min = vec3f(0.0f, -1.0f, 0.0f);
 
     // start from lower extreme point and draw slice of circles
     // connect them to the lower level
@@ -455,14 +455,13 @@ void termite::shutdownDebugDraw()
     g_dbg = nullptr;
 }
 
-DebugDrawContext* termite::createDebugDrawContext(uint8_t viewId)
+DebugDrawContext* termite::createDebugDrawContext()
 {
     assert(g_dbg);
 
     bx::AllocatorI* alloc = g_dbg->alloc;
     DebugDrawContext* ctx = BX_NEW(alloc, DebugDrawContext)(alloc);
     ctx->driver = g_dbg->driver;
-    ctx->viewId = viewId;
 
     ctx->defaultFont = getFont("fixedsys");
     if (!ctx->defaultFont) {
@@ -494,14 +493,14 @@ void termite::destroyDebugDrawContext(DebugDrawContext* ctx)
     BX_DELETE(ctx->alloc, ctx);
 }
 
-void termite::ddBegin(DebugDrawContext* ctx, float viewWidth, float viewHeight, const mtx4x4_t& viewMtx, 
+void termite::ddBegin(DebugDrawContext* ctx, uint8_t viewId, float viewWidth, float viewHeight, const mtx4x4_t& viewMtx, 
                       const mtx4x4_t& projMtx, VectorGfxContext* vg)
 {
     assert(ctx);
-    ctx->viewport = rect_t(0, 0, viewWidth, viewHeight);
     ddReset(ctx);
+    ctx->viewId;
     ctx->vgCtx = vg;
-    ctx->viewport = rect_t(0, 0, viewWidth, viewHeight);
+    ctx->viewport = rectf(0, 0, viewWidth, viewHeight);
     ctx->readyToDraw = true;
 
     bx::mtxMul(ctx->viewProjMtx.f, viewMtx.f, projMtx.f);
@@ -511,14 +510,11 @@ void termite::ddBegin(DebugDrawContext* ctx, float viewWidth, float viewHeight, 
                                  0.0f, 0.0f, 0.0f);
 
     if (vg) {
-        vgBegin(ctx->vgCtx, viewWidth, viewHeight);
+        vgBegin(ctx->vgCtx, viewId, viewWidth, viewHeight);
     }
 
     GfxDriverApi* driver = ctx->driver;
-    uint8_t viewId = ctx->viewId;
-    driver->touch(viewId);
-    driver->setViewRect(viewId, 0, 0, uint16_t(viewWidth), uint16_t(viewHeight));
-    driver->setViewSeq(viewId, false);
+    driver->setViewRectRatio(viewId, 0, 0, BackbufferRatio::Equal);
     driver->setViewTransform(viewId, viewMtx.f, projMtx.f, GfxViewFlag::Stereo, nullptr);
 }
 
@@ -593,7 +589,7 @@ void termite::ddRect(DebugDrawContext* ctx, const vec3_t& vmin, const vec3_t& vm
             ctx->stateStack.peek(&state);
             vec4_t c = state->color;
             vgFillColor(ctx->vgCtx, colorRGBAf(c.x, c.y, c.z, c.w));
-            vgRect(ctx->vgCtx, rect_t(minPt, maxPt));
+            vgRect(ctx->vgCtx, rectv(minPt, maxPt));
         }
     }
 }
@@ -623,7 +619,7 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spaci
     cam.calcFrustumCorners(corners, ratio, -2.0f, bx::fmin(maxDepth, cam.ffar));
 
     mtx4x4_t projToXz;
-    mtxProjPlane(&projToXz, vec3_t(0, 1.0f, 0));
+    mtxProjPlane(&projToXz, vec3f(0, 1.0f, 0));
 
     // project frustum corners to XZ plane add them to bounding box
     aabb_t bb;
@@ -638,12 +634,12 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spaci
     int nspace = (int)spacing;
     vec3_t& minpt = bb.vmin;
     vec3_t& maxpt = bb.vmax;
-    aabb_t snapbox = aabb_t(float(int(minpt.x) - int(minpt.x) % nspace),
-                            0,
-                            float(int(minpt.z) - int(minpt.z) % nspace),
-                            float(int(maxpt.x) - int(maxpt.x) % nspace),
-                            0,
-                            float(int(maxpt.z) - int(maxpt.z) % nspace));
+    aabb_t snapbox = aabbf(float(int(minpt.x) - int(minpt.x) % nspace),
+                           0,
+                           float(int(minpt.z) - int(minpt.z) % nspace),
+                           float(int(maxpt.x) - int(maxpt.x) % nspace),
+                           0,
+                           float(int(maxpt.z) - int(maxpt.z) % nspace));
     float w = snapbox.xmax - snapbox.xmin;
     float d = snapbox.zmax - snapbox.zmin;
     if (bx::fequal(w, 0, 0.00001f) || bx::fequal(d, 0, 0.00001f))
@@ -655,7 +651,7 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spaci
 
     // Draw
     GfxDriverApi* driver = ctx->driver;
-    if (!driver->checkAvailTransientVertexBuffer(numVerts, eddVertexPosCoordColor::Decl))
+    if (!driver->getAvailTransientVertexBuffer(numVerts, eddVertexPosCoordColor::Decl))
         return;
     TransientVertexBuffer tvb;
     driver->allocTransientVertexBuffer(&tvb, numVerts, eddVertexPosCoordColor::Decl);
@@ -675,7 +671,7 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spaci
         verts[ni].y = 0;
         verts[ni].z = zoffset;
 
-        verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(zoffset, boldSpacing), 0.0f, 0.0001f) ? color : boldColor;
+        verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(zoffset, boldSpacing), 0.0f, 0.0001f) ? color.n : boldColor.n;
     }
 
     for (float xoffset = snapbox.xmin; xoffset <= snapbox.xmax; xoffset += spacing, i += 2) {
@@ -688,7 +684,7 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spaci
         verts[ni].y = 0;
         verts[ni].z = snapbox.zmax;
 
-        verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(xoffset, boldSpacing), 0.0f, 0.0001f) ? color : boldColor;
+        verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(xoffset, boldSpacing), 0.0f, 0.0001f) ? color.n : boldColor.n;
     }
 
     mtx4x4_t ident = mtx4x4Ident();
@@ -714,7 +710,7 @@ void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spa
 
     vec2_t& minpt = rc.vmin;
     vec2_t& maxpt = rc.vmax;
-    rect_t snapRect = rect_t(float(int(minpt.x) - int(minpt.x) % nspace) - spacing,
+    rect_t snapRect = rectf(float(int(minpt.x) - int(minpt.x) % nspace) - spacing,
                             float(int(minpt.y) - int(minpt.y) % nspace) - spacing,
                             float(int(maxpt.x) - int(maxpt.x) % nspace) + spacing,
                             float(int(maxpt.y) - int(maxpt.y) % nspace) + spacing);
@@ -730,7 +726,7 @@ void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spa
 
     // Draw
     GfxDriverApi* driver = ctx->driver;
-    if (!driver->checkAvailTransientVertexBuffer(numVerts, eddVertexPosCoordColor::Decl))
+    if (!driver->getAvailTransientVertexBuffer(numVerts, eddVertexPosCoordColor::Decl))
         return;
     TransientVertexBuffer tvb;
     driver->allocTransientVertexBuffer(&tvb, numVerts, eddVertexPosCoordColor::Decl);
@@ -750,7 +746,7 @@ void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spa
         verts[ni].y = yoffset;
         verts[ni].z = 0;
 
-        verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(yoffset, boldSpacing), 0.0f, 0.0001f) ? color : boldColor;
+        verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(yoffset, boldSpacing), 0.0f, 0.0001f) ? color.n : boldColor.n;
     }
 
     for (float xoffset = snapRect.xmin; xoffset <= snapRect.xmax; xoffset += spacing, i += 2) {
@@ -763,7 +759,7 @@ void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spa
         verts[ni].y = snapRect.ymax;
         verts[ni].z = 0;
 
-        verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(xoffset, boldSpacing), 0.0f, 0.0001f) ? color : boldColor;
+        verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(xoffset, boldSpacing), 0.0f, 0.0001f) ? color.n : boldColor.n;
     }
 
     mtx4x4_t ident = mtx4x4Ident();
@@ -927,7 +923,7 @@ void termite::ddPopState(DebugDrawContext* ctx)
 void DebugDrawState::setDefault(DebugDrawContext* ctx)
 {
     mtx = mtx4x4Ident();
-    color = vec4_t(1.0f, 1.0f, 1.0f, 1.0f);
+    color = vec4f(1.0f, 1.0f, 1.0f, 1.0f);
     alpha = 1.0f;
     scissor = ctx->viewport;
     font = ctx->defaultFont;

@@ -31,8 +31,6 @@ namespace termite
             TexCoord7, // a_texcoord7
             Count
         };
-
-        typedef uint32_t Type;
     };
 
     struct t3dTextureUsage
@@ -49,8 +47,6 @@ namespace termite
             Reflection,
             Alpha
         };
-
-        typedef uint32_t Type;
     };
 
     struct t3dJoint
@@ -76,7 +72,7 @@ namespace termite
 #if 0
         h3dJoint* joints;
         float* initPose;    // array of 4x3 matrices float[12]
-        t3dVertexAttrib::Type* attribs;  
+        t3dVertexAttrib::Enum* attribs;  
         void* verts;    // each vertex is packed into single struct
         uint16_t* indices;
 #endif
@@ -101,7 +97,7 @@ namespace termite
 
     struct t3dTexture
     {
-        t3dTextureUsage::Type usage;
+        t3dTextureUsage::Enum usage;
         char filepath[256];
     };
 

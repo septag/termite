@@ -409,18 +409,22 @@ namespace termite
 		void (*destroyEntity)(EntityManager* emgr, Entity ent);
 		bool (*isEntityAlive)(EntityManager* emgr, Entity ent);
 
-		ComponentTypeHandle (*registerComponentType)(const char* name, uint32_t id,
+		ComponentTypeHandle (*registerComponentType)(const char* name,
 													 const ComponentCallbacks* callbacks, ComponentFlag::Bits flags,
-													 uint32_t dataSize, uint16_t poolSize, uint16_t growSize);
-		ComponentHandle (*createComponent)(EntityManager* emgr, Entity ent, ComponentTypeHandle handle);
+													 uint32_t dataSize, uint16_t poolSize, uint16_t growSize,
+                                                     bx::AllocatorI* alloc);
+		ComponentHandle (*createComponent)(EntityManager* emgr, Entity ent, ComponentTypeHandle handle, ComponentGroupHandle group);
 		void (*destroyComponent)(EntityManager* emgr, Entity ent, ComponentHandle handle);
 
 		ComponentTypeHandle (*findComponentTypeByName)(const char* name);
-		ComponentTypeHandle (*findComponentTypeById)(uint32_t id);
+		ComponentTypeHandle (*findComponentTypeByNameHash)(size_t hashName);
 		ComponentHandle (*getComponent)(ComponentTypeHandle handle, Entity ent);
 		void* (*getComponentData)(ComponentHandle handle);
-
 		void (*garbageCollectComponents)(EntityManager* emgr);
+
+        void (*runComponentGroup)(ComponentStage::Enum stage, ComponentGroupHandle groupHandle, float dt);
+        ComponentGroupHandle (*createComponentGroup)(bx::AllocatorI* alloc, uint16_t poolSize);
+        void (*destroyComponentGroup)(ComponentGroupHandle handle);
 	};
 } // namespace termite
 #endif

@@ -9,8 +9,6 @@
 #include "bxx/pool.h"
 #include "bxx/lock.h"
 #include "bx/crtimpl.h"
-#define BX_IMPLEMENT_JSON
-#include "bxx/json.h"
 
 #include "gfx_defines.h"
 #include "gfx_font.h"
@@ -39,6 +37,7 @@
 #include "../imgui_impl/imgui_impl.h"
 
 #define STB_LEAKCHECK_IMPLEMENTATION
+#define STB_LEAKCHECK_MULTITHREAD
 #include "bxx/leakcheck_allocator.h"
 
 #include "bxx/path.h"
@@ -48,6 +47,9 @@
 #   define BX_SHARED_LIB
 #endif
 #include "bxx/logger.h"
+
+#define BX_IMPLEMENT_JSON
+#include "bxx/json.h"
 
 #include <dirent.h>
 #include <random>
@@ -88,6 +90,9 @@ struct HeapMemoryImpl
 
 class GfxDriverEvents : public GfxDriverEventsI
 {
+private:
+    bx::Lock m_lock;
+
 public:
     void onFatal(GfxFatalType::Enum type, const char* str) override;
     void onTraceVargs(const char* filepath, int line, const char* format, va_list argList) override;
@@ -642,7 +647,7 @@ static double calcAvgFrameTime(const FrameData& fd)
 
 void termite::doFrame()
 {
-    freeTag(T_MID_TEMP);
+    g_core->tempAlloc.free();
 
     FrameData& fd = g_core->frameData;
     if (fd.lastFrameTick == 0)
@@ -658,16 +663,10 @@ void termite::doFrame()
         ImGuizmo::BeginFrame();
     }
 
-    callComponentUpdates(ComponentUpdateStage::PreUpdate, float(dt));
-
     if (g_core->updateFn)
         g_core->updateFn(fdt);
     
     runEventDispatcher(fdt);
-    callComponentUpdates(ComponentUpdateStage::Update, float(dt));
-
-    callComponentUpdates(ComponentUpdateStage::PostUpdate, float(dt));
-    resetComponentUpdateCache();
 
     if (g_core->gfxDriver) {
         ImGui::Render();
@@ -941,9 +940,13 @@ void GfxDriverEvents::onFatal(GfxFatalType::Enum type, const char* str)
     bx::strlcpy(strTrimed, str, sizeof(strTrimed));
     strTrimed[strlen(strTrimed) - 1] = 0;
 
-    g_core->gfxLogCache = (LogCache*)BX_REALLOC(g_alloc, g_core->gfxLogCache, sizeof(LogCache) * (++g_core->numGfxLogCache));
-    g_core->gfxLogCache[g_core->numGfxLogCache-1].type = bx::LogType::Fatal;
-    strcpy(g_core->gfxLogCache[g_core->numGfxLogCache-1].text, strTrimed);
+    if (g_core->numGfxLogCache < 1000) {
+        m_lock.lock();
+        g_core->gfxLogCache = (LogCache*)BX_REALLOC(g_alloc, g_core->gfxLogCache, sizeof(LogCache) * (++g_core->numGfxLogCache));
+        g_core->gfxLogCache[g_core->numGfxLogCache-1].type = bx::LogType::Fatal;
+        strcpy(g_core->gfxLogCache[g_core->numGfxLogCache-1].text, strTrimed);
+        m_lock.unlock();
+    }
 }
 
 void GfxDriverEvents::onTraceVargs(const char* filepath, int line, const char* format, va_list argList)
@@ -951,7 +954,11 @@ void GfxDriverEvents::onTraceVargs(const char* filepath, int line, const char* f
     char text[LOG_STRING_SIZE];
     vsnprintf(text, sizeof(text), format, argList);
     text[strlen(text) - 1] = 0;
-    g_core->gfxLogCache = (LogCache*)BX_REALLOC(g_alloc, g_core->gfxLogCache, sizeof(LogCache) * (++g_core->numGfxLogCache));
-    g_core->gfxLogCache[g_core->numGfxLogCache-1].type = bx::LogType::Verbose;
-    strcpy(g_core->gfxLogCache[g_core->numGfxLogCache-1].text, text);
+    if (g_core->numGfxLogCache < 1000) {
+        m_lock.lock();
+        g_core->gfxLogCache = (LogCache*)BX_REALLOC(g_alloc, g_core->gfxLogCache, sizeof(LogCache) * (++g_core->numGfxLogCache));
+        g_core->gfxLogCache[g_core->numGfxLogCache-1].type = bx::LogType::Verbose;
+        strcpy(g_core->gfxLogCache[g_core->numGfxLogCache-1].text, text);
+        m_lock.unlock();
+    }
 }

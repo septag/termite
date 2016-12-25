@@ -27,6 +27,7 @@ namespace termite
     TERMITE_API ProgramHandle loadShaderProgram(GfxDriverApi* gfxDriver, IoDriverApi* ioDriver, const char* vsFilepath, 
                                                 const char* fsFilepath);
     TERMITE_API void drawFullscreenQuad(uint8_t viewId, ProgramHandle prog);
+    TERMITE_API void blitFullscreen(uint8_t viewId, TextureHandle texture);
 
     TERMITE_API vec2i_t getRelativeDisplaySize(int refWidth, int refHeight, int targetWidth, int targetHeight, 
                                                  DisplayPolicy::Enum policy);

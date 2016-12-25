@@ -300,7 +300,7 @@ static void deleteResource(ResourceHandle handle, const ResourceTypeData* tdata)
     if (rs->obj != tdata->asyncProgressObj && rs->obj != tdata->failObj)
         rs->callbacks->unloadObj(rs->obj, rs->objAlloc);
 
-    int tIdx = resLib->resourcesTable.find(bx::hashMurmur2A(rs->uri.cstr(), rs->uri.getLength()));
+    int tIdx = resLib->resourcesTable.find(hashResource(rs->uri.cstr(), rs->userParams, tdata->userParamsSize, rs->objAlloc));
     if (tIdx != -1)
         resLib->resourcesTable.remove(tIdx);
 }
@@ -490,6 +490,20 @@ ResourceHandle termite::getResourceFailHandle(const char* name)
      return getResourceHandleInPlace(tdata, typeNameHash, "[ASYNC]", tdata->asyncProgressObj);
 }
 
+ ResourceHandle termite::addResourceRef(ResourceHandle handle)
+ {
+     assert(handle.isValid());
+     Resource* rs = g_resLib->resources.getHandleData<Resource>(0, handle);
+     rs->refcount++;
+     return handle;
+ }
+
+ uint32_t termite::getResourceRefCount(ResourceHandle handle)
+ {
+     assert(handle.isValid());
+     return g_resLib->resources.getHandleData<Resource>(0, handle)->refcount;
+ }
+
 static ResourceHandle loadResourceHashedInMem(size_t nameHash, const char* uri, const MemoryBlock* mem, 
                                               const void* userParams, ResourceFlag::Bits flags, bx::AllocatorI* objAlloc)
 {
@@ -634,6 +648,29 @@ const char* termite::getResourceUri(ResourceHandle handle)
     assert(handle.isValid());
     
     return resLib->resources.getHandleData<Resource>(0, handle)->uri.cstr();
+}
+
+const char* termite::getResourceName(ResourceHandle handle)
+{
+    ResourceLib* resLib = g_resLib;
+    assert(resLib);
+    assert(handle.isValid());
+
+    int r = resLib->resourceTypesTable.find(resLib->resources.getHandleData<Resource>(0, handle)->typeNameHash);
+    if (r != 0) {
+        return resLib->resourceTypes.getHandleData<ResourceTypeData>(0, resLib->resourceTypesTable.getValue(r))->name;
+    }
+
+    return "";
+}
+
+const void* termite::getResourceParams(ResourceHandle handle)
+{
+    ResourceLib* resLib = g_resLib;
+    assert(resLib);
+    assert(handle.isValid());
+
+    return resLib->resources.getHandleData<Resource>(0, handle)->userParams;
 }
 
 // Async

@@ -12,14 +12,14 @@
 
 #define MIN_FREE_INDICES 1024
 
-static const uint32_t kComponentIndexBits = 16;
-static const uint32_t kComponentIndexMask = (1 << kComponentIndexBits) - 1;
+static const uint32_t kComponentHandleBits = 16;
+static const uint32_t kComponentHandleMask = (1 << kComponentHandleBits) - 1;
 static const uint32_t kComponentTypeHandleBits = 16;
 static const uint32_t kComponentTypeHandleMask = (1 << kComponentTypeHandleBits) - 1;
 
-#define COMPONENT_INSTANCE_INDEX(_Handle) uint16_t(_Handle.value & kComponentIndexMask)
-#define COMPONENT_TYPE_INDEX(_Handle) uint16_t((_Handle.value >> kComponentIndexBits) & kComponentTypeHandleMask)
-#define COMPONENT_MAKE_HANDLE(_CTypeIdx, _CIdx) ComponentHandle((uint32_t(_CTypeIdx) << kComponentTypeHandleBits) | uint32_t(_CIdx))
+#define COMPONENT_INSTANCE_HANDLE(_Handle) uint16_t(_Handle.value & kComponentHandleMask)
+#define COMPONENT_TYPE_INDEX(_Handle) uint16_t((_Handle.value >> kComponentHandleBits) & kComponentTypeHandleMask)
+#define COMPONENT_MAKE_HANDLE(_CTypeIdx, _CHdl) ComponentHandle((uint32_t(_CTypeIdx) << kComponentTypeHandleBits) | uint32_t(_CHdl))
 
 using namespace termite;
 
@@ -63,23 +63,37 @@ struct ComponentType
 {
     ComponentTypeHandle myHandle;
     char name[32];
-    uint32_t id;
     ComponentCallbacks callbacks;
     ComponentFlag::Bits flags;
     uint32_t dataSize;
     bx::HandlePool dataPool;
     bx::HashTable<int, uint32_t> entTable;  // Entity -> ComponentHandle
-    ComponentHandle* cachedHandles; // Keep cached component handles (lifetime is one frame only)
 
     ComponentType() : 
         entTable(bx::HashTableType::Mutable)
     {
         strcpy(name, "");
-        id = 0;
         memset(&callbacks, 0x00, sizeof(callbacks));
         flags = ComponentFlag::None;
         dataSize = 0;
-        cachedHandles = nullptr;
+    }
+};
+
+struct ComponentGroup
+{
+    struct Batch
+    {
+        int index;
+        int count;
+    };
+
+    bx::Array<ComponentHandle> components;
+    bx::Array<Batch> batches;
+    bool sorted;
+
+    ComponentGroup() :
+        sorted(false)
+    {
     }
 };
 
@@ -88,12 +102,11 @@ struct ComponentSystem
     bx::AllocatorI* alloc;
     bx::Array<ComponentType> components;
     bx::HashTableInt nameTable;
-    bx::HashTable<int, uint32_t> idTable;
+    bx::HandlePool componentGroups;
 
     ComponentSystem(bx::AllocatorI* _alloc) : 
         alloc(_alloc),
-        nameTable(bx::HashTableType::Mutable),
-        idTable(bx::HashTableType::Mutable)
+        nameTable(bx::HashTableType::Mutable)
     {
     }
 };
@@ -148,17 +161,52 @@ Entity termite::createEntity(EntityManager* emgr)
     return Entity(idx, emgr->generations[idx]);
 }
 
-static void destroyComponentNoImmDestroy(EntityManager* emgr, Entity ent, ComponentHandle handle)
+static void addToComponentGroup(ComponentGroupHandle handle, ComponentHandle component)
+{
+    ComponentGroup* group = g_csys->componentGroups.getHandleData<ComponentGroup>(0, handle);
+    ComponentHandle* pchandle = group->components.push();
+    if (pchandle) {
+        *pchandle = component;
+        group->sorted = false;
+    }
+}
+
+static void removeFromComponentGroup(ComponentType& ctype, ComponentHandle component)
+{
+    assert(component.isValid());
+
+    ComponentGroupHandle handle = *ctype.dataPool.getHandleData<ComponentGroupHandle>(2, COMPONENT_INSTANCE_HANDLE(component));
+    if (handle.isValid()) {
+        ComponentGroup* group = g_csys->componentGroups.getHandleData<ComponentGroup>(0, handle);
+
+        int count = group->components.getCount();
+        // Find the component and Swap current with the last group
+        int index = group->components.find(component);
+        if (index != -1) {
+            ComponentHandle* buff = group->components.getBuffer();
+            if (index != count - 1) {
+                std::swap<ComponentHandle>(buff[index], buff[count-1]);
+                group->sorted = false;
+            }
+            group->components.pop();
+        }
+    }
+}
+
+static void destroyComponentNoImmDestroy(Entity ent, ComponentHandle handle)
 {
     assert(handle.isValid());
 
     ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handle)];
 
-    // Call destroy callback
-    if (ctype.callbacks.destroyInstance)
-        ctype.callbacks.destroyInstance(ent, handle);
+    removeFromComponentGroup(ctype, handle);
 
-    ctype.dataPool.freeHandle(COMPONENT_INSTANCE_INDEX(handle));
+    // Call destroy callback
+    uint16_t instHandle = COMPONENT_INSTANCE_HANDLE(handle);
+    if (ctype.callbacks.destroyInstance)
+        ctype.callbacks.destroyInstance(ent, handle, ctype.dataPool.getHandleData(1, instHandle));
+
+    ctype.dataPool.freeHandle(instHandle);
 
     int r = ctype.entTable.find(ent.id);
     if (r != -1)
@@ -177,7 +225,7 @@ void termite::destroyEntity(EntityManager* emgr, Entity ent)
         while (node) {
             DestroyHashTable::Node* next = node->next;
             ComponentHandle component(uint32_t(node->value));
-            destroyComponentNoImmDestroy(emgr, ent, component);
+            destroyComponentNoImmDestroy(ent, component);
 
             emgr->destroyTable.remove(entIdx, node);
             node = next;
@@ -216,9 +264,7 @@ result_t termite::initComponentSystem(bx::AllocatorI* alloc)
         return T_ERR_OUTOFMEM;
     }
 
-    if (!g_csys->nameTable.create(128, alloc) ||
-        !g_csys->idTable.create(128, alloc))
-    {
+    if (!g_csys->nameTable.create(128, alloc)) {
         return T_ERR_OUTOFMEM;
     }
 
@@ -237,14 +283,46 @@ void termite::shutdownComponentSystem()
     }
     g_csys->components.destroy();
     g_csys->nameTable.destroy();
-    g_csys->idTable.destroy();
 
     BX_DELETE(g_csys->alloc, g_csys);
 }
 
-ComponentTypeHandle termite::registerComponentType(const char* name, uint32_t id, const ComponentCallbacks* callbacks, 
+ComponentGroupHandle termite::createComponentGroup(bx::AllocatorI* alloc, uint16_t poolSize /*= 0*/)
+{
+    ComponentGroupHandle handle = ComponentGroupHandle(g_csys->componentGroups.newHandle());
+    if (handle.isValid()) {
+        ComponentGroup* group = new(g_csys->componentGroups.getHandleData(0, handle)) ComponentGroup();
+        if (!group->components.create(poolSize, poolSize, alloc) ||
+            !group->batches.create(32, 64, alloc)) 
+        {
+            destroyComponentGroup(handle);
+            return ComponentGroupHandle();
+        }
+    }
+    return handle;
+}
+
+void termite::destroyComponentGroup(ComponentGroupHandle handle)
+{
+    assert(handle.isValid());
+    ComponentGroup* group = g_csys->componentGroups.getHandleData<ComponentGroup>(0, handle);
+
+    // Unlink all component references
+    // It is recommended that you Call this function before destroying components/entities 
+    for (int i = 0; i < group->components.getCount(); i++) {
+        ComponentHandle chandle = group->components[i];
+        ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(chandle)];
+        *ctype.dataPool.getHandleData<ComponentGroupHandle>(2, COMPONENT_INSTANCE_HANDLE(chandle)) = ComponentGroupHandle();
+    }
+
+    group->batches.destroy();
+    group->components.destroy();
+    g_csys->componentGroups.freeHandle(handle);
+}
+
+ComponentTypeHandle termite::registerComponentType(const char* name, const ComponentCallbacks* callbacks, 
                                                    ComponentFlag::Bits flags, uint32_t dataSize, uint16_t poolSize, 
-                                                   uint16_t growSize)
+                                                   uint16_t growSize, bx::AllocatorI* alloc)
 {
     assert(g_csys);
     assert(g_csys->components.getCount() < UINT16_MAX);
@@ -256,21 +334,19 @@ ComponentTypeHandle termite::registerComponentType(const char* name, uint32_t id
     ComponentType* ctype = new(buff) ComponentType();
 
     bx::strlcpy(ctype->name, name, sizeof(ctype->name));
-    ctype->id = id;
     if (callbacks)
         memcpy(&ctype->callbacks, callbacks, sizeof(ComponentCallbacks));
     ctype->flags = flags;
     ctype->dataSize = dataSize;
-    const uint32_t itemSizes[2] = {sizeof(Entity), dataSize};
-    if (!ctype->dataPool.create(itemSizes, 2, poolSize, growSize, g_csys->alloc) ||
-        !ctype->entTable.create(poolSize, g_csys->alloc)) 
+    const uint32_t itemSizes[3] = {sizeof(Entity), dataSize, sizeof(ComponentGroupHandle)};
+    if (!ctype->dataPool.create(itemSizes, BX_COUNTOF(itemSizes), poolSize, growSize, alloc ? alloc : g_csys->alloc) ||
+        !ctype->entTable.create(poolSize, alloc ? alloc : g_csys->alloc)) 
     {
         return ComponentTypeHandle();
     }
 
     // Add to ComponentType database
     int index = g_csys->components.getCount() - 1;
-    g_csys->idTable.add(id, index);
     g_csys->nameTable.add(tinystl::hash_string(name, strlen(name)), index);
 
     ComponentTypeHandle handle = ComponentTypeHandle(uint16_t(index));
@@ -301,7 +377,8 @@ void termite::garbageCollectComponents(EntityManager* emgr)
     }
 }
 
-ComponentHandle termite::createComponent(EntityManager* emgr, Entity ent, ComponentTypeHandle handle)
+ComponentHandle termite::createComponent(EntityManager* emgr, Entity ent, ComponentTypeHandle handle, 
+                                         ComponentGroupHandle group)
 {
     ComponentType& ctype = g_csys->components[handle.value];
 
@@ -313,11 +390,16 @@ ComponentHandle termite::createComponent(EntityManager* emgr, Entity ent, Compon
     uint16_t cIdx = ctype.dataPool.newHandle();
     if (cIdx == UINT16_MAX)
         return ComponentHandle();
-    Entity* pEnt = ctype.dataPool.getHandleData<Entity>(0, cIdx);
-    *pEnt = ent;
+    *ctype.dataPool.getHandleData<Entity>(0, cIdx) = ent;
+    void* data = ctype.dataPool.getHandleData(1, cIdx);
+    *ctype.dataPool.getHandleData<ComponentGroupHandle>(2, cIdx) = group;
 
     ComponentHandle chandle = COMPONENT_MAKE_HANDLE(handle.value, cIdx);
-    ctype.entTable.add(ent.id, int(chandle.value));
+
+    if (group.isValid())
+        addToComponentGroup(group, chandle);
+
+    ctype.entTable.add(ent.id, chandle);
 
     if (ctype.flags & ComponentFlag::ImmediateDestroy) {
         emgr->destroyTable.add(ent.id, int(chandle.value));
@@ -325,7 +407,7 @@ ComponentHandle termite::createComponent(EntityManager* emgr, Entity ent, Compon
 
     // Call create callback
     if (ctype.callbacks.createInstance) {
-        ctype.callbacks.createInstance(ent, chandle);
+        ctype.callbacks.createInstance(ent, chandle, data);
     }
 
     return chandle;
@@ -333,7 +415,7 @@ ComponentHandle termite::createComponent(EntityManager* emgr, Entity ent, Compon
 
 void termite::destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle handle)
 {
-    destroyComponentNoImmDestroy(emgr, ent, handle);
+    destroyComponentNoImmDestroy(ent, handle);
     
     ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handle)];
 
@@ -352,73 +434,42 @@ void termite::destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle 
     }
 }
 
-static ComponentHandle* gatherComponents(const ComponentType& ctype, bx::AllocatorI* alloc)
+void termite::runComponentGroup(ComponentStage::Enum stage, ComponentGroupHandle groupHandle, float dt)
 {
-    // Gather all components    
-    uint16_t count = ctype.dataPool.getCount();
-    ComponentHandle* handles = (ComponentHandle*)BX_ALLOC(alloc, sizeof(ComponentHandle)*count);
-    assert(handles);
-    ComponentTypeHandle myHandle = ctype.myHandle;
-    for (uint16_t i = 0; i < count; i++) {
-        handles[i] = COMPONENT_MAKE_HANDLE(myHandle.value, ctype.dataPool.handleAt(i));
-    }
+    assert(groupHandle.isValid());
+    ComponentGroup* group = g_csys->componentGroups.getHandleData<ComponentGroup>(0, groupHandle);
 
-    return handles;
-}
+    // Sort components if it's required
+    int count = group->components.getCount();
+    if (count > 1 && !group->sorted) {
+        std::sort(group->components.itemPtr(0), group->components.itemPtr(count - 1),
+                  [](const ComponentHandle& a, const ComponentHandle& b) { return a.value < b.value; });
 
-void termite::callComponentUpdates(ComponentUpdateStage::Enum updateStage, float dt)
-{
-    bx::AllocatorI* tmpAlloc = getTempAlloc();
+        // Batch by component-type
+        group->batches.clear();
+        ComponentTypeHandle prevHandle;
+        ComponentGroup::Batch* curBatch = nullptr;
 
-    // Get components by their registration order
-    for (int i = 0, c = g_csys->components.getCount(); i < c; i++) {
-        ComponentType& ctype = g_csys->components[i];
-        uint16_t count = ctype.dataPool.getCount();
-        if (count) {
-            if (!ctype.cachedHandles)
-                ctype.cachedHandles = gatherComponents(ctype, tmpAlloc);
-
-            switch (updateStage) {
-            case ComponentUpdateStage::PreUpdate:
-                if (ctype.callbacks.preUpdateAll)
-                    ctype.callbacks.preUpdateAll(ctype.cachedHandles, count, dt);
-                break;
-
-            case ComponentUpdateStage::PostUpdate:
-                if (ctype.callbacks.postUpdateAll)
-                    ctype.callbacks.postUpdateAll(ctype.cachedHandles, count, dt);
-                break;
-
-            case ComponentUpdateStage::Update:
-                if (ctype.callbacks.updateAll)
-                    ctype.callbacks.updateAll(ctype.cachedHandles, count, dt);
-                break;
+        for (int i = 0; i < count; i++) {
+            ComponentTypeHandle curHandle = ComponentTypeHandle(COMPONENT_TYPE_INDEX(group->components[i]));
+            if (curHandle != prevHandle) {
+                curBatch = group->batches.push();
+                curBatch->index = i;
+                curBatch->count = 0;
+                prevHandle = curHandle;
             }
+            curBatch->count++;
         }
+
+        group->sorted = true;
     }
-}
 
-void termite::callRenderComponents(GfxDriverApi* driver)
-{
-    // Get components by their registration order
-    for (int i = 0, c = g_csys->components.getCount(); i < c; i++) {
-        ComponentType& ctype = g_csys->components[i];
-        uint16_t count = ctype.dataPool.getCount();
-        if (count) {
-            assert(ctype.cachedHandles);
-
-            if (ctype.callbacks.renderAll)
-                ctype.callbacks.renderAll(ctype.cachedHandles, count, driver);
-        }
-    }
-}
-
-void termite::resetComponentUpdateCache()
-{
-    // Get components by their registration order
-    for (int i = 0, c = g_csys->components.getCount(); i < c; i++) {
-        ComponentType& ctype = g_csys->components[i];
-        ctype.cachedHandles = nullptr;
+    // Call their callbacks
+    for (int i = 0, c = group->batches.getCount(); i < c; i++) {
+        ComponentGroup::Batch batch = group->batches[i];
+        const ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(group->components[batch.index])];
+        if (ctype.callbacks.stageFn[stage])
+            ctype.callbacks.stageFn[stage](group->components.itemPtr(batch.index), batch.count, dt);
     }
 }
 
@@ -431,11 +482,11 @@ ComponentTypeHandle termite::findComponentTypeByName(const char* name)
         return ComponentTypeHandle();
 }
 
-ComponentTypeHandle termite::findComponentTypeById(uint32_t id)
+ComponentTypeHandle termite::findComponentTypeByNameHash(size_t nameHash)
 {
-    int index = g_csys->idTable.find(id);
+    int index = g_csys->nameTable.find(nameHash);
     if (index != -1)
-        return ComponentTypeHandle(uint16_t(g_csys->idTable.getValue(index)));
+        return ComponentTypeHandle(uint16_t(g_csys->nameTable.getValue(index)));
     else
         return ComponentTypeHandle();
 }
@@ -447,9 +498,17 @@ ComponentHandle termite::getComponent(ComponentTypeHandle handle, Entity ent)
     const ComponentType& ctype = g_csys->components[handle.value];
     int r = ctype.entTable.find(ent.id);
     if (r != -1)
-        return ComponentHandle(uint32_t(ctype.entTable.getValue(r)));
+        return ComponentHandle(ctype.entTable.getValue(r));
     else
         return ComponentHandle();
+}
+
+const char* termite::getComponentName(ComponentHandle handle)
+{
+    assert(handle.isValid());
+
+    ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handle)];
+    return ctype.name;
 }
 
 void* termite::getComponentData(ComponentHandle handle)
@@ -457,7 +516,7 @@ void* termite::getComponentData(ComponentHandle handle)
     assert(handle.isValid());
 
     ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handle)];
-    return ctype.dataPool.getHandleData(1, COMPONENT_INSTANCE_INDEX(handle));    
+    return ctype.dataPool.getHandleData(1, COMPONENT_INSTANCE_HANDLE(handle));    
 }
 
 Entity termite::getComponentEntity(ComponentHandle handle)
@@ -465,7 +524,15 @@ Entity termite::getComponentEntity(ComponentHandle handle)
     assert(handle.isValid());
 
     ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handle)];
-    return *ctype.dataPool.getHandleData<Entity>(0, COMPONENT_INSTANCE_INDEX(handle));
+    return *ctype.dataPool.getHandleData<Entity>(0, COMPONENT_INSTANCE_HANDLE(handle));
+}
+
+ComponentGroupHandle termite::getComponentGroup(ComponentHandle handle)
+{
+    assert(handle.isValid());
+
+    ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handle)];
+    return *ctype.dataPool.getHandleData<ComponentGroupHandle>(2, COMPONENT_INSTANCE_HANDLE(handle));
 }
 
 uint16_t termite::getAllComponents(ComponentTypeHandle typeHandle, ComponentHandle* handles, uint16_t maxComponents)
@@ -483,5 +550,36 @@ uint16_t termite::getAllComponents(ComponentTypeHandle typeHandle, ComponentHand
 	}
 
 	return count;
+}
+
+uint16_t termite::getEntityComponents(Entity ent, ComponentHandle* handles, uint16_t maxComponents)
+{
+    int index = 0;
+    for (int i = 0, c = g_csys->components.getCount(); i < c; i++) {
+        const ComponentType& ctype = g_csys->components[i];
+        int r = ctype.entTable.find(ent.id);
+        if (r == -1)
+            continue;
+
+        if (index == maxComponents)
+            return maxComponents;
+
+        if (handles)
+            handles[index] = ComponentHandle(ctype.entTable.getValue(r));
+        index ++;
+    }
+
+    return index;
+}
+
+uint16_t termite::getGroupComponents(ComponentGroupHandle groupHandle, ComponentHandle* handles, uint16_t maxComponents)
+{
+    assert(groupHandle.isValid());
+    ComponentGroup* group = g_csys->componentGroups.getHandleData<ComponentGroup>(0, groupHandle);
+    uint16_t count = std::min<uint16_t>(maxComponents, (uint16_t)group->components.getCount());
+
+    if (handles)
+        memcpy(handles, group->components.itemPtr(0), count*sizeof(ComponentHandle));
+    return count;
 }
 

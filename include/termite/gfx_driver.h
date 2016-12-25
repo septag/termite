@@ -140,7 +140,6 @@ namespace termite
         void (*setViewSeq)(uint8_t id, bool enabled);
         void(*setViewTransform)(uint8_t id, const void* view, const void* projLeft,
                                 GfxViewFlag::Bits flags/* = GfxViewFlag::Stereo*/, const void* projRight/* = nullptr*/);
-        void(*setViewRemap)(uint8_t id, uint8_t num, const void* remap);
         void(*setViewFrameBuffer)(uint8_t id, FrameBufferHandle handle);
         void(*resetView)(uint8_t id);
 
@@ -152,8 +151,9 @@ namespace termite
         void(*setScissorCache)(uint16_t cache);
 
         // Transform
-        uint32_t(*allocTransform)(GpuTransform* transform, uint16_t num);
-        uint32_t(*setTransform)(const void* mtx, uint16_t num);
+        uint32_t(*allocTransform)(GpuTransform* transform, uint16_t num/* = 1*/);
+        uint32_t(*setTransform)(const void* mtx, uint16_t num/* = 1*/);
+        void(*setTransformCached)(uint32_t cache, uint16_t num/* = 1*/);
 
         // Conditional Rendering
         void(*setCondition)(OcclusionQueryHandle handle, bool visible);
@@ -174,8 +174,6 @@ namespace termite
 
         // Textures
         void(*setTexture)(uint8_t stage, UniformHandle sampler, TextureHandle handle, TextureFlag::Bits flags/* = TextureFlag::FromTexture*/);
-        void(*setTextureFb)(uint8_t stage, UniformHandle sampler, FrameBufferHandle handle,
-                            uint8_t attachment, TextureFlag::Bits flags/* = TextureFlag::FromTexture*/);
 
         // Submit
         uint32_t(*submit)(uint8_t viewId, ProgramHandle program, int32_t depth/* = 0*/, bool preserveState/* = false*/);
@@ -194,8 +192,6 @@ namespace termite
         // Compute Images
         void (*setComputeImage)(uint8_t stage, UniformHandle sampler, TextureHandle handle, uint8_t mip,
                                 GpuAccessFlag::Enum access, TextureFormat::Enum fmt);
-        void (*setComputeImageFb)(uint8_t stage, UniformHandle sampler, FrameBufferHandle handle, uint8_t attachment,
-                                GpuAccessFlag::Enum access, TextureFormat::Enum fmt);
 
         // Compute Dispatch
         uint32_t(*computeDispatch)(uint8_t viewId, ProgramHandle handle, uint16_t numX, uint16_t numY, uint16_t numZ,
@@ -204,19 +200,12 @@ namespace termite
                                    uint16_t start, uint16_t num, GfxSubmitFlag::Bits flags/* = GfxSubmitFlag::Left*/);
 
         // Blit
-        void (*blitToDefault)(uint8_t viewId, TextureHandle dest, uint16_t destX, uint16_t destY, TextureHandle src,
+        void (*blit)(uint8_t viewId, TextureHandle dest, uint16_t destX, uint16_t destY, TextureHandle src,
             uint16_t srcX/* = 0*/, uint16_t srcY/* = 0*/, uint16_t width/* = UINT16_MAX*/, uint16_t height/* = UINT16_MAX*/);
-        void (*blitToTextureFb)(uint8_t viewId, TextureHandle dest, uint16_t destX, uint16_t destY, FrameBufferHandle src,
-            uint8_t attachment/* = 0*/, uint16_t srcX/* = 0*/, uint16_t srcY/* = 0*/, uint16_t width/* = UINT16_MAX*/,
-            uint16_t height/* = UINT16_MAX*/);
-        void (*blitToTextureT)(uint8_t viewId, TextureHandle dest, uint8_t destMip, uint16_t destX, uint16_t destY,
+        void (*blitMip)(uint8_t viewId, TextureHandle dest, uint8_t destMip, uint16_t destX, uint16_t destY,
             uint16_t destZ, TextureHandle src, uint8_t srcMip/* = 0*/, uint16_t srcX/* = 0*/, uint16_t srcY/* = 0*/,
             uint16_t srcZ/* = 0*/, uint16_t width/* = UINT16_MAX*/, uint16_t height/* = UINT16_MAX*/,
             uint16_t depth/* = UINT16_MAX*/);
-        void (*blitToTextureFbMRT)(uint8_t viewId, TextureHandle dest, uint8_t destMip, uint16_t destX, uint16_t destY,
-            uint16_t destZ, FrameBufferHandle src, uint8_t attachment/* = 0*/, uint8_t srcMip/* = 0*/,
-            uint16_t srcX/* = 0*/, uint16_t srcY/* = 0*/, uint16_t srcZ/* = 0*/, uint16_t width/* = UINT16_MAX*/,
-            uint16_t height/* = UINT16_MAX*/, uint16_t depth/* = UINT16_MAX*/);
         
         // Memory
         const GfxMemory* (*alloc)(uint32_t size);
@@ -246,7 +235,7 @@ namespace termite
         void(*updateDynamicVertexBuffer)(DynamicVertexBufferHandle handle, uint32_t startVertex, const GfxMemory* mem);
         void(*destroyVertexBuffer)(VertexBufferHandle handle);
         void(*destroyDynamicVertexBuffer)(DynamicVertexBufferHandle handle);
-        bool(*checkAvailTransientVertexBuffer)(uint32_t num, const VertexDecl& decl);
+        uint32_t(*getAvailTransientVertexBuffer)(uint32_t num, const VertexDecl& decl);
         void(*allocTransientVertexBuffer)(TransientVertexBuffer* tvb, uint32_t num, const VertexDecl& decl);
 
         // Index buffers
@@ -256,7 +245,7 @@ namespace termite
         void(*updateDynamicIndexBuffer)(DynamicIndexBufferHandle handle, uint32_t startIndex, const GfxMemory* mem);
         void(*destroyIndexBuffer)(IndexBufferHandle handle);
         void(*destroyDynamicIndexBuffer)(DynamicIndexBufferHandle handle);
-        bool(*checkAvailTransientIndexBuffer)(uint32_t num);
+        uint32_t(*getAvailTransientIndexBuffer)(uint32_t num);
         void(*allocTransientIndexBuffer)(TransientIndexBuffer* tib, uint32_t num);
 
         // Textures
@@ -279,8 +268,7 @@ namespace termite
                                           TextureFlag::Bits flags, const GfxMemory* mem/* = nullptr*/);
         void(*updateTextureCube)(TextureHandle handle, uint16_t layer, CubeSide::Enum side, uint8_t mip, uint16_t x, uint16_t y,
                                  uint16_t width, uint16_t height, const GfxMemory* mem, uint16_t pitch);
-        void(*readTexture)(TextureHandle handle, void* data);
-        void(*readFrameBuffer)(FrameBufferHandle handle, uint8_t attachment, void* data);
+        void(*readTexture)(TextureHandle handle, void* data, uint8_t mip/* = 0*/);
         void(*destroyTexture)(TextureHandle handle);
 
         // Frame Buffers
@@ -292,7 +280,7 @@ namespace termite
         void(*destroyFrameBuffer)(FrameBufferHandle handle);
 
         // Instance Buffer
-        bool(*checkAvailInstanceDataBuffer)(uint32_t num, uint16_t stride);
+        uint32_t(*getAvailInstanceDataBuffer)(uint32_t num, uint16_t stride);
         const InstanceDataBuffer* (*allocInstanceDataBuffer)(uint32_t num, uint16_t stride);
 
         // Indirect Buffer

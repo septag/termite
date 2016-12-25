@@ -4,7 +4,7 @@
 #include "termite/gfx_driver.h"
 
 #include "bgfx/bgfx.h"
-#include "bgfx/bgfxplatform.h"
+#include "bgfx/platform.h"
 
 #include <cstdarg>
 #include <cstdio>
@@ -355,11 +355,6 @@ static void setViewTransform(uint8_t id, const void* view, const void* projLeft,
     bgfx::setViewTransform(id, view, projLeft, flags, projRight);
 }
 
-static void setViewRemap(uint8_t id, uint8_t num, const void* remap)
-{
-    bgfx::setViewRemap(id, num, remap);
-}
-
 static void setViewFrameBuffer(uint8_t id, FrameBufferHandle handle)
 {
     BGFX_DECLARE_HANDLE(FrameBufferHandle, h, handle);
@@ -403,6 +398,11 @@ static uint32_t allocTransform(GpuTransform* transform, uint16_t num)
 static uint32_t setTransform(const void* mtx, uint16_t num)
 {
     return bgfx::setTransform(mtx, num);
+}
+
+static void setTransformCached(uint32_t cache, uint16_t num)
+{
+    bgfx::setTransform(cache, num);
 }
 
 static void setCondition(OcclusionQueryHandle handle, bool visible)
@@ -486,15 +486,6 @@ static void setTexture(uint8_t stage, UniformHandle sampler, TextureHandle handl
     bgfx::setTexture(stage, s, h, flags);
 }
 
-static void setTextureFb(uint8_t stage, UniformHandle sampler, FrameBufferHandle handle, uint8_t attachment,
-                         TextureFlag::Bits flags)
-{
-    BGFX_DECLARE_HANDLE(UniformHandle, s, sampler);
-    BGFX_DECLARE_HANDLE(FrameBufferHandle, h, handle);
-
-    bgfx::setTexture(stage, s, h, attachment, flags);
-}
-
 static uint32_t submit(uint8_t viewId, ProgramHandle program, int32_t depth, bool preserveState)
 {
     BGFX_DECLARE_HANDLE(ProgramHandle, p, program);
@@ -554,14 +545,6 @@ static void setComputeImage(uint8_t stage, UniformHandle sampler, TextureHandle 
     bgfx::setImage(stage, s, h, mip, (bgfx::Access::Enum)access, (bgfx::TextureFormat::Enum)fmt);
 }
 
-static void setComputeImageFb(uint8_t stage, UniformHandle sampler, FrameBufferHandle handle, uint8_t attachment,
-                              GpuAccessFlag::Enum access, TextureFormat::Enum fmt)
-{
-    BGFX_DECLARE_HANDLE(UniformHandle, s, sampler);
-    BGFX_DECLARE_HANDLE(FrameBufferHandle, h, handle);
-    bgfx::setImage(stage, s, h, attachment, (bgfx::Access::Enum)access, (bgfx::TextureFormat::Enum)fmt);
-}
-
 static uint32_t computeDispatch(uint8_t viewId, ProgramHandle handle, uint16_t numX, uint16_t numY, uint16_t numZ,
                                 GfxSubmitFlag::Bits flags)
 {
@@ -577,7 +560,7 @@ static uint32_t computeDispatchIndirect(uint8_t viewId, ProgramHandle handle, In
     return bgfx::dispatch(viewId, h, i, start, num, flags);
 }
 
-static void blitToDefault(uint8_t viewId, TextureHandle dest, uint16_t destX, uint16_t destY, TextureHandle src,
+static void blit(uint8_t viewId, TextureHandle dest, uint16_t destX, uint16_t destY, TextureHandle src,
             uint16_t srcX, uint16_t srcY, uint16_t width, uint16_t height)
 {
     BGFX_DECLARE_HANDLE(TextureHandle, d, dest);
@@ -585,30 +568,13 @@ static void blitToDefault(uint8_t viewId, TextureHandle dest, uint16_t destX, ui
     bgfx::blit(viewId, d, destX, destY, s, srcX, srcY, width, height);
 }
 
-static void blitToTextureFb(uint8_t viewId, TextureHandle dest, uint16_t destX, uint16_t destY, FrameBufferHandle src,
-            uint8_t attachment, uint16_t srcX, uint16_t srcY, uint16_t width, uint16_t height)
-{
-    BGFX_DECLARE_HANDLE(TextureHandle, d, dest);
-    BGFX_DECLARE_HANDLE(FrameBufferHandle, s, src);
-    bgfx::blit(viewId, d, destX, destY, s, attachment, srcX, srcY, width, height);
-}
-
-static void blitToTextureT(uint8_t viewId, TextureHandle dest, uint8_t destMip, uint16_t destX, uint16_t destY,
+static void blitMip(uint8_t viewId, TextureHandle dest, uint8_t destMip, uint16_t destX, uint16_t destY,
             uint16_t destZ, TextureHandle src, uint8_t srcMip, uint16_t srcX, uint16_t srcY,
             uint16_t srcZ, uint16_t width, uint16_t height, uint16_t depth)
 {
     BGFX_DECLARE_HANDLE(TextureHandle, d, dest);
     BGFX_DECLARE_HANDLE(TextureHandle, s, src);
     bgfx::blit(viewId, d, destMip, destX, destY, destZ, s, srcMip, srcX, srcY, srcZ, width, height, depth);
-}
-
-static void blitToTextureFbMRT(uint8_t viewId, TextureHandle dest, uint8_t destMip, uint16_t destX, uint16_t destY,
-            uint16_t destZ, FrameBufferHandle src, uint8_t attachment, uint8_t srcMip, uint16_t srcX,
-            uint16_t srcY, uint16_t srcZ, uint16_t width, uint16_t height, uint16_t depth)
-{
-    BGFX_DECLARE_HANDLE(TextureHandle, d, dest);
-    BGFX_DECLARE_HANDLE(FrameBufferHandle, s, src);
-    bgfx::blit(viewId, d, destMip, destX, destY, destZ, s, attachment, srcMip, srcX, srcY, srcZ, width, height, depth);
 }
 
 static const GfxMemory* allocMem(uint32_t size)
@@ -720,9 +686,9 @@ static void destroyDynamicVertexBuffer(DynamicVertexBufferHandle handle)
     bgfx::destroyDynamicVertexBuffer(h);
 }
 
-static bool checkAvailTransientVertexBuffer(uint32_t num, const VertexDecl& decl)
+static uint32_t getAvailTransientVertexBuffer(uint32_t num, const VertexDecl& decl)
 {
-    return bgfx::checkAvailTransientVertexBuffer(num, (const bgfx::VertexDecl&)decl);
+    return bgfx::getAvailTransientVertexBuffer(num, (const bgfx::VertexDecl&)decl);
 }
 
 static void allocTransientVertexBuffer(TransientVertexBuffer* tvb, uint32_t num, const VertexDecl& decl)
@@ -769,9 +735,9 @@ static void destroyDynamicIndexBuffer(DynamicIndexBufferHandle handle)
     bgfx::destroyDynamicIndexBuffer(h);
 }
 
-static bool checkAvailTransientIndexBuffer(uint32_t num)
+static uint32_t getAvailTransientIndexBuffer(uint32_t num)
 {
-    return bgfx::checkAvailTransientIndexBuffer(num);
+    return bgfx::getAvailTransientIndexBuffer(num);
 }
 
 static void allocTransientIndexBuffer(TransientIndexBuffer* tib, uint32_t num)
@@ -850,16 +816,10 @@ static void updateTextureCube(TextureHandle handle, uint16_t layer, CubeSide::En
     bgfx::updateTextureCube(h, layer, (uint8_t)side, mip, x, y, width, height, (const bgfx::Memory*)mem, pitch);
 }
 
-static void readTexture(TextureHandle handle, void* data)
+static void readTexture(TextureHandle handle, void* data, uint8_t mip)
 {
     BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
-    bgfx::readTexture(h, data);
-}
-
-static void readFrameBuffer(FrameBufferHandle handle, uint8_t attachment, void* data)
-{
-    BGFX_DECLARE_HANDLE(FrameBufferHandle, h, handle);
-    bgfx::readTexture(h, attachment, data);
+    bgfx::readTexture(h, data, mip);
 }
 
 static void destroyTexture(TextureHandle handle)
@@ -909,9 +869,9 @@ static void destroyFrameBuffer(FrameBufferHandle handle)
     bgfx::destroyFrameBuffer(h);
 }
 
-static bool checkAvailInstanceDataBuffer(uint32_t num, uint16_t stride)
+static uint32_t getAvailInstanceDataBuffer(uint32_t num, uint16_t stride)
 {
-    return bgfx::checkAvailInstanceDataBuffer(num, stride);
+    return bgfx::getAvailInstanceDataBuffer(num, stride);
 }
 
 static const InstanceDataBuffer* allocInstanceDataBuffer(uint32_t num, uint16_t stride)
@@ -1015,7 +975,6 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.setViewClearPalette = setViewClearPalette;
     api.setViewSeq = setViewSeq;
     api.setViewTransform = setViewTransform;
-    api.setViewRemap = setViewRemap;
     api.setViewFrameBuffer = setViewFrameBuffer;
     api.resetView = resetView;
     api.setMarker = setMarker;
@@ -1025,6 +984,7 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.setScissorCache = setScissorCache;
     api.allocTransform = allocTransform;
     api.setTransform = setTransform;
+    api.setTransformCached = setTransformCached;
     api.setCondition = setCondition;
     api.setIndexBuffer = setIndexBuffer;
     api.setDynamicIndexBuffer = setDynamicIndexBuffer;
@@ -1039,7 +999,6 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.setInstanceDataBufferVb = setInstanceDataBufferVb;
     api.setInstanceDataBufferDynamicVb = setInstanceDataBufferDynamicVb;
     api.setTexture = setTexture;
-    api.setTextureFb = setTextureFb;
     api.submit = submit;
     api.submitWithOccQuery = submitWithOccQuery;
     api.submitIndirect = submitIndirect;
@@ -1049,13 +1008,10 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.setComputeBufferDynamicIb = setComputeBufferDynamicIb;
     api.setComputeBufferIndirect = setComputeBufferIndirect;
     api.setComputeImage = setComputeImage;
-    api.setComputeImageFb = setComputeImageFb;
     api.computeDispatch = computeDispatch;
     api.computeDispatchIndirect = computeDispatchIndirect;
-    api.blitToDefault = blitToDefault;
-    api.blitToTextureFb = blitToTextureFb;
-    api.blitToTextureT = blitToTextureT;
-    api.blitToTextureFbMRT = blitToTextureFbMRT;
+    api.blit = blit;
+    api.blitMip = blitMip;
     api.alloc = allocMem;
     api.copy = copy;
     api.makeRef = makeRef;
@@ -1073,8 +1029,8 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.updateDynamicVertexBuffer = updateDynamicVertexBuffer;
     api.destroyVertexBuffer = destroyVertexBuffer;
     api.destroyDynamicVertexBuffer = destroyDynamicVertexBuffer;
-    api.checkAvailTransientVertexBuffer = checkAvailTransientVertexBuffer;
-    api.checkAvailTransientIndexBuffer = checkAvailTransientIndexBuffer;
+    api.getAvailTransientVertexBuffer = getAvailTransientVertexBuffer;
+    api.getAvailTransientIndexBuffer = getAvailTransientIndexBuffer;
     api.allocTransientVertexBuffer = allocTransientVertexBuffer;
     api.allocTransientIndexBuffer = allocTransientIndexBuffer;
     api.createIndexBuffer = createIndexBuffer;
@@ -1095,7 +1051,6 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.createTextureCube = createTextureCube;
     api.updateTextureCube = updateTextureCube;
     api.readTexture = readTexture;
-    api.readFrameBuffer = readFrameBuffer;
     api.destroyTexture = destroyTexture;
     api.createFrameBuffer = createFrameBuffer;
     api.createFrameBufferRatio = createFrameBufferRatio;
@@ -1103,7 +1058,7 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.createFrameBufferNative = createFrameBufferNative;
     api.createFrameBufferAttachment = createFrameBufferAttachment;
     api.destroyFrameBuffer = destroyFrameBuffer;
-    api.checkAvailInstanceDataBuffer = checkAvailInstanceDataBuffer;
+    api.getAvailInstanceDataBuffer = getAvailInstanceDataBuffer;
     api.allocInstanceDataBuffer = allocInstanceDataBuffer;
     api.createIndirectBuffer = createIndirectBuffer;
     api.destroyIndirectBuffer = destroyIndirectBuffer;

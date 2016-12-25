@@ -4,11 +4,14 @@
 #include "gfx_utils.h"
 #include "io_driver.h"
 
+#include "shaders_h/blit.vso"
+#include "shaders_h/blit.fso"
+
 using namespace termite;
 
 struct VertexFs
 {
-    float x, y, z;
+    float x, y;
     float tx, ty;
 
     static VertexDecl Decl;
@@ -16,26 +19,54 @@ struct VertexFs
     static void init()
     {
         vdeclBegin(&Decl);
-        vdeclAdd(&Decl, VertexAttrib::Position, 3, VertexAttribType::Float);
+        vdeclAdd(&Decl, VertexAttrib::Position, 2, VertexAttribType::Float);
         vdeclAdd(&Decl, VertexAttrib::TexCoord0, 2, VertexAttribType::Float);
         vdeclEnd(&Decl);
     }
 };
 VertexDecl VertexFs::Decl;
 
-static VertexBufferHandle g_fsVb;
-static IndexBufferHandle g_fsIb;
-static GfxDriverApi* g_driver = nullptr;
+struct GfxUtils
+{
+    VertexBufferHandle fsVb;
+    IndexBufferHandle fsIb;
+    GfxDriverApi* driver;
+    ProgramHandle blitProg;
+    UniformHandle utexture;
+
+    GfxUtils() :
+        driver(nullptr)
+    {
+    }
+};
+static GfxUtils* g_gutils = nullptr;
 
 result_t termite::initGfxUtils(GfxDriverApi* driver)
 {
+    if (g_gutils) {
+        assert(0);
+        return T_ERR_ALREADY_INITIALIZED;
+    }
+    
+    g_gutils = BX_NEW(getHeapAlloc(), GfxUtils);
+    if (!g_gutils)
+        return T_ERR_OUTOFMEM;
+    g_gutils->driver = driver;
+
     VertexFs::init();
     static VertexFs fsQuad[] = {
-        { -1.0f,  1.0f,  0,  0,    0 },        // top-left
-        {  1.0f,  1.0f,  0,  1.0f, 0 },        // top-right
-        { -1.0f, -1.0f,  0,  0,    1.0f },     // bottom-left
-        {  1.0f, -1.0f,  0,  1.0f, 1.0f }      // bottom-right
+        { -1.0f,  1.0f,  0,    0 },        // top-left
+        {  1.0f,  1.0f,  1.0f, 0 },        // top-right
+        { -1.0f, -1.0f,  0,    1.0f },     // bottom-left
+        {  1.0f, -1.0f,  1.0f, 1.0f }      // bottom-right
     };
+
+    if (driver->getRendererType() == RendererType::OpenGL || driver->getRendererType() == RendererType::OpenGLES) {
+        fsQuad[0].ty = 1.0f - fsQuad[0].ty;
+        fsQuad[1].ty = 1.0f - fsQuad[1].ty;
+        fsQuad[2].ty = 1.0f - fsQuad[2].ty;
+        fsQuad[3].ty = 1.0f - fsQuad[3].ty;
+    }
 
     static uint16_t indices[] = {
         0, 1, 2,
@@ -43,36 +74,48 @@ result_t termite::initGfxUtils(GfxDriverApi* driver)
     };
 
 
-    if (!g_fsVb.isValid()) {
-        g_fsVb = driver->createVertexBuffer(driver->makeRef(fsQuad, sizeof(VertexFs) * 4, nullptr, nullptr), 
+    if (!g_gutils->fsVb.isValid()) {
+        g_gutils->fsVb = driver->createVertexBuffer(driver->makeRef(fsQuad, sizeof(VertexFs) * 4, nullptr, nullptr), 
             VertexFs::Decl, GpuBufferFlag::None);
-        if (!g_fsVb.isValid())
+        if (!g_gutils->fsVb.isValid())
             return T_ERR_FAILED;
     }
 
-    if (!g_fsIb.isValid()) {
-        g_fsIb = driver->createIndexBuffer(driver->makeRef(indices, sizeof(uint16_t) * 6, nullptr, nullptr), 
+    if (!g_gutils->fsIb.isValid()) {
+        g_gutils->fsIb = driver->createIndexBuffer(driver->makeRef(indices, sizeof(uint16_t) * 6, nullptr, nullptr), 
             GpuBufferFlag::None);
-        if (!g_fsIb.isValid())
+        if (!g_gutils->fsIb.isValid())
             return T_ERR_FAILED;
     }
 
-    g_driver = driver;
+    g_gutils->blitProg = driver->createProgram(
+        driver->createShader(driver->makeRef(blit_vso, sizeof(blit_vso), nullptr, nullptr)),
+        driver->createShader(driver->makeRef(blit_fso, sizeof(blit_fso), nullptr, nullptr)),
+        true);
+    if (!g_gutils->blitProg.isValid())
+        return T_ERR_FAILED;
+    g_gutils->utexture = driver->createUniform("u_texture", UniformType::Int1, 1);
+        
     return 0;
 }
 
 void termite::shutdownGfxUtils()
 {
-    if (!g_driver)
+    if (!g_gutils)
         return;
 
-    if (g_fsVb.isValid())
-        g_driver->destroyVertexBuffer(g_fsVb);
-    if (g_fsIb.isValid())
-        g_driver->destroyIndexBuffer(g_fsIb);
-    g_fsVb.reset();
-    g_fsIb.reset();
-    g_driver = nullptr;
+    if (g_gutils->utexture.isValid())
+        g_gutils->driver->destroyUniform(g_gutils->utexture);
+    if (g_gutils->blitProg.isValid())
+        g_gutils->driver->destroyProgram(g_gutils->blitProg);
+    if (g_gutils->fsVb.isValid())
+        g_gutils->driver->destroyVertexBuffer(g_gutils->fsVb);
+    if (g_gutils->fsIb.isValid())
+        g_gutils->driver->destroyIndexBuffer(g_gutils->fsIb);
+    g_gutils->fsVb.reset();
+    g_gutils->fsIb.reset();
+    BX_DELETE(getHeapAlloc(), g_gutils);
+    g_gutils = nullptr;
 }
 
 /* references :
@@ -94,7 +137,7 @@ void termite::calcGaussKernel(vec4_t* kernel, int kernelSize, float stdDevSqr, f
         float x = p / (float)hk;
         float w = expf(-(x*x) / (2.0f*stdDevSqr)) / sqrtf(2.0f*bx::pi*stdDevSqr);
         sum += w;
-        kernel[i] = vec4_t(
+        kernel[i] = vec4f(
             direction == 0 ? (w_stride*p) : 0.0f,
             direction == 1 ? (h_stride*p) : 0.0f,
             w,
@@ -138,15 +181,29 @@ ProgramHandle termite::loadShaderProgram(GfxDriverApi* gfxDriver, IoDriverApi* i
     return driver->createProgram(vs, fs, true);
 }
 
+void termite::blitFullscreen(uint8_t viewId, TextureHandle texture)
+{
+    assert(texture.isValid());
+
+    GfxDriverApi* driver = g_gutils->driver;
+
+    driver->setViewRectRatio(viewId, 0, 0, BackbufferRatio::Equal);
+    driver->setViewFrameBuffer(viewId, FrameBufferHandle());
+                             
+    driver->setState(GfxState::RGBWrite | GfxState::AlphaWrite, 0);
+    driver->setTexture(0, g_gutils->utexture, texture, TextureFlag::FromTexture);
+    drawFullscreenQuad(viewId, g_gutils->blitProg);
+}
+
 void termite::drawFullscreenQuad(uint8_t viewId, ProgramHandle prog)
 {
-    assert(g_fsIb.isValid());
-    assert(g_fsVb.isValid());
+    assert(g_gutils->fsIb.isValid());
+    assert(g_gutils->fsVb.isValid());
 
-    GfxDriverApi* driver = g_driver;
+    GfxDriverApi* driver = g_gutils->driver;
 
-    driver->setVertexBuffer(g_fsVb);
-    driver->setIndexBuffer(g_fsIb, 0, 6);
+    driver->setVertexBuffer(g_gutils->fsVb);
+    driver->setIndexBuffer(g_gutils->fsIb, 0, 6);
     driver->submit(viewId, prog, 0, false);
 }
 
@@ -167,5 +224,5 @@ vec2i_t termite::getRelativeDisplaySize(int refWidth, int refHeight, int targetW
         break;
     }
 
-    return vec2i_t(int(w), int(h));
+    return vec2i(int(w), int(h));
 }

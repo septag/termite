@@ -37,7 +37,7 @@ namespace termite
         vec2_t gravity;
         float timestep;
 
-        PhysSceneDef2D(const vec2_t _gravity = vec2_t(0, -9.8f), float _timestep = 1.0f/60.0f) :
+        PhysSceneDef2D(const vec2_t _gravity = vec2f(0, -9.8f), float _timestep = 1.0f/60.0f) :
             gravity(_gravity),
             timestep(_timestep)
         {
@@ -182,8 +182,8 @@ namespace termite
         float gravityScale;
 
         PhysBodyDef2D(PhysBodyType2D::Enum _type = PhysBodyType2D::Static, 
-                      const vec2_t& _pos = vec2_t(0, 0), float _angle = 0,
-                      const vec2_t& _linearVel = vec2_t(0, 0), float _angularVel = 0,
+                      const vec2_t& _pos = vec2f(0, 0), float _angle = 0,
+                      const vec2_t& _linearVel = vec2f(0, 0), float _angularVel = 0,
                       float _linearDamping = 0, float _angularDamping = 0,
                       uint32_t _flags = PhysBodyFlags2D::AllowSleep | PhysBodyFlags2D::IsAwake | PhysBodyFlags2D::IsActive, 
                       void* _userData = nullptr,
@@ -299,8 +299,8 @@ namespace termite
         void* userData;
         PhysParticleGroup2D* group;
 
-        PhysParticleDef2D(PhysParticleFlags2D::Bits _flags = 0, const vec2_t& _pos = vec2_t(0, 0),
-                          const vec2_t& _velocity = vec2_t(0, 0), color_t _color = 0, float _lifetime = 0,
+        PhysParticleDef2D(PhysParticleFlags2D::Bits _flags = 0, const vec2_t& _pos = vec2f(0, 0),
+                          const vec2_t& _velocity = vec2f(0, 0), color_t _color = color1n(0), float _lifetime = 0,
                           void* _userData = nullptr, PhysParticleGroup2D* _group = nullptr) :
             flags(_flags),
             position(_pos),
@@ -327,8 +327,8 @@ namespace termite
         void* userData;
 
         PhysParticleGroupDef2D(PhysParticleFlags2D::Bits _particleFlags = 0, PhysParticleGroupFlags2D::Bits _flags = 0, 
-                               const vec2_t& _pos = vec2_t(0, 0), float _angle = 0,
-                               const vec2_t& _linearVel = vec2_t(0, 0), float _angularVel = 0,
+                               const vec2_t& _pos = vec2f(0, 0), float _angle = 0,
+                               const vec2_t& _linearVel = vec2f(0, 0), float _angularVel = 0,
                                void* _userData = nullptr) :
             particleFlags(_particleFlags),
             flags(_flags),

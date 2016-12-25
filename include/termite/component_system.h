@@ -45,8 +45,10 @@ namespace termite
     struct EntityManager;
     struct ComponentTypeT {};
     struct ComponentT {};
+    struct ComponentGroupT {};
     typedef PhantomType<uint16_t, ComponentTypeT, UINT16_MAX> ComponentTypeHandle;
     typedef PhantomType<uint32_t, ComponentT, UINT32_MAX> ComponentHandle;
+    typedef PhantomType<uint16_t, ComponentGroupT, UINT16_MAX> ComponentGroupHandle;
 
     // Entity Management
     TERMITE_API EntityManager* createEntityManager(bx::AllocatorI* alloc, int bufferSize = 0);
@@ -59,35 +61,33 @@ namespace termite
     // Component System
     result_t initComponentSystem(bx::AllocatorI* alloc);
     void shutdownComponentSystem();
-    
-    struct ComponentCallbacks
-    {
-        bool(*createInstance)(Entity ent, ComponentHandle handle);
-        void(*destroyInstance)(Entity ent, ComponentHandle handle);
-        void(*updateAll)(const ComponentHandle* handles, uint16_t count, float dt);
-        void(*preUpdateAll)(const ComponentHandle* handles, uint16_t count, float dt);
-        void(*postUpdateAll)(const ComponentHandle* handles, uint16_t count, float dt);
-        void(*renderAll)(const ComponentHandle* handles, uint16_t count, GfxDriverApi* driver);
 
-        ComponentCallbacks()
-        {
-            createInstance = nullptr;
-            destroyInstance = nullptr;
-            updateAll = nullptr;
-            preUpdateAll = nullptr;
-            postUpdateAll = nullptr;
-            renderAll = nullptr;
-        }
-    };
-
-    struct ComponentUpdateStage
+    struct ComponentStage
     {
         enum Enum
         {
-            PreUpdate,
+            PreUpdate = 0,
             Update,
             PostUpdate,
+            Render,
+            Count
         };
+    };
+
+    struct ComponentCallbacks
+    {
+        bool(*createInstance)(Entity ent, ComponentHandle handle, void* data);
+        void(*destroyInstance)(Entity ent, ComponentHandle handle, void* data);
+
+        typedef void (*StageFunc)(const ComponentHandle* handles, uint16_t count, float dt);
+        StageFunc stageFn[ComponentStage::Count];
+
+        ComponentCallbacks() :
+            createInstance(nullptr),
+            destroyInstance(nullptr)
+        {
+            memset(stageFn, 0x00, sizeof(StageFunc)*ComponentStage::Count);
+        }
     };
 
     struct ComponentFlag
@@ -101,29 +101,39 @@ namespace termite
         typedef uint8_t Bits;
     };
 
-	TERMITE_API ComponentTypeHandle registerComponentType(const char* name, uint32_t id,
+    // ComponentGroup: Caches bunch of ComponentHandles for updates, render and other stuff 
+    TERMITE_API ComponentGroupHandle createComponentGroup(bx::AllocatorI* alloc, uint16_t poolSize = 0);
+    TERMITE_API void destroyComponentGroup(ComponentGroupHandle handle);
+
+	TERMITE_API ComponentTypeHandle registerComponentType(const char* name, 
 							                              const ComponentCallbacks* callbacks, ComponentFlag::Bits flags,
-										                  uint32_t dataSize, uint16_t poolSize, uint16_t growSize);
+										                  uint32_t dataSize, uint16_t poolSize, uint16_t growSize,
+                                                          bx::AllocatorI* alloc = nullptr);
 	TERMITE_API void garbageCollectComponents(EntityManager* emgr);
 
-	TERMITE_API ComponentHandle createComponent(EntityManager* emgr, Entity ent, ComponentTypeHandle handle);
+	TERMITE_API ComponentHandle createComponent(EntityManager* emgr, Entity ent, ComponentTypeHandle handle, 
+                                                ComponentGroupHandle group = ComponentGroupHandle());
 	TERMITE_API void destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle handle);
-    TERMITE_API void callComponentUpdates(ComponentUpdateStage::Enum updateStage, float dt);
-    TERMITE_API void callRenderComponents(GfxDriverApi* driver);
-    TERMITE_API void resetComponentUpdateCache();
+
+    TERMITE_API void runComponentGroup(ComponentStage::Enum stage, ComponentGroupHandle groupHandle, float dt);
 
 	TERMITE_API ComponentTypeHandle findComponentTypeByName(const char* name);
-	TERMITE_API ComponentTypeHandle findComponentTypeById(uint32_t id);
+	TERMITE_API ComponentTypeHandle findComponentTypeByNameHash(size_t nameHash);
 	TERMITE_API ComponentHandle getComponent(ComponentTypeHandle handle, Entity ent);
+    TERMITE_API const char* getComponentName(ComponentHandle handle);
 	TERMITE_API void* getComponentData(ComponentHandle handle);
     TERMITE_API Entity getComponentEntity(ComponentHandle handle);
+    TERMITE_API ComponentGroupHandle getComponentGroup(ComponentHandle handle);
 
-    // Pass handles=nullptr to get the count of all components only
+    // Pass handles=nullptr to just get the count of all components
     TERMITE_API uint16_t getAllComponents(ComponentTypeHandle typeHandle, ComponentHandle* handles, uint16_t maxComponents);
+    TERMITE_API uint16_t getEntityComponents(Entity ent, ComponentHandle* handles, uint16_t maxComponents);
+    TERMITE_API uint16_t getGroupComponents(ComponentGroupHandle groupHandle, ComponentHandle* handles, uint16_t maxComponents);
 
     template <typename Ty> 
     Ty* getComponentData(ComponentHandle handle)
     {
         return (Ty*)getComponentData(handle);
     }
+    
 } // namespace termite

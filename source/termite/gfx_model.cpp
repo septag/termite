@@ -240,7 +240,7 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const R
         // Vertex Decl
         vdeclBegin(&geo.vdecl);
         for (int c = 0; c < tgeo.numAttribs; c++) {
-            t3dVertexAttrib::Type tatt;
+            t3dVertexAttrib::Enum tatt;
             data->read(&tatt, sizeof(tatt), &err);
             VertexAttrib::Enum att = (VertexAttrib::Enum)tatt;
             int num;

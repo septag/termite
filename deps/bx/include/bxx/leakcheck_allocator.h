@@ -24,19 +24,19 @@ static stb_leakcheck_malloc_info *mi_head;
 
 #define STB_LEAKCHECK_MULTITHREAD
 #ifdef STB_LEAKCHECK_MULTITHREAD
-#  include "lock.h"
-static bx::Lock mi_lock;
+#  include "bx/mutex.h"
+static bx::Mutex mi_mutex;
 #endif
 
 void *stb_leakcheck_malloc(size_t sz, const char *file, int line)
 {
-   stb_leakcheck_malloc_info *mi = (stb_leakcheck_malloc_info *) malloc(sz + sizeof(*mi));
+   stb_leakcheck_malloc_info *mi = (stb_leakcheck_malloc_info *) malloc(sz + sizeof(stb_leakcheck_malloc_info));
    if (mi == NULL) return mi;
    mi->file = file;
    mi->line = line;
 
 #ifdef STB_LEAKCHECK_MULTITHREAD
-   mi_lock.lock();
+   bx::MutexScope mtx(mi_mutex);
 #endif
    mi->next = mi_head;
    if (mi_head)
@@ -44,9 +44,7 @@ void *stb_leakcheck_malloc(size_t sz, const char *file, int line)
    mi->prev = NULL;
    mi->size = (int) sz;
    mi_head = mi;
-#ifdef STB_LEAKCHECK_MULTITHREAD
-   mi_lock.unlock();
-#endif
+
    return mi+1;
 }
 
@@ -58,7 +56,7 @@ void stb_leakcheck_free(void *ptr)
       #ifndef STB_LEAKCHECK_SHOWALL
 
 #ifdef STB_LEAKCHECK_MULTITHREAD
-      mi_lock.lock();
+      bx::MutexScope mtx(mi_mutex);
 #endif
 
       if (mi->prev == NULL) {
@@ -68,10 +66,6 @@ void stb_leakcheck_free(void *ptr)
          mi->prev->next = mi->next;
       if (mi->next)
          mi->next->prev = mi->prev;
-
-#ifdef STB_LEAKCHECK_MULTITHREAD
-      mi_lock.unlock();
-#endif
 
       #endif
    }

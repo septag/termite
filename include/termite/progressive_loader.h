@@ -17,7 +17,7 @@ namespace termite
         {
             LoadDeltaTime,
             LoadDeltaFrame,
-            Sequential
+            LoadSequential
         };
 
         Type type;
@@ -27,7 +27,7 @@ namespace termite
             float deltaTime;
         };
 
-        LoadingScheme(LoadingScheme::Type _type = LoadingScheme::Sequential, float _value = 0)
+        LoadingScheme(LoadingScheme::Type _type = LoadingScheme::LoadSequential, float _value = 0)
         {
             type = _type;
 
@@ -58,7 +58,7 @@ namespace termite
     // Receives a handle to Resource, which will be filled later
     TERMITE_API void loadResource(ProgressiveLoader* loader, ResourceHandle* pHandle,
                                   const char* name, const char* uri, const void* userParams, 
-                                  ResourceFlag::Bits flags = 0);
+                                  ResourceFlag::Bits flags = 0, bx::AllocatorI* objAlloc = nullptr);
     TERMITE_API void unloadResource(ProgressiveLoader* loader, ResourceHandle handle);
 
     TERMITE_API void stepLoader(ProgressiveLoader* loader, float dt);
@@ -81,6 +81,7 @@ namespace termite
 
         inline bool create(bx::AllocatorI* alloc)
         {
+            assert(!m_loader);
             m_loader = createProgressiveLoader(alloc);
             return m_loader != nullptr;
         }
@@ -93,36 +94,37 @@ namespace termite
             }
         }
 
-        inline CProgressiveLoader& beginGroup(const LoadingScheme& scheme = LoadingScheme())
+        inline const CProgressiveLoader& beginGroup(const LoadingScheme& scheme = LoadingScheme()) const 
         {
             termite::beginLoaderGroup(m_loader, scheme);
             return *this;
         }
 
-        CProgressiveLoader& loadResource(ResourceHandle* pHandle, const char* name, const char* uri, 
-                                              const void* userParams, ResourceFlag::Bits flags = 0)
+        const CProgressiveLoader& loadResource(ResourceHandle* pHandle, const char* name, const char* uri, 
+                                               const void* userParams, ResourceFlag::Bits flags = 0,
+                                               bx::AllocatorI* objAlloc = nullptr) const
         {
-            termite::loadResource(m_loader, pHandle, name, uri, userParams, flags);
+            termite::loadResource(m_loader, pHandle, name, uri, userParams, flags, objAlloc);
             return *this;
         }
 
-        CProgressiveLoader& unloadResource(ResourceHandle handle)
+        const CProgressiveLoader& unloadResource(ResourceHandle handle) const
         {
             termite::unloadResource(m_loader, handle);
             return *this;
         }
 
-        inline LoaderGroupHandle endGroup()
+        inline LoaderGroupHandle endGroup() const
         {
             return termite::endLoaderGroup(m_loader);
         }
 
-        inline bool checkGroupDone(LoaderGroupHandle handle)
+        inline bool checkGroupDone(LoaderGroupHandle handle) const
         {
             return termite::checkLoaderGroupDone(m_loader, handle);
         }
 
-        inline void step(float dt)
+        inline void step(float dt) const
         {
             return termite::stepLoader(m_loader, dt);
         }

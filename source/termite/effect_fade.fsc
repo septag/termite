@@ -1,0 +1,27 @@
+$input v_texcoord0
+
+#include <bgfx_shader.sh>
+
+uniform vec4 u_fadeColor;
+uniform vec4 u_mixValue;
+SAMPLER2D(u_texture, 0);
+
+void main()
+{
+#ifdef FADE_OUT
+    vec4 sourceColor = texture2D(u_texture, v_texcoord0);
+    vec4 targetColor = u_fadeColor;
+#elif FADE_IN
+    vec4 sourceColor = u_fadeColor;
+    vec4 targetColor = texture2D(u_texture, v_texcoord0);
+#endif
+
+#ifdef FADE_COLOR
+    vec4 color = mix(sourceColor, targetColor, u_mixValue.x);
+#elif FADE_ALPHA
+    float alpha = mix(sourceColor.a, targetColor.a, u_mixValue.x);
+    vec4 color = vec4(targetColor.rgb, alpha);
+#endif
+
+    gl_FragColor = color;
+}

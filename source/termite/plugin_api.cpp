@@ -259,9 +259,12 @@ static void* getComponentApi(uint32_t version)
 		api.isEntityAlive = isEntityAlive;
 		api.registerComponentType = registerComponentType;
 		api.createComponent = createComponent;
-		api.findComponentTypeById = findComponentTypeById;
+		api.findComponentTypeByNameHash = findComponentTypeByNameHash;
 		api.getComponent = getComponent;
 		api.getComponentData = getComponentData;
+        api.createComponentGroup = createComponentGroup;
+        api.destroyComponentGroup = destroyComponentGroup;
+        api.runComponentGroup = runComponentGroup;
 		return &api;
 	default:
 		return nullptr;

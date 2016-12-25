@@ -91,7 +91,7 @@ namespace bx
         bx::AllocatorI* alloc;
         int numChildItems;
 
-        union   {
+        union value_t  {
             float f;
             int i;
             char* s;
@@ -163,6 +163,36 @@ namespace bx
     // Creates a Json node
     JsonNode* createJsonNode(bx::AllocatorI* nodeAlloc, const char* name = nullptr, JsonType type = JsonType::Null);
 
+    inline JsonNode* createJsonNodevf(bx::AllocatorI* nodeAlloc, const float* f, int num, const char* name = nullptr)
+    {
+        JsonNode* jnode = createJsonNode(nodeAlloc, name, JsonType::Array);
+        for (int i = 0; i < num; i++)
+            jnode->addChild(createJsonNode(nodeAlloc, nullptr, JsonType::Float)->setFloat(f[i]));
+        return jnode;
+    }
+
+    inline JsonNode* createJsonNodevi(bx::AllocatorI* nodeAlloc, const int* n, int num, const char* name = nullptr)
+    {
+        JsonNode* jnode = createJsonNode(nodeAlloc, name, JsonType::Array);
+        for (int i = 0; i < num; i++)
+            jnode->addChild(createJsonNode(nodeAlloc, nullptr, JsonType::Int)->setInt(n[i]));
+        return jnode;
+    }
+
+    inline void parseJsonNodevf(const JsonNode* jnode, float* f, int num)
+    {
+        num = (num <= jnode->getArrayCount()) ? num : jnode->getArrayCount();
+        for (int i = 0; i < num; i++)
+            f[i] = jnode->getArrayItem(i)->valueFloat();
+    }
+
+    inline void parseJsonNodevi(const JsonNode* jnode, int* n, int num)
+    {
+        num = (num <= jnode->getArrayCount()) ? num : jnode->getArrayCount();
+        for (int i = 0; i < num; i++)
+            n[i] = jnode->getArrayItem(i)->valueInt();
+    }
+
 }
 
 #ifdef BX_IMPLEMENT_JSON
@@ -226,10 +256,10 @@ namespace bx
     static char *atof(char *first, char *last, float *out)
     {
         // sign
-        float sign = 1;
+        float sign = 1.0f;
         if (first != last)    {
             if (*first == '-')  {
-                sign = -1;
+                sign = -1.0f;
                 ++first;
             } else if (*first == '+') {
                 ++first;
@@ -239,7 +269,7 @@ namespace bx
         // integer part
         float result = 0;
         for (; first != last && isdigit(*first); ++first)  {
-            result = 10 * result + (float)(*first - '0');
+            result = 10.0f * result + (float)(*first - '0');
         }
 
         // fraction part
@@ -275,9 +305,9 @@ namespace bx
         }
 
         if (exponent)    {
-            float power_of_ten = 10;
+            float power_of_ten = 10.0f;
             for (; exponent > 1; exponent--)        {
-                power_of_ten *= 10;
+                power_of_ten *= 10.0f;
             }
 
             if (exponent_negative)        {
@@ -306,9 +336,11 @@ namespace bx
     JsonNode* createJsonNode(bx::AllocatorI* nodeAlloc, const char* name, JsonType type)
     {
         JsonNode* node = BX_NEW(nodeAlloc, JsonNode);
-        node->alloc = nodeAlloc;
-        node->name = const_cast<char*>(name);
-        node->type = type;
+        if (node) {
+            node->alloc = nodeAlloc;
+            node->name = const_cast<char*>(name);
+            node->type = type;
+        }
 
         return node;
     }
@@ -550,7 +582,6 @@ namespace bx
 
                     object->name = name;
                     name = 0;
-
                     object->type = JsonType::Int;
 
                     char *first = it;
@@ -563,11 +594,11 @@ namespace bx
                         ++it;
                     }
 
-                    if (object->type == JsonType::Int && atoi(first, it, &object->value.i) != it)   {
+                    if (object->type == JsonType::Int && bx::atoi(first, it, &object->value.i) != it)   {
                         JSON_ERROR(first, "Bad integer number");
                     }
 
-                    if (object->type == JsonType::Float && atof(first, it, &object->value.f) != it)   {
+                    if (object->type == JsonType::Float && bx::atof(first, it, &object->value.f) != it)   {
                         JSON_ERROR(first, "Bad float number");
                     }
 

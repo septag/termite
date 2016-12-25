@@ -2,10 +2,11 @@
 
 #include "memory_pool.h"
 
-#include "bxx/lock.h"
+#include "bx/mutex.h"
 #include "bxx/linked_list.h"
 #include "bxx/pool.h"
 #include "bxx/linear_allocator.h"
+#include "bxx/logger.h"
 
 using namespace termite;
 
@@ -20,16 +21,15 @@ struct MemoryPage
 
     uint64_t tag;
     PageBucket* owner;
-    LNode lnode;
     bx::LinearAllocator linAlloc;
+    LNode lnode;
 
     MemoryPage(void* buff, size_t size) :
-        lnode(this),
-        linAlloc(buff, size)
+        tag(0),
+        owner(nullptr),
+        linAlloc(buff, size),
+        lnode(this)
     {
-        tag = 0;
-        owner = nullptr;
-        lnode.next = lnode.prev = nullptr;
     }
 };
 
@@ -39,12 +39,13 @@ struct PageBucket
 
     MemoryPage* pages;
     MemoryPage** pagePtrs;
-    PageBucket* next;
     int index;
-    uint8_t* buffer;
     LNode lnode;
 
     PageBucket() :
+        pages(nullptr),
+        pagePtrs(nullptr),
+        index(-1),
         lnode(this)
     {
     }
@@ -58,7 +59,7 @@ struct MemoryPool
     size_t pageSize;
     bx::List<PageBucket*> bucketList;
     bx::List<MemoryPage*> pageList;
-    bx::Lock lock;
+    bx::Mutex mutex;
 
     MemoryPool()
     {
@@ -84,15 +85,14 @@ static PageBucket* createBucket(size_t pageSize, int maxPages, bx::AllocatorI* a
         return nullptr;
     
     PageBucket* bucket = new(buff) PageBucket();     buff += sizeof(PageBucket);
-    bucket->pages = (MemoryPage*)buff;             buff += sizeof(MemoryPage)*maxPages;
-    bucket->pagePtrs = (MemoryPage**)buff;         buff += sizeof(MemoryPage**)*maxPages;
-    bucket->buffer = buff;
+    bucket->pages = (MemoryPage*)buff;               buff += sizeof(MemoryPage)*maxPages;
+    bucket->pagePtrs = (MemoryPage**)buff;           buff += sizeof(MemoryPage*)*maxPages;
 
     for (int i = 0; i < maxPages; i++) {
         // Init page
-        uint8_t* pageBuff = buff + i*pageSize;
-        bucket->pagePtrs[maxPages - i - 1] = new(bucket->pages + i) MemoryPage(pageBuff, pageSize);
+        bucket->pagePtrs[maxPages - i - 1] = new(bucket->pages + i) MemoryPage(buff, pageSize);
         bucket->pages[i].owner = bucket;
+        buff += pageSize;
     }
 
     bucket->index = maxPages;
@@ -155,7 +155,7 @@ static bx::AllocatorI* newPage(PageBucket* bucket, uint64_t tag)
     g_mempool->pageList.add(&page->lnode);
     bx::atomicFetchAndAdd(&g_mempool->numPages, 1);
     page->linAlloc.reset();
-    
+
     return &page->linAlloc;
 }
 
@@ -163,7 +163,7 @@ bx::AllocatorI* termite::allocPage(uint64_t tag) T_THREAD_SAFE
 {
     assert(g_mempool);
 
-    bx::LockScope lk(g_mempool->lock);
+    bx::MutexScope mutex(g_mempool->mutex);
 
     PageBucket::LNode* node = g_mempool->bucketList.getFirst();
     while (node) {
@@ -176,7 +176,7 @@ bx::AllocatorI* termite::allocPage(uint64_t tag) T_THREAD_SAFE
     // Create a new bucket
     PageBucket* bucket = createBucket(g_mempool->pageSize, g_mempool->maxPagesPerBucket, g_mempool->alloc);
     if (!bucket) {
-        BX_WARN("Out of memory for tag '%d'", tag);
+        BX_WARN("Out of memory for Tag '%d'", tag);
         return nullptr;
     }
 
@@ -187,7 +187,7 @@ void termite::freeTag(uint64_t tag) T_THREAD_SAFE
 {
     assert(g_mempool);
 
-    bx::LockScope lk(g_mempool->lock);
+    bx::MutexScope mutex(g_mempool->mutex);
 
     // Search all pages for the tag
     MemoryPage::LNode* node = g_mempool->pageList.getFirst();
@@ -222,7 +222,7 @@ size_t termite::getAllocSize() T_THREAD_SAFE
 
 size_t termite::getTagSize(uint64_t tag) T_THREAD_SAFE
 {
-    bx::LockScope lk(g_mempool->lock);
+    bx::MutexScope mutex(g_mempool->mutex);
     
     size_t pageSize = g_mempool->pageSize;
     size_t sz = 0;
@@ -237,5 +237,26 @@ size_t termite::getTagSize(uint64_t tag) T_THREAD_SAFE
     return sz;
 }
 
+void* PageAllocator::realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line)
+{
+    if (_size <= g_mempool->pageSize) {
+        if (_size > 0) {
+            if (!m_linAlloc) {
+                m_linAlloc = allocPage(m_tag);
+                if (!m_linAlloc)
+                    return nullptr;
+            }
 
-
+            void* p = m_linAlloc->realloc(_ptr, _size, _align, _file, _line);
+            if (!p) {
+                m_linAlloc = allocPage(m_tag);
+                if (m_linAlloc)
+                    p = m_linAlloc->realloc(_ptr, _size, _align, _file, _line);
+            }
+            return p;
+        }
+    } else {
+        BX_WARN("Invalid memory requested from memory pool (requested: %d, max: %d)", _size, g_mempool->pageSize);
+    }
+    return nullptr;
+}

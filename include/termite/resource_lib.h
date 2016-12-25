@@ -80,12 +80,17 @@ namespace termite
                                                    const void* userParams = nullptr, ResourceFlag::Bits flags = ResourceFlag::None,
                                                    bx::AllocatorI* objAlloc = nullptr);
     TERMITE_API void unloadResource(ResourceHandle handle);
+
     TERMITE_API uintptr_t getResourceObj(ResourceHandle handle);
     TERMITE_API ResourceLoadState::Enum getResourceLoadState(ResourceHandle handle);
     TERMITE_API int getResourceParamSize(const char* name);
     TERMITE_API const char* getResourceUri(ResourceHandle handle);
+    TERMITE_API const char* getResourceName(ResourceHandle handle);
+    TERMITE_API const void* getResourceParams(ResourceHandle handle);
     TERMITE_API ResourceHandle getResourceFailHandle(const char* name);
     TERMITE_API ResourceHandle getResourceAsyncHandle(const char* name);
+    TERMITE_API ResourceHandle addResourceRef(ResourceHandle handle);
+    TERMITE_API uint32_t getResourceRefCount(ResourceHandle handle);
 
     template <typename Ty>
     Ty* getResourcePtr(ResourceHandle handle)

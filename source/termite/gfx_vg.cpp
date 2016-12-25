@@ -132,7 +132,7 @@ namespace termite
             maxVerts = maxBatches = 0;
             numVerts = numBatches = 0;
             numIndices = maxIndices = 0;
-            viewport = rect_t(0, 0, 0, 0);
+            viewport = rectf(0, 0, 0, 0);
         }
     };
 } // namespace termite
@@ -202,9 +202,9 @@ static VgMgr* g_vg = nullptr;
 void VgState::setDefault(VectorGfxContext* ctx)
 {
     mtx = mtx3x3Ident();
-    textColor = color_t(0, 255, 0);
-    strokeColor = color_t(0, 0, 0);
-    fillColor = color_t(255, 255, 255);
+    textColor = color4u(0, 255, 0);
+    strokeColor = color4u(0, 0, 0);
+    fillColor = color4u(255, 255, 255);
     alpha = 1.0f;
     scissor = ctx->viewport;
     font = ctx->defaultFont;
@@ -271,7 +271,7 @@ static void pushBatch(VectorGfxContext* ctx, DrawHandler* handler, const void* p
 static void drawBatches(VectorGfxContext* ctx)
 {
     GfxDriverApi* driver = ctx->driver;
-    GfxState::Bits baseState = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite;
+    GfxState::Bits baseState = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::CullCCW;
 
     uint8_t viewId = ctx->viewId;
     rect_t vp = ctx->viewport;
@@ -281,19 +281,19 @@ static void drawBatches(VectorGfxContext* ctx)
     driver->setViewRect(viewId, uint16_t(vp.xmin), uint16_t(vp.ymin), 
                         uint16_t(vp.xmax - vp.xmin), uint16_t(vp.ymax - vp.ymin));
 
-    driver->setViewTransform(viewId, &ctx->viewMtx, &ctx->projMtx, GfxViewFlag::Stereo, nullptr);
+    driver->setViewTransform(viewId, ctx->viewMtx.f, ctx->projMtx.f, GfxViewFlag::Stereo, nullptr);
     driver->setViewSeq(viewId, true);
 
     // Allocate and fill vertices
     TransientVertexBuffer tvb;
-    if (!driver->checkAvailTransientVertexBuffer(numVerts, vgVertexPosCoordColor::Decl))
+    if (!driver->getAvailTransientVertexBuffer(numVerts, vgVertexPosCoordColor::Decl))
         return;
     driver->allocTransientVertexBuffer(&tvb, numVerts, vgVertexPosCoordColor::Decl);
     memcpy(tvb.data, ctx->vertexBuff, sizeof(vgVertexPosCoordColor)*numVerts);
 
     // Allocate and fill indices
     TransientIndexBuffer tib;
-    if (!driver->checkAvailTransientIndexBuffer(numIndices))
+    if (!driver->getAvailTransientIndexBuffer(numIndices))
         return;
     driver->allocTransientIndexBuffer(&tib, numIndices);
     memcpy(tib.data, ctx->indexBuff, sizeof(uint16_t)*numIndices);
@@ -374,14 +374,13 @@ void termite::shutdownVectorGfx()
     g_vg = nullptr;
 }
 
-VectorGfxContext* termite::createVectorGfxContext(uint8_t viewId, int maxVerts, int maxBatches)
+VectorGfxContext* termite::createVectorGfxContext(int maxVerts, int maxBatches)
 {
     assert(g_vg);
 
     bx::AllocatorI* alloc = g_vg->alloc;
     VectorGfxContext* ctx = BX_NEW(alloc, VectorGfxContext)(alloc);
     ctx->driver = g_vg->driver;
-    ctx->viewId = viewId;
 
     if (maxVerts == 0)
         maxVerts = MAX_VERTICES;
@@ -449,18 +448,19 @@ void termite::destroyVectorGfxContext(VectorGfxContext* ctx)
     BX_DELETE(ctx->alloc, ctx);
 }
 
-void termite::vgBegin(VectorGfxContext* ctx, float viewWidth, float viewHeight,
+void termite::vgBegin(VectorGfxContext* ctx, uint8_t viewId, float viewWidth, float viewHeight,
                       const mtx4x4_t* viewMtx, const mtx4x4_t* projMtx)
 {
     assert(ctx);
     if (ctx->readyToDraw)
         return;
 
-    ctx->viewport = rect_t(0, 0, viewWidth, viewHeight);
+    ctx->viewport = rectf(0, 0, viewWidth, viewHeight);
     vgReset(ctx);
     ctx->numVerts = 0;
     ctx->numBatches = 0;
     ctx->numIndices = 0;
+    ctx->viewId = viewId;
     ctx->readyToDraw = true;
     if (viewMtx)
         ctx->viewMtx = *viewMtx;
@@ -506,7 +506,7 @@ void termite::vgText(VectorGfxContext* ctx, float x, float y, const char* text)
     textParams.scissor = state->scissor;
     textParams.color = colorPremultiplyAlpha(state->textColor, state->alpha);
     textParams.font = state->font;
-    textParams.pos = vec2_t(x, y);
+    textParams.pos = vec2f(x, y);
 
     pushBatch(ctx, &g_vg->textHandler, &textParams, sizeof(textParams));
 }
@@ -759,7 +759,7 @@ void TextHandler::writePrimitives(VectorGfxContext* ctx, const void* params, vgV
             v3.tx = (glyph.x + glyph.width) / texWidth;
             v3.ty = (glyph.y + glyph.height) / texHeight;
 
-            v0.color = v1.color = v2.color = v3.color = color;
+            v0.color = v1.color = v2.color = v3.color = color.n;
 
             // Advance
             pos.x += glyph.xadvance;
@@ -840,7 +840,7 @@ void RectHandler::writePrimitives(VectorGfxContext* ctx, const void* params, vgV
         v3.x = rect.xmax;               v3.y = rect.ymax;
         v3.tx = 1.0f;                   v3.ty = 1.0f;
 
-        v0.color = v1.color = v2.color = v3.color = color;
+        v0.color = v1.color = v2.color = v3.color = color.n;
 
         // Make a quad from 4 verts
         int startVertex = firstVertIdx + vertexIdx;

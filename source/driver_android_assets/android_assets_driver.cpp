@@ -176,6 +176,9 @@ static MemoryBlock* blockReadRaw(const char* uri, IoPathType::Enum pathType, Asy
             mem = g_core->createMemoryBlock(size, g_blocking.alloc);
             if (mem) {
                 AAsset_read(asset, mem->data, size);
+                *pRes = AsyncResponse::RequestReadOk;
+            } else {
+                *pRes = AsyncResponse::RequestReadFailed;
             }
         }
         AAsset_close(asset);
@@ -203,8 +206,7 @@ static MemoryBlock* blockReadRaw(const char* uri, IoPathType::Enum pathType, Asy
         file.close();
     }
 
-    if (!mem)
-        *pRes = AsyncResponse::RequestReadFailed;
+    *pRes = mem ? AsyncResponse::RequestReadOk : AsyncResponse::RequestReadFailed;
     return mem;
 }
 

@@ -18,8 +18,7 @@
 // For self-documenting code
 #define T_THREAD_SAFE
 
-#define T_MID_TEMP 0x01
-#define T_MID_COMPONENT 0x02
+#define T_MID_TEMP 0x1fece76b992f595e 
 
 namespace termite
 {
@@ -39,6 +38,8 @@ namespace termite
             LockThreadsToCores = 0x2,
             ScanFontsDirectory = 0x4
         };
+
+        typedef uint8_t Bits;
     };
 
     struct Config
@@ -66,7 +67,7 @@ namespace termite
         uint16_t maxBigFibers;
         uint16_t bigFiberSize;      // in Kb
         uint8_t numWorkerThreads;
-        InitEngineFlags::Enum engineFlags;
+        InitEngineFlags::Bits engineFlags;
 
         // Memory
         uint32_t pageSize;          // in Kb

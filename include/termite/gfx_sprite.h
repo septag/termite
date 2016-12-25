@@ -15,6 +15,18 @@ namespace termite
     struct Sprite;
     struct SpriteCache;
 
+    struct SpriteFlag
+    {
+        enum Enum
+        {
+            DestroyResource = 0x1,
+            FlipX = 0x2,
+            FlipY = 0x3
+        };
+
+        typedef uint8_t Bits;
+    };
+
     // Callback for setting custom states when drawing sprites
     typedef void(*SetSpriteStateCallback)(GfxDriverApi* driver);
     // Callback for animation frames
@@ -30,29 +42,29 @@ namespace termite
     // Pivot: Relative to sprite's center. MaxTopLeft(-0.5, 0.5), MaxBottomRight(0.5, -0.5)
     TERMITE_API void addSpriteFrameTexture(Sprite* sprite,
                                            ResourceHandle texHandle,
-                                           bool destroy = false,
-                                           const vec2_t pivot = vec2_t(0, 0),
-                                           const vec2_t topLeftCoords = vec2_t(0, 0),
-                                           const vec2_t bottomRightCoords = vec2_t(1.0f, 1.0f),
+                                           SpriteFlag::Bits flags = 0,
+                                           const vec2_t pivot = vec2f(0, 0),
+                                           const vec2_t topLeftCoords = vec2f(0, 0),
+                                           const vec2_t bottomRightCoords = vec2f(1.0f, 1.0f),
                                            const char* frameTag = nullptr);
     TERMITE_API void addSpriteFrameSpritesheet(Sprite* sprite,
                                                ResourceHandle ssHandle, 
                                                const char* name,
-                                               bool destroy = false,
+                                               SpriteFlag::Bits flags = 0,
                                                const char* frameTag = nullptr);
-    TERMITE_API void addSpriteFrameAll(Sprite* sprite, ResourceHandle ssHandle, bool destroy = false);
+    TERMITE_API void addSpriteFrameAll(Sprite* sprite, ResourceHandle ssHandle, SpriteFlag::Bits flags);
 
     inline Sprite* createSpriteFromTexture(bx::AllocatorI* alloc,
                                            const vec2_t& halfSize, 
                                            ResourceHandle texHandle, 
-                                           bool destroy = false,
-                                           const vec2_t& pivot = vec2_t(0, 0),
-                                           const vec2_t& topLeftCoords = vec2_t(0, 0),
-                                           const vec2_t& bottomRightCoords = vec2_t(1.0f, 1.0f))
+                                           SpriteFlag::Bits flags = 0,
+                                           const vec2_t& pivot = vec2f(0, 0),
+                                           const vec2_t& topLeftCoords = vec2f(0, 0),
+                                           const vec2_t& bottomRightCoords = vec2f(1.0f, 1.0f))
     {
         Sprite* s = createSprite(alloc, halfSize);
         if (s)
-            addSpriteFrameTexture(s, texHandle, destroy, pivot, topLeftCoords, bottomRightCoords);
+            addSpriteFrameTexture(s, texHandle, flags, pivot, topLeftCoords, bottomRightCoords);
         return s;
     }
 
@@ -60,11 +72,11 @@ namespace termite
                                                const vec2_t& halfSize, 
                                                ResourceHandle ssHandle,
                                                const char* name,
-                                               bool destroy = false)
+                                               SpriteFlag::Bits flags = 0)
     {
         Sprite* s = createSprite(alloc, halfSize);
         if (s)
-            addSpriteFrameSpritesheet(s, ssHandle, name, destroy);
+            addSpriteFrameSpritesheet(s, ssHandle, name, flags);
         return s;
     }
 
@@ -163,12 +175,12 @@ namespace termite
         inline bool create(bx::AllocatorI* alloc,
                            const vec2_t& halfSize,
                            ResourceHandle texHandle,
-                           bool destroy = false,
-                           const vec2_t pivot = vec2_t(0, 0),
-                           const vec2_t topLeftCoords = vec2_t(0, 0),
-                           const vec2_t bottomRightCoords = vec2_t(1.0f, 1.0f))
+                           SpriteFlag::Bits flags = 0,
+                           const vec2_t pivot = vec2f(0, 0),
+                           const vec2_t topLeftCoords = vec2f(0, 0),
+                           const vec2_t bottomRightCoords = vec2f(1.0f, 1.0f))
         {
-            m_sprite = createSpriteFromTexture(alloc, halfSize, texHandle, destroy, pivot, topLeftCoords, bottomRightCoords);
+            m_sprite = createSpriteFromTexture(alloc, halfSize, texHandle, flags, pivot, topLeftCoords, bottomRightCoords);
             return m_sprite != nullptr;
         }
 
@@ -176,31 +188,32 @@ namespace termite
                            const vec2_t& halfSize,
                            ResourceHandle ssHandle,
                            const char* name,
-                           bool destroy = false)
+                           SpriteFlag::Bits flags = 0)
         {
-            m_sprite = createSpriteFromSpritesheet(alloc, halfSize, ssHandle, name, destroy);
+            m_sprite = createSpriteFromSpritesheet(alloc, halfSize, ssHandle, name, flags);
             return m_sprite != nullptr;
         }
 
-        inline CSprite& addFrame(ResourceHandle texHandle, bool destroy = false,
-                                 const vec2_t& pivot = vec2_t(0, 0),
-                                 const vec2_t& topLeftCoords = vec2_t(0, 0),
-                                 const vec2_t& bottomRightCoords = vec2_t(1.0f, 1.0f),
+        inline CSprite& addFrame(ResourceHandle texHandle, 
+                                 SpriteFlag::Bits flags = 0,
+                                 const vec2_t& pivot = vec2f(0, 0),
+                                 const vec2_t& topLeftCoords = vec2f(0, 0),
+                                 const vec2_t& bottomRightCoords = vec2f(1.0f, 1.0f),
                                  const char* frameTag = nullptr)
         {
-            addSpriteFrameTexture(m_sprite, texHandle, destroy, pivot, topLeftCoords, bottomRightCoords, frameTag);
+            addSpriteFrameTexture(m_sprite, texHandle, flags, pivot, topLeftCoords, bottomRightCoords, frameTag);
             return *this;
         }
 
-        inline CSprite& addFrame(ResourceHandle ssHandle, const char* name, bool destroy = false, const char* frameTag = nullptr)
+        inline CSprite& addFrame(ResourceHandle ssHandle, const char* name, SpriteFlag::Bits flags = 0, const char* frameTag = nullptr)
         {
-            addSpriteFrameSpritesheet(m_sprite, ssHandle, name, destroy, frameTag);
+            addSpriteFrameSpritesheet(m_sprite, ssHandle, name, flags, frameTag);
             return *this;
         }
 
-        inline CSprite& addAllFrames(ResourceHandle ssHandle, bool destroy = false)
+        inline CSprite& addAllFrames(ResourceHandle ssHandle, SpriteFlag::Bits flags = 0)
         {
-            addSpriteFrameAll(m_sprite, ssHandle, destroy);
+            addSpriteFrameAll(m_sprite, ssHandle, flags);
             return *this;
         }
 

@@ -18,6 +18,10 @@ namespace bx
             m_ptr = (uint8_t*)_ptr;
         }
 
+        virtual ~LinearAllocator()
+        {
+        }
+
         void init(void* _ptr, size_t _size)
         {
             m_offset = 0;
@@ -25,14 +29,10 @@ namespace bx
             m_ptr = (uint8_t*)_ptr;
         }
 
-        virtual ~LinearAllocator()
-        {
-        }
-
-        virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) BX_OVERRIDE
+        void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) BX_OVERRIDE
         {
             if (_size) {
-                if (m_offset + _size + sizeof(size_t) > m_size)
+                if (m_offset + _size + sizeof(uint32_t) > m_size)
                     return nullptr;
 
                 void* p = m_ptr + m_offset + sizeof(uint32_t);

@@ -17,3 +17,4 @@ cp -r ../bgfx/include/bgfx bgfx/include
 cp ../bgfx/src/*.sh bgfx/include/shader
 
 tar cf bgfx_vc140.tar.gz bgfx
+rm -rf bgfx

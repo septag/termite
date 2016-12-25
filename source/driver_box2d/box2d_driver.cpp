@@ -27,7 +27,7 @@ inline b2Vec2 b2vec2(const vec2_t& v)
 
 inline vec2_t tvec2(const b2Vec2& v)
 {
-    return vec2_t(v.x, v.y);
+    return vec2f(v.x, v.y);
 }
 
 class PhysDebugDraw : public b2Draw
@@ -572,7 +572,7 @@ void ContactListenerBox2d::EndContact(b2Fixture* fixture, b2ParticleSystem* part
     if (r != -1) {
         PhysParticleEmitter2D* emitter = g_box2d.emitterTable.getValue(r);
         if (emitter->shapeEndContactFn) {
-            emitter->shapeEndContactFn(emitter, index, (PhysShape2D*)fixture->GetUserData(), vec2_t(0, 0), 0);
+            emitter->shapeEndContactFn(emitter, index, (PhysShape2D*)fixture->GetUserData(), vec2f(0, 0), 0);
         }
     }
 }
@@ -583,7 +583,7 @@ void ContactListenerBox2d::EndContact(b2ParticleSystem* particleSystem, int32 in
     if (r != -1) {
         PhysParticleEmitter2D* emitter = g_box2d.emitterTable.getValue(r);
         if (emitter->particleEndContactFn) {
-            emitter->particleEndContactFn(emitter, indexA, indexB, vec2_t(0, 0), 0);
+            emitter->particleEndContactFn(emitter, indexA, indexB, vec2f(0, 0), 0);
         }
     }
 }
