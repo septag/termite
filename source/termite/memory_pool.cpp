@@ -237,7 +237,7 @@ size_t termite::getTagSize(uint64_t tag) T_THREAD_SAFE
     return sz;
 }
 
-void* PageAllocator::realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line)
+void* termite::PageAllocator::realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line)
 {
     if (_size <= g_mempool->pageSize) {
         if (_size > 0) {

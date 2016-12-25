@@ -17,7 +17,7 @@ namespace termite
     // IMPORTANT NOTE: When using page allocator, you should not use the common API (see above)
     //                 Instead you should only use the api provided in the page allocator for free and allocate
     //                 Calling freeTag of the API scrambles PageAllocator internal allocator pointer
-    class PageAllocator : public bx::AllocatorI
+    class TERMITE_API PageAllocator : public bx::AllocatorI
     {
     public:
         PageAllocator(uint64_t tag) :
