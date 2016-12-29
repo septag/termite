@@ -20,7 +20,15 @@ namespace bx
         bool create(int _bucketSize, AllocatorI* _alloc);
         void destroy();
 
-        Ty* newInstance();
+        template <typename ... _ConstructorParams>
+        Ty* newInstance(_ConstructorParams ... params)
+        {
+            if (m_index > 0)
+                return new(m_ptrs[--m_index]) Ty(params ...);
+            else
+                return nullptr;
+        }
+
         void deleteInstance(Ty* _inst);
         void clear();
 
@@ -42,8 +50,25 @@ namespace bx
         bool create(int _bucketSize, AllocatorI* _alloc);
         void destroy();
 
-        Ty* newInstance();
+        template <typename ... _ConstructorParams>
+        Ty* newInstance(_ConstructorParams ... params)
+        {
+            Bucket* b = m_firstBucket;
+            while (b) {
+                if (b->iter > 0)
+                    return new(b->ptrs[--b->iter]) Ty(params ...);
+                b = b->next;
+            }
+
+            b = createBucket();
+            if (!b)
+                return nullptr;
+
+            return new(b->ptrs[--b->iter]) Ty(params ...);
+        }
+
         void deleteInstance(Ty* _inst);
+
         void clear();
         int getLeakCount() const;
 
@@ -126,15 +151,6 @@ namespace bx
     }
 
     template <typename Ty>
-    Ty* bx::FixedPool<Ty>::newInstance()
-    {
-        if (m_index > 0)
-            return new(m_ptrs[--m_index]) Ty;
-        else
-            return nullptr;
-    }
-
-    template <typename Ty>
     void bx::FixedPool<Ty>::deleteInstance(Ty* _inst)
     {
         assert(m_index != m_maxItems);
@@ -189,23 +205,6 @@ namespace bx
             destroyBucket(b);
             b = next;
         }
-    }
-
-    template <typename Ty>
-    Ty* Pool<Ty>::newInstance()
-    {
-        Bucket* b = m_firstBucket;
-        while (b)   {
-            if (b->iter > 0)
-                return new(b->ptrs[--b->iter]) Ty;
-            b = b->next;
-        }
-
-        b = createBucket();
-        if (!b)
-            return nullptr;
-
-        return new(b->ptrs[--b->iter]) Ty;
     }
 
     template <typename Ty>

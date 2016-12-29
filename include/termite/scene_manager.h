@@ -49,16 +49,14 @@ namespace termite
         }
     };
 
-    struct FindSceneFlag
+    struct FindSceneMode
     {
         enum Enum
         {
-            Linked = 0x1,
-            LinkedChildren = 0x2,
-            Active = 0x4
+            All = 0,
+            Linked,
+            Active
         };
-
-        typedef uint8_t Bits;
     };
 
     struct SceneCallbackResult
@@ -127,8 +125,8 @@ namespace termite
     TERMITE_API void triggerSceneLink(SceneManager* mgr, SceneLinkHandle handle);
 
     // 
-    TERMITE_API Scene* findScene(SceneManager* mgr, const char* name, FindSceneFlag::Bits flags = 0);
-    TERMITE_API int findSceneByTag(SceneManager* mgr, Scene** pScenes, uint32_t tag, FindSceneFlag::Bits flags = 0);
+    TERMITE_API Scene* findScene(SceneManager* mgr, const char* name, FindSceneMode::Enum mode = FindSceneMode::All);
+    TERMITE_API int findSceneByTag(SceneManager* mgr, Scene** pScenes, int maxScenes, uint32_t tag, FindSceneMode::Enum mode = FindSceneMode::All);
 
     // 
     TERMITE_API void updateSceneManager(SceneManager* mgr, float dt, uint8_t* viewId,

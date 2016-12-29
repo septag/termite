@@ -247,7 +247,7 @@ static void uvCallbackOpenForRead(uv_fs_t* req)
 static MemoryBlock* asyncRead(const char* uri, IoPathType::Enum pathType)
 {
     bx::Path filepath = resolvePath(uri, g_async.rootDir, pathType);
-    DiskFileRequest* req = g_async.fsReqPool.newInstance();
+    DiskFileRequest* req = g_async.fsReqPool.newInstance<>();
 
     if (!req) {
         if (g_async.callbacks)
@@ -304,7 +304,7 @@ static void uvCallbackOpenForWrite(uv_fs_t* req)
 static size_t asyncWrite(const char* uri, const MemoryBlock* mem, IoPathType::Enum pathType)
 {
     bx::Path filepath = resolvePath(uri, g_async.rootDir, pathType);
-    DiskFileRequest* req = g_async.fsReqPool.newInstance();
+    DiskFileRequest* req = g_async.fsReqPool.newInstance<>();
 
     if (!req) {
         if (g_async.callbacks)

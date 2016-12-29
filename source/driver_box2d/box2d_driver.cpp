@@ -271,7 +271,7 @@ static void b2FreeCallback(void* mem, void* callbackData)
 
 static PhysScene2D* createSceneBox2d(const PhysSceneDef2D& worldDef)
 {
-    PhysScene2D* scene = g_box2d.scenePool.newInstance();
+    PhysScene2D* scene = g_box2d.scenePool.newInstance<>();
     if (!scene)
         return nullptr;
     b2SetAllocFreeCallbacks(b2AllocCallback, b2FreeCallback, nullptr);
@@ -329,7 +329,7 @@ static PhysBody2D* createBodyBox2d(PhysScene2D* scene, const PhysBodyDef2D& body
     static_assert(PhysBodyType2D::Dynamic == b2_dynamicBody, "BodyType mismatch");
     static_assert(PhysBodyType2D::Kinematic == b2_kinematicBody, "BodyType mismatch");
 
-    PhysBody2D* pbody = g_box2d.bodyPool.newInstance();
+    PhysBody2D* pbody = g_box2d.bodyPool.newInstance<>();
     if (!pbody)
         return nullptr;
     pbody->ownerScene = scene;
@@ -370,7 +370,7 @@ static void destroyBodyBox2d(PhysBody2D* body)
 
 static PhysShape2D* createBoxShapeBox2d(PhysBody2D* body, const vec2_t& halfSize, const PhysShapeDef2D& shapeDef)
 {
-    PhysShape2D* shape = g_box2d.shapePool.newInstance();
+    PhysShape2D* shape = g_box2d.shapePool.newInstance<>();
     if (!shape)
         return nullptr;
     b2PolygonShape box;
@@ -399,7 +399,7 @@ static PhysShape2D* createBoxShapeBox2d(PhysBody2D* body, const vec2_t& halfSize
 static PhysShape2D* createArbitaryBoxShapeBox2d(PhysBody2D* body, const vec2_t& halfSize, const vec2_t& pos, float angle,
                                                 const PhysShapeDef2D& shapeDef)
 {
-    PhysShape2D* shape = g_box2d.shapePool.newInstance();
+    PhysShape2D* shape = g_box2d.shapePool.newInstance<>();
     if (!shape)
         return nullptr;
     b2PolygonShape box;
@@ -427,7 +427,7 @@ static PhysShape2D* createArbitaryBoxShapeBox2d(PhysBody2D* body, const vec2_t& 
 
 static PhysShape2D* createPolyShapeBox2d(PhysBody2D* body, const vec2_t* verts, int numVerts, const PhysShapeDef2D& shapeDef)
 {
-    PhysShape2D* shape = g_box2d.shapePool.newInstance();
+    PhysShape2D* shape = g_box2d.shapePool.newInstance<>();
     if (!shape)
         return nullptr;
     b2PolygonShape poly;
@@ -460,7 +460,7 @@ static PhysShape2D* createPolyShapeBox2d(PhysBody2D* body, const vec2_t* verts, 
 
 static PhysShape2D* createCircleShapeBox2d(PhysBody2D* body, const vec2_t& pos, float radius, const PhysShapeDef2D& shapeDef)
 {
-    PhysShape2D* shape = g_box2d.shapePool.newInstance();
+    PhysShape2D* shape = g_box2d.shapePool.newInstance<>();
     if (!shape)
         return nullptr;
     b2CircleShape circle;

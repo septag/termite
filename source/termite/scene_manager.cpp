@@ -9,6 +9,7 @@
 #include "bx/fpumath.h"
 #include "bx/cpu.h"
 #include "tinystl/hash.h"
+#include "bxx/linked_list.h"
 
 #include "io_driver.h"
 #include "event_dispatcher.h"
@@ -64,6 +65,7 @@ namespace termite
         LoadingScheme loadScheme;
         LoaderGroupHandle loaderGroup;
         void* userData;
+        bx::List<Scene*>::Node lnode;
 
         bool drawOnEffectFb;
 
@@ -74,7 +76,8 @@ namespace termite
             tag(0),
             flags(0),
             userData(nullptr),
-            drawOnEffectFb(false)
+            drawOnEffectFb(false),
+            lnode(this)
         {
             name[0] = 0;
         }
@@ -134,6 +137,8 @@ namespace termite
         TextureHandle effectTex;
         FrameBufferHandle finalFb;
         TextureHandle finalTex;
+
+        bx::List<Scene*> sceneList;
 
         SceneManager(bx::AllocatorI* _alloc) :
             alloc(_alloc),
@@ -425,7 +430,7 @@ Scene* termite::createScene(SceneManager* mgr, const char* name, SceneCallbacksI
 {
     assert(mgr);
 
-    Scene* scene = mgr->scenePool.newInstance();
+    Scene* scene = mgr->scenePool.newInstance<>();
     if (!scene)
         return nullptr;
     bx::strlcpy(scene->name, name, sizeof(scene->name));
@@ -438,6 +443,8 @@ Scene* termite::createScene(SceneManager* mgr, const char* name, SceneCallbacksI
 
     if (flags & SceneFlag::Preload)
         preloadScene(mgr, scene);
+
+    mgr->sceneList.addToEnd(&scene->lnode);
 
     return scene;
 }
@@ -500,6 +507,7 @@ void termite::destroyScene(SceneManager* mgr, Scene* scene)
     }
 
     removeActiveScene(mgr, scene);
+    mgr->sceneList.remove(&scene->lnode);
     mgr->scenePool.deleteInstance(scene);
 
     // Delete all links related to this scene
@@ -626,6 +634,63 @@ void termite::triggerSceneLink(SceneManager* mgr, SceneLinkHandle handle)
             return;
         }
     }
+}
+
+Scene* termite::findScene(SceneManager* mgr, const char* name, FindSceneMode::Enum mode /*= 0*/)
+{
+    switch (mode) {
+    case FindSceneMode::Active:
+        for (int i = 0; i < mgr->numActiveScenes; i++) {
+            if (bx::stricmp(mgr->activeScenes[i]->name, name) == 0)
+                return mgr->activeScenes[i];
+        }
+        break;
+    case FindSceneMode::Linked:
+        assert(0);
+        break;
+    default:
+    {
+        Scene* scene = nullptr;
+        bx::List<Scene*>::Node* node = mgr->sceneList.getFirst();
+        while (node) {
+            if (bx::stricmp(node->data->name, name) == 0)
+                return node->data;
+            node = node->next;
+        }
+        break;
+    }
+    }
+
+    return nullptr;
+}
+
+int termite::findSceneByTag(SceneManager* mgr, Scene** pScenes, int maxScenes, uint32_t tag, FindSceneMode::Enum mode /*= 0*/)
+{
+    int index = 0;
+    switch (mode) {
+    case FindSceneMode::Active:
+        for (int i = 0; i < mgr->numActiveScenes && index < maxScenes; i++) {
+            if (mgr->activeScenes[i]->tag == tag)
+                pScenes[index++] = mgr->activeScenes[i];
+        }
+        break;
+    case FindSceneMode::Linked:
+        assert(0);
+        break;
+    default:
+    {
+        Scene* scene = nullptr;
+        bx::List<Scene*>::Node* node = mgr->sceneList.getFirst();
+        while (node && index < maxScenes) {
+            if (node->data->tag == tag)
+                pScenes[index++] = node->data;
+            node = node->next;
+        }
+        break;
+    }
+    }
+
+    return index;
 }
 
 static void updateLink(SceneManager* mgr, SceneLink* link, float dt)
@@ -782,12 +847,11 @@ void termite::startSceneManager(SceneManager* mgr, Scene* entryScene,
     }
 
     addActiveScene(mgr, entryScene);
-
 }
 
 void termite::debugSceneManager(SceneManager* mgr)
 {
-    static bool opened = true;
+    static bool opened = false;
     static int curActiveScene = -1;
 
     ImGuiApi_v0* imgui = (ImGuiApi_v0*)getEngineApi(ApiId::ImGui, 0);

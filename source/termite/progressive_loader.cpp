@@ -125,6 +125,7 @@ LoaderGroupHandle termite::endLoaderGroup(ProgressiveLoader* loader)
 bool termite::checkLoaderGroupDone(ProgressiveLoader* loader, LoaderGroupHandle handle)
 {
     assert(loader);
+    assert(handle.isValid());
 
     LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, handle);
     bool done = group->loadRequestList.isEmpty() && group->unloadRequestList.isEmpty();
@@ -140,6 +141,8 @@ void termite::loadResource(ProgressiveLoader* loader,
 {
     assert(loader->curGroupHandle.isValid());
     assert(pHandle);
+
+    pHandle->reset();
 
     // create a new request
     LoadResourceRequest* req = loader->loadRequestPool.newInstance();

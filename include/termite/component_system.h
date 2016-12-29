@@ -17,9 +17,8 @@ namespace termite
     {
         uint32_t id;
 
-        inline Entity()
+        inline Entity() : id(0)
         {
-            id = 0;
         }
 
         explicit Entity(uint32_t _id) : id(_id)
@@ -40,6 +39,16 @@ namespace termite
         {
             return (id >> kEntityIndexBits) & kEntityGenerationMask;
         }
+
+        inline bool operator==(const Entity& ent) const
+        {
+            return this->id == ent.id;
+        }
+
+        inline bool operator!=(const Entity& ent) const
+        {
+            return this->id != ent.id;
+        }
     };
 
     struct EntityManager;
@@ -57,6 +66,7 @@ namespace termite
 	TERMITE_API Entity createEntity(EntityManager* emgr);
 	TERMITE_API void destroyEntity(EntityManager* emgr, Entity ent);
 	TERMITE_API bool isEntityAlive(EntityManager* emgr, Entity ent);
+    TERMITE_API void setEntityActive(Entity ent, bool active);
 
     // Component System
     result_t initComponentSystem(bx::AllocatorI* alloc);
@@ -69,7 +79,6 @@ namespace termite
             PreUpdate = 0,
             Update,
             PostUpdate,
-            Render,
             Count
         };
     };
@@ -129,6 +138,8 @@ namespace termite
     TERMITE_API uint16_t getAllComponents(ComponentTypeHandle typeHandle, ComponentHandle* handles, uint16_t maxComponents);
     TERMITE_API uint16_t getEntityComponents(Entity ent, ComponentHandle* handles, uint16_t maxComponents);
     TERMITE_API uint16_t getGroupComponents(ComponentGroupHandle groupHandle, ComponentHandle* handles, uint16_t maxComponents);
+    TERMITE_API uint16_t getGroupComponentsByType(ComponentGroupHandle groupHandle, ComponentHandle* handles, 
+                                                  uint16_t maxComponents, ComponentTypeHandle typeHandle);
 
     template <typename Ty> 
     Ty* getComponentData(ComponentHandle handle)

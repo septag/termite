@@ -27,7 +27,7 @@ namespace bx
         { 
         }
 
-        inline void add(Node* _node)
+        void add(Node* _node)
         {
             _node->next = m_first;
             _node->prev = nullptr;
@@ -38,7 +38,7 @@ namespace bx
                 m_last = _node;
         }
 
-        inline void addToEnd(Node* _node)
+        void addToEnd(Node* _node)
         {
             if (m_last) {
                 m_last->next = _node;
@@ -50,7 +50,7 @@ namespace bx
                 m_first = _node;
         }
 
-        inline void remove(Node* _node)
+        void remove(Node* _node)
         {
             if (_node->next)
                 _node->next->prev = _node->prev;
@@ -63,7 +63,7 @@ namespace bx
             _node->next = _node->prev = nullptr;
         }
 
-        inline void insert(Node* _insertAfter, Node* _node)
+        void insert(Node* _insertAfter, Node* _node)
         {
             if (_insertAfter->next)
                 _insertAfter->next->prev = _node;
@@ -72,19 +72,24 @@ namespace bx
             _insertAfter->next = _node;
         }
 
-        inline bool isEmpty() const
+        bool isEmpty() const
         {
             return m_first == nullptr;
         }
 
-        inline Node* getFirst() const
+        Node* getFirst() const
         {
             return m_first;
         }
 
-        inline Node* getLast() const
+        Node* getLast() const
         {
             return m_last;
+        }
+
+        void reset()
+        {
+            m_first = m_last = nullptr;
         }
 
     private:

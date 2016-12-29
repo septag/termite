@@ -350,12 +350,12 @@ static ResourceHandle loadResourceHashed(size_t nameHash, const char* uri, const
         return ResourceHandle();
     }
     const ResourceTypeData* tdata = resLib->resourceTypes.getHandleData<ResourceTypeData>(0, 
-                                                                    resLib->resourceTypesTable.getValue(resTypeIdx));
+                                                                    resLib->resourceTypesTable[resTypeIdx]);
 
     // Find the possible already loaded handle by uri+params hash value
     int rresult = resLib->resourcesTable.find(hashResource(uri, userParams, tdata->userParamsSize, objAlloc));
     if (rresult != -1) {
-        handle.value = (uint16_t)resLib->resourcesTable.getValue(rresult);
+        handle.value = (uint16_t)resLib->resourcesTable[rresult];
     }
 
     // Resource already exists ?

@@ -659,7 +659,7 @@ static int importMesh(const aiScene* scene, ModelData* model, unsigned int* ames
 
 static aabb_t calcGeoBoundsNoSkin(const ModelData::Geometry& geo)
 {
-    aabb_t bb;
+    aabb_t bb = aabbEmpty();
     for (int i = 0; i < geo.g.numVerts; i++) {
         const float* poss = (const float*)((uint8_t*)geo.verts + i*geo.g.vertStride);
         aabbPushPoint(&bb, vec3f(poss[0], poss[1], poss[2]));
@@ -669,7 +669,7 @@ static aabb_t calcGeoBoundsNoSkin(const ModelData::Geometry& geo)
 
 static aabb_t calcGeoBoundsSkin(const ModelData::Geometry& geo)
 {
-    aabb_t bb;
+    aabb_t bb = aabbEmpty();
     int numJoints = geo.g.skel.numJoints;
 
     mtx4x4_t* skinMtxs = (mtx4x4_t*)alloca(sizeof(mtx4x4_t)*numJoints);

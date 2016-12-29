@@ -1,6 +1,8 @@
 #pragma once
 
 #include "types.h"
+#include "bx/allocator.h"
+#include "core.h"
 
 #define T_RESOURCE_MAX_USERPARAM_SIZE 256   // maximum size of userParam to be passed to resource loader
 

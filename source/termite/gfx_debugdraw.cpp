@@ -172,7 +172,7 @@ static bool projectToScreen(vec2_t* result, const vec3_t point, const rect_t& re
 
 static Shape createSolidAABB()
 {
-    aabb_t box;
+    aabb_t box = aabbEmpty();
     vec3_t pts[8];
 
     const int numVerts = 36;
@@ -212,7 +212,7 @@ static Shape createSolidAABB()
 
 static Shape createAABB()
 {
-    aabb_t box;
+    aabb_t box = aabbEmpty();
     vec3_t pts[8];
 
     const int numVerts = 24;
@@ -498,7 +498,7 @@ void termite::ddBegin(DebugDrawContext* ctx, uint8_t viewId, float viewWidth, fl
 {
     assert(ctx);
     ddReset(ctx);
-    ctx->viewId;
+    ctx->viewId = viewId;
     ctx->vgCtx = vg;
     ctx->viewport = rectf(0, 0, viewWidth, viewHeight);
     ctx->readyToDraw = true;
@@ -510,7 +510,7 @@ void termite::ddBegin(DebugDrawContext* ctx, uint8_t viewId, float viewWidth, fl
                                  0.0f, 0.0f, 0.0f);
 
     if (vg) {
-        vgBegin(ctx->vgCtx, viewId, viewWidth, viewHeight);
+        vgBegin(ctx->vgCtx, viewId + 1, viewWidth, viewHeight);
     }
 
     GfxDriverApi* driver = ctx->driver;
@@ -622,7 +622,7 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spaci
     mtxProjPlane(&projToXz, vec3f(0, 1.0f, 0));
 
     // project frustum corners to XZ plane add them to bounding box
-    aabb_t bb;
+    aabb_t bb = aabbEmpty();
     for (int i = 0; i < 8; i++) {
         vec3_t tmp;
         bx::vec3MulMtx(tmp.f, corners[i].f, projToXz.f);
@@ -746,6 +746,7 @@ void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spa
         verts[ni].y = yoffset;
         verts[ni].z = 0;
 
+        verts[i].tx = verts[i].ty = verts[ni].tx = verts[ni].ty = 0;        
         verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(yoffset, boldSpacing), 0.0f, 0.0001f) ? color.n : boldColor.n;
     }
 
@@ -759,6 +760,7 @@ void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spa
         verts[ni].y = snapRect.ymax;
         verts[ni].z = 0;
 
+        verts[i].tx = verts[i].ty = verts[ni].tx = verts[ni].ty = 0;
         verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(xoffset, boldSpacing), 0.0f, 0.0001f) ? color.n : boldColor.n;
     }
 
@@ -766,7 +768,7 @@ void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spa
 
     driver->setTransientVertexBuffer(&tvb);
     driver->setTransform(ident.f, 1);
-    driver->setState(GfxState::RGBWrite | GfxState::DepthTestLess | GfxState::PrimitiveLines, 0);
+    driver->setState(GfxState::RGBWrite | GfxState::PrimitiveLines | gfxStateBlendAlpha(), 0);
     driver->setUniform(g_dbg->uColor, state->color.f, 1);
     driver->setTexture(0, g_dbg->uTexture, g_dbg->whiteTexture, TextureFlag::FromTexture);
     driver->submit(ctx->viewId, g_dbg->program, 0, false);

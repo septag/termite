@@ -38,6 +38,10 @@ namespace bx
         bool isEmpty() const;
 
         const Ty& getValue(int index) const;
+        inline const Ty& operator[](int index) const
+        {
+            return getValue(index);
+        }
 
         static size_t GetImmutableSizeBytes(int capacity);
 
@@ -87,6 +91,11 @@ namespace bx
 
         void clear();
         bool isEmpty() const;
+
+        inline Node* operator[](int index)
+        {
+            return getNode(index);
+        }
 
     private:
         int probeLinear(int index, Ky key, const Ky* keys, int count) const;
