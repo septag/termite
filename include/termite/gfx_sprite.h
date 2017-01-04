@@ -21,7 +21,8 @@ namespace termite
         {
             DestroyResource = 0x1,
             FlipX = 0x2,
-            FlipY = 0x3
+            FlipY = 0x3,
+            None = 0
         };
 
         typedef uint8_t Bits;
@@ -106,10 +107,16 @@ namespace termite
     TERMITE_API void gotoSpriteFrameName(Sprite* sprite, const char* name);
     TERMITE_API void gotoSpriteFrameTag(Sprite* sprite, const char* frameTag);
     TERMITE_API int getSpriteFrameIndex(Sprite* sprite);
+    TERMITE_API int getSpriteFrameCount(Sprite* sprite);
+    TERMITE_API void setSpriteFlip(Sprite* sprite, SpriteFlag::Enum flip);
+    TERMITE_API void setSpritePosOffset(Sprite* sprite, const vec2_t posOffset);
 
     // Set/Get tint color for the sprite
     TERMITE_API void setSpriteTintColor(Sprite* sprite, color_t color);
     TERMITE_API color_t getSpriteTintColor(Sprite* sprite);
+    TERMITE_API rect_t getSpriteDrawRect(Sprite* sprite);
+    TERMITE_API void getSpriteRealRect(Sprite* sprite, vec2_t* pHalfSize, vec2_t* pCenter);
+    TERMITE_API vec2_t getSpriteImageSize(Sprite* sprite);
 
     // Dynamically draw sprites
     TERMITE_API void drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,

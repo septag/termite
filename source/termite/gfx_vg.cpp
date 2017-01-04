@@ -271,7 +271,7 @@ static void pushBatch(VectorGfxContext* ctx, DrawHandler* handler, const void* p
 static void drawBatches(VectorGfxContext* ctx)
 {
     GfxDriverApi* driver = ctx->driver;
-    GfxState::Bits baseState = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::CullCCW;
+    GfxState::Bits baseState = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite;
 
     uint8_t viewId = ctx->viewId;
     rect_t vp = ctx->viewport;

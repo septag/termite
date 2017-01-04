@@ -86,6 +86,7 @@ namespace termite
 
         bx::AllocatorI* alloc;
         vec2_t halfSize;
+        vec2_t posOffset;
         bx::Array<SpriteFrame> frames;
         int curFrameIdx;
 
@@ -94,6 +95,8 @@ namespace termite
         float playSpeed;
         float resumeSpeed;
         color_t tint;
+
+        SpriteFlag::Enum flip;
         LNode lnode;
 
         Sprite(bx::AllocatorI* _alloc) :
@@ -103,9 +106,11 @@ namespace termite
             playReverse(false),
             playSpeed(30.0f),
             resumeSpeed(30.0f),
-            lnode(this)
+            lnode(this),
+            flip(SpriteFlag::None)
         {
             tint = color1n(0xffffffff);
+            posOffset = vec2f(0, 0);
         }
 
         inline const SpriteFrame& getCurFrame() const
@@ -713,6 +718,21 @@ int termite::getSpriteFrameIndex(Sprite* sprite)
     return sprite->curFrameIdx;
 }
 
+int termite::getSpriteFrameCount(Sprite* sprite)
+{
+    return sprite->frames.getCount();
+}
+
+void termite::setSpriteFlip(Sprite* sprite, SpriteFlag::Enum flip)
+{
+    sprite->flip = flip;
+}
+
+void termite::setSpritePosOffset(Sprite* sprite, const vec2_t posOffset)
+{
+    sprite->posOffset = posOffset;
+}
+
 void termite::setSpriteTintColor(Sprite* sprite, color_t color)
 {
     sprite->tint = color;
@@ -721,6 +741,45 @@ void termite::setSpriteTintColor(Sprite* sprite, color_t color)
 color_t termite::getSpriteTintColor(Sprite* sprite)
 {
     return sprite->tint;
+}
+
+rect_t termite::getSpriteDrawRect(Sprite* sprite)
+{
+    const SpriteFrame& frame = sprite->getCurFrame();
+
+    float pixelRatio = frame.pixelRatio;
+    vec2_t halfSize = sprite->halfSize;
+    if (halfSize.y <= 0)
+        halfSize.y = halfSize.x / pixelRatio;
+    else if (halfSize.x <= 0)
+        halfSize.x = halfSize.y * pixelRatio;
+
+    vec2_t fullSize = halfSize * 2.0f;
+    vec2_t pivot = frame.pivot * fullSize;
+    vec2_t posOffset = frame.posOffset + sprite->posOffset * fullSize;
+    halfSize = halfSize * frame.sizeOffset;
+    vec2_t offset = posOffset * fullSize - pivot;
+
+    return rectv(vec2f(-halfSize.x, -halfSize.y) + offset, vec2f(halfSize.x, halfSize.y) + offset);
+}
+
+void termite::getSpriteRealRect(Sprite* sprite, vec2_t* pHalfSize, vec2_t* pCenter)
+{
+    const SpriteFrame& frame = sprite->getCurFrame();
+    vec2_t halfSize = sprite->halfSize;
+    float pixelRatio = frame.pixelRatio;
+    if (halfSize.y <= 0)
+        halfSize.y = halfSize.x / pixelRatio;
+    else if (halfSize.x <= 0)
+        halfSize.x = halfSize.y * pixelRatio;
+    *pHalfSize = halfSize;
+    *pCenter = frame.pivot * halfSize * 2.0f;
+}
+
+vec2_t termite::getSpriteImageSize(Sprite* sprite)
+{
+    //const SpriteFrame& frame = sprite->getCurFrame();
+    return sprite->getCurFrame().sourceSize;
 }
 
 void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,
@@ -792,42 +851,45 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
         // calculate final pivot offset to make geometry
         vec2_t fullSize = halfSize * 2.0f;
         vec2_t pivot = frame.pivot * fullSize;
+        vec2_t posOffset = ss.sprite->posOffset + frame.posOffset*fullSize;
 
         // shrink and offset to match the image inside sprite
         halfSize = halfSize * frame.sizeOffset;
-        vec2_t offset = frame.posOffset * fullSize;
-
+        vec2_t offset = posOffset * fullSize - pivot;
+        
         SpriteVertex& v0 = verts[vertexIdx];
         SpriteVertex& v1 = verts[vertexIdx + 1];
         SpriteVertex& v2 = verts[vertexIdx + 2];
         SpriteVertex& v3 = verts[vertexIdx + 3];
 
         // Top-Left
-        v0.pos = vec2f(-halfSize.x - pivot.x + offset.x, halfSize.y - pivot.y + offset.y);
+        v0.pos = vec2f(-halfSize.x, halfSize.y) + offset;
         v0.coords = vec2f(texRect.xmin, texRect.ymin);
 
         // Top-Right
-        v1.pos = vec2f(halfSize.x - pivot.x + offset.x, halfSize.y - pivot.y + offset.y);
+        v1.pos = vec2f(halfSize.x, halfSize.y) + offset;
         v1.coords = vec2f(texRect.xmax, texRect.ymin);
 
         // Bottom-Left
-        v2.pos = vec2f(-halfSize.x - pivot.x + offset.x, -halfSize.y - pivot.y + offset.y);
+        v2.pos = vec2f(-halfSize.x, -halfSize.y) + offset;
         v2.coords = vec2f(texRect.xmin, texRect.ymax);
 
         // Bottom-Right
-        v3.pos = vec2f(halfSize.x - pivot.x + offset.x, -halfSize.y - pivot.y + offset.y);
+        v3.pos = vec2f(halfSize.x, -halfSize.y) + offset;
         v3.coords = vec2f(texRect.xmax, texRect.ymax);
 
         v0.transform1 = v1.transform1 = v2.transform1 = v3.transform1 = transform1;
         v0.transform2 = v1.transform2 = v2.transform2 = v3.transform2 = transform2;
         v0.color = v1.color = v2.color = v3.color = ss.sprite->tint.n;
 
-        if (frame.flags & SpriteFlag::FlipX) {
+        SpriteFlag::Bits flipX = ss.sprite->flip | frame.flags;
+        if (flipX & SpriteFlag::FlipX) {
             std::swap<float>(v0.coords.x, v1.coords.x);
             std::swap<float>(v2.coords.x, v3.coords.x);
         }
 
-        if (frame.flags & SpriteFlag::FlipY) {
+        SpriteFlag::Bits flipY = ss.sprite->flip | frame.flags;
+        if (flipY & SpriteFlag::FlipY) {
             std::swap<float>(v0.coords.y, v1.coords.y);
             std::swap<float>(v2.coords.y, v3.coords.y);
         }

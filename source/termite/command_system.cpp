@@ -5,7 +5,6 @@
 #include "bxx/array.h"
 #include "bxx/hash_table.h"
 #include "bxx/stack.h"
-#include "bxx/logger.h"
 
 using namespace termite;
 
@@ -62,17 +61,15 @@ struct Command
     CommandHandle nextHandle;
     CommandHandle prevHandle;
     CommandHandle childHandle;
-    uint16_t paramIndex;
+    uint16_t paramHandle;
     CommandMode::Enum mode;
     CommandState::Enum state;
-    void* userData;
 
     Command()
     {
-        paramIndex = UINT16_MAX;
+        paramHandle = UINT16_MAX;
         mode = CommandMode::Normal;
         state = CommandState::None;
-        userData = nullptr;
     }
 };
 
@@ -148,8 +145,8 @@ static void removeCommand(CommandHandle handle, bool recursive)
         while (childHandle.isValid()) {
             Command* child = getCommand(childHandle);
             CommandType& ctype = g_cmdSys->commandTypes[COMMAND_TYPE_INDEX(childHandle)];
-            if (ctype.cleanupFn)
-                ctype.cleanupFn(cmd->userData);
+            if (ctype.cleanupFn && cmd->state)
+                ctype.cleanupFn(ctype.paramPool.getHandleData(0, cmd->paramHandle));
 
             g_cmdSys->commandPool.freeHandle(COMMAND_INSTANCE_INDEX(childHandle));
             childHandle = child->nextHandle;
@@ -160,7 +157,7 @@ static void removeCommand(CommandHandle handle, bool recursive)
     if (typeIdx != UINT16_MAX) {
         CommandType& ctype = g_cmdSys->commandTypes[typeIdx];
         if (ctype.cleanupFn)
-            ctype.cleanupFn(cmd->userData);
+            ctype.cleanupFn(ctype.paramPool.getHandleData(0, cmd->paramHandle));
     }
     g_cmdSys->commandPool.freeHandle(COMMAND_INSTANCE_INDEX(handle));
 }
@@ -209,10 +206,9 @@ CommandTypeHandle termite::registerCommand(const char* name, ExecuteCommandFn ex
 
     if (paramSize > 0) {
         const uint32_t itemSizes[] = {
-            uint32_t(paramSize),
             uint32_t(paramSize)
         };
-        if (!ctype->paramPool.create(itemSizes, 2, 32, 128, g_cmdSys->alloc))
+        if (!ctype->paramPool.create(itemSizes, BX_COUNTOF(itemSizes), 32, 128, g_cmdSys->alloc))
             return CommandTypeHandle();
     }
 
@@ -291,7 +287,7 @@ static void addToParent(CommandHandle handle, CommandHandle parentHandle)
     }
 }
 
-CommandHandle termite::addCommand(CommandTypeHandle handle, const void* param, const void* undoParam)
+CommandHandle termite::addCommand(CommandTypeHandle handle, const void* param)
 {
     assert(handle.isValid());
 
@@ -300,9 +296,8 @@ CommandHandle termite::addCommand(CommandTypeHandle handle, const void* param, c
     Command* cmd = new(g_cmdSys->commandPool.getHandleData(0, cIndex)) Command();
 
     if (ctype.paramSize > 0) {
-        cmd->paramIndex = ctype.paramPool.newHandle();
-        memcpy(ctype.paramPool.getHandleData(0, cmd->paramIndex), param, ctype.paramSize);
-        memcpy(ctype.paramPool.getHandleData(1, cmd->paramIndex), undoParam, ctype.paramSize);
+        cmd->paramHandle = ctype.paramPool.newHandle();
+        memcpy(ctype.paramPool.getHandleData(0, cmd->paramHandle), param, ctype.paramSize);
     }
 
     CommandHandle cmdHandle = COMMAND_MAKE_HANDLE(handle.value, cIndex);
@@ -316,8 +311,7 @@ CommandHandle termite::addCommand(CommandTypeHandle handle, const void* param, c
     return cmdHandle;
 }
 
-CommandHandle termite::addCommandGroup(CommandTypeHandle handle, int numCommands, 
-                                       const void* const* params, const void* const* undoParams)
+CommandHandle termite::addCommandGroup(CommandTypeHandle handle, int numCommands, const void* const* params)
 {
     assert(numCommands > 0);
     assert(handle.isValid());
@@ -334,9 +328,8 @@ CommandHandle termite::addCommandGroup(CommandTypeHandle handle, int numCommands
         Command* cmd = new(g_cmdSys->commandPool.getHandleData(0, cIndex)) Command();
 
         if (ctype.paramSize > 0) {
-            cmd->paramIndex = ctype.paramPool.newHandle();
-            memcpy(ctype.paramPool.getHandleData(0, cmd->paramIndex), params[i], ctype.paramSize);
-            memcpy(ctype.paramPool.getHandleData(1, cmd->paramIndex), undoParams[i], ctype.paramSize);
+            cmd->paramHandle = ctype.paramPool.newHandle();
+            memcpy(ctype.paramPool.getHandleData(0, cmd->paramHandle), params[i], ctype.paramSize);
         }
 
         addToParent(COMMAND_MAKE_HANDLE(handle.value, cIndex), groupCmdHandle);
@@ -356,7 +349,7 @@ void termite::beginCommandChain()
     g_cmdSys->curChain = COMMAND_MAKE_HANDLE(UINT16_MAX, cIndex);
 }
 
-void termite::addCommandChain(CommandTypeHandle handle, const void* param, const void* undoParam)
+void termite::addCommandChain(CommandTypeHandle handle, const void* param)
 {
     if (!g_cmdSys->curChain.isValid()) {
         assert(false);  // beginCommandChain is not called
@@ -368,9 +361,8 @@ void termite::addCommandChain(CommandTypeHandle handle, const void* param, const
     Command* cmd = new(g_cmdSys->commandPool.getHandleData(0, cIndex)) Command();
 
     if (ctype.paramSize > 0) {
-        cmd->paramIndex = ctype.paramPool.newHandle();
-        memcpy(ctype.paramPool.getHandleData(0, cmd->paramIndex), param, ctype.paramSize);
-        memcpy(ctype.paramPool.getHandleData(1, cmd->paramIndex), undoParam, ctype.paramSize);
+        cmd->paramHandle = ctype.paramPool.newHandle();
+        memcpy(ctype.paramPool.getHandleData(0, cmd->paramHandle), param, ctype.paramSize);
     }
 
     CommandHandle cmdHandle = COMMAND_MAKE_HANDLE(handle.value, cIndex);
@@ -414,7 +406,7 @@ void termite::executeCommand(CommandHandle handle)
     case CommandMode::Normal:
     {
         CommandType& ctype = g_cmdSys->commandTypes[COMMAND_TYPE_INDEX(handle)];
-        ctype.executeFn(cmd->paramIndex != UINT16_MAX ? ctype.paramPool.getHandleData(0, cmd->paramIndex) : nullptr);
+        ctype.executeFn(cmd->paramHandle != UINT16_MAX ? ctype.paramPool.getHandleData(0, cmd->paramHandle) : nullptr);
         break;
     }
     case CommandMode::Chain:
@@ -424,7 +416,7 @@ void termite::executeCommand(CommandHandle handle)
         while (childHandle) {
             Command* child = getCommand(childHandle);
             CommandType& ctype = g_cmdSys->commandTypes[COMMAND_TYPE_INDEX(childHandle)];
-            ctype.executeFn(cmd->paramIndex != UINT16_MAX ? ctype.paramPool.getHandleData(0, cmd->paramIndex) : nullptr);
+            ctype.executeFn(cmd->paramHandle != UINT16_MAX ? ctype.paramPool.getHandleData(0, cmd->paramHandle) : nullptr);
             childHandle = child->nextHandle;
         }
         break;
@@ -432,7 +424,6 @@ void termite::executeCommand(CommandHandle handle)
     }
 
     cmd->state = CommandState::Execute;
-    BX_TRACE("Execute: %d", handle.value);
 }
 
 void termite::undoCommand(CommandHandle handle)
@@ -456,7 +447,7 @@ void termite::undoCommand(CommandHandle handle)
     {
         CommandType& ctype = g_cmdSys->commandTypes[COMMAND_TYPE_INDEX(handle)];
         if (ctype.undoFn)
-            ctype.undoFn(cmd->paramIndex != UINT16_MAX ? ctype.paramPool.getHandleData(1, cmd->paramIndex) : nullptr);
+            ctype.undoFn(cmd->paramHandle != UINT16_MAX ? ctype.paramPool.getHandleData(0, cmd->paramHandle) : nullptr);
         break;
     }
     case CommandMode::Chain:
@@ -470,7 +461,7 @@ void termite::undoCommand(CommandHandle handle)
             Command* last = getCommand(lastHandle);
             CommandType& ctype = g_cmdSys->commandTypes[COMMAND_TYPE_INDEX(lastHandle)];
             if (ctype.undoFn)
-                ctype.undoFn(cmd->paramIndex != UINT16_MAX ? ctype.paramPool.getHandleData(1, cmd->paramIndex) : nullptr);
+                ctype.undoFn(cmd->paramHandle != UINT16_MAX ? ctype.paramPool.getHandleData(0, cmd->paramHandle) : nullptr);
             lastHandle = last->prevHandle;
         }
         break;
@@ -482,7 +473,7 @@ void termite::undoCommand(CommandHandle handle)
             Command* child = getCommand(childHandle);
             CommandType& ctype = g_cmdSys->commandTypes[COMMAND_TYPE_INDEX(childHandle)];
             if (ctype.undoFn)
-                ctype.undoFn(cmd->paramIndex != UINT16_MAX ? ctype.paramPool.getHandleData(1, cmd->paramIndex) : nullptr);
+                ctype.undoFn(cmd->paramHandle != UINT16_MAX ? ctype.paramPool.getHandleData(0, cmd->paramHandle) : nullptr);
             childHandle = child->nextHandle;
         }
         break;
@@ -490,7 +481,17 @@ void termite::undoCommand(CommandHandle handle)
     }
 
     cmd->state = CommandState::Undo;
-    BX_TRACE("Undo: %d", handle.value);
+}
+
+void termite::resetCommands()
+{
+    // Cleanup command list
+    if (g_cmdSys->firstCommand.isValid())
+        removeCommand(g_cmdSys->firstCommand, true);
+    g_cmdSys->firstCommand.reset();
+    g_cmdSys->lastCommand.reset();
+    g_cmdSys->curChain.reset();
+    g_cmdSys->numCommands = 0;
 }
 
 void termite::undoLastCommand()
@@ -572,12 +573,4 @@ const char* termite::getCommandName(CommandHandle handle)
     } else {
         return "[]";
     }
-}
-
-void termite::setCommandData(CommandHandle handle, void* userData)
-{
-    assert(g_cmdSys);
-    assert(handle.isValid());
-    
-    getCommand(handle)->userData = userData;
 }

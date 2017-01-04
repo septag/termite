@@ -35,7 +35,8 @@ namespace termite
     TERMITE_API void ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spacing, float boldSpacing, float maxDepth,
                                   color_t color = color1n(0xff808080), color_t boldColor = color1n(0xffffffff));
     TERMITE_API void ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spacing, float boldSpacing,
-                                  color_t color = color1n(0xff808080), color_t boldColor = color1n(0xffffffff));
+                                  color_t color = color1n(0xff808080), color_t boldColor = color1n(0xffffffff),
+                                  bool showVerticalInfo = false);
     TERMITE_API void ddBoundingBox(DebugDrawContext* ctx, const aabb_t bb, bool showInfo = false);
     TERMITE_API void ddBoundingSphere(DebugDrawContext* ctx, const sphere_t sphere, bool showInfo = false);
     TERMITE_API void ddBox(DebugDrawContext* ctx, const aabb_t aabb, const mtx4x4_t* modelMtx = nullptr);
@@ -129,9 +130,10 @@ namespace termite
         }
 
         inline DebugDraw& snapGridXY(const Camera2D& cam, float spacing, float boldSpacing,
-                                     color_t color = color1n(0xff808080), color_t boldColor = color1n(0xffffffff))
+                                     color_t color = color1n(0xff808080), color_t boldColor = color1n(0xffffffff),
+                                     bool showVerticalInfo = false)
         {
-            ddSnapGridXY(m_ctx, cam, spacing, boldSpacing, color, boldColor);
+            ddSnapGridXY(m_ctx, cam, spacing, boldSpacing, color, boldColor, showVerticalInfo);
             return *this;
         }
 

@@ -698,7 +698,7 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spaci
 }
 
 void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spacing, float boldSpacing,
-                           color_t color, color_t boldColor)
+                           color_t color, color_t boldColor, bool showVerticalInfo)
 {
     spacing = bx::fceil(bx::fclamp(spacing, 1.0f, 20.0f));
 
@@ -736,6 +736,20 @@ void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spa
     ctx->stateStack.peek(&state);
 
     int i = 0;
+
+    float fontHH = 0;
+    if (showVerticalInfo) {
+        DebugDrawState* state;
+        ctx->stateStack.peek(&state);
+
+        vgSetFont(ctx->vgCtx, state->font);
+        vec4_t c = state->color;
+        color_t color = colorRGBAf(c.x, c.y, c.z, c.w);
+        vgTextColor(ctx->vgCtx, color);
+        fontHH = bx::ffloor(state->font->getLineHeight() * 0.5f);
+    }
+
+    // Horizontal Lines
     for (float yoffset = snapRect.ymin; yoffset <= snapRect.ymax; yoffset += spacing, i += 2) {
         verts[i].x = snapRect.xmin;
         verts[i].y = yoffset;
@@ -746,10 +760,20 @@ void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spa
         verts[ni].y = yoffset;
         verts[ni].z = 0;
 
-        verts[i].tx = verts[i].ty = verts[ni].tx = verts[ni].ty = 0;        
-        verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(yoffset, boldSpacing), 0.0f, 0.0001f) ? color.n : boldColor.n;
+        verts[i].tx = verts[i].ty = verts[ni].tx = verts[ni].ty = 0;    
+        if (!bx::fequal(bx::fmod(yoffset, boldSpacing), 0.0f, 0.0001f)) {
+            verts[i].color = verts[ni].color = color.n;
+        } else {
+            verts[i].color = verts[ni].color = boldColor.n;
+            if (showVerticalInfo) {
+                vec2_t screenPt;
+                projectToScreen(&screenPt, vec3f(snapRect.xmin + spacing, yoffset, 0), ctx->viewport, ctx->viewProjMtx);
+                vgTextf(ctx->vgCtx, screenPt.x, screenPt.y - fontHH, "%.1f", yoffset);
+            }
+        }
     }
 
+    // Vertical Lines
     for (float xoffset = snapRect.xmin; xoffset <= snapRect.xmax; xoffset += spacing, i += 2) {
         verts[i].x = xoffset;
         verts[i].y = snapRect.ymin;

@@ -62,7 +62,6 @@ namespace termite
 
 struct ComponentType
 {
-    ComponentTypeHandle myHandle;
     char name[32];
     ComponentCallbacks callbacks;
     ComponentFlag::Bits flags;
@@ -261,8 +260,10 @@ void termite::setEntityActive(Entity ent, bool active)
         bool prevActive = *ctype.dataPool.getHandleData<bool>(3, cHandle);
         if (prevActive != active) {
             *ctype.dataPool.getHandleData<bool>(3, cHandle) = active;
+            if (ctype.callbacks.setActive)
+                ctype.callbacks.setActive(handles[i], ctype.dataPool.getHandleData(1, handles[i]), active);
 
-            ComponentGroupHandle groupHandle = *ctype.dataPool.getHandleData<bool>(3, cHandle);
+            ComponentGroupHandle groupHandle = *ctype.dataPool.getHandleData<ComponentGroupHandle>(2, cHandle);
             if (groupHandle.isValid()) {
                 if (active)
                     addToComponentGroup(groupHandle, handles[i]);
@@ -374,9 +375,7 @@ ComponentTypeHandle termite::registerComponentType(const char* name, const Compo
     int index = g_csys->components.getCount() - 1;
     g_csys->nameTable.add(tinystl::hash_string(name, strlen(name)), index);
 
-    ComponentTypeHandle handle = ComponentTypeHandle(uint16_t(index));
-    ctype->myHandle = handle;
-    return handle;
+    return  ComponentTypeHandle(uint16_t(index));
 }
 
 void termite::garbageCollectComponents(EntityManager* emgr)
@@ -464,26 +463,28 @@ static void sortAndBatchComponents(ComponentGroup* group)
 {
     // Sort components if it's invalidated
     int count = group->components.getCount();
-    if (count > 1 && !group->sorted) {
-        std::sort(group->components.itemPtr(0), group->components.itemPtr(count - 1),
-                  [](const ComponentHandle& a, const ComponentHandle& b) { return a.value < b.value; });
-
-        // Batch by component-type
+    if (!group->sorted) {
         group->batches.clear();
-        ComponentTypeHandle prevHandle;
-        ComponentGroup::Batch* curBatch = nullptr;
+        if (count > 0) {
+            std::sort(group->components.itemPtr(0), group->components.itemPtr(count - 1),
+                      [](const ComponentHandle& a, const ComponentHandle& b) { return a.value < b.value; });
 
-        for (int i = 0; i < count; i++) {
-            ComponentTypeHandle curHandle = ComponentTypeHandle(COMPONENT_TYPE_INDEX(group->components[i]));
-            if (curHandle != prevHandle) {
-                curBatch = group->batches.push();
-                curBatch->index = i;
-                curBatch->count = 0;
-                prevHandle = curHandle;
+            // Batch by component-type
+            ComponentTypeHandle prevHandle;
+            ComponentGroup::Batch* curBatch = nullptr;
+
+            for (int i = 0; i < count; i++) {
+                ComponentTypeHandle curHandle = ComponentTypeHandle(COMPONENT_TYPE_INDEX(group->components[i]));
+                if (curHandle != prevHandle) {
+                    curBatch = group->batches.push();
+                    curBatch->index = i;
+                    curBatch->count = 0;
+                    prevHandle = curHandle;
+                }
+                curBatch->count++;
             }
-            curBatch->count++;
-        }
 
+        }
         group->sorted = true;
     }
 }
@@ -623,7 +624,7 @@ uint16_t termite::getGroupComponentsByType(ComponentGroupHandle groupHandle, Com
 
     for (int i = 0, c = group->batches.getCount(); i < c; i++) {
         const ComponentGroup::Batch& batch = group->batches[i];
-        if (typeHandle == ComponentTypeHandle(COMPONENT_TYPE_INDEX(group->components[i]))) {
+        if (typeHandle == ComponentTypeHandle(COMPONENT_TYPE_INDEX(group->components[batch.index]))) {
             uint16_t count = std::min<uint16_t>(maxComponents, (uint16_t)batch.count);
             if (handles) {
                 memcpy(handles, group->components.itemPtr(batch.index), count*sizeof(ComponentHandle));

@@ -1441,11 +1441,29 @@ namespace bx
         result[8] = 1.0f;
     }
 
+    inline void mtx3x3Compose(float* result, float x, float y, float angle)
+    {
+        memset(result, 0x00, sizeof(float) * 9);
+        float c = fcos(angle);
+        float s = fsin(angle);
+        result[0] = c;     result[1] = -s;
+        result[3] = s;     result[4] = c;
+        result[6] = x;     result[7] = y;
+        result[8] = 1.0f;
+    }
+
+    inline void mtx3x3Decompose(const float* mat, float* translation, float* rotation)
+    {
+        translation[0] = mat[6];
+        translation[1] = mat[7];
+
+        *rotation = atan2f(mat[3], mat[4]);
+    }
+
     inline void vec2MulMtx3x3(float* __restrict _result, const float* __restrict _vec, const float* __restrict _mat)
     {
         _result[0] = _vec[0] * _mat[0] + _vec[1] * _mat[3] + _mat[6];
         _result[1] = _vec[0] * _mat[1] + _vec[1] * _mat[4] + _mat[7];
-        _result[2] = _vec[0] * _mat[2] + _vec[1] * _mat[5] + _mat[8];
     }
 
     inline void vec3MulMtx3x3(float* __restrict _result, const float* __restrict _vec, const float* __restrict _mat)

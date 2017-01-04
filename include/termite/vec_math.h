@@ -543,6 +543,16 @@ namespace termite
                        _r3[0], _r3[1], _r3[2], 1.0f);
     }
 
+    inline mtx4x4_t mtx4x4From3x3(const mtx3x3_t& m)
+    {
+        return mtx4x4f3(m.m11, m.m12, m.m13,
+                        m.m21, m.m22, m.m23,
+                        0, 0, 1.0,
+                        m.m31, m.m32, m.m33);
+
+
+    }
+
     inline mtx4x4_t mtx4x4Ident()
     {
         return mtx4x4f(1.0f, 0, 0, 0,
@@ -556,6 +566,13 @@ namespace termite
         return mtx3x3f(1.0f, 0, 0,
                        0, 1.0f, 0,
                        0, 0, 1.0f);
+    }
+
+    inline mtx3x3_t mtx3x3From4x4(const mtx4x4_t& m)
+    {
+        return mtx3x3f(m.m11, m.m12, m.m13,
+                       m.m12, m.m22, m.m23,
+                       m.m41, m.m42, m.m43);
     }
 
     // Rect

@@ -49,6 +49,11 @@ namespace termite
         {
             return this->id != ent.id;
         }
+
+        inline bool isValid() const
+        {
+            return this->id != 0;
+        }
     };
 
     struct EntityManager;
@@ -87,13 +92,15 @@ namespace termite
     {
         bool(*createInstance)(Entity ent, ComponentHandle handle, void* data);
         void(*destroyInstance)(Entity ent, ComponentHandle handle, void* data);
+        void(*setActive)(ComponentHandle handle, void* data, bool active);
 
         typedef void (*StageFunc)(const ComponentHandle* handles, uint16_t count, float dt);
         StageFunc stageFn[ComponentStage::Count];
 
         ComponentCallbacks() :
             createInstance(nullptr),
-            destroyInstance(nullptr)
+            destroyInstance(nullptr),
+            setActive(nullptr)
         {
             memset(stageFn, 0x00, sizeof(StageFunc)*ComponentStage::Count);
         }

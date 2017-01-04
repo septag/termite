@@ -45,6 +45,10 @@ PluginDesc* getBgfxDriverDesc();
 void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi);
 void shutdownBgfxDriver();
 
+PluginDesc* getBox2dDriverDesc();
+void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi);
+void shutdownBox2dDriver();
+
 static void loadStaticPlugins()
 {
     // IoDriver
@@ -73,6 +77,16 @@ static void loadStaticPlugins()
     bgfxApi.init = initBgfxDriver;
     bgfxApi.shutdown = shutdownBgfxDriver;
     p->api = &bgfxApi;
+
+    // Box2D driver
+    static PluginApi_v0 box2dApi;
+    p = g_pluginSys->plugins.push();
+    memset(p, 0x00, sizeof(*p));
+    memcpy(&p->desc, getBox2dDriverDesc(), sizeof(p->desc));
+    box2dApi.getDesc = getBox2dDriverDesc;
+    box2dApi.init = initBox2dDriver;
+    box2dApi.shutdown = shutdownBox2dDriver;
+    p->api = &box2dApi;
 }
 #endif
 

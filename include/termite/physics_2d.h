@@ -380,6 +380,7 @@ namespace termite
 
         // Body
         void (*setTransform)(PhysBody2D* body, const vec2_t& pos, float angle);
+        void (*getTransform)(PhysBody2D* body, vec2_t* pPos, float* pAngle);
         vec2_t (*getPosition)(PhysBody2D* body);
         float (*getAngle)(PhysBody2D* body);
         vec2_t (*getWorldCenter)(PhysBody2D* body);
@@ -394,16 +395,18 @@ namespace termite
         void (*applyForce)(PhysBody2D* body, const vec2_t& force, const vec2_t& worldPt, bool wake/* = true*/);
         void (*applyForceToCenter)(PhysBody2D* body, const vec2_t& force, bool wake/* = true*/);
         void (*applyTorque)(PhysBody2D* body, float torque, bool wake/* = true*/);
-        void (*applyLinearImpulse)(PhysBody2D* body, const vec2_t& worldPt, bool wake/* = true*/);
+        void (*applyLinearImpulse)(PhysBody2D* body, const vec2_t& impulse, const vec2_t& worldPt, bool wake/* = true*/);
         void (*applyAngularImpulse)(PhysBody2D* body, float impulse, bool wake/* = true*/);
         void (*setActive)(PhysBody2D* body, bool active);
         bool (*isActive)(PhysBody2D* body);
+        bool (*isAwake)(PhysBody2D* body);
+        void (*setAwake)(PhysBody2D* body, bool awake);
         void (*addShapeToBody)(PhysBody2D* body, PhysShape2D* shape);
         void* (*getBodyUserData)(PhysBody2D* body);
 
         // Shape
         void* (*getShapeUserData)(PhysShape2D* shape);
-        void (*setShapeContactFilterData)(PhysShape2D* shape, uint16_t maskBits, int16_t groupIndex);
+        void (*setShapeContactFilterData)(PhysShape2D* shape, uint16_t catBits, uint16_t maskBits, int16_t groupIndex);
         void (*getShapeContactFilterData)(PhysShape2D* shape, uint16_t* catBits, uint16_t* maskBits, int16_t* groupIndex);
 
         // Joints

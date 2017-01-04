@@ -95,7 +95,7 @@ namespace termite
 {
     struct PhysScene2D
     {
-        b2World* w;
+        b2World w;
         ContactListenerBox2d contactListener;
         ContactFilterBox2d contactFilter;
         DestructionListenerBox2d destructionListener;
@@ -103,9 +103,9 @@ namespace termite
         float timestep;
         float accumulator;
 
-        PhysScene2D() :
-            w(nullptr),
-            timestep(0),
+        PhysScene2D(const PhysSceneDef2D& worldDef) :
+            w(b2vec2(worldDef.gravity)),
+            timestep(worldDef.timestep),
             accumulator(0)
         {
         }
@@ -271,25 +271,19 @@ static void b2FreeCallback(void* mem, void* callbackData)
 
 static PhysScene2D* createSceneBox2d(const PhysSceneDef2D& worldDef)
 {
-    PhysScene2D* scene = g_box2d.scenePool.newInstance<>();
+    b2SetAllocFreeCallbacks(b2AllocCallback, b2FreeCallback, nullptr);
+    PhysScene2D* scene = g_box2d.scenePool.newInstance<const PhysSceneDef2D&>(worldDef);
     if (!scene)
         return nullptr;
-    b2SetAllocFreeCallbacks(b2AllocCallback, b2FreeCallback, nullptr);
-    scene->w = BX_NEW(g_box2d.alloc, b2World)(b2vec2(worldDef.gravity));
-    if (!scene->w)
-        return nullptr;
-    scene->timestep = worldDef.timestep;
-    scene->w->SetContactFilter(&scene->contactFilter);
-    scene->w->SetContactListener(&scene->contactListener);
-    scene->w->SetDestructionListener(&scene->destructionListener);
+    scene->w.SetContactFilter(&scene->contactFilter);
+    scene->w.SetContactListener(&scene->contactListener);
+    scene->w.SetDestructionListener(&scene->destructionListener);
     return scene;
 }
 
 static void destroySceneBox2d(PhysScene2D* scene)
 {
     bx::AllocatorI* alloc = g_box2d.alloc;
-    if (scene->w)
-        BX_DELETE(alloc, scene->w);
     g_box2d.scenePool.deleteInstance(scene);
 }
 
@@ -298,7 +292,7 @@ static void stepSceneBox2d(PhysScene2D* scene, float dt)
     const float timestep = scene->timestep;
     float accum = scene->accumulator + dt;
     while (accum >= timestep) {
-        scene->w->Step(timestep, 8, 3, 2);
+        scene->w.Step(timestep, 8, 3, 2);
         accum -= timestep;
     }
     scene->accumulator = accum;
@@ -311,20 +305,18 @@ static void debugSceneBox2d(PhysScene2D* scene, int viewWidth, int viewHeight, c
                             PhysDebugFlags2D::Bits flags)
 {
     assert(scene);
-    assert(scene->w);
 
     if (g_box2d.nvg) {
         scene->debugDraw.SetFlags(flags);
-        scene->w->SetDebugDraw(&scene->debugDraw);
+        scene->w.SetDebugDraw(&scene->debugDraw);
         scene->debugDraw.beginDraw(g_box2d.nvg, cam, viewWidth, viewHeight);
-        scene->w->DrawDebugData();
+        scene->w.DrawDebugData();
         scene->debugDraw.endDraw();
     }
 }
 
 static PhysBody2D* createBodyBox2d(PhysScene2D* scene, const PhysBodyDef2D& bodyDef)
 {
-    assert(scene->w);
     static_assert(PhysBodyType2D::Static == b2_staticBody, "BodyType mismatch");
     static_assert(PhysBodyType2D::Dynamic == b2_dynamicBody, "BodyType mismatch");
     static_assert(PhysBodyType2D::Kinematic == b2_kinematicBody, "BodyType mismatch");
@@ -348,7 +340,7 @@ static PhysBody2D* createBodyBox2d(PhysScene2D* scene, const PhysBodyDef2D& body
     bdef.position = b2vec2(bodyDef.position);
     bdef.userData = pbody;
 
-    b2Body* bbody = scene->w->CreateBody(&bdef);
+    b2Body* bbody = scene->w.CreateBody(&bdef);
     if (!bbody) {
         g_box2d.bodyPool.deleteInstance(pbody);
         return nullptr;
@@ -364,7 +356,7 @@ static void destroyBodyBox2d(PhysBody2D* body)
     assert(body);
     assert(body->b);
     
-    body->ownerScene->w->DestroyBody(body->b);
+    body->ownerScene->w.DestroyBody(body->b);
     g_box2d.bodyPool.deleteInstance(body);
 }
 
@@ -384,6 +376,7 @@ static PhysShape2D* createBoxShapeBox2d(PhysBody2D* body, const vec2_t& halfSize
     fdef.filter.groupIndex = shapeDef.groupIndex;
     fdef.filter.maskBits = shapeDef.maskBits;
     fdef.restitution = shapeDef.restitution;
+    fdef.isSensor = (shapeDef.flags & PhysShapeFlags2D::IsSensor) ? true : false;
     fdef.shape = &box;
 
     shape->ownerBody = body;
@@ -413,6 +406,7 @@ static PhysShape2D* createArbitaryBoxShapeBox2d(PhysBody2D* body, const vec2_t& 
     fdef.filter.groupIndex = shapeDef.groupIndex;
     fdef.filter.maskBits = shapeDef.maskBits;
     fdef.restitution = shapeDef.restitution;
+    fdef.isSensor = (shapeDef.flags & PhysShapeFlags2D::IsSensor) ? true : false;
     fdef.shape = &box;
 
     shape->ownerBody = body;
@@ -446,6 +440,7 @@ static PhysShape2D* createPolyShapeBox2d(PhysBody2D* body, const vec2_t* verts, 
     fdef.filter.groupIndex = shapeDef.groupIndex;
     fdef.filter.maskBits = shapeDef.maskBits;
     fdef.restitution = shapeDef.restitution;
+    fdef.isSensor = (shapeDef.flags & PhysShapeFlags2D::IsSensor) ? true : false;
     fdef.shape = &poly;
 
     shape->ownerBody = body;
@@ -475,6 +470,7 @@ static PhysShape2D* createCircleShapeBox2d(PhysBody2D* body, const vec2_t& pos, 
     fdef.filter.groupIndex = shapeDef.groupIndex;
     fdef.filter.maskBits = shapeDef.maskBits;
     fdef.restitution = shapeDef.restitution;
+    fdef.isSensor = (shapeDef.flags & PhysShapeFlags2D::IsSensor) ? true : false;
     fdef.shape = &circle;
 
     shape->ownerBody = body;
@@ -485,6 +481,21 @@ static PhysShape2D* createCircleShapeBox2d(PhysBody2D* body, const vec2_t& pos, 
     }
     shape->userData = shapeDef.userData;
     return shape;
+}
+
+static void setTransformBox2d(PhysBody2D* body, const vec2_t& pos, float angle)
+{
+    body->b->SetTransform(b2vec2(pos), angle);
+}
+
+static vec2_t getPositionBox2d(PhysBody2D* body)
+{
+    return tvec2(body->b->GetPosition());
+}
+
+static float getAngle(PhysBody2D* body)
+{
+    return body->b->GetAngle();
 }
 
 void ContactListenerBox2d::BeginContact(b2Contact* contact)
@@ -669,17 +680,18 @@ void PhysDebugDraw::beginDraw(NVGcontext* nvg, const Camera2D& cam, int viewWidt
     float scale = 1.0f;
     switch (cam.policy) {
     case DisplayPolicy::FitToHeight:
-        scale = 0.5f*float(viewWidth) * cam.zoom;
+        scale = float(viewWidth) * cam.zoom;
         break;
     case DisplayPolicy::FitToWidth:
-        scale = 0.5f*float(viewHeight) * cam.zoom;
+        scale = float(viewHeight) * cam.zoom;
         break;
     }
     
     nvgScale(nvg, scale, -scale);
     nvgTranslate(nvg, -cam.pos.x, -cam.pos.y);
+    nvgGlobalAlpha(nvg, 0.3f);
 
-    m_strokeScale = 2.0f / scale;
+    m_strokeScale = 1.0f / scale;
     m_viewRect = g_camApi->cam2dGetRect(cam);
 }
 
@@ -846,6 +858,50 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.createCircleShape = createCircleShapeBox2d;
     api.stepScene = stepSceneBox2d;
     api.debugScene = debugSceneBox2d;
+    api.setTransform = setTransformBox2d;
+    api.getTransform = [](PhysBody2D* body, vec2_t* pPos, float* pAngle) {
+        *pPos = tvec2(body->b->GetPosition());
+        *pAngle = -body->b->GetAngle();
+    };
+    api.getPosition = [](PhysBody2D* body)->vec2_t { return tvec2(body->b->GetPosition()); };
+    api.getAngle = [](PhysBody2D* body)->float { return -body->b->GetAngle(); };
+    
+    api.setLinearVelocity = [](PhysBody2D* body, const vec2_t& vel) { body->b->SetLinearVelocity(b2vec2(vel)); };
+    api.setAngularVelocity = [](PhysBody2D* body, float omega) { body->b->SetAngularVelocity(omega); };
+    api.getLinearVelocity = [](PhysBody2D* body)->vec2_t { return tvec2(body->b->GetLinearVelocity()); };
+    api.getAngularVelocity = [](PhysBody2D* body)->float { return -body->b->GetAngularVelocity(); };
+    api.isAwake = [](PhysBody2D* body)->bool { return body->b->IsAwake(); };
+    api.setAwake = [](PhysBody2D* body, bool awake) { body->b->SetAwake(awake); };
+    api.isActive = [](PhysBody2D* body)->bool { return body->b->IsActive(); };
+    api.setActive = [](PhysBody2D* body, bool active) { body->b->SetActive(active); };
+
+    api.getWorldCenter = [](PhysBody2D* body)->vec2_t { return tvec2(body->b->GetWorldCenter()); };
+    api.getWorldPoint = [](PhysBody2D* body, const vec2_t& localPt) { return tvec2(body->b->GetWorldPoint(b2vec2(localPt))); };
+    api.applyLinearImpulse = [](PhysBody2D* body, const vec2_t& impulse, const vec2_t& worldPt, bool wake) {
+        body->b->ApplyLinearImpulse(b2vec2(impulse), b2vec2(worldPt), wake);
+    };
+
+    api.setBeginShapeContactCallback = [](PhysShape2D* shape, PhysShapeContactCallback2D callback, bool reportContactInfo) {
+        shape->beginContactFn = callback;
+    };
+    api.setEndShapeContactCallback = [](PhysShape2D* shape, PhysShapeContactCallback2D callback) {
+        shape->endContactFn = callback;
+    };
+
+    api.getShapeUserData = [](PhysShape2D* shape) { return shape->userData; };
+    api.setShapeContactFilterData = [](PhysShape2D* shape, uint16_t catBits, uint16_t maskBits, int16_t groupIndex) {
+        b2Filter filter;
+        filter.categoryBits = catBits;
+        filter.maskBits = maskBits;
+        filter.groupIndex = groupIndex;
+        shape->fixture->SetFilterData(filter);
+    };
+    api.getShapeContactFilterData = [](PhysShape2D* shape, uint16_t* catBits, uint16_t* maskBits, int16_t* groupIndex) {
+        const b2Filter& filter = shape->fixture->GetFilterData();
+        *catBits = filter.categoryBits;
+        *maskBits = filter.maskBits;
+        *groupIndex = filter.groupIndex;
+    };
 
     static_assert(b2_maxManifoldPoints >= 2, "Manifold points mistmatch");
 
