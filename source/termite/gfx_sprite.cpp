@@ -95,6 +95,7 @@ namespace termite
         float playSpeed;
         float resumeSpeed;
         color_t tint;
+        uint8_t order;
 
         SpriteFlag::Enum flip;
         LNode lnode;
@@ -106,8 +107,9 @@ namespace termite
             playReverse(false),
             playSpeed(30.0f),
             resumeSpeed(30.0f),
-            lnode(this),
-            flip(SpriteFlag::None)
+            order(0),
+            flip(SpriteFlag::None),
+            lnode(this)
         {
             tint = color1n(0xffffffff);
             posOffset = vec2f(0, 0);
@@ -593,26 +595,29 @@ void termite::animateSprites(Sprite** sprites, uint16_t numSprites, float dt)
 {
     for (int i = 0; i < numSprites; i++) {
         Sprite* sprite = sprites[i];
-        float t = sprite->animTm;
-        t += dt;
-        float progress = t * sprite->playSpeed;
-        float frames = bx::ffloor(progress);
-        float reminder = frames > 0 ? bx::fmod(progress, frames) : progress;
-        t = reminder / sprite->playSpeed;
 
-        // Progress sprite frame
-        int frameIdx = sprite->curFrameIdx;
-        int iframes = int(frames);
-        frameIdx = iwrap(!sprite->playReverse ? (frameIdx + iframes) : (frameIdx - iframes), 
-                         0, sprite->frames.getCount() - 1);
+        if (!bx::fequal(sprite->playSpeed, 0, 0.00001f)) {
+            float t = sprite->animTm;
+            t += dt;
+            float progress = t * sprite->playSpeed;
+            float frames = bx::ffloor(progress);
+            float reminder = frames > 0 ? bx::fmod(progress, frames) : progress;
+            t = reminder / sprite->playSpeed;
 
-        // Check if we hit any callbacks
-        const SpriteFrame& frame = sprite->frames[frameIdx];
-        if (frame.frameCallback)
-            frame.frameCallback(sprite, frame.frameCallbackUserData);
+            // Progress sprite frame
+            int frameIdx = sprite->curFrameIdx;
+            int iframes = int(frames);
+            frameIdx = iwrap(!sprite->playReverse ? (frameIdx + iframes) : (frameIdx - iframes),
+                             0, sprite->frames.getCount() - 1);
 
-        sprite->curFrameIdx = frameIdx;
-        sprite->animTm = t;
+            // Check if we hit any callbacks
+            const SpriteFrame& frame = sprite->frames[frameIdx];
+            if (frame.frameCallback)
+                frame.frameCallback(sprite, frame.frameCallbackUserData);
+
+            sprite->curFrameIdx = frameIdx;
+            sprite->animTm = t;
+        }
     }
 }
 
@@ -723,6 +728,12 @@ int termite::getSpriteFrameCount(Sprite* sprite)
     return sprite->frames.getCount();
 }
 
+void termite::setSpriteFrameIndex(Sprite* sprite, int index)
+{
+    assert(index < sprite->frames.getCount());
+    sprite->curFrameIdx = index;
+}
+
 void termite::setSpriteFlip(Sprite* sprite, SpriteFlag::Enum flip)
 {
     sprite->flip = flip;
@@ -731,6 +742,17 @@ void termite::setSpriteFlip(Sprite* sprite, SpriteFlag::Enum flip)
 void termite::setSpritePosOffset(Sprite* sprite, const vec2_t posOffset)
 {
     sprite->posOffset = posOffset;
+}
+
+void termite::setSpriteCurFrameTag(Sprite* sprite, const char* frameTag)
+{
+    SpriteFrame& frame = sprite->frames[sprite->curFrameIdx];
+    frame.tagHash = tinystl::hash_string(frameTag, strlen(frameTag));
+}
+
+void termite::setSpriteOrder(Sprite* sprite, uint8_t order)
+{
+    sprite->order = order;
 }
 
 void termite::setSpriteTintColor(Sprite* sprite, color_t color)
@@ -823,7 +845,9 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     std::sort(sortedSprites, sortedSprites + numSprites, [](const SortedSprite& a, const SortedSprite&b)->bool {
         const SpriteFrame& fa = a.sprite->getCurFrame();
         const SpriteFrame& fb = a.sprite->getCurFrame();
-        return fa.texHandle.value < fb.texHandle.value;
+        uint32_t keyA = (uint32_t(a.sprite->order) << 16) | uint32_t(fa.texHandle.value);
+        uint32_t keyB = (uint32_t(b.sprite->order) << 16) | uint32_t(fb.texHandle.value);
+        return keyA < keyB;
     });
 
     // Fill sprite quads
@@ -915,21 +939,22 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     bx::Array<Batch> batches;
     batches.create(32, 64, tmpAlloc);
 
-    ResourceHandle prevHandle;
+    uint32_t prevKey = UINT32_MAX;
     Batch* curBatch = nullptr;
     for (int i = 0; i < numSprites; i++) {
         Sprite* sprite = sortedSprites[i].sprite;
-        ResourceHandle curHandle = sprite->getCurFrame().texHandle;
-        if (curHandle != prevHandle) {
+        uint32_t key = (uint32_t(sprite->order) << 16) | uint32_t(sprite->getCurFrame().texHandle.value);
+        if (key != prevKey) {
             curBatch = batches.push();
             curBatch->index = i;
             curBatch->count = 0;
-            prevHandle = curHandle;
+            prevKey = key;
         }
         curBatch->count++;
     }
 
     // Draw
+    driver->setViewSeq(viewId, true);
     ProgramHandle prog = !progOverride.isValid() ? g_spriteSys->spriteProg : progOverride;
     for (int i = 0, c = batches.getCount(); i < c; i++) {
         const Batch batch = batches[i];

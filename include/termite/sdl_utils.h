@@ -27,6 +27,7 @@ namespace termite
                                               void** pBackbuffer = nullptr);
     TERMITE_API bool sdlHandleEvent(SDL_Event* ev, bool wait = false);
     TERMITE_API void sdlMapImGuiKeys(Config* conf);
+    TERMITE_API void sdlGetAccelState(float* accel);
 
     // Register shortcut keys, mostly for tools and editors
     // vkey: SDLK_xxx 

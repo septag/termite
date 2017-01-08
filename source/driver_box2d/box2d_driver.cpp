@@ -287,7 +287,7 @@ static void destroySceneBox2d(PhysScene2D* scene)
     g_box2d.scenePool.deleteInstance(scene);
 }
 
-static void stepSceneBox2d(PhysScene2D* scene, float dt)
+static float stepSceneBox2d(PhysScene2D* scene, float dt)
 {
     const float timestep = scene->timestep;
     float accum = scene->accumulator + dt;
@@ -297,8 +297,7 @@ static void stepSceneBox2d(PhysScene2D* scene, float dt)
     }
     scene->accumulator = accum;
 
-    // TODO: Interpolate transform data
-
+    return accum / timestep;
 }
 
 static void debugSceneBox2d(PhysScene2D* scene, int viewWidth, int viewHeight, const Camera2D& cam,

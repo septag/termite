@@ -30,6 +30,7 @@ struct SdlState
     ModifierKey::Bits modKeys;
     bool keysDown[512];
     bx::Array<ShortcutKey> shortcutKeys;
+    float accel[3];
 
     SdlState(bx::AllocatorI* _alloc) : alloc(_alloc)
     {
@@ -37,10 +38,26 @@ struct SdlState
         mouseButtons[0] = mouseButtons[1] = mouseButtons[2] = false;
         modKeys = 0;
         memset(keysDown, 0x00, sizeof(keysDown));
+        accel[0] = accel[1] = accel[2] = 0;
     }
 };
 
 static SdlState* g_sdl = nullptr;
+
+#if BX_PLATFORM_ANDROID
+#include <jni.h>
+extern "C" JNIEXPORT void JNICALL Java_com_termite_utils_PlatformUtils_termiteSetAccelData(JNIEnv* env, jclass cls,
+                                                                                           jfloat x, jfloat y, jfloat z)
+{
+    BX_UNUSED(cls);
+
+    if (g_sdl) {
+        g_sdl->accel[0] = x;
+        g_sdl->accel[1] = y;
+        g_sdl->accel[2] = z;
+    }
+}
+#endif
 
 result_t termite::initSdlUtils(bx::AllocatorI* alloc)
 {
@@ -204,6 +221,13 @@ void termite::sdlMapImGuiKeys(Config* conf)
     conf->keymap[ImGuiKey_X] = SDLK_x;
     conf->keymap[ImGuiKey_Y] = SDLK_y;
     conf->keymap[ImGuiKey_Z] = SDLK_z;
+}
+
+void termite::sdlGetAccelState(float* accel)
+{
+    accel[0] = g_sdl->accel[0];
+    accel[1] = g_sdl->accel[1];
+    accel[2] = g_sdl->accel[2];
 }
 
 void termite::sdlRegisterShortcutKey(SDL_Keycode vkey, ModifierKey::Bits modKeys, ShortcutKeyCallback callback, void* userData)

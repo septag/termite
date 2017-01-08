@@ -365,7 +365,10 @@ namespace termite
 
         PhysScene2D* (*createScene)(const PhysSceneDef2D& worldDef);
         void (*destroyScene)(PhysScene2D* scene);
-        void (*stepScene)(PhysScene2D* scene, float dt);
+
+        // Returns blending coeff for interpolating between frames
+        // State = currentState * alpha + prevState * (1 - alpha)
+        float (*stepScene)(PhysScene2D* scene, float dt);   
         void (*debugScene)(PhysScene2D* scene, int viewWidth, int viewHeight, const Camera2D& cam, 
                            PhysDebugFlags2D::Bits flags/* = PhysDebugFlags2D::All*/);
 

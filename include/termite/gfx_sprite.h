@@ -108,8 +108,11 @@ namespace termite
     TERMITE_API void gotoSpriteFrameTag(Sprite* sprite, const char* frameTag);
     TERMITE_API int getSpriteFrameIndex(Sprite* sprite);
     TERMITE_API int getSpriteFrameCount(Sprite* sprite);
+    TERMITE_API void setSpriteFrameIndex(Sprite* sprite, int index);
     TERMITE_API void setSpriteFlip(Sprite* sprite, SpriteFlag::Enum flip);
     TERMITE_API void setSpritePosOffset(Sprite* sprite, const vec2_t posOffset);
+    TERMITE_API void setSpriteCurFrameTag(Sprite* sprite, const char* frameTag);
+    TERMITE_API void setSpriteOrder(Sprite* sprite, uint8_t order); // higher orders gets to draw later
 
     // Set/Get tint color for the sprite
     TERMITE_API void setSpriteTintColor(Sprite* sprite, color_t color);

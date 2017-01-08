@@ -58,7 +58,7 @@ if (BUILD_STATIC)
     else()
         set(DISK_DRIVER disk_driver)
     endif()
-    set(PLUGIN_LIBS bgfx_driver ${DISK_DRIVER})
+    set(PLUGIN_LIBS bgfx_driver box2d_driver ${DISK_DRIVER})
 endif()
 
 target_link_libraries(termite 
