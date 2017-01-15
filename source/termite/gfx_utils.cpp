@@ -4,8 +4,8 @@
 #include "gfx_utils.h"
 #include "io_driver.h"
 
-#include "shaders_h/blit.vso"
-#include "shaders_h/blit.fso"
+#include T_MAKE_SHADER_PATH(shaders_h, blit.vso)
+#include T_MAKE_SHADER_PATH(shaders_h, blit.fso)
 
 using namespace termite;
 

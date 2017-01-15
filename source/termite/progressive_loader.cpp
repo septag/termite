@@ -267,16 +267,19 @@ static void stepLoadGroupDeltaFrame(ProgressiveLoader* loader, LoaderGroup* grou
     group->frameCount++;
     if (group->frameCount >= group->scheme.frameDelta) {
         LoadResourceRequest* req = getFirstLoadRequest(loader, group);
-        *req->pHandle = loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
-        if (!req->pHandle->isValid()) {
-            // Something went wrong, remove the request from the list
-            group->loadRequestList.remove(&req->lnode);
-            loader->loadRequestPool.deleteInstance(req);
+        if (req) {
+            *req->pHandle = loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
+            if (!req->pHandle->isValid()) {
+                // Something went wrong, remove the request from the list
+                group->loadRequestList.remove(&req->lnode);
+                loader->loadRequestPool.deleteInstance(req);
+            }
         }
 
-        processUnloadRequests(loader, group);
         group->frameCount = 0;
+        processUnloadRequests(loader, group);
     }
+
 }
 
 static void stepLoadGroupDeltaTime(ProgressiveLoader* loader, LoaderGroup* group, float dt)
@@ -284,11 +287,13 @@ static void stepLoadGroupDeltaTime(ProgressiveLoader* loader, LoaderGroup* group
     group->elapsedTime += dt;
     if (group->elapsedTime >= group->scheme.deltaTime) {
         LoadResourceRequest* req = getFirstLoadRequest(loader, group);
-        *req->pHandle = loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
-        if (!req->pHandle->isValid()) {
-            // Something went wrong, remove the request from the list
-            group->loadRequestList.remove(&req->lnode);
-            loader->loadRequestPool.deleteInstance(req);
+        if (req) {
+            *req->pHandle = loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
+            if (!req->pHandle->isValid()) {
+                // Something went wrong, remove the request from the list
+                group->loadRequestList.remove(&req->lnode);
+                loader->loadRequestPool.deleteInstance(req);
+            }
         }
 
         processUnloadRequests(loader, group);

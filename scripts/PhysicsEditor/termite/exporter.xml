@@ -1,0 +1,73 @@
+<exporter>
+    <!-- identifier of the exporter -->
+    <name>termite</name>
+    
+    <!-- display name of the exporter for the combo box -->
+    <displayName>Termite</displayName>
+    
+    <!-- description of the exporter -->
+    <description>This exporter creates a simple list of polygon vertices for C++ source</description>
+
+    <!-- exporter version -->
+    <version>1.0</version>
+    
+    <!-- direction of the y-axis up / down -->
+    <yAxisDirection>up</yAxisDirection>
+    
+    <!-- physics engine: box2d / chipmunk -->
+    <physicsEngine>box2d</physicsEngine>
+    
+    <!-- name of the template -->
+    <template>termite.h</template>
+    
+    <!-- file extension for the file to create -->
+    <fileExtension>h</fileExtension>
+    
+    <!-- anchorpoint -->
+    <anchorPoint>
+        <!-- does the system use anchor ponits ? -->
+        <enabled>no</enabled>
+        
+        <!-- default of the anchor point -->
+        <relX>0.5</relX>        
+        <relY>0.5</relY>
+    </anchorPoint>
+    
+    <!-- origin of the coordinate system -->
+    <origin>
+        <!-- may be: anchorPoint or fixed -->
+        <type>fixed</type>
+
+        <relX>0.5</relX>        
+        <relY>0.5</relY>
+    </origin>
+
+    <global>
+        <parameter>
+            <name>body_id</name>
+            <displayName>Name</displayName>
+            <description>Body name</description>
+            <shortDescription>Body name</shortDescription>
+            <type><code>string</code></type>
+            <default>body01</default>
+        </parameter>
+    </global>
+    
+    <!--
+    Example for a fixed anchor point
+    <origin>
+        <type>fixed</type>
+        <relX>0.5</relX>
+        <relY>0.5</relY>
+    </origin>
+    -->
+    
+    <!--  
+         global parameters for the file 
+         may be empty.
+         can be referenced with {{global.<name>}} from the template file
+    -->
+
+        -->
+</exporter>
+

@@ -10,11 +10,13 @@
 #include <assert.h>
 #include <string.h>
 
+#include "bx/string.h"
+
 typedef struct malloc_info stb_leakcheck_malloc_info;
 
 struct malloc_info
 {
-   const char *file;
+   char file[32];
    int line;
    size_t size;
    stb_leakcheck_malloc_info *next,*prev;
@@ -32,7 +34,19 @@ void *stb_leakcheck_malloc(size_t sz, const char *file, int line)
 {
    stb_leakcheck_malloc_info *mi = (stb_leakcheck_malloc_info *) malloc(sz + sizeof(stb_leakcheck_malloc_info));
    if (mi == NULL) return mi;
-   mi->file = file;
+   // get filename
+   if (file) {
+       const char* r = strrchr(file, '/');
+       if (!r)
+           r = strrchr(file, '\\');
+
+       if (r)
+           bx::strlcpy(mi->file, r + 1, sizeof(mi->file));
+       else
+           bx::strlcpy(mi->file, file, sizeof(mi->file));
+   } else {
+       mi->file[0] = 0;
+   }
    mi->line = line;
 
 #ifdef STB_LEAKCHECK_MULTITHREAD

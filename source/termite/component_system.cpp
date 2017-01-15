@@ -25,7 +25,7 @@ using namespace termite;
 
 namespace termite
 {
-    typedef bx::MultiHashTable<int, uint32_t> DestroyHashTable;
+    typedef bx::MultiHashTable<ComponentHandle, uint32_t> EntityHashTable;  // EntityId -> Multiple Component Handles
 
     struct EntityManager
     {
@@ -48,13 +48,15 @@ namespace termite
         bx::Queue<FreeIndex*> freeIndexQueue;
         uint32_t freeIndexSize;
         bx::Array<uint16_t> generations;
-        DestroyHashTable destroyTable; // keep a multi-hash for all components that entity has to destroy
-		bx::Pool<DestroyHashTable::Node> nodePool;
+        EntityHashTable destroyTable; // keep a multi-hash for all components that entity has to destroy
+        EntityHashTable deactiveTable;
+		bx::Pool<EntityHashTable::Node> nodePool;
         
         EntityManager(bx::AllocatorI* _alloc) : 
             alloc(_alloc),
             freeIndexSize(0),
-            destroyTable(bx::HashTableType::Mutable)
+            destroyTable(bx::HashTableType::Mutable),
+            deactiveTable(bx::HashTableType::Mutable)
         {
         }
     };
@@ -123,7 +125,8 @@ EntityManager* termite::createEntityManager(bx::AllocatorI* alloc, int bufferSiz
     if (!emgr->generations.create(bufferSize, bufferSize, alloc) ||
         !emgr->freeIndexPool.create(bufferSize, alloc) ||
 		!emgr->nodePool.create(bufferSize, alloc) ||
-        !emgr->destroyTable.create(bufferSize, alloc, &emgr->nodePool))
+        !emgr->destroyTable.create(bufferSize, alloc, &emgr->nodePool) ||
+        !emgr->deactiveTable.create(bufferSize, alloc, &emgr->nodePool))
     {
         destroyEntityManager(emgr);
         return nullptr;
@@ -139,6 +142,7 @@ void termite::destroyEntityManager(EntityManager* emgr)
     emgr->freeIndexPool.destroy();
 	emgr->nodePool.destroy();
     emgr->generations.destroy();
+    emgr->deactiveTable.destroy();
     emgr->destroyTable.destroy();
 
     BX_DELETE(emgr->alloc, emgr);
@@ -191,7 +195,7 @@ static void removeFromComponentGroup(ComponentGroupHandle handle, ComponentHandl
     }
 }
 
-static void destroyComponentNoImmDestroy(Entity ent, ComponentHandle handle)
+static void destroyComponentNoImmAction(Entity ent, ComponentHandle handle)
 {
     assert(handle.isValid());
 
@@ -214,24 +218,47 @@ static void destroyComponentNoImmDestroy(Entity ent, ComponentHandle handle)
         ctype.entTable.remove(r);
 }
 
+
 void termite::destroyEntity(EntityManager* emgr, Entity ent)
 {
     assert(isEntityAlive(emgr, ent));
 
+    // Check if the entity has immediate deactivate components
+    // And deactivate all components registered to entity
+    int entIdx = emgr->deactiveTable.find(ent.id);
+    if (entIdx != -1) {
+        EntityHashTable::Node* node = emgr->deactiveTable[entIdx];
+        while (node) {
+            EntityHashTable::Node* next = node->next;
+
+            ComponentHandle handle = node->value;
+            ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handle)];
+            bool prevActive = *ctype.dataPool.getHandleData<bool>(3, handle);
+            if (prevActive) {
+                uint16_t cHandle = COMPONENT_INSTANCE_HANDLE(handle);
+                *(ctype.dataPool.getHandleData<bool>(3, cHandle)) = false;
+                if (ctype.callbacks.setActive)
+                    ctype.callbacks.setActive(handle, ctype.dataPool.getHandleData(1, cHandle), false);
+            }
+
+            emgr->deactiveTable.remove(entIdx, node);
+            node = next;
+        }
+    }
+
     // Check if the entity has immediate destroy components
     // And destroy all components registered to entity
-    int entIdx = emgr->destroyTable.find(ent.id);
+    entIdx = emgr->destroyTable.find(ent.id);
     if (entIdx != -1) {
-        DestroyHashTable::Node* node = emgr->destroyTable.getNode(entIdx);
+        EntityHashTable::Node* node = emgr->destroyTable[entIdx];
         while (node) {
-            DestroyHashTable::Node* next = node->next;
-            ComponentHandle component(uint32_t(node->value));
-            destroyComponentNoImmDestroy(ent, component);
+            EntityHashTable::Node* next = node->next;
+            destroyComponentNoImmAction(ent, node->value);
 
             emgr->destroyTable.remove(entIdx, node);
             node = next;
         }
-    }
+    } 
 
     uint32_t idx = ent.getIndex();
     ++emgr->generations[idx];
@@ -303,6 +330,13 @@ void termite::shutdownComponentSystem()
 
     for (int i = 0; i < g_csys->components.getCount(); i++) {
         ComponentType& ctype = g_csys->components[i];
+        // Destroy remaining components
+        for (int k = 0; k < ctype.dataPool.getCount(); k++) {
+            ComponentHandle handle = COMPONENT_MAKE_HANDLE(i, ctype.dataPool.handleAt(k));
+            if (ctype.callbacks.destroyInstance)
+                ctype.callbacks.destroyInstance(getComponentEntity(handle), handle, ctype.dataPool.getHandleData(1, handle));
+        }
+
         ctype.dataPool.destroy();
         ctype.entTable.destroy();
     }
@@ -427,7 +461,11 @@ ComponentHandle termite::createComponent(EntityManager* emgr, Entity ent, Compon
     ctype.entTable.add(ent.id, chandle);
 
     if (ctype.flags & ComponentFlag::ImmediateDestroy) {
-        emgr->destroyTable.add(ent.id, int(chandle.value));
+        emgr->destroyTable.add(ent.id, chandle);
+    }
+
+    if (ctype.flags & ComponentFlag::ImmediateDeactivate) {
+        emgr->deactiveTable.add(ent.id, chandle);
     }
 
     // Call create callback
@@ -440,16 +478,16 @@ ComponentHandle termite::createComponent(EntityManager* emgr, Entity ent, Compon
 
 void termite::destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle handle)
 {
-    destroyComponentNoImmDestroy(ent, handle);
+    destroyComponentNoImmAction(ent, handle);
     
-    ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handle)];
+    ComponentFlag::Bits flags = g_csys->components[COMPONENT_TYPE_INDEX(handle)].flags;
 
-    if (ctype.flags & ComponentFlag::ImmediateDestroy) {
+    if (flags & ComponentFlag::ImmediateDestroy) {
         int r = emgr->destroyTable.find(ent.id);
         if (r != -1) {
-            DestroyHashTable::Node* node = emgr->destroyTable.getNode(r);
+            EntityHashTable::Node* node = emgr->destroyTable[r];
             while (node) {
-                if (node->value == int(handle.value)) {
+                if (node->value == handle) {
                     emgr->destroyTable.remove(r, node);
                     break;
                 }
@@ -457,6 +495,21 @@ void termite::destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle 
             }
         }
     }
+
+    if (flags & ComponentFlag::ImmediateDeactivate) {
+        int r = emgr->deactiveTable.find(ent.id);
+        if (r != -1) {
+            EntityHashTable::Node* node = emgr->deactiveTable[r];
+            while (node) {
+                if (node->value == handle) {
+                    emgr->deactiveTable.remove(r, node);
+                    break;
+                }
+                node = node->next;
+            }
+        }
+    }
+
 }
 
 static void sortAndBatchComponents(ComponentGroup* group)

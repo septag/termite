@@ -11,8 +11,8 @@
 #include "bxx/logger.h"
 #include "bxx/json.h"
 
-#include "shaders_h/sprite.vso"
-#include "shaders_h/sprite.fso"
+#include T_MAKE_SHADER_PATH(shaders_h, sprite.vso)
+#include T_MAKE_SHADER_PATH(shaders_h, sprite.fso)
 
 #include <algorithm>
 
@@ -755,6 +755,12 @@ void termite::setSpriteOrder(Sprite* sprite, uint8_t order)
     sprite->order = order;
 }
 
+void termite::setSpritePivot(Sprite* sprite, const vec2_t pivot)
+{
+    for (int i = 0, c = sprite->frames.getCount(); i < c; i++)
+        sprite->frames[i].pivot = pivot;
+}
+
 void termite::setSpriteTintColor(Sprite* sprite, color_t color)
 {
     sprite->tint = color;
@@ -844,7 +850,7 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     }
     std::sort(sortedSprites, sortedSprites + numSprites, [](const SortedSprite& a, const SortedSprite&b)->bool {
         const SpriteFrame& fa = a.sprite->getCurFrame();
-        const SpriteFrame& fb = a.sprite->getCurFrame();
+        const SpriteFrame& fb = b.sprite->getCurFrame();
         uint32_t keyA = (uint32_t(a.sprite->order) << 16) | uint32_t(fa.texHandle.value);
         uint32_t keyB = (uint32_t(b.sprite->order) << 16) | uint32_t(fb.texHandle.value);
         return keyA < keyB;
@@ -954,7 +960,6 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     }
 
     // Draw
-    driver->setViewSeq(viewId, true);
     ProgramHandle prog = !progOverride.isValid() ? g_spriteSys->spriteProg : progOverride;
     for (int i = 0, c = batches.getCount(); i < c; i++) {
         const Batch batch = batches[i];

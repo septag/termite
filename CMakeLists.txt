@@ -175,6 +175,8 @@ if (USE_SDL2)
     add_definitions(-Dtermite_SDL2)
 endif()
 
+add_definitions(-Dtermite_SHADER_APPEND_PATH=${CMAKE_SYSTEM_NAME})
+
 # copy release flags into profile
 copy_build_flags(PROFILE)
 copy_build_flags(DEVELOPMENT)

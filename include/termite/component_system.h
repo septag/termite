@@ -8,9 +8,9 @@ namespace termite
 {
     static const uint32_t kEntityIndexBits = 16;
     static const uint32_t kEntityIndexMask = (1 << kEntityIndexBits) - 1;
-    static const uint32_t kEntityGenerationBits = 16;
+    static const uint32_t kEntityGenerationBits = 14;
     static const uint32_t kEntityGenerationMask = (1 << kEntityGenerationBits) - 1;
-
+    
     struct GfxDriverApi;
 
     struct Entity
@@ -111,7 +111,8 @@ namespace termite
         enum Enum
         {
             None = 0x0,
-            ImmediateDestroy = 0x01   // Destroys component immediately after owner entity is destroyed
+            ImmediateDestroy = 0x01,   // Destroys component immediately after owner entity is destroyed
+            ImmediateDeactivate = 0x02   // Deactivates component immediately after owner entity is destroyed
         };
 
         typedef uint8_t Bits;

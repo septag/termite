@@ -8,15 +8,15 @@
 
 namespace termite
 {
-    VertexDecl* vdeclBegin(VertexDecl* vdecl, RendererType::Enum _type = RendererType::Noop);
-    void vdeclEnd(VertexDecl* vdecl);
-    VertexDecl* vdeclAdd(VertexDecl* vdecl, VertexAttrib::Enum _attrib, uint8_t _num, VertexAttribType::Enum _type, 
-                         bool _normalized = false, bool _asInt = false);
-    VertexDecl* vdeclSkip(VertexDecl* vdecl, uint8_t _numBytes);
-    void vdeclDecode(VertexDecl* vdecl, VertexAttrib::Enum _attrib, uint8_t* _num, VertexAttribType::Enum* _type,
-                     bool* _normalized, bool* _asInt);
-    bool vdeclHas(VertexDecl* vdecl, VertexAttrib::Enum _attrib);
-    uint32_t vdeclGetSize(VertexDecl* vdecl, uint32_t _num);
+    TERMITE_API VertexDecl* vdeclBegin(VertexDecl* vdecl, RendererType::Enum _type = RendererType::Noop);
+    TERMITE_API void vdeclEnd(VertexDecl* vdecl);
+    TERMITE_API VertexDecl* vdeclAdd(VertexDecl* vdecl, VertexAttrib::Enum _attrib, uint8_t _num, VertexAttribType::Enum _type,
+                                     bool _normalized = false, bool _asInt = false);
+    TERMITE_API VertexDecl* vdeclSkip(VertexDecl* vdecl, uint8_t _numBytes);
+    TERMITE_API void vdeclDecode(VertexDecl* vdecl, VertexAttrib::Enum _attrib, uint8_t* _num, VertexAttribType::Enum* _type,
+                                 bool* _normalized, bool* _asInt);
+    TERMITE_API bool vdeclHas(VertexDecl* vdecl, VertexAttrib::Enum _attrib);
+    TERMITE_API uint32_t vdeclGetSize(VertexDecl* vdecl, uint32_t _num);
 
     class VertexDeclHelper
     {

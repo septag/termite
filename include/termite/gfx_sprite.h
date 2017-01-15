@@ -102,7 +102,7 @@ namespace termite
     TERMITE_API void setSpriteFrameCallbackByIndex(Sprite* sprite, int frameIdx, SpriteFrameCallback callback,
                                                    void* userData);
 
-    // Goes from current sprite frame to the next specified tag/name or frameIdx
+    // Set/Get Sprite props
     TERMITE_API void gotoSpriteFrameIndex(Sprite* sprite, int frameIdx);
     TERMITE_API void gotoSpriteFrameName(Sprite* sprite, const char* name);
     TERMITE_API void gotoSpriteFrameTag(Sprite* sprite, const char* frameTag);
@@ -113,8 +113,7 @@ namespace termite
     TERMITE_API void setSpritePosOffset(Sprite* sprite, const vec2_t posOffset);
     TERMITE_API void setSpriteCurFrameTag(Sprite* sprite, const char* frameTag);
     TERMITE_API void setSpriteOrder(Sprite* sprite, uint8_t order); // higher orders gets to draw later
-
-    // Set/Get tint color for the sprite
+    TERMITE_API void setSpritePivot(Sprite* sprite, const vec2_t pivot);
     TERMITE_API void setSpriteTintColor(Sprite* sprite, color_t color);
     TERMITE_API color_t getSpriteTintColor(Sprite* sprite);
     TERMITE_API rect_t getSpriteDrawRect(Sprite* sprite);

@@ -30,7 +30,11 @@ function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OU
         if (NOT IS_DIRECTORY ${OUTPUT_DIR})
             file(MAKE_DIRECTORY ${OUTPUT_DIR})
         endif()
+        get_filename_component(OUTPUT_DIR ${OUTPUT_DIR} ABSOLUTE)
+    else()
+        set(OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
     endif()
+    set(OUTPUT_DIR ${OUTPUT_DIR}/${CMAKE_SYSTEM_NAME})
 
     # make include dirs string
     if (INCLUDE_DIRS)
@@ -40,12 +44,6 @@ function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OU
 
     if (SHADER_DEFINES)
         join_array("${SHADER_DEFINES}" "$<SEMICOLON>" BGFX_SHADER_DEFINES)
-    endif()
-
-    if (NOT OUTPUT_DIR)
-        set(OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-    else()
-        get_filename_component(OUTPUT_DIR ${OUTPUT_DIR} ABSOLUTE)
     endif()
 
     # build shaders
@@ -88,9 +86,9 @@ function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OU
             # Shader profile (dx only)
             if (WIN32)
                 if (SHADER_TYPE STREQUAL "vertex")
-                    set(BGFX_SHADER_PROFILE --profile vs_4_0)
+                    set(BGFX_SHADER_PROFILE --profile vs_5_0)
                 elseif (SHADER_TYPE STREQUAL "fragment")
-                    set(BGFX_SHADER_PROFILE --profile ps_4_0)
+                    set(BGFX_SHADER_PROFILE --profile ps_5_0)
                 endif()
                 set(ARGS ${ARGS} ${BGFX_SHADER_PROFILE})
             endif()

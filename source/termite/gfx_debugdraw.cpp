@@ -13,8 +13,8 @@
 
 #include <cstdarg>
 
-#include "shaders_h/ddraw.vso"
-#include "shaders_h/ddraw.fso"
+#include T_MAKE_SHADER_PATH(shaders_h, ddraw.vso)
+#include T_MAKE_SHADER_PATH(shaders_h, ddraw.fso)
 
 #define STATE_POOL_SIZE 8
 #define MAX_TEXT_SIZE 256

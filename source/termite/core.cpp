@@ -541,7 +541,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     return 0;
 }
 
-void termite::shutdown()
+void termite::shutdown(ShutdownCallback callback, void* userData)
 {
     if (!g_core) {
         assert(false);
@@ -602,9 +602,16 @@ void termite::shutdown()
         g_core->gfxDriver->shutdown();
         g_core->gfxDriver = nullptr;
         BX_END_OK();
+        dumpGfxLog();
     }
 
     shutdownResourceLib();
+    
+    // User Shutdown happens before IO and memory stuff
+    // In order for user to clean-up any memory or save stuff
+    if (callback) {
+        callback(userData);
+    }
 
     if (g_core->ioDriver) {
         BX_BEGINP("Shutting down IO Driver");
@@ -618,8 +625,11 @@ void termite::shutdown()
     shutdownPluginSystem();
     BX_END_OK();
 
-    if (g_core->gfxLogCache)
+    if (g_core->gfxLogCache) {
         BX_FREE(g_alloc, g_core->gfxLogCache);
+        g_core->gfxLogCache = nullptr;
+        g_core->numGfxLogCache = 0;
+    }
 
     BX_BEGINP("Destroying Memory pools");
     g_core->memPool.destroy();
@@ -931,6 +941,7 @@ void termite::dumpGfxLog() T_THREAD_SAFE
 
         BX_FREE(g_alloc, g_core->gfxLogCache);
         g_core->gfxLogCache = nullptr;
+        g_core->numGfxLogCache = 0;
     }
 }
 

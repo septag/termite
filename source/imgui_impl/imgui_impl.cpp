@@ -1,3 +1,6 @@
+#ifdef termite_SHARED_LIB
+#undef termite_SHARED_LIB
+#endif
 #include "termite/core.h"
 
 #include "bx/fpumath.h"
@@ -7,8 +10,8 @@
 
 #include "imgui_impl.h"
 
-#include "shaders_h/imgui.fso"
-#include "shaders_h/imgui.vso"
+#include T_MAKE_SHADER_PATH(shaders_h, imgui.fso)
+#include T_MAKE_SHADER_PATH(shaders_h, imgui.vso)
 
 using namespace termite;
 

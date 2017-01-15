@@ -406,6 +406,7 @@ namespace termite
         void (*setAwake)(PhysBody2D* body, bool awake);
         void (*addShapeToBody)(PhysBody2D* body, PhysShape2D* shape);
         void* (*getBodyUserData)(PhysBody2D* body);
+        void (*setGravityScale)(PhysBody2D* body, float gravityScale);
 
         // Shape
         void* (*getShapeUserData)(PhysShape2D* shape);

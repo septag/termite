@@ -39,8 +39,8 @@ BX_PRAGMA_DIAGNOSTIC_IGNORED_MSVC(4244); // warning C4244: '=' : conversion from
 
 namespace
 {
-#include "shaders_h/nanovg_fill.vso"
-#include "shaders_h/nanovg_fill.fso"
+#include T_MAKE_SHADER_PATH(shaders_h, nanovg_fill.vso)
+#include T_MAKE_SHADER_PATH(shaders_h, nanovg_fill.fso)
 
 	static termite::VertexDecl s_nvgDecl;
 

@@ -92,9 +92,6 @@ static void uvCallbackFsEvent(uv_fs_event_t* handle, const char* filename, int e
     static bx::Path lastModFile;
     static double lastModTime = 0.0;
 
-    if (events != UV_CHANGE)
-        return;
-
     if (g_async.callbacks) {
         bx::Path filepath(g_async.rootDir);
         filepath.join(filename);

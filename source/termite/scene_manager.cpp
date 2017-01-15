@@ -19,16 +19,14 @@
 #define T_IMGUI_API
 #include "plugin_api.h"
 
-#include <functional>
-
-#include "shaders_h/effect_fade_in_color.fso"
-#include "shaders_h/effect_fade_in_color.vso"
-#include "shaders_h/effect_fade_out_color.fso"
-#include "shaders_h/effect_fade_out_color.vso"
-#include "shaders_h/effect_fade_in_alpha.fso"
-#include "shaders_h/effect_fade_in_alpha.vso"
-#include "shaders_h/effect_fade_out_alpha.fso"
-#include "shaders_h/effect_fade_out_alpha.vso"
+#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_in_color.fso)
+#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_in_color.vso)
+#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_out_color.fso)
+#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_out_color.vso)
+#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_in_alpha.fso)
+#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_in_alpha.vso)
+#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_out_alpha.fso)
+#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_out_alpha.vso)
 
 using namespace termite;
 

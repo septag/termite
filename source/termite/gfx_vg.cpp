@@ -12,8 +12,8 @@
 
 #include <cstdarg>
 
-#include "shaders_h/vg.fso"
-#include "shaders_h/vg.vso"
+#include T_MAKE_SHADER_PATH(shaders_h, vg.fso)
+#include T_MAKE_SHADER_PATH(shaders_h, vg.vso)
 
 using namespace termite;
 

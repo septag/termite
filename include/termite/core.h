@@ -1,7 +1,10 @@
 #pragma once
 
 #include <cassert>
+
+// Stuff we need from stl
 #include <algorithm>
+#include <functional>
 
 #include "bx/allocator.h"
 #include "tinystl/hash.h"
@@ -110,6 +113,7 @@ namespace termite
     };
     
     typedef void(*UpdateCallback)(float dt);
+    typedef void(*ShutdownCallback)(void* userData);
 
     // Public
     TERMITE_API Config* loadConfig(const char* confFilepath);
@@ -117,7 +121,10 @@ namespace termite
 
     TERMITE_API result_t initialize(const Config& conf, UpdateCallback updateFn = nullptr, 
                                     const GfxPlatformData* platformData = nullptr);
-    TERMITE_API void shutdown();
+
+    // Note: User Shutdown happens before IO and memory stuff
+    //       In order for user to clean-up any memory or save stuff
+    TERMITE_API void shutdown(ShutdownCallback callback = nullptr, void* userData = nullptr);
     TERMITE_API void doFrame();
     TERMITE_API void pause();
     TERMITE_API void resume();

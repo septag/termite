@@ -460,7 +460,7 @@ static PhysShape2D* createCircleShapeBox2d(PhysBody2D* body, const vec2_t& pos, 
     b2CircleShape circle;
     circle.m_p = b2vec2(pos);
     circle.m_radius = radius;
-    
+
     b2FixtureDef fdef;
     fdef.friction = shapeDef.friction;
     fdef.userData = shape;
@@ -482,19 +482,32 @@ static PhysShape2D* createCircleShapeBox2d(PhysBody2D* body, const vec2_t& pos, 
     return shape;
 }
 
-static void setTransformBox2d(PhysBody2D* body, const vec2_t& pos, float angle)
+static PhysDistanceJoint2D* createDistanceJointBox2d(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB,
+                                                     const vec2_t& anchorA, const vec2_t& anchorB,
+                                                     float length, float frequencyHz/* = 0*/, float dampingRatio/* = 0.7f*/,
+                                                     bool collide/* = false*/, void* userData/* = nullptr*/)
 {
-    body->b->SetTransform(b2vec2(pos), angle);
-}
+    PhysJoint2D* joint = g_box2d.jointPool.newInstance<>();
 
-static vec2_t getPositionBox2d(PhysBody2D* body)
-{
-    return tvec2(body->b->GetPosition());
-}
+    b2DistanceJointDef def;
+    def.bodyA = bodyA->b;
+    def.bodyB = bodyB->b;
+    def.localAnchorA = b2vec2(anchorA);
+    def.localAnchorB = b2vec2(anchorB);
+    def.length = length;
+    def.frequencyHz = frequencyHz;
+    def.dampingRatio = dampingRatio;
+    def.collideConnected = collide;
+    def.userData = joint;
 
-static float getAngle(PhysBody2D* body)
-{
-    return body->b->GetAngle();
+    joint->j = scene->w.CreateJoint(&def);
+    if (!joint->j) {
+        g_box2d.jointPool.deleteInstance(joint);
+        return nullptr;
+    }
+    joint->userData = userData;
+
+    return (PhysDistanceJoint2D*)joint;
 }
 
 void ContactListenerBox2d::BeginContact(b2Contact* contact)
@@ -857,7 +870,9 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.createCircleShape = createCircleShapeBox2d;
     api.stepScene = stepSceneBox2d;
     api.debugScene = debugSceneBox2d;
-    api.setTransform = setTransformBox2d;
+    api.setTransform = [](PhysBody2D* body, const vec2_t& pos, float angle) {
+        body->b->SetTransform(b2vec2(pos), -angle);
+    };
     api.getTransform = [](PhysBody2D* body, vec2_t* pPos, float* pAngle) {
         *pPos = tvec2(body->b->GetPosition());
         *pAngle = -body->b->GetAngle();
@@ -873,6 +888,7 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.setAwake = [](PhysBody2D* body, bool awake) { body->b->SetAwake(awake); };
     api.isActive = [](PhysBody2D* body)->bool { return body->b->IsActive(); };
     api.setActive = [](PhysBody2D* body, bool active) { body->b->SetActive(active); };
+    api.setGravityScale = [](PhysBody2D* body, float gravityScale) { body->b->SetGravityScale(gravityScale); };
 
     api.getWorldCenter = [](PhysBody2D* body)->vec2_t { return tvec2(body->b->GetWorldCenter()); };
     api.getWorldPoint = [](PhysBody2D* body, const vec2_t& localPt) { return tvec2(body->b->GetWorldPoint(b2vec2(localPt))); };
@@ -882,6 +898,7 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 
     api.setBeginShapeContactCallback = [](PhysShape2D* shape, PhysShapeContactCallback2D callback, bool reportContactInfo) {
         shape->beginContactFn = callback;
+        shape->beginContactReportInfo = reportContactInfo;
     };
     api.setEndShapeContactCallback = [](PhysShape2D* shape, PhysShapeContactCallback2D callback) {
         shape->endContactFn = callback;
@@ -901,6 +918,8 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
         *maskBits = filter.maskBits;
         *groupIndex = filter.groupIndex;
     };
+
+    api.createDistanceJoint = createDistanceJointBox2d;
 
     static_assert(b2_maxManifoldPoints >= 2, "Manifold points mistmatch");
 

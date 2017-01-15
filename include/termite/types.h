@@ -29,6 +29,13 @@
 #define T_FAILED(_R) (_R) < 0
 #define T_OK(_R) (_R) >= 0
 
+// Shader and Path
+#define T_XSTR(s) #s
+#define T_STR(s) T_XSTR(s)
+#define T_CONCAT_PATH_3(s1, s2, s3) T_STR(s1 ## / ## s2 ## / ## s3)
+#define T_MAKE_SHADER_PATH_PLATFORM(Prefix, Platform, Filename) T_CONCAT_PATH_3(Prefix, Platform, Filename)
+#define T_MAKE_SHADER_PATH(Prefix, Filename) T_MAKE_SHADER_PATH_PLATFORM(Prefix, termite_SHADER_APPEND_PATH, Filename)
+
 namespace termite
 {
     typedef int result_t;	// used for returning results see error_report and T_FAILED
