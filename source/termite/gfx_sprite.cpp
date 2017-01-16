@@ -810,6 +810,18 @@ vec2_t termite::getSpriteImageSize(Sprite* sprite)
     return sprite->getCurFrame().sourceSize;
 }
 
+void termite::convertSpritePhysicsVerts(vec2_t* ptsOut, const vec2_t* ptsIn, int numPts, Sprite* sprite)
+{
+    vec2_t halfSize;
+    vec2_t center;
+    vec2_t imgSize = getSpriteImageSize(sprite);
+    getSpriteRealRect(sprite, &halfSize, &center);
+    for (int i = 0; i < numPts; i++) {
+        vec2_t pt = ptsIn[i];
+        ptsOut[i] = vec2f(pt.x/imgSize.x, pt.y/imgSize.y) * halfSize * 2.0f - center;
+    }
+}
+
 void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,
                           ProgramHandle progOverride /*= ProgramHandle()*/, SetSpriteStateCallback stateCallback /*= nullptr*/)
 {

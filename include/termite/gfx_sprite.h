@@ -120,6 +120,8 @@ namespace termite
     TERMITE_API void getSpriteRealRect(Sprite* sprite, vec2_t* pHalfSize, vec2_t* pCenter);
     TERMITE_API vec2_t getSpriteImageSize(Sprite* sprite);
 
+    TERMITE_API void convertSpritePhysicsVerts(vec2_t* ptsOut, const vec2_t* ptsIn, int numPts, Sprite* sprite);
+
     // Dynamically draw sprites
     TERMITE_API void drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,
                                  ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr);

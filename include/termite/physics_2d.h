@@ -412,6 +412,8 @@ namespace termite
         void* (*getShapeUserData)(PhysShape2D* shape);
         void (*setShapeContactFilterData)(PhysShape2D* shape, uint16_t catBits, uint16_t maskBits, int16_t groupIndex);
         void (*getShapeContactFilterData)(PhysShape2D* shape, uint16_t* catBits, uint16_t* maskBits, int16_t* groupIndex);
+        PhysBody2D* (*getShapeBody)(PhysShape2D* shape);
+        rect_t (*getShapeAABB)(PhysShape2D* shape);
 
         // Joints
 

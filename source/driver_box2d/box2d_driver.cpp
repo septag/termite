@@ -905,6 +905,14 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     };
 
     api.getShapeUserData = [](PhysShape2D* shape) { return shape->userData; };
+    api.getShapeBody = [](PhysShape2D* shape)->PhysBody2D* { return (PhysBody2D*)shape->fixture->GetBody()->GetUserData(); };
+    api.getShapeAABB = [](PhysShape2D* shape)->rect_t {
+        b2AABB aabb = shape->fixture->GetAABB(0);
+        rect_t r;
+        r.vmin = tvec2(aabb.lowerBound);
+        r.vmax = tvec2(aabb.upperBound);
+        return r;
+    };
     api.setShapeContactFilterData = [](PhysShape2D* shape, uint16_t catBits, uint16_t maskBits, int16_t groupIndex) {
         b2Filter filter;
         filter.categoryBits = catBits;

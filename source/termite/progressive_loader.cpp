@@ -268,7 +268,7 @@ static void stepLoadGroupDeltaFrame(ProgressiveLoader* loader, LoaderGroup* grou
     if (group->frameCount >= group->scheme.frameDelta) {
         LoadResourceRequest* req = getFirstLoadRequest(loader, group);
         if (req) {
-            *req->pHandle = loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
+            *req->pHandle = loadResource(req->name, req->uri.cstr(), req->userParams, req->flags, req->objAlloc);
             if (!req->pHandle->isValid()) {
                 // Something went wrong, remove the request from the list
                 group->loadRequestList.remove(&req->lnode);
@@ -288,7 +288,7 @@ static void stepLoadGroupDeltaTime(ProgressiveLoader* loader, LoaderGroup* group
     if (group->elapsedTime >= group->scheme.deltaTime) {
         LoadResourceRequest* req = getFirstLoadRequest(loader, group);
         if (req) {
-            *req->pHandle = loadResource(req->name, req->uri.cstr(), req->userParams, req->flags);
+            *req->pHandle = loadResource(req->name, req->uri.cstr(), req->userParams, req->flags, req->objAlloc);
             if (!req->pHandle->isValid()) {
                 // Something went wrong, remove the request from the list
                 group->loadRequestList.remove(&req->lnode);

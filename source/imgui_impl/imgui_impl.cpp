@@ -10,8 +10,8 @@
 
 #include "imgui_impl.h"
 
-#include T_MAKE_SHADER_PATH(shaders_h, imgui.fso)
-#include T_MAKE_SHADER_PATH(shaders_h, imgui.vso)
+#include T_MAKE_SHADER_PATH(shaders_h,imgui.fso)
+#include T_MAKE_SHADER_PATH(shaders_h,imgui.vso)
 
 using namespace termite;
 
