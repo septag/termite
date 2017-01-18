@@ -310,8 +310,10 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     // IO
 #if BX_PLATFORM_ANDROID
     const char* ioDriverName = "AssetIO";
+#elif BX_PLATFORM_IOS
+    const char* ioDriverName = "DiskIO_Lite";
 #else
-    const char* ioDriverName = "DiskIO";
+    const char* ioDriverName = "DiskIO_Lite";
 #endif
     r = findPluginByName(conf.ioName[0] ? conf.ioName : ioDriverName , 0, &pluginHandle, 1, PluginType::IoDriver);
     if (r > 0) {

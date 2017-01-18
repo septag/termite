@@ -31,6 +31,7 @@ namespace bx
 
         void deleteInstance(Ty* _inst);
         void clear();
+        int getMaxItems() const {  return m_maxItems;    }
 
     private:
         AllocatorI* m_alloc;

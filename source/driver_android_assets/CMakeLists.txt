@@ -6,11 +6,6 @@ source_group(source FILES ${SOURCE_FILES})
 
 add_library(android_assets_driver ${BUILD_LIBRARY_TYPE} ${SOURCE_FILES})
 
-target_include_directories(android_assets_driver PRIVATE ${LIBUV_INCLUDE_DIR})
-target_link_libraries(android_assets_driver PRIVATE ${LIBUV_LIBRARY} bx)
+target_link_libraries(android_assets_driver PRIVATE bx)
 set_target_properties(android_assets_driver PROPERTIES FOLDER Plugins)
-
-if (WIN32)
-    add_dependencies(android_assets_driver LibuvCopyBinaries)
-endif()
 

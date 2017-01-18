@@ -15,7 +15,6 @@
 #include "fcontext/fcontext.h"
 
 #include <mutex>
-#include <condition_variable>
 #include <thread>
 
 using namespace termite;
@@ -119,14 +118,12 @@ struct JobDispatcher
     bx::Lock counterLock;
     bx::TlsData threadData;
     volatile int32_t stop;
-    volatile int32_t numWaits;
 
     fcontext_stack_t mainStack;
     bx::FixedPool<CounterContainer> counterPool;
     JobCounter dummyCounter;
 
-    std::mutex workMutex;
-    std::condition_variable workCv;
+    bx::Semaphore semaphore;
 
     JobDispatcher()
     {
@@ -135,7 +132,6 @@ struct JobDispatcher
         numThreads = 0;
         stop = 0;
         dummyCounter = 0;
-        numWaits = 0;
         memset(&mainStack, 0x00, sizeof(mainStack));
     }
 };
@@ -249,6 +245,7 @@ static void fiberCallback(fcontext_transfer_t transfer)
 
     data->running = fiber;
 
+    // Call user task callback
     fiber->callback(fiber->jobIndex, fiber->userData);
 
     // Job is finished
@@ -296,29 +293,33 @@ static void jobPusherCallback(fcontext_transfer_t transfer)
     ThreadData* data = (ThreadData*)transfer.data;
 
     while (!g_dispatcher->stop) {
+        // Wait for a job to be placed in the job queue
+        if (!data->main)
+            g_dispatcher->semaphore.wait();     // Decreases list counter on continue
+
         Fiber* fiber = nullptr;
-        if (g_dispatcher->jobLock.tryLock()) {
+        bool listNotEmpty = false;
+        g_dispatcher->jobLock.lock();
+        {
             for (int i = 0; i < JobPriority::Count && !fiber; i++) {
                 bx::List<Fiber*>& list = g_dispatcher->waitList[i];
                 Fiber::LNode* node = list.getFirst();
-                while (node && !fiber) {
-                    Fiber* f = list.getFirst()->data;
-                    Fiber::LNode* next = node->next;
-                    if (*f->waitCounter == 0) {
+                while (node) {
+                    listNotEmpty = true;
+                    Fiber* f = node->data;
+                    if (*f->waitCounter == 0) {     // Fiber is not waiting for any child tasks
                         if (f->ownerThread == 0 || f->ownerThread == data->threadId) {
                             // Job is ready to run, pull it from the wait list
                             fiber = f;
                             list.remove(node);
-
-                            std::lock_guard<std::mutex> lk(g_dispatcher->workMutex);
-                            bx::atomicFetchAndSub<int32_t>(&g_dispatcher->numWaits, 1);
+                            break;
                         }
                     }
-                    node = next;
+                    node = node->next;
                 }
             }
-            g_dispatcher->jobLock.unlock();
         }
+        g_dispatcher->jobLock.unlock();
 
         if (fiber) {
             // If jobPusher is called within another 'Wait' call, get back to it's context, which should be the same working thread
@@ -329,15 +330,13 @@ static void jobPusherCallback(fcontext_transfer_t transfer)
             } else {
                 jump_fcontext(fiber->context, fiber);
             }
-        } else if (data->main && g_dispatcher->numWaits == 0) {
-            break;
+        } else if (!data->main && listNotEmpty) {
+            g_dispatcher->semaphore.post(); // Increase the list counter because we didn't pull any jobs
         }
 
-        // Stay idle in worker threads if no job is in queue
-        if (!data->main) {
-            std::unique_lock<std::mutex> lk(g_dispatcher->workMutex);
-            g_dispatcher->workCv.wait(lk, [] {return g_dispatcher->numWaits > 0; });
-        }
+        // In the main thread, we have to quit the loop and get back to the caller
+        if (data->main)
+            break;
     }
 
     // Back to main thread func
@@ -354,37 +353,36 @@ static JobHandle dispatch(const JobDesc* jobs, uint16_t numJobs, FiberPool* pool
     JobCounter* counter = &g_dispatcher->counterPool.newInstance()->counter;
     g_dispatcher->counterLock.unlock();
     if (!counter) {
-        BX_WARN("Exceeded maximum counters");
+        BX_WARN("Exceeded maximum jobCounters (Max = %d)", g_dispatcher->counterPool.getMaxItems());
         return nullptr;
     }
-    *counter = numJobs;
 
+    // Create N Fibers/Job
+    uint32_t count = 0;
+    Fiber** fibers = (Fiber**)alloca(sizeof(Fiber*)*numJobs);
+    assert(fibers);
+
+    for (uint16_t i = 0; i < numJobs; i++) {
+        Fiber* fiber = pool->newFiber(jobs[i].callback, jobs[i].userParam, i, jobs[i].priority, pool, counter);
+        if (fiber) {
+            fibers[i] = fiber;
+            count++;
+        } else {
+            BX_WARN("Exceeded maximum jobs (Max = %d)", pool->getMax());
+        }
+    }
+
+    *counter = count;
     if (data->running)
         data->running->waitCounter = counter;
 
-    // Create N Fibers/Job
-    // Push to list in reverse form to optimize fiber cache reading a bit
-    uint32_t c = 0;
     g_dispatcher->jobLock.lock();
-    for (uint16_t i = 0; i < numJobs; i++) {
-        int index = numJobs - i - 1;
-        Fiber* fiber = pool->newFiber(jobs[index].callback, jobs[index].userParam, index, jobs[index].priority, pool, counter);
-        if (fiber) {
-            g_dispatcher->waitList[fiber->priority].add(&fiber->lnode);
-            c++;
-        } else {
-            BX_WARN("Exceeded maximum jobs (%d)", pool->getMax());
-        }
-    }
+    for (uint32_t i = 0; i < count; i++) 
+        g_dispatcher->waitList[fibers[i]->priority].addToEnd(&fibers[i]->lnode);
     g_dispatcher->jobLock.unlock();
 
-    // Notify all threads to continue
-    if (c) {
-        g_dispatcher->workMutex.lock();
-        bx::atomicFetchAndAdd<int32_t>(&g_dispatcher->numWaits, c);
-        g_dispatcher->workMutex.unlock();
-        g_dispatcher->workCv.notify_all();
-    }
+    // post to semaphore so worker threads can continue and fetch them
+    g_dispatcher->semaphore.post(count);
     return counter;
 }
 
@@ -412,7 +410,8 @@ void termite::waitJobs(JobHandle handle) T_THREAD_SAFE
 
         fcontext_t jobPusherCtx = make_fcontext(stack->sptr, stack->ssize, jobPusherCallback);
 
-        // ReAdd the running fiber (the one that the user has called Wait on), to the waiting list again
+        // This means that user has called 'waitJobs' inside another running task
+        // So the task is WIP, we have to re-add it to the pending jobs so it can continue later on
         if (data->running) {
             Fiber* fiber = data->running;
             data->running = nullptr;
@@ -422,14 +421,10 @@ void termite::waitJobs(JobHandle handle) T_THREAD_SAFE
             g_dispatcher->waitList[fiber->priority].addToEnd(&fiber->lnode);
             g_dispatcher->jobLock.unlock();
 
-            // Notify threads to continue
-            g_dispatcher->workMutex.lock();
-            bx::atomicFetchAndAdd<int32_t>(&g_dispatcher->numWaits, 1);
-            g_dispatcher->workMutex.unlock();
-            g_dispatcher->workCv.notify_all();
+            g_dispatcher->semaphore.post();
         }
 
-        // Run job pusher and exit current one
+        // Switch to job-pusher To see if we can process any remaining jobs
         jump_fcontext(jobPusherCtx, data);
         popWaitStack(data);
     }
@@ -527,10 +522,7 @@ void termite::shutdownJobDispatcher()
 
     // Command all worker threads to stop
     g_dispatcher->stop = 1;
-    g_dispatcher->workMutex.lock();
-    g_dispatcher->numWaits = g_dispatcher->numThreads + 1;
-    g_dispatcher->workMutex.unlock();
-    g_dispatcher->workCv.notify_all();
+    g_dispatcher->semaphore.post(g_dispatcher->numThreads + 1);
     for (uint8_t i = 0; i < g_dispatcher->numThreads; i++) {
         g_dispatcher->threads[i]->shutdown();
         BX_DELETE(g_dispatcher->alloc, g_dispatcher->threads[i]);

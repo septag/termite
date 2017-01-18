@@ -1,16 +1,18 @@
 # PROJECT: TESTS
 cmake_minimum_required(VERSION 3.3)
 
-if (WIN32)
-    set(${WIN_DEPS} SDL2CopyBinaries)
-endif()
-
 set(SHADER_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../assets/shaders)
 
 if (ANDROID)
     set(PLATFORM_PLUGINS android_assets_driver)
+elseif (IOS)
+    set(PLATFORM_PLUGINS disk_lite_driver)
 else()
-    set(PLATFORM_PLUGINS disk_driver)
+    if (USE_DISK_LITE_DRIVER)
+        set(PLATFORM_PLUGINS disk_lite_driver)
+    else()
+        set(PLATFORM_PLUGINS disk_driver)
+    endif()
 endif()
 
 # test_init

@@ -1,21 +1,16 @@
 #include "termite/core.h"
 #include "termite/io_driver.h"
 
-#define T_CORE_API
-#include "termite/plugin_api.h"
-
 #include "bx/platform.h"
 #include "bx/crtimpl.h"
 #include "bx/cpu.h"
 #include "bxx/path.h"
-#include "bxx/logger.h"
 #include "bxx/pool.h"
 #include "bxx/queue.h"
 #include "bx/thread.h"
 
-#include <android/asset_manager.h>
-#include <android/asset_manager_jni.h>
-#include <jni.h>
+#define T_CORE_API
+#include "termite/plugin_api.h"
 
 #include <mutex>
 #include <condition_variable>
@@ -27,13 +22,11 @@ static CoreApi_v0* g_core = nullptr;
 struct BlockingAssetDriver
 {
     bx::AllocatorI* alloc;
-    AAssetManager* mgr;
     bx::Path rootDir;
 
     BlockingAssetDriver()
     {
         alloc = nullptr;
-        mgr = nullptr;
     }
 };
 
@@ -71,7 +64,6 @@ struct AsyncResponse
 struct AsyncAssetDriver
 {
     bx::AllocatorI* alloc;
-    AAssetManager* mgr;
     IoDriverEventsI* callbacks;
     bx::Thread loadThread;
     bx::Path rootDir;
@@ -89,10 +81,11 @@ struct AsyncAssetDriver
     std::mutex reqMutex;
     std::condition_variable reqCv;
 
+    //bx::Semaphore semaphore;
+
     AsyncAssetDriver()
     {
         alloc = nullptr;
-        mgr = nullptr;
         callbacks = nullptr;
         requestQueue = nullptr;
         responseQueue = nullptr;
@@ -103,21 +96,15 @@ struct AsyncAssetDriver
 
 static BlockingAssetDriver g_blocking;
 static AsyncAssetDriver g_async;
-static AAssetManager* g_amgr = nullptr;
-
-// JNI
-extern "C" JNIEXPORT void JNICALL Java_com_termite_utils_PlatformUtils_termiteInitAssetManager(JNIEnv* env, jclass cls, jobject jassetManager)
-{
-    BX_UNUSED(cls);
-    g_amgr = AAssetManager_fromJava(env, jassetManager);
-}
 
 static bx::Path resolvePath(const char* uri, const bx::Path& rootDir, IoPathType::Enum pathType)
 {
-    assert(pathType != IoPathType::Assets);
-
     bx::Path filepath;
     switch (pathType) {
+    case IoPathType::Assets:
+        filepath = rootDir;
+        filepath.join("assets").join(uri);
+        break;
     case IoPathType::Relative:
         filepath = rootDir;
         filepath.join(uri);
@@ -133,15 +120,8 @@ static bx::Path resolvePath(const char* uri, const bx::Path& rootDir, IoPathType
 static int blockInit(bx::AllocatorI* alloc, const char* uri, const void* params, IoDriverEventsI* callbacks)
 {
     g_blocking.alloc = alloc;
-    g_blocking.mgr = g_amgr;
     g_blocking.rootDir = uri;
     g_blocking.rootDir.normalizeSelf();
-
-    if (!g_blocking.mgr) {
-        T_ERROR_API(g_core, "JNI AssetManager is not initialized. Call "
-                    "com.termite.utils.PlatformUtils.termiteInitAssetManager before initializing the engine");
-        return T_ERR_FAILED;
-    }
 
     return 0;
 }
@@ -162,47 +142,28 @@ static IoDriverEventsI* blockGetCallbacks()
 static MemoryBlock* blockReadRaw(const char* uri, IoPathType::Enum pathType, AsyncResponse::Type* pRes)
 {
     MemoryBlock* mem = nullptr;
-    if (pathType == IoPathType::Assets) {
-        AAsset* asset = AAssetManager_open(g_blocking.mgr, uri, AASSET_MODE_UNKNOWN);
-        if (!asset) {
-            *pRes = AsyncResponse::RequestOpenFailed;
-            return nullptr;
-        }
 
-        off_t size = AAsset_getLength(asset);
-        if (size) {
-            mem = g_core->createMemoryBlock(size, g_blocking.alloc);
-            if (mem) {
-                AAsset_read(asset, mem->data, size);
-                *pRes = AsyncResponse::RequestReadOk;
-            } else {
-                *pRes = AsyncResponse::RequestReadFailed;
-            }
-        }
-        AAsset_close(asset);
-    } else {
-        bx::Path filepath = resolvePath(uri, g_blocking.rootDir, pathType);
+    bx::Path filepath = resolvePath(uri, g_blocking.rootDir, pathType);
 
-        bx::CrtFileReader file;
-        bx::Error err;
-        if (!file.open(filepath.cstr(), &err)) {
-            *pRes = AsyncResponse::RequestOpenFailed;
-            return nullptr;
-        }
-
-        // Get file size
-        int64_t size = file.seek(0, bx::Whence::End);
-        file.seek(0, bx::Whence::Begin);
-
-        // Read Contents
-        if (size) {
-            mem = g_core->createMemoryBlock((uint32_t)size, g_blocking.alloc);
-            if (mem)
-                file.read(mem->data, mem->size, &err);
-        }
-
-        file.close();
+    bx::CrtFileReader file;
+    bx::Error err;
+    if (!file.open(filepath.cstr(), &err)) {
+        *pRes = AsyncResponse::RequestOpenFailed;
+        return nullptr;
     }
+
+    // Get file size
+    int64_t size = file.seek(0, bx::Whence::End);
+    file.seek(0, bx::Whence::Begin);
+
+    // Read Contents
+    if (size) {
+        mem = g_core->createMemoryBlock((uint32_t)size, g_blocking.alloc);
+        if (mem)
+            file.read(mem->data, mem->size, &err);
+    }
+
+    file.close();
 
     *pRes = mem ? AsyncResponse::RequestReadOk : AsyncResponse::RequestReadFailed;
     return mem;
@@ -323,13 +284,6 @@ static int asyncInit(bx::AllocatorI* alloc, const char* uri, const void* params,
 
     g_async.alloc = alloc;
     g_async.callbacks = callbacks;
-    g_async.mgr = g_amgr;
-
-    if (!g_async.mgr) {
-        T_ERROR_API(g_core, "JNI AssetManager is not initialized. Call "
-                    "com.termite.utils.PlatformUtils.termiteInitAssetManager before initializing the engine");
-        return T_ERR_FAILED;
-    }
 
     // Initialize pools and their queues
     if (!g_async.requestPool.create(32, alloc))
@@ -352,6 +306,7 @@ static void asyncShutdown()
 
     bx::AllocatorI* alloc = g_async.alloc;
     bx::atomicExchange<int32_t>(&g_async.stop, 1);
+
     {
         std::lock_guard<std::mutex> lk(g_async.reqMutex);
         g_async.numRequests+=100;
@@ -452,8 +407,8 @@ static const char* asyncGetUri()
 PluginDesc* getAndroidAssetDriverDesc()
 {
     static PluginDesc desc;
-    strcpy(desc.name, "AssetIO");
-    strcpy(desc.description, "AssetIO Android Driver (Blocking and Async)");
+    strcpy(desc.name, "DiskIO_Lite");
+    strcpy(desc.description, "DiskIO-Lite driver (Blocking and Async) - with no Hot-Loading and Libuv support");
     desc.type = PluginType::IoDriver;
     desc.version = T_MAKE_VERSION(1, 0);
     return &desc;

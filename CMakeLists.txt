@@ -37,10 +37,13 @@ option(BUILD_FISHERBOY "Build Fisherboy Game" OFF)
 option(USE_SDL2 "Use SDL2 with the engine" ON)
 option(BUILD_STATIC "Force Static library builds" OFF)
 if (NOT ANDROID AND NOT IOS)
+    option(USE_DISK_LITE_DRIVER "Use Disk-Lite IO Driver for PC builds. So there will be no Hot-Loading and LibUV dependency" OFF)
     option(BUILD_TOOLS "Build tools" ON)
 else()
+    option(USE_DISK_LITE_DRIVER "Use Disk-Lite IO Driver for PC builds. So there will be no Hot-Loading and LibUV dependency" ON)
     option(BUILD_TOOLS "Build tools" OFF)
 endif()
+option(BUILD_TESTS "Build test programs" OFF)
 
 # Dependencies
 
@@ -49,17 +52,23 @@ if (USE_SDL2)
     include(FindSDL2)
 endif()
 
-include(FindAssimp)
-include(FindLibuv)
 include(FindBgfx)
+
+if (BUILD_TOOLS)
+    include(FindAssimp)
+endif()
+    
+if (NOT USE_DISK_LITE_DRIVER AND NOT ANDROID AND NOT IOS)
+    include(FindLibuv)
+endif()
 
 # standard windows dependencies
 if (WIN32)
-    if (NOT ASSIMP_FOUND)
+    if (BUILD_TOOLS AND NOT ASSIMP_FOUND)
         download_package(${DOWNLOAD_URL_ROOT}/assimp_vc140.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
         include(FindAssimp)
     endif()
-    if (NOT LIBUV_FOUND)
+    if (NOT USE_DISK_LITE_DRIVER AND NOT LIBUV_FOUND)
         download_package(${DOWNLOAD_URL_ROOT}/libuv_vc140.tar.gz ${CMAKE_CURRENT_SOURCE_DIR}/deps)
         include(FindLibuv)
     endif()
@@ -96,7 +105,7 @@ else()
     message(FATAL_ERROR "Bgfx library not found")
 endif()
 
-if (NOT ANDROID AND NOT IOS)
+if (NOT USE_DISK_LITE_DRIVER AND NOT ANDROID AND NOT IOS)
     if (LIBUV_FOUND)
         if (WIN32)
             libuv_copy_binaries(${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
@@ -215,8 +224,14 @@ add_subdirectory(source/termite)
 add_subdirectory(source/driver_bgfx)
 if (ANDROID)
     add_subdirectory(source/driver_android_assets)
-elseif(NOT IOS)
-    add_subdirectory(source/driver_disk)
+elseif (IOS)
+    add_subdirectory(source/driver_disk_lite)
+else()
+    if (USE_DISK_LITE_DRIVER)
+        add_subdirectory(source/driver_disk_lite)
+    else()
+        add_subdirectory(source/driver_disk)
+    endif()
 endif()
 
 if (USE_BOX2D)
@@ -226,8 +241,6 @@ if (USE_BOX2D)
     add_subdirectory(source/driver_box2d)
 endif()
 
-#add_subdirectory(source/render_stock)
-
 # tools
 if (BUILD_TOOLS)
     add_subdirectory(source/ls-model)
@@ -236,18 +249,23 @@ if (BUILD_TOOLS)
 endif()
 
 # tests
-add_subdirectory(tests)
+if (BUILD_TESTS)
+    add_subdirectory(tests)
+endif()
 
 # copy binaries
 if (WIN32)
     set_target_properties(AssimpCopyBinaries PROPERTIES FOLDER Deps/CopyBinaries) 
-    set_target_properties(LibuvCopyBinaries PROPERTIES FOLDER Deps/CopyBinaries) 
     set_target_properties(SDL2CopyBinaries PROPERTIES FOLDER Deps/CopyBinaries) 
+
+    set(WIN_DEPS SDL2CopyBinaries)
+    if (NOT USE_DISK_LITE_DRIVER)
+        set_target_properties(LibuvCopyBinaries PROPERTIES FOLDER Deps/CopyBinaries) 
+        set(WIN_DEPS ${WIN_DEPS} LibuvCopyBinaries)
+    endif()
 endif()
 
-# Digger
+# Add Games Here
 if (BUILD_FISHERBOY)
     add_subdirectory(fisherboy)
 endif()
-
-
