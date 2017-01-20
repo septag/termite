@@ -7,6 +7,7 @@
 #define BX_CPU_H_HEADER_GUARD
 
 #include "bx.h"
+#include "platform.h"
 
 #if BX_COMPILER_MSVC
 #	if BX_PLATFORM_XBOX360
@@ -34,7 +35,7 @@ extern "C" void _ReadWriteBarrier();
 #   pragma intrinsic(_InterlockedXor)
 #   pragma intrinsic(_InterlockedAnd)
 #   pragma intrinsic(_InterlockedOr)
-#elif (__arm__)
+#elif (BX_CPU_ARM)
 #  if __ARM_NEON__
 #   include <arm_neon.h>
 #  endif
@@ -76,7 +77,7 @@ namespace bx
 
     inline void yieldCpu()
     {
-#ifdef __arm__
+#if BX_CPU_ARM
         asm volatile("NOP");
 #else
         _mm_pause();
@@ -102,10 +103,10 @@ namespace bx
 	inline Ty atomicFetchAndAdd(volatile Ty* _ptr, Ty _value);
 
 	template<typename Ty>
-	inline Ty atomicAddAndFetch(volatile Ty* _ptr, Ty _value);
+	Ty atomicAddAndFetch(volatile Ty* _ptr, Ty _value);
 
 	template<typename Ty>
-	inline Ty atomicFetchAndSub(volatile Ty* _ptr, Ty _value);
+	Ty atomicFetchAndSub(volatile Ty* _ptr, Ty _value);
 
 	template<typename Ty>
 	inline Ty atomicSubAndFetch(volatile Ty* _ptr, Ty _value);

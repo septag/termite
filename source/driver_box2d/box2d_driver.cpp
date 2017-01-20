@@ -283,7 +283,6 @@ static PhysScene2D* createSceneBox2d(const PhysSceneDef2D& worldDef)
 
 static void destroySceneBox2d(PhysScene2D* scene)
 {
-    bx::AllocatorI* alloc = g_box2d.alloc;
     g_box2d.scenePool.deleteInstance(scene);
 }
 

@@ -118,20 +118,6 @@ static result_t loadPlugin(const bx::Path& pluginPath, void** pDllHandle, Plugin
     return 0;
 }
 
-static result_t validatePlugin(const bx::Path& pluginPath, PluginDesc* desc)
-{
-    void* dllHandle;
-    PluginApi_v0* api;
-    if (T_FAILED(loadPlugin(pluginPath, &dllHandle, &api))) {
-        return -1;
-    }
-
-    memcpy(desc, api->getDesc(), sizeof(PluginDesc));
-    bx::dlclose(dllHandle);
-
-    return 0;
-}
-
 result_t termite::initPluginSystem(const char* pluginPath, bx::AllocatorI* alloc)
 {
     if (g_pluginSys) {

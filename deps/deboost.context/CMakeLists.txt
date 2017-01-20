@@ -6,6 +6,16 @@ if (NOT CMAKE_MODULE_PATH)
     set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 endif()
 
+# IOS is a different story, I had to make xcode project manually that contains two targets with different ARCHS and 
+# Another target to join them together
+if (IOS)
+    add_custom_target(fcontext 
+        COMMAND xcodebuild -workspace ${CMAKE_CURRENT_SOURCE_DIR}/projects/xcode/fcontext/fcontext.xcodeproj/project.xcworkspace -scheme fcontext -configuration 'Release' -sdk iphoneos10.0 CONFIGURATION_BUILD_DIR=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+        COMMENT "Building deboost.context"
+        VERBATIM)
+    return()
+endif()
+
 if (MSVC)
     enable_language(CXX ASM_MASM)
 else()
@@ -38,13 +48,6 @@ if (UNIX)
             set(CPU_ARCH "x86_64")
             set(ASM_EXT "sysv_elf_gas.S")
         endif()
-    elseif(IOS)
-        if (CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
-            set(CPU_ARCH "arm64")
-        else()
-            set(CPU_ARCH "arm")
-        endif()
-        set(ASM_EXT "aapcs_macho_gas.S")
     else()
         # PC (x86/x64)
         if (CMAKE_SIZEOF_VOID_P EQUAL 8)

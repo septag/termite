@@ -211,7 +211,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_subdirectory(deps/deboost.context)
 add_subdirectory(deps/bx)
 add_subdirectory(deps/nvg)
-set_target_properties(fcontext PROPERTIES FOLDER Deps)
+if (NOT IOS)
+    set_target_properties(fcontext PROPERTIES FOLDER Deps)
+endif()
 set_target_properties(nanovg PROPERTIES FOLDER Deps)
 
 # common

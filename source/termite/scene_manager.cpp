@@ -74,8 +74,8 @@ namespace termite
             tag(0),
             flags(0),
             userData(nullptr),
-            drawOnEffectFb(false),
-            lnode(this)
+            lnode(this),
+            drawOnEffectFb(false)
         {
             name[0] = 0;
         }
@@ -648,7 +648,6 @@ Scene* termite::findScene(SceneManager* mgr, const char* name, FindSceneMode::En
         break;
     default:
     {
-        Scene* scene = nullptr;
         bx::List<Scene*>::Node* node = mgr->sceneList.getFirst();
         while (node) {
             if (bx::stricmp(node->data->name, name) == 0)
@@ -677,7 +676,6 @@ int termite::findSceneByTag(SceneManager* mgr, Scene** pScenes, int maxScenes, u
         break;
     default:
     {
-        Scene* scene = nullptr;
         bx::List<Scene*>::Node* node = mgr->sceneList.getFirst();
         while (node && index < maxScenes) {
             if (node->data->tag == tag)
