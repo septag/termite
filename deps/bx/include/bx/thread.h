@@ -21,6 +21,7 @@ using namespace Windows::System::Threading;
 #endif // BX_PLATFORM_
 
 #include "sem.h"
+#include "string.h"
 
 #if BX_CONFIG_SUPPORTS_THREADING
 
@@ -49,6 +50,7 @@ namespace bx
 			, m_exitCode(0 /*EXIT_SUCCESS*/)
 			, m_running(false)
 		{
+            m_name[0] = 0;
 		}
 
 		virtual ~Thread()
@@ -110,12 +112,15 @@ namespace bx
 #	error "Not implemented!"
 #endif // BX_PLATFORM_
 
+            bx::strlcpy(m_name, _name, sizeof(m_name));
 			m_sem.wait();
-
+            
+#if !BX_PLATFORM_IOS && !BX_PLATFORM_OSX
 			if (NULL != _name)
 			{
 				setThreadName(_name);
 			}
+#endif
 		}
 
 		void shutdown()
@@ -147,6 +152,11 @@ namespace bx
 		{
 			return m_running;
 		}
+        
+        const char* getName() const
+        {
+            return m_name;
+        }
 
 		int32_t getExitCode() const
 		{
@@ -203,7 +213,9 @@ namespace bx
 		int32_t entry()
 		{
 #if BX_PLATFORM_WINDOWS
-			m_threadId = ::GetCurrentThreadId();
+            m_threadId = ::GetCurrentThreadId();
+#elif BX_PLATFORM_IOS || BX_PLATFORM_OSX
+            setThreadName(m_name);
 #endif // BX_PLATFORM_WINDOWS
 
 			m_sem.post();
@@ -259,6 +271,7 @@ namespace bx
 		uint32_t  m_stackSize;
 		int32_t   m_exitCode;
 		bool      m_running;
+        char      m_name[32];
 	};
 
 #if BX_PLATFORM_WINDOWS

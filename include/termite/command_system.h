@@ -41,9 +41,9 @@ namespace termite
     TERMITE_API CommandHandle endCommandChain();
 
     template <typename Tx>
-    CommandHandle addCommandChain(CommandTypeHandle handle, const Tx& param)
+    void addCommandChain(CommandTypeHandle handle, const Tx& param)
     {
-        return addCommandChain(handle, (const void*)&param);
+        addCommandChain(handle, (const void*)&param);
     }
 
     TERMITE_API void executeCommand(CommandHandle handle);

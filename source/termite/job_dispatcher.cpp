@@ -508,7 +508,7 @@ result_t termite::initJobDispatcher(bx::AllocatorI* alloc,
         for (uint8_t i = 0; i < numWorkerThreads; i++) {
             g_dispatcher->threads[i] = BX_NEW(alloc, bx::Thread);
             char name[32];
-            bx::snprintf(name, sizeof(name), "Thread #%d", i + 1);
+            bx::snprintf(name, sizeof(name), "JobThread #%d", i + 1);
             g_dispatcher->threads[i]->init(threadFunc, nullptr, 8 * 1024, name);
         }
     }

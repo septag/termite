@@ -4,6 +4,9 @@ cmake_minimum_required(VERSION 3.3)
 # Source Files
 file(GLOB SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.c*" "*.h")
 file(GLOB INCLUDE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "../../include/termite/*.h")
+if (IOS)
+    list(APPEND SOURCE_FILES "ios_window.mm")
+endif()
 source_group(source FILES ${SOURCE_FILES})
 source_group(include FILES ${INCLUDE_FILES})
 
@@ -55,19 +58,29 @@ endif()
 if (BUILD_STATIC)
     if (ANDROID)
         set(DISK_DRIVER android_assets_driver)
+    elseif (USE_DISK_LITE_DRIVER)
+        set(DISK_DRIVER disk_lite_driver)
     else()
         set(DISK_DRIVER disk_driver)
     endif()
     set(PLUGIN_LIBS bgfx_driver box2d_driver ${DISK_DRIVER})
 endif()
 
+if (NOT IOS)
+    set(FCONTEXT_LIB fcontext)
+else()
+    add_dependencies(termite fcontext)
+    get_filename_component(FCONTEXT_LIB ${CMAKE_CURRENT_SOURCE_DIR}/../../out/libfcontext.a ABSOLUTE)
+    get_filename_component(FCONTEXT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/deboost.context/include ABSOLUTE)
+endif()
+
 target_link_libraries(termite 
-    PRIVATE fcontext imgui_impl ${PLUGIN_LIBS} ${PRIVATE_LIBS}
+    PRIVATE ${FCONTEXT_LIB} imgui_impl ${PLUGIN_LIBS} ${PRIVATE_LIBS}
     PUBLIC bx ${STD_LIBS})
 
 # 
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)
-target_include_directories(termite PUBLIC ${TERMITE_INCLUDE_DIR} ${DEP_ROOT_DIR})
+target_include_directories(termite PUBLIC ${TERMITE_INCLUDE_DIR} ${DEP_ROOT_DIR} ${FCONTEXT_INCLUDE_DIR})
 if (USE_SDL2)
     target_include_directories(termite PUBLIC ${SDL2_INCLUDE_DIR})
     target_link_libraries(termite PUBLIC ${SDL2_LIBRARY})

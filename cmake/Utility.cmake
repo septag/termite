@@ -20,22 +20,54 @@ function(join_array VALUES GLUE OUTPUT)
   set (${OUTPUT} "${_TMP_STR}" PARENT_SCOPE)
 endfunction()
 
-##############################################
-# remove CXX flags
-macro(remove_cxx_flag flag)
-    string(REPLACE "${flag}" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-endmacro()
-
-macro(remove_c_flag flag)
-    string(REPLACE "${flag}" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
-endmacro()
-
 # build compile flags
-function(copy_build_flags BUILD_TYPE)
+function(copy_release_build_flags BUILD_TYPE)
     set(CMAKE_C_FLAGS_${BUILD_TYPE} ${CMAKE_C_FLAGS_RELEASE} PARENT_SCOPE)
     set(CMAKE_CXX_FLAGS_${BUILD_TYPE} ${CMAKE_CXX_FLAGS_RELEASE} PARENT_SCOPE)
     set(CMAKE_SHARED_LINKER_FLAGS_${BUILD_TYPE} ${CMAKE_SHARED_LINKER_FLAGS_RELEASE} PARENT_SCOPE)
     set(CMAKE_MODULE_LINKER_FLAGS_${BUILD_TYPE} ${CMAKE_MODULE_LINKER_FLAGS_RELEASE} PARENT_SCOPE)
     set(CMAKE_EXE_LINKER_FLAGS_${BUILD_TYPE} ${CMAKE_EXE_LINKER_FLAGS_RELEASE} PARENT_SCOPE)
     set(CMAKE_STATIC_LINKER_FLAGS_${BUILD_TYPE} ${CMAKE_STATIC_LINKER_FLAGS_RELEASE} PARENT_SCOPE)
+endfunction()
+
+##############################################
+# remove CXX flags
+function(remove_cxx_flags FLAGS)
+    separate_arguments(FLAGS)
+    foreach(FLAG ${FLAGS})
+        string(REPLACE "${FLAG}" "" TEMP_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+        set(CMAKE_CXX_FLAGS ${TEMP_CXX_FLAGS} PARENT_SCOPE)
+
+        if (CMAKE_CXX_FLAGS_DEBUG)
+            string(REPLACE "${FLAG}" "" TEMP_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+            set(CMAKE_CXX_FLAGS_DEBUG ${TEMP_CXX_FLAGS_DEBUG} PARENT_SCOPE)
+        endif()
+
+        if (CMAKE_CXX_FLAGS_DEVELOPMENT)
+            string(REPLACE "${FLAG}" "" TEMP_CXX_FLAGS_DEVELOPMENT "${CMAKE_CXX_FLAGS_DEVELOPMENT}")
+            set(CMAKE_CXX_FLAGS_DEBUG ${TEMP_CXX_FLAGS_DEVELOPMENT} PARENT_SCOPE)
+        endif()
+
+        if (CMAKE_CXX_FLAGS_PROFILE)
+            string(REPLACE "${FLAG}" "" TEMP_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_PROFILE}")
+            set(CMAKE_CXX_FLAGS_DEBUG ${TEMP_CXX_FLAGS_PROFILE} PARENT_SCOPE)
+        endif()
+
+        if (CMAKE_CXX_FLAGS_RELEASE)
+            string(REPLACE "${FLAG}" "" TEMP_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+            set(CMAKE_CXX_FLAGS_DEBUG ${TEMP_CXX_FLAGS_RELEASE} PARENT_SCOPE)
+        endif()
+    endforeach()
+endfunction()
+
+function(add_cxx_flags FLAGS)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FLAGS}" PARENT_SCOPE)
+endfunction()
+
+function(remove_duplicates COMPILE_FLAGS RESULT)
+    set(TEMP_FLAGS ${COMPILE_FLAGS})
+    separate_arguments(TEMP_FLAGS)  
+    list(REMOVE_DUPLICATES TEMP_FLAGS)
+    string(REPLACE ";" " " COMPILE_FLAGS_STRIPPED "${TEMP_FLAGS}") 
+    set(${RESULT} ${COMPILE_FLAGS_STRIPPED} PARENT_SCOPE)
 endfunction()
