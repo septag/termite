@@ -6,6 +6,7 @@ _ReSharper*
 *.dir
 *.suo
 *.user
+*.bak
 Win32
 Win64
 Debug
