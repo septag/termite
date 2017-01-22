@@ -11,6 +11,10 @@
 #include "sdl_utils.h"
 #include "imgui.h"
 
+#if BX_PLATFORM_IOS
+void* iosGetNativeLayer(void* wnd);
+#endif
+
 using namespace termite;
 
 struct ShortcutKey
@@ -104,6 +108,7 @@ void termite::sdlGetNativeWindowHandle(SDL_Window* window, void** pWndHandle, vo
     *pWndHandle = (void*)(uintptr_t)wmi.info.x11.window;
 #elif BX_PLATFORM_OSX
     *pWndHandle = wmi.info.cocoa.window;
+    wmi.info.cocoa
 #elif BX_PLATFORM_STEAMLINK
     if (pDisplayHandle)
         *pDisplayHandle = wmi.info.vivante.display;
@@ -114,6 +119,8 @@ void termite::sdlGetNativeWindowHandle(SDL_Window* window, void** pWndHandle, vo
     *pWndHandle = wmi.info.android.window;
     if (pBackbuffer)
         *pBackbuffer = wmi.info.android.surface;
+#elif BX_PLATFORM_IOS
+    *pWndHandle = iosGetNativeLayer(wmi.info.uikit.window);
 #endif // BX_PLATFORM_
 }
 

@@ -155,12 +155,16 @@ if(MSVC)
     add_definitions(-D_SCL_SECURE_NO_WARNINGS)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 
-    remove_cxx_flag("/EHsc")
-    remove_cxx_flag("/GR")
-    add_compile_options(/GR-)
+    remove_cxx_flags("/EHsc /GR")
+    add_cxx_flags("/GR-")
 else()
-    add_compile_options(-std=c++11 -fPIC -Wno-switch -fno-rtti -fno-exceptions)
+    add_compile_options(-fPIC)
+    add_cxx_flags("-std=c++11 -Wno-switch -fno-rtti -fno-exceptions")
 endif()
+
+# Strip duplicates from CXX flags
+remove_duplicates(${CMAKE_CXX_FLAGS} CMAKE_CXX_FLAGS)
+remove_duplicates(${CMAKE_C_FLAGS} CMAKE_C_FLAGS)
 
 if (ANDROID)    
     add_definitions(-D__STDC_LIMIT_MACROS 
@@ -187,8 +191,8 @@ endif()
 add_definitions(-Dtermite_SHADER_APPEND_PATH=${CMAKE_SYSTEM_NAME})
 
 # copy release flags into profile
-copy_build_flags(PROFILE)
-copy_build_flags(DEVELOPMENT)
+copy_release_build_flags(PROFILE)
+copy_release_build_flags(DEVELOPMENT)
 
 # http://stackoverflow.com/questions/33829152/for-cmake-can-you-modify-the-release-debug-compiler-flags-with-add-compiler-fl
 set(DEBUG_COMPILE_OPTIONS "-DBX_CONFIG_ALLOCATOR_DEBUG" "-Dtermite_DEV=1")
@@ -214,7 +218,6 @@ add_subdirectory(deps/nvg)
 if (NOT IOS)
     set_target_properties(fcontext PROPERTIES FOLDER Deps)
 endif()
-set_target_properties(nanovg PROPERTIES FOLDER Deps)
 
 # common
 add_subdirectory(source/imgui_impl)

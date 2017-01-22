@@ -4,6 +4,9 @@ cmake_minimum_required(VERSION 3.3)
 # Source Files
 file(GLOB SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.c*" "*.h")
 file(GLOB INCLUDE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "../../include/termite/*.h")
+if (IOS)
+    list(APPEND SOURCE_FILES "ios_window.mm")
+endif()
 source_group(source FILES ${SOURCE_FILES})
 source_group(include FILES ${INCLUDE_FILES})
 
@@ -67,6 +70,7 @@ if (NOT IOS)
     set(FCONTEXT_LIB fcontext)
 else()
     add_dependencies(termite fcontext)
+    get_filename_component(FCONTEXT_LIB ${CMAKE_CURRENT_SOURCE_DIR}/../../out/libfcontext.a ABSOLUTE)
     get_filename_component(FCONTEXT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/deboost.context/include ABSOLUTE)
 endif()
 

@@ -313,7 +313,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
 #elif BX_PLATFORM_IOS
     const char* ioDriverName = "DiskIO_Lite";
 #else
-    const char* ioDriverName = "DiskIO_Lite";
+    const char* ioDriverName = "DiskIO";
 #endif
     r = findPluginByName(conf.ioName[0] ? conf.ioName : ioDriverName , 0, &pluginHandle, 1, PluginType::IoDriver);
     if (r > 0) {
@@ -973,5 +973,7 @@ void GfxDriverEvents::onTraceVargs(const char* filepath, int line, const char* f
         g_core->gfxLogCache[g_core->numGfxLogCache-1].type = bx::LogType::Verbose;
         strcpy(g_core->gfxLogCache[g_core->numGfxLogCache-1].text, text);
         m_lock.unlock();
+        dumpGfxLog();
     }
+
 }

@@ -35,6 +35,10 @@ static PluginSystem* g_pluginSys = nullptr;
 void* initAndroidAssetDriver(bx::AllocatorI* alloc, GetApiFunc getApi);
 PluginDesc* getAndroidAssetDriverDesc();
 void shutdownAndroidAssetDriver();
+#elif BX_PLATFORM_IOS
+void* initDiskLiteDriver(bx::AllocatorI* alloc, GetApiFunc getApi);
+PluginDesc* getDiskLiteDriverDesc();
+void shutdownDiskLiteDriver();
 #else
 PluginDesc* getDiskDriverDesc();
 void* initDiskDriver(bx::AllocatorI* alloc, GetApiFunc getApi);
@@ -60,6 +64,11 @@ static void loadStaticPlugins()
     ioApi.getDesc = getAndroidAssetDriverDesc;
     ioApi.init = initAndroidAssetDriver;
     ioApi.shutdown = shutdownAndroidAssetDriver;
+#elif BX_PLATFORM_IOS
+    memcpy(&p->desc, getDiskLiteDriverDesc(), sizeof(p->desc));
+    ioApi.getDesc = getDiskLiteDriverDesc;
+    ioApi.init = initDiskLiteDriver;
+    ioApi.shutdown = shutdownDiskLiteDriver;
 #else
     memcpy(&p->desc, getDiskDriverDesc(), sizeof(p->desc));
     ioApi.getDesc = getDiskDriverDesc;

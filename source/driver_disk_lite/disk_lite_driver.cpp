@@ -96,14 +96,24 @@ struct AsyncAssetDriver
 
 static BlockingAssetDriver g_blocking;
 static AsyncAssetDriver g_async;
+static int g_assetsBundleId = -1;
+
+#if BX_PLATFORM_IOS
+int iosAddBundle(const char* bundleName);
+bx::Path iosResolveBundlePath(int bundleId, const char* filepath);
+#endif
 
 static bx::Path resolvePath(const char* uri, const bx::Path& rootDir, IoPathType::Enum pathType)
 {
     bx::Path filepath;
     switch (pathType) {
     case IoPathType::Assets:
+#if !BX_PLATFORM_IOS
         filepath = rootDir;
         filepath.join("assets").join(uri);
+#else
+        filepath = iosResolveBundlePath(g_assetsBundleId, uri);
+#endif
         break;
     case IoPathType::Relative:
         filepath = rootDir;
@@ -404,7 +414,7 @@ static const char* asyncGetUri()
 }
 
 //
-PluginDesc* getAndroidAssetDriverDesc()
+PluginDesc* getDiskLiteDriverDesc()
 {
     static PluginDesc desc;
     strcpy(desc.name, "DiskIO_Lite");
@@ -414,7 +424,7 @@ PluginDesc* getAndroidAssetDriverDesc()
     return &desc;
 }
 
-void* initAndroidAssetDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
+void* initDiskLiteDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 {
     g_core = (CoreApi_v0*)getApi(uint16_t(ApiId::Core), 0);
     if (!g_core)
@@ -449,11 +459,16 @@ void* initAndroidAssetDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     blockApi.runAsyncLoop = blockRunAsyncLoop;
     blockApi.getOpMode = blockGetOpMode;
     blockApi.getUri = blockGetUri;
+    
+#if BX_PLATFORM_IOS
+    if (g_assetsBundleId == -1)
+        g_assetsBundleId = iosAddBundle("assets");
+#endif
 
     return &driver;
 }
 
-void shutdownAndroidAssetDriver()
+void shutdownDiskLiteDriver()
 {
 }
 
