@@ -973,7 +973,6 @@ void GfxDriverEvents::onTraceVargs(const char* filepath, int line, const char* f
         g_core->gfxLogCache[g_core->numGfxLogCache-1].type = bx::LogType::Verbose;
         strcpy(g_core->gfxLogCache[g_core->numGfxLogCache-1].text, text);
         m_lock.unlock();
-        dumpGfxLog();
     }
 
 }

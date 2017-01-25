@@ -1,11 +1,12 @@
 #pragma once
 
 #include "bx/bx.h"
+#include "bx/platform.h"
 #include "bx/fpumath.h"
 #include <float.h>
 #include <cassert>
 
-#ifdef __clang__
+#if BX_COMPILER_CLANG || BX_COMPILER_GCC
 #  include <limits.h>
 #endif
 

@@ -164,7 +164,9 @@ endif()
 
 # Strip duplicates from CXX flags
 remove_duplicates(${CMAKE_CXX_FLAGS} CMAKE_CXX_FLAGS)
-remove_duplicates(${CMAKE_C_FLAGS} CMAKE_C_FLAGS)
+if (CMAKE_C_FLAGS)
+    remove_duplicates(${CMAKE_C_FLAGS} CMAKE_C_FLAGS)
+endif()
 
 if (ANDROID)    
     add_definitions(-D__STDC_LIMIT_MACROS 
