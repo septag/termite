@@ -106,8 +106,10 @@ static result_t loadPlugin(const bx::Path& pluginPath, void** pDllHandle, Plugin
         return -1;
 
     void* dllHandle = bx::dlopen(pluginPath.cstr());
-    if (!dllHandle)
+    if (!dllHandle) {
+        puts(dlerror());
         return -1;  // Invalid DLL
+    }
 
     GetApiFunc getPluginApi = (GetApiFunc)bx::dlsym(dllHandle, "termiteGetPluginApi");
     if (!getPluginApi) {
@@ -123,6 +125,20 @@ static result_t loadPlugin(const bx::Path& pluginPath, void** pDllHandle, Plugin
 
     *pDllHandle = dllHandle;
     *pApi = pluginApi;
+
+    return 0;
+}
+
+static result_t validatePlugin(const bx::Path& pluginPath, PluginDesc* desc)
+{
+    void* dllHandle;
+    PluginApi_v0* api;
+    if (T_FAILED(loadPlugin(pluginPath, &dllHandle, &api))) {
+        return -1;
+    }
+
+    memcpy(desc, api->getDesc(), sizeof(PluginDesc));
+    bx::dlclose(dllHandle);
 
     return 0;
 }

@@ -61,7 +61,7 @@ function(remove_cxx_flags FLAGS)
 endfunction()
 
 function(add_cxx_flags FLAGS)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FLAGS}" PARENT_SCOPE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}${FLAGS}" PARENT_SCOPE)
 endfunction()
 
 function(remove_duplicates COMPILE_FLAGS RESULT)
