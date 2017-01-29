@@ -26,7 +26,6 @@ find_library(BGFX_LIBRARY_RELEASE bgfxRelease PATHS ${BGFX_ROOT_DIR}/lib ${FIND_
 find_library(BGFX_LIBRARY_DEBUG	bgfxDebug PATHS ${BGFX_ROOT_DIR}/lib ${FIND_EXTRA_FLAG})
 
 if (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-	message("ding")
 	find_library(BX_LIBRARY_RELEASE bxRelease PATHS ${BGFX_ROOT_DIR}/lib ${FIND_EXTRA_FLAG})
 	find_library(BX_LIBRARY_DEBUG bxDebug PATHS ${BGFX_ROOT_DIR}/lib ${FIND_EXTRA_FLAG})
 endif()

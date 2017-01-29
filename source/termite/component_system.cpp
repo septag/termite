@@ -519,7 +519,7 @@ static void sortAndBatchComponents(ComponentGroup* group)
     if (!group->sorted) {
         group->batches.clear();
         if (count > 0) {
-            std::sort(group->components.itemPtr(0), group->components.itemPtr(count - 1),
+            std::sort(group->components.itemPtr(0), group->components.itemPtr(0) + count,
                       [](const ComponentHandle& a, const ComponentHandle& b) { return a.value < b.value; });
 
             // Batch by component-type

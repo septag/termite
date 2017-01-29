@@ -93,7 +93,8 @@ namespace termite
     TERMITE_API void pauseSpriteAnim(Sprite* sprite);
     TERMITE_API void resumeSpriteAnim(Sprite* sprite);
     TERMITE_API void stopSpriteAnim(Sprite* sprite);
-
+    TERMITE_API void replaySpriteAnim(Sprite* sprite);
+    
     // Set frame callbacks: Frame callbacks are called when sprite animation reaches them
     TERMITE_API void setSpriteFrameCallbackByTag(Sprite* sprite, const char* frameTag, SpriteFrameCallback callback,
                                                  void* userData);

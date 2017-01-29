@@ -652,6 +652,12 @@ void termite::stopSpriteAnim(Sprite* sprite)
     sprite->playSpeed = 0;
 }
 
+void termite::replaySpriteAnim(Sprite* sprite)
+{
+    sprite->curFrameIdx = 0;
+    sprite->playSpeed = sprite->resumeSpeed;
+}
+
 void termite::setSpriteFrameCallbackByTag(Sprite* sprite, const char* frameTag, SpriteFrameCallback callback, void* userData)
 {
     assert(frameTag);

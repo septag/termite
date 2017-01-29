@@ -34,34 +34,15 @@ endfunction()
 # remove CXX flags
 function(remove_cxx_flags FLAGS)
     separate_arguments(FLAGS)
+    set(TEMP_CXX_FLAGS ${CMAKE_CXX_FLAGS})
     foreach(FLAG ${FLAGS})
-        string(REPLACE "${FLAG}" "" TEMP_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-        set(CMAKE_CXX_FLAGS ${TEMP_CXX_FLAGS} PARENT_SCOPE)
-
-        if (CMAKE_CXX_FLAGS_DEBUG)
-            string(REPLACE "${FLAG}" "" TEMP_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
-            set(CMAKE_CXX_FLAGS_DEBUG ${TEMP_CXX_FLAGS_DEBUG} PARENT_SCOPE)
-        endif()
-
-        if (CMAKE_CXX_FLAGS_DEVELOPMENT)
-            string(REPLACE "${FLAG}" "" TEMP_CXX_FLAGS_DEVELOPMENT "${CMAKE_CXX_FLAGS_DEVELOPMENT}")
-            set(CMAKE_CXX_FLAGS_DEBUG ${TEMP_CXX_FLAGS_DEVELOPMENT} PARENT_SCOPE)
-        endif()
-
-        if (CMAKE_CXX_FLAGS_PROFILE)
-            string(REPLACE "${FLAG}" "" TEMP_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_PROFILE}")
-            set(CMAKE_CXX_FLAGS_DEBUG ${TEMP_CXX_FLAGS_PROFILE} PARENT_SCOPE)
-        endif()
-
-        if (CMAKE_CXX_FLAGS_RELEASE)
-            string(REPLACE "${FLAG}" "" TEMP_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-            set(CMAKE_CXX_FLAGS_DEBUG ${TEMP_CXX_FLAGS_RELEASE} PARENT_SCOPE)
-        endif()
+        string(REPLACE "${FLAG}" "" TEMP_CXX_FLAGS "${TEMP_CXX_FLAGS}")
     endforeach()
+    set(CMAKE_CXX_FLAGS ${TEMP_CXX_FLAGS} PARENT_SCOPE)
 endfunction()
 
 function(add_cxx_flags FLAGS)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}${FLAGS}" PARENT_SCOPE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FLAGS}" PARENT_SCOPE)
 endfunction()
 
 function(remove_duplicates COMPILE_FLAGS RESULT)

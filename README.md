@@ -63,7 +63,7 @@ Before that download and install _Android NDK_ and _Android SDK_. Define Environ
 ```
 mkdir .build  
 cd .build  
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/android.toolchain.cmake -DANDROID_ABI="armeabi-v7a with NEON" -DANDROID_NATIVE_API_LEVEL=android-19 -DANDROID_STL=gnustl_shared -DANDROID_STL_FORCE_FEATURES=0 -DCMAKE_BUILD_TYPE=Release -GNinja
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/android.toolchain.cmake -DANDROID_ABI="armeabi-v7a with NEON" -DANDROID_NATIVE_API_LEVEL=android-19 -DANDROID_STL=gnustl_static -DANDROID_STL_FORCE_FEATURES=0 -DCMAKE_BUILD_TYPE=Release -GNinja
 ```
 
 In the example above, I built for _armv7a_ architecture in ```-DANDROID_ABI="armeabi-v7a with NEON"```.  

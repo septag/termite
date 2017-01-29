@@ -66,7 +66,7 @@
 #  License text for the above reference.)
 
 if (ANDROID)
-	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/sdl_android_arm CACHE PATH "SDL2 root directory")
+	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/SDL2_android CACHE PATH "SDL2 root directory")
     set(FIND_EXTRA_FLAG NO_CMAKE_FIND_ROOT_PATH)
     set(SDL2_ANDROID_MAIN_ENTRY ${SDL2_PATH}/src/main/android/SDL_android_main.c)
 elseif (IOS)

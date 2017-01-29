@@ -107,7 +107,7 @@ static result_t loadPlugin(const bx::Path& pluginPath, void** pDllHandle, Plugin
 
     void* dllHandle = bx::dlopen(pluginPath.cstr());
     if (!dllHandle) {
-        puts(dlerror());
+        //puts(dlerror());
         return -1;  // Invalid DLL
     }
 
