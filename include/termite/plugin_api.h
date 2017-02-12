@@ -422,7 +422,7 @@ namespace termite
 		void* (*getComponentData)(ComponentHandle handle);
 		void (*garbageCollectComponents)(EntityManager* emgr);
 
-        void (*runComponentGroup)(ComponentStage::Enum stage, ComponentGroupHandle groupHandle, float dt);
+        void (*runComponentGroup)(ComponentUpdateStage::Enum stage, ComponentGroupHandle groupHandle, float dt);
         ComponentGroupHandle (*createComponentGroup)(bx::AllocatorI* alloc, uint16_t poolSize);
         void (*destroyComponentGroup)(ComponentGroupHandle handle);
 	};

@@ -172,6 +172,13 @@ namespace bx
 		return fmodf(_a, _b);
 	}
 
+    inline float facos(float _a)
+    {
+        if (_a < -1.0f) _a = -1.0f;
+        if (_a > 1.0f)  _a = 1.0f;
+        return acosf(_a);
+    }
+
 	inline bool fequal(float _a, float _b, float _epsilon)
 	{
 		// http://realtimecollisiondetection.net/blog/?p=89

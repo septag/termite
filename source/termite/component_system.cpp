@@ -187,10 +187,8 @@ static void removeFromComponentGroup(ComponentGroupHandle handle, ComponentHandl
     int index = group->components.find(component);
     if (index != -1) {
         ComponentHandle* buff = group->components.getBuffer();
-        if (index != count - 1) {
-            std::swap<ComponentHandle>(buff[index], buff[count-1]);
-            group->sorted = false;
-        }
+        std::swap<ComponentHandle>(buff[index], buff[count-1]);
+        group->sorted = false;
         group->components.pop();
     }
 }
@@ -515,9 +513,9 @@ void termite::destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle 
 static void sortAndBatchComponents(ComponentGroup* group)
 {
     // Sort components if it's invalidated
-    int count = group->components.getCount();
     if (!group->sorted) {
         group->batches.clear();
+        int count = group->components.getCount();
         if (count > 0) {
             std::sort(group->components.itemPtr(0), group->components.itemPtr(0) + count,
                       [](const ComponentHandle& a, const ComponentHandle& b) { return a.value < b.value; });
@@ -542,7 +540,7 @@ static void sortAndBatchComponents(ComponentGroup* group)
     }
 }
 
-void termite::runComponentGroup(ComponentStage::Enum stage, ComponentGroupHandle groupHandle, float dt)
+void termite::runComponentGroup(ComponentUpdateStage::Enum stage, ComponentGroupHandle groupHandle, float dt)
 {
     assert(groupHandle.isValid());
     ComponentGroup* group = g_csys->componentGroups.getHandleData<ComponentGroup>(0, groupHandle);
@@ -552,8 +550,8 @@ void termite::runComponentGroup(ComponentStage::Enum stage, ComponentGroupHandle
     for (int i = 0, c = group->batches.getCount(); i < c; i++) {
         ComponentGroup::Batch batch = group->batches[i];
         const ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(group->components[batch.index])];
-        if (ctype.callbacks.stageFn[stage])
-            ctype.callbacks.stageFn[stage](group->components.itemPtr(batch.index), batch.count, dt);
+        if (ctype.callbacks.updateStageFn[stage])
+            ctype.callbacks.updateStageFn[stage](group->components.itemPtr(batch.index), batch.count, dt);
     }
 }
 
@@ -663,7 +661,7 @@ uint16_t termite::getGroupComponents(ComponentGroupHandle groupHandle, Component
     uint16_t count = std::min<uint16_t>(maxComponents, (uint16_t)group->components.getCount());
 
     if (handles)
-        memcpy(handles, group->components.itemPtr(0), count*sizeof(ComponentHandle));
+        memcpy(handles, group->components.getBuffer(), count*sizeof(ComponentHandle));
     return count;
 }
 

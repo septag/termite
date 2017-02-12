@@ -87,7 +87,9 @@ if (USE_SDL2)
 endif()
 
 # PCH
-add_precompiled_header(termite pch.h)
+if (NOT ANDROID)
+    add_precompiled_header(termite pch.h)
+endif()
 
 ## Install
 install(TARGETS termite

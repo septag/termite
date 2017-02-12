@@ -599,9 +599,7 @@ namespace termite
 
     inline bool rectTestRect(const rect_t& rc1, const rect_t& rc2)
     {
-        if (rc1.xmax < rc2.xmin || rc1.xmin > rc2.xmax || rc1.ymax < rc2.ymin || rc1.ymin > rc2.ymax)
-            return false;
-        return true;
+        return !(rc1.xmax < rc2.xmin || rc1.xmin > rc2.xmax || rc1.ymax < rc2.ymin || rc1.ymin > rc2.ymax);
     }
 
     inline void rectPushPoint(rect_t* rc, const vec2_t& pt)

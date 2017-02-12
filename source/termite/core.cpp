@@ -716,6 +716,12 @@ void termite::pause()
 void termite::resume()
 {
     g_core->timeMultiplier = 1.0;
+    g_core->frameData.lastFrameTick = bx::getHPCounter();
+}
+
+bool termite::isPaused()
+{
+    return g_core->timeMultiplier == 0;
 }
 
 double termite::getFrameTime()

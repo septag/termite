@@ -356,7 +356,15 @@ namespace termite
     typedef void(*PhysParticleShapeContactCallback2D)(PhysParticleEmitter2D* emitter, int index, PhysShape2D* shape,
                                                   const vec2_t& normal, float weight);
     typedef void(*PhysParticleContactCallback2D)(PhysParticleEmitter2D* emitter, int indexA, int indexB,
-                                             const vec2_t& normal, float weight);
+                                                 const vec2_t& normal, float weight);
+
+    /// @param fraction interpolation value between p1 and p2
+    /// @return shrinks or grows the ray by the fraction value returned
+    ///         return -1 to ignore current
+    ///         return 0 abort the next checks because we have no rays
+    ///         return 1 , testing ray does not change
+    ///         return fraction shrinks the ray after this callback, do this and keep recent result for closest hit
+    typedef float(*PhysRayCastCallback2D)(PhysShape2D* shape, const vec2_t& point, const vec2_t& normal, float fraction, void* userData);
 
     struct PhysDriver2DApi
     {
@@ -365,10 +373,11 @@ namespace termite
 
         PhysScene2D* (*createScene)(const PhysSceneDef2D& worldDef);
         void (*destroyScene)(PhysScene2D* scene);
+        float (*getSceneTimeStep)(PhysScene2D* scene);
 
         // Returns blending coeff for interpolating between frames
         // State = currentState * alpha + prevState * (1 - alpha)
-        float (*stepScene)(PhysScene2D* scene, float dt);   
+        void (*stepScene)(PhysScene2D* scene, float dt);   
         void (*debugScene)(PhysScene2D* scene, int viewWidth, int viewHeight, const Camera2D& cam, 
                            PhysDebugFlags2D::Bits flags/* = PhysDebugFlags2D::All*/);
 
@@ -407,6 +416,9 @@ namespace termite
         void (*addShapeToBody)(PhysBody2D* body, PhysShape2D* shape);
         void* (*getBodyUserData)(PhysBody2D* body);
         void (*setGravityScale)(PhysBody2D* body, float gravityScale);
+        vec2_t (*getMassCenter)(PhysBody2D* body);
+        void (*setMassCenter)(PhysBody2D* body, const vec2_t& center);
+        float (*getMass)(PhysBody2D* body);
 
         // Shape
         void* (*getShapeUserData)(PhysShape2D* shape);
@@ -414,6 +426,9 @@ namespace termite
         void (*getShapeContactFilterData)(PhysShape2D* shape, uint16_t* catBits, uint16_t* maskBits, int16_t* groupIndex);
         PhysBody2D* (*getShapeBody)(PhysShape2D* shape);
         rect_t (*getShapeAABB)(PhysShape2D* shape);
+
+        // Ray Cast
+        void (*rayCast)(PhysScene2D* scene, const vec2_t& p1, const vec2_t& p2, PhysRayCastCallback2D callback, void* userData);
 
         // Joints
 
@@ -459,7 +474,7 @@ namespace termite
 
         // Weld Joint: Attaches/welds two bodies
         PhysWeldJoint2D* (*createWeldJoint)(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB,
-                                                   const vec2_t& anchorA, const vec2_t& anchorB);
+                                                   const vec2_t& anchorA, const vec2_t& anchorB, void* userData);
         void (*destroyWeldJoint)(PhysWeldJoint2D* joint);
 
         // Gear Joint: Connects two prismatic or revolute joints together. coordsA + ratio*coordsB = constant

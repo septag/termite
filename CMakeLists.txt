@@ -89,7 +89,7 @@ endif()
 # Download dependencies that doesn't have packages on any platform
 if (NOT BGFX_FOUND)
     if (ANDROID)
-        download_package(${DOWNLOAD_URL_ROOT}/bgfx_android_arm.tar.gz ${DEP_ROOT_DIR})
+        download_package(${DOWNLOAD_URL_ROOT}/bgfx_android.tar.gz ${DEP_ROOT_DIR})
     elseif (IOS)
         download_package(${DOWNLOAD_URL_ROOT}/bgfx_ios_arm.tar.gz ${DEP_ROOT_DIR})
     elseif (MSVC)
@@ -205,7 +205,7 @@ copy_release_build_flags(PROFILE)
 copy_release_build_flags(DEVELOPMENT)
 
 # http://stackoverflow.com/questions/33829152/for-cmake-can-you-modify-the-release-debug-compiler-flags-with-add-compiler-fl
-set(DEBUG_COMPILE_OPTIONS "-DBX_CONFIG_ALLOCATOR_DEBUG" "-Dtermite_DEV=1")
+set(DEBUG_COMPILE_OPTIONS "-DBX_CONFIG_ALLOCATOR_DEBUG" "-Dtermite_DEV=1" "-DBX_CONFIG_CHECK_ASSERT=1")
 add_compile_options("$<$<CONFIG:Debug>:${DEBUG_COMPILE_OPTIONS}>")
 
 set(DEVELOPMENT_COMPILE_OPTIONS "-Dtermite_DEV=1")

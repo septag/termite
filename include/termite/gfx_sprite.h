@@ -20,9 +20,18 @@ namespace termite
         enum Enum
         {
             DestroyResource = 0x1,
-            FlipX = 0x2,
-            FlipY = 0x3,
             None = 0
+        };
+
+        typedef uint8_t Bits;
+    };
+
+    struct SpriteFlip
+    {
+        enum Enum
+        {
+            FlipX = 0x1,
+            FlipY = 0x2,
         };
 
         typedef uint8_t Bits;
@@ -31,7 +40,7 @@ namespace termite
     // Callback for setting custom states when drawing sprites
     typedef void(*SetSpriteStateCallback)(GfxDriverApi* driver);
     // Callback for animation frames
-    typedef void(*SpriteFrameCallback)(Sprite* sprite, void* userData);
+    typedef void(*SpriteFrameCallback)(Sprite* sprite, int frameIdx, void* userData);
 
     // Allocator can be heap, it's used to created memory pools and initial buffers
     result_t initSpriteSystem(GfxDriverApi* driver, bx::AllocatorI* alloc);
@@ -102,6 +111,7 @@ namespace termite
                                                   void* userData);
     TERMITE_API void setSpriteFrameCallbackByIndex(Sprite* sprite, int frameIdx, SpriteFrameCallback callback,
                                                    void* userData);
+    TERMITE_API void setSpriteFrameEndCallback(Sprite* sprite, SpriteFrameCallback callback, void* userData);
 
     // Set/Get Sprite props
     TERMITE_API void gotoSpriteFrameIndex(Sprite* sprite, int frameIdx);
@@ -110,7 +120,8 @@ namespace termite
     TERMITE_API int getSpriteFrameIndex(Sprite* sprite);
     TERMITE_API int getSpriteFrameCount(Sprite* sprite);
     TERMITE_API void setSpriteFrameIndex(Sprite* sprite, int index);
-    TERMITE_API void setSpriteFlip(Sprite* sprite, SpriteFlag::Enum flip);
+    TERMITE_API void setSpriteFlip(Sprite* sprite, SpriteFlip::Bits flip);
+    TERMITE_API SpriteFlip::Bits getSpriteFlip(Sprite* sprite);
     TERMITE_API void setSpritePosOffset(Sprite* sprite, const vec2_t posOffset);
     TERMITE_API void setSpriteCurFrameTag(Sprite* sprite, const char* frameTag);
     TERMITE_API void setSpriteOrder(Sprite* sprite, uint8_t order); // higher orders gets to draw later

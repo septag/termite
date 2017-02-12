@@ -14,7 +14,7 @@ namespace bx
         double readDelta();
 
     private:
-        int64_t m_freq;
+        double m_freq;
         int64_t m_last;
         int64_t m_start;
         double m_toMs;
@@ -24,7 +24,7 @@ namespace bx
     inline Timer::Timer()
     {
         m_freq = bx::getHPFrequency();
-        m_toMs = 1000.0/(double)m_freq;
+        m_toMs = 1000.0/m_freq;
         m_last = 0;
         m_start = 0;
     }

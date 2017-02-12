@@ -63,7 +63,7 @@ Before that download and install _Android NDK_ and _Android SDK_. Define Environ
 ```
 mkdir .build  
 cd .build  
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/android.toolchain.cmake -DANDROID_ABI="armeabi-v7a with NEON" -DANDROID_NATIVE_API_LEVEL=android-19 -DANDROID_STL=gnustl_static -DANDROID_STL_FORCE_FEATURES=0 -DCMAKE_BUILD_TYPE=Release -GNinja
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/android.toolchain.cmake -DBUILD_FISHERBOY=1 -DANDROID_ABI="armeabi-v7a with NEON" -DANDROID_NATIVE_API_LEVEL=android-19 -DCMAKE_BUILD_TYPE=Release -GNinja
 ```
 
 In the example above, I built for _armv7a_ architecture in ```-DANDROID_ABI="armeabi-v7a with NEON"```.  
@@ -84,9 +84,9 @@ Currently there are two test apps and sources are under ```tests``` directory:
 - [__libuv__](https://github.com/libuv/libuv) AsyncIO
 - [__SDL2__](https://www.libsdl.org) Window and input
 - [__NanoVg__](https://github.com/memononen/nanovg) Vector based debug drawing
-- [__ImGui__](https://github.com/ocornut/imgui) Debugging and tools GUI
+- [__ImGui__](https://github.com/ocornut/imgui) Debugging and Tools GUI
 - [__Assimp__](http://www.assimp.org/) 3D model importing
-- [__bx__](https://github.com/bkaradzic/bx) A modified version of Branimir Karadžić's base library used as base
+- [__bx__](https://github.com/bkaradzic/bx) A modified version of Branimir Karadžić's base library
 - [__Box2D__](http://box2d.org) 2D Physics
 - [__OpenAL Soft__](http://kcat.strangesoft.net/openal.html) Audio
 - [__stb__](https://github.com/nothings/stb) Sean Barrett's single header libraries 

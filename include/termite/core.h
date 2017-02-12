@@ -111,9 +111,41 @@ namespace termite
         uint8_t* data;
         uint32_t size;
     };
-    
+
     typedef void(*UpdateCallback)(float dt);
     typedef void(*ShutdownCallback)(void* userData);
+    typedef void(*FixedUpdateCallback)(float dt, void* userData);
+
+    ///
+    /// TimeStep: Used to call an update function in fixed intervals
+    ///           mainly used for physics
+    class TimeStepper
+    {
+    public:
+        explicit TimeStepper(float timestep) :
+            m_callback(nullptr),
+            m_timestep(timestep),
+            m_accum(0)
+        {
+        }
+
+        float step(float dt, FixedUpdateCallback callback, void* userData)
+        {
+            const float timestep = m_timestep;
+            float accum = m_accum + dt;
+            while (accum >= timestep) {
+                callback(timestep, userData);
+                accum -= timestep;
+            }
+            m_accum = accum;
+            return accum / timestep;
+        }
+
+    private:
+        FixedUpdateCallback m_callback;
+        float m_accum;
+        float m_timestep;
+    };
 
     // Public
     TERMITE_API Config* loadConfig(const char* confFilepath);
@@ -128,6 +160,7 @@ namespace termite
     TERMITE_API void doFrame();
     TERMITE_API void pause();
     TERMITE_API void resume();
+    TERMITE_API bool isPaused();
 
     TERMITE_API double getFrameTime();
     TERMITE_API double getElapsedTime();

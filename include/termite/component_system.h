@@ -4,6 +4,9 @@
 #include "bx/bx.h"
 #include "bx/allocator.h"
 
+#define T_COMPONENT_DATA(_C, _Ent) getComponentData<_C>(getComponent(_C::Handle, _Ent));
+#define T_COMPONENT_DATA_H(_C, _Handle) getComponentData<_C>(getComponent(_C::Handle, getComponentEntity(_Handle)));
+
 namespace termite
 {
     static const uint32_t kEntityIndexBits = 16;
@@ -17,43 +20,16 @@ namespace termite
     {
         uint32_t id;
 
-        inline Entity() : id(0)
-        {
-        }
+        inline Entity() : id(0)        {}
 
-        explicit Entity(uint32_t _id) : id(_id)
-        {
-        }
+        explicit Entity(uint32_t _id) : id(_id)      {}
+        inline Entity(uint32_t index, uint32_t generation)  { id = (index & kEntityIndexMask) | ((generation & kEntityGenerationMask) << kEntityIndexBits); }
 
-        inline Entity(uint32_t index, uint32_t generation)
-        {
-            id = (index & kEntityIndexMask) | ((generation & kEntityGenerationMask) << kEntityIndexBits);
-        }
-
-        inline uint32_t getIndex()
-        {
-            return (id & kEntityIndexMask);
-        }
-
-        inline uint32_t getGeneration()
-        {
-            return (id >> kEntityIndexBits) & kEntityGenerationMask;
-        }
-
-        inline bool operator==(const Entity& ent) const
-        {
-            return this->id == ent.id;
-        }
-
-        inline bool operator!=(const Entity& ent) const
-        {
-            return this->id != ent.id;
-        }
-
-        inline bool isValid() const
-        {
-            return this->id != 0;
-        }
+        inline uint32_t getIndex() { return (id & kEntityIndexMask);  }
+        inline uint32_t getGeneration() {   return (id >> kEntityIndexBits) & kEntityGenerationMask;  }
+        inline bool operator==(const Entity& ent) const { return this->id == ent.id; }
+        inline bool operator!=(const Entity& ent) const { return this->id != ent.id; }
+        inline bool isValid() const   {  return this->id != 0;  }
     };
 
     struct EntityManager;
@@ -77,11 +53,12 @@ namespace termite
     result_t initComponentSystem(bx::AllocatorI* alloc);
     void shutdownComponentSystem();
 
-    struct ComponentStage
+    struct ComponentUpdateStage
     {
         enum Enum
         {
             PreUpdate = 0,
+            FixedUpdate,
             Update,
             PostUpdate,
             Count
@@ -94,15 +71,15 @@ namespace termite
         void(*destroyInstance)(Entity ent, ComponentHandle handle, void* data);
         void(*setActive)(ComponentHandle handle, void* data, bool active);
 
-        typedef void (*StageFunc)(const ComponentHandle* handles, uint16_t count, float dt);
-        StageFunc stageFn[ComponentStage::Count];
+        typedef void (*UpdateStageFunc)(const ComponentHandle* handles, uint16_t count, float dt);
+        UpdateStageFunc updateStageFn[ComponentUpdateStage::Count];
 
         ComponentCallbacks() :
             createInstance(nullptr),
             destroyInstance(nullptr),
             setActive(nullptr)
         {
-            memset(stageFn, 0x00, sizeof(StageFunc)*ComponentStage::Count);
+            memset(updateStageFn, 0x00, sizeof(UpdateStageFunc)*ComponentUpdateStage::Count);
         }
     };
 
@@ -132,7 +109,7 @@ namespace termite
                                                 ComponentGroupHandle group = ComponentGroupHandle());
 	TERMITE_API void destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle handle);
 
-    TERMITE_API void runComponentGroup(ComponentStage::Enum stage, ComponentGroupHandle groupHandle, float dt);
+    TERMITE_API void runComponentGroup(ComponentUpdateStage::Enum stage, ComponentGroupHandle groupHandle, float dt);
 
 	TERMITE_API ComponentTypeHandle findComponentTypeByName(const char* name);
 	TERMITE_API ComponentTypeHandle findComponentTypeByNameHash(size_t nameHash);

@@ -286,22 +286,14 @@ static void destroySceneBox2d(PhysScene2D* scene)
     g_box2d.scenePool.deleteInstance(scene);
 }
 
-static float stepSceneBox2d(PhysScene2D* scene, float dt)
+static void stepSceneBox2d(PhysScene2D* scene, float dt)
 {
-    const float timestep = scene->timestep;
-    float accum = scene->accumulator + dt;
-    while (accum >= timestep) {
-        scene->w.Step(timestep, 8, 3, 2);
-        accum -= timestep;
-    }
-    scene->accumulator = accum;
-
-    return accum / timestep;
+    scene->w.Step(dt, 8, 3, 2);
 }
 
 static void debugSceneBox2d(PhysScene2D* scene, int viewWidth, int viewHeight, const Camera2D& cam,
                             PhysDebugFlags2D::Bits flags)
-{
+ {
     assert(scene);
 
     if (g_box2d.nvg) {
@@ -509,6 +501,27 @@ static PhysDistanceJoint2D* createDistanceJointBox2d(PhysScene2D* scene, PhysBod
     return (PhysDistanceJoint2D*)joint;
 }
 
+static PhysWeldJoint2D* createWeldJoint(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB,
+                                        const vec2_t& anchorA, const vec2_t& anchorB, void* userData)
+{
+    PhysJoint2D* joint = g_box2d.jointPool.newInstance<>();
+    b2WeldJointDef def;
+    def.bodyA = bodyA->b;
+    def.bodyB = bodyB->b;
+    def.localAnchorA = b2vec2(anchorA);
+    def.localAnchorB = b2vec2(anchorB);
+    def.collideConnected = false;
+    
+    joint->j = scene->w.CreateJoint(&def);
+    if (!joint->j) {
+        g_box2d.jointPool.deleteInstance(joint);
+        return nullptr;
+    }
+    joint->userData = userData;
+
+    return (PhysWeldJoint2D*)joint;
+}
+
 void ContactListenerBox2d::BeginContact(b2Contact* contact)
 {
     const b2Fixture* fixtureA = contact->GetFixtureA();
@@ -618,7 +631,14 @@ bool ContactFilterBox2d::ShouldCollide(b2Fixture* fixtureA, b2Fixture* fixtureB)
         return shapeA->contactFilterFn(shapeA, shapeB);
     if (shapeB->contactFilterFn)
         return shapeB->contactFilterFn(shapeB, shapeA);
-    return true;
+
+    const b2Filter& filterA = fixtureA->GetFilterData();
+    const b2Filter& filterB = fixtureB->GetFilterData();
+
+    bool collide =
+        (filterA.maskBits & filterB.categoryBits) != 0 &&
+        (filterA.categoryBits & filterB.maskBits) != 0;
+    return collide;
 }
 
 bool ContactFilterBox2d::ShouldCollide(b2Fixture* fixture, b2ParticleSystem* particleSystem, int32 particleIndex)
@@ -630,6 +650,7 @@ bool ContactFilterBox2d::ShouldCollide(b2Fixture* fixture, b2ParticleSystem* par
             return emitter->shapeContactFilterFn(emitter, particleIndex, (PhysShape2D*)fixture->GetUserData());
         }
     }
+
     return true;
 }
 
@@ -678,6 +699,31 @@ void DestructionListenerBox2d::SayGoodbye(b2ParticleSystem* particleSystem, int3
         if (emitter->destroyFn)
             emitter->destroyFn(emitter, index);
     }
+}
+
+static void box2dRayCast(PhysScene2D* scene, const vec2_t& p1, const vec2_t& p2, PhysRayCastCallback2D callback, void* userData)
+{
+    class RayCastCallback : public b2RayCastCallback
+    {
+    private:
+        PhysRayCastCallback2D m_callback;
+        void* m_userData;
+
+    public:
+        RayCastCallback(PhysRayCastCallback2D _callback, void* _userData) :
+            m_callback(_callback),
+            m_userData(_userData)
+        {
+        }
+
+        float32 ReportFixture(b2Fixture* fixture, const b2Vec2& point, const b2Vec2& normal, float32 fraction) override
+        {
+            return m_callback((PhysShape2D*)fixture->GetUserData(), tvec2(point), tvec2(normal), fraction, m_userData);
+        }
+    };
+
+    RayCastCallback b2callback(callback, userData);
+    scene->w.RayCast(&b2callback, b2vec2(p1), b2vec2(p2));
 }
 
 void PhysDebugDraw::beginDraw(NVGcontext* nvg, const Camera2D& cam, int viewWidth, int viewHeight)
@@ -861,6 +907,7 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.shutdown = shutdownBox2d;
     api.createScene = createSceneBox2d;
     api.destroyScene = destroySceneBox2d;
+    api.getSceneTimeStep = [](PhysScene2D* scene)->float { return scene->timestep; };
     api.createBody = createBodyBox2d;
     api.destroyBody = destroyBodyBox2d;
     api.createBoxShape = createBoxShapeBox2d;
@@ -880,7 +927,7 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.getAngle = [](PhysBody2D* body)->float { return -body->b->GetAngle(); };
     
     api.setLinearVelocity = [](PhysBody2D* body, const vec2_t& vel) { body->b->SetLinearVelocity(b2vec2(vel)); };
-    api.setAngularVelocity = [](PhysBody2D* body, float omega) { body->b->SetAngularVelocity(omega); };
+    api.setAngularVelocity = [](PhysBody2D* body, float omega) { body->b->SetAngularVelocity(-omega); };
     api.getLinearVelocity = [](PhysBody2D* body)->vec2_t { return tvec2(body->b->GetLinearVelocity()); };
     api.getAngularVelocity = [](PhysBody2D* body)->float { return -body->b->GetAngularVelocity(); };
     api.isAwake = [](PhysBody2D* body)->bool { return body->b->IsAwake(); };
@@ -893,6 +940,12 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.getWorldPoint = [](PhysBody2D* body, const vec2_t& localPt) { return tvec2(body->b->GetWorldPoint(b2vec2(localPt))); };
     api.applyLinearImpulse = [](PhysBody2D* body, const vec2_t& impulse, const vec2_t& worldPt, bool wake) {
         body->b->ApplyLinearImpulse(b2vec2(impulse), b2vec2(worldPt), wake);
+    };
+    api.applyForce = [](PhysBody2D* body, const vec2_t& force, const vec2_t& worldPt, bool wake) {
+        body->b->ApplyForce(b2vec2(force), b2vec2(worldPt), wake);
+    };
+    api.applyTorque = [](PhysBody2D* body, float torque, bool wake) {
+        body->b->ApplyTorque(-torque, wake);
     };
 
     api.setBeginShapeContactCallback = [](PhysShape2D* shape, PhysShapeContactCallback2D callback, bool reportContactInfo) {
@@ -927,6 +980,25 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     };
 
     api.createDistanceJoint = createDistanceJointBox2d;
+    api.createWeldJoint = createWeldJoint;
+
+    api.rayCast = box2dRayCast;
+    api.getMassCenter = [](PhysBody2D* body)->vec2_t {
+        b2MassData massData;
+        body->b->GetMassData(&massData);
+        return tvec2(massData.center);
+    };
+    api.setMassCenter = [](PhysBody2D* body, const vec2_t& center) {
+        b2MassData massData;
+        body->b->GetMassData(&massData);
+        massData.center = b2vec2(center);
+        body->b->SetMassData(&massData);
+    };
+    api.getMass = [](PhysBody2D* body)->float {
+        b2MassData massData;
+        body->b->GetMassData(&massData);
+        return massData.mass;
+    };
 
     static_assert(b2_maxManifoldPoints >= 2, "Manifold points mistmatch");
 

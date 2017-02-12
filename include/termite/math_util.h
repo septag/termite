@@ -82,5 +82,15 @@ namespace termite
 
         return kLowerBound + (kX - kLowerBound) % range_size;
     }
+
+    inline int iclamp(int n, const int _min, const int _max)
+    {
+        if (n < _min)
+            return _min;
+        else if (n > _max)
+            return _max;
+        else
+            return n;
+    }
 } // namespace termite
 

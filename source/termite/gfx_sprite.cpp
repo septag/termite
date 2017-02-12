@@ -53,7 +53,7 @@ struct SpriteFrame
 {
     ResourceHandle texHandle;   // Handle to spritesheet/texture resource
     ResourceHandle ssHandle;    // For spritesheets we have spritesheet handle
-    SpriteFlag::Bits flags;
+    uint8_t flags;
 
     size_t nameHash;
     size_t tagHash;
@@ -97,8 +97,12 @@ namespace termite
         color_t tint;
         uint8_t order;
 
-        SpriteFlag::Enum flip;
+        SpriteFlag::Bits flip;
         LNode lnode;
+
+        SpriteFrameCallback endCallback;
+        void* endUserData;
+        bool triggerEndCallback;
 
         Sprite(bx::AllocatorI* _alloc) :
             alloc(_alloc),
@@ -109,7 +113,10 @@ namespace termite
             resumeSpeed(30.0f),
             order(0),
             flip(SpriteFlag::None),
-            lnode(this)
+            lnode(this),
+            endCallback(nullptr),
+            endUserData(nullptr),
+            triggerEndCallback(false)
         {
             tint = color1n(0xffffffff);
             posOffset = vec2f(0, 0);
@@ -607,13 +614,26 @@ void termite::animateSprites(Sprite** sprites, uint16_t numSprites, float dt)
             // Progress sprite frame
             int frameIdx = sprite->curFrameIdx;
             int iframes = int(frames);
-            frameIdx = iwrap(!sprite->playReverse ? (frameIdx + iframes) : (frameIdx - iframes),
-                             0, sprite->frames.getCount() - 1);
+            if (sprite->endCallback == nullptr) {
+                frameIdx = iwrap(!sprite->playReverse ? (frameIdx + iframes) : (frameIdx - iframes),
+                                 0, sprite->frames.getCount() - 1);
+            } else {
+                if (sprite->triggerEndCallback && iframes > 0) {
+                    sprite->triggerEndCallback = false;
+                    sprite->endCallback(sprite, frameIdx, sprite->endUserData);
+                }
+
+                int nextFrame = !sprite->playReverse ? (frameIdx + iframes) : (frameIdx - iframes);
+                frameIdx = iclamp(nextFrame, 0, sprite->frames.getCount() - 1);
+
+                if (frameIdx != nextFrame)
+                    sprite->triggerEndCallback = true;
+            }
 
             // Check if we hit any callbacks
             const SpriteFrame& frame = sprite->frames[frameIdx];
             if (frame.frameCallback)
-                frame.frameCallback(sprite, frame.frameCallbackUserData);
+                frame.frameCallback(sprite, frameIdx, frame.frameCallbackUserData);
 
             sprite->curFrameIdx = frameIdx;
             sprite->animTm = t;
@@ -691,6 +711,13 @@ void termite::setSpriteFrameCallbackByIndex(Sprite* sprite, int frameIdx, Sprite
     frame->frameCallbackUserData = userData;
 }
 
+void termite::setSpriteFrameEndCallback(Sprite* sprite, SpriteFrameCallback callback, void* userData)
+{
+    sprite->endCallback = callback;
+    sprite->endUserData = userData;
+    sprite->triggerEndCallback = false;
+}
+
 void termite::gotoSpriteFrameIndex(Sprite* sprite, int frameIdx)
 {
     assert(frameIdx < sprite->frames.getCount());
@@ -740,9 +767,14 @@ void termite::setSpriteFrameIndex(Sprite* sprite, int index)
     sprite->curFrameIdx = index;
 }
 
-void termite::setSpriteFlip(Sprite* sprite, SpriteFlag::Enum flip)
+void termite::setSpriteFlip(Sprite* sprite, SpriteFlag::Bits flip)
 {
     sprite->flip = flip;
+}
+
+SpriteFlip::Bits termite::getSpriteFlip(Sprite* sprite)
+{
+    return sprite->flip;
 }
 
 void termite::setSpritePosOffset(Sprite* sprite, const vec2_t posOffset)
@@ -886,6 +918,8 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
         vec2_t halfSize = ss.sprite->halfSize;
         rect_t texRect = frame.frame;
         float pixelRatio = frame.pixelRatio;
+        SpriteFlag::Bits flipX = ss.sprite->flip | frame.flags;
+        SpriteFlag::Bits flipY = ss.sprite->flip | frame.flags;
 
         if (halfSize.y <= 0)
             halfSize.y = halfSize.x / pixelRatio;
@@ -898,13 +932,16 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
 
         // calculate final pivot offset to make geometry
         vec2_t fullSize = halfSize * 2.0f;
-        vec2_t pivot = frame.pivot * fullSize;
-        vec2_t posOffset = ss.sprite->posOffset + frame.posOffset*fullSize;
+        vec2_t offset = frame.posOffset + ss.sprite->posOffset - frame.pivot;
+        if (flipX & SpriteFlip::FlipX)
+            offset.x = -offset.x;
+        if (flipY & SpriteFlip::FlipY)
+            offset.y = -offset.y;
 
         // shrink and offset to match the image inside sprite
         halfSize = halfSize * frame.sizeOffset;
-        vec2_t offset = posOffset * fullSize - pivot;
-        
+        offset = offset * fullSize;
+
         SpriteVertex& v0 = verts[vertexIdx];
         SpriteVertex& v1 = verts[vertexIdx + 1];
         SpriteVertex& v2 = verts[vertexIdx + 2];
@@ -930,14 +967,12 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
         v0.transform2 = v1.transform2 = v2.transform2 = v3.transform2 = transform2;
         v0.color = v1.color = v2.color = v3.color = ss.sprite->tint.n;
 
-        SpriteFlag::Bits flipX = ss.sprite->flip | frame.flags;
-        if (flipX & SpriteFlag::FlipX) {
+        if (flipX & SpriteFlip::FlipX) {
             std::swap<float>(v0.coords.x, v1.coords.x);
             std::swap<float>(v2.coords.x, v3.coords.x);
         }
 
-        SpriteFlag::Bits flipY = ss.sprite->flip | frame.flags;
-        if (flipY & SpriteFlag::FlipY) {
+        if (flipY & SpriteFlip::FlipY) {
             std::swap<float>(v0.coords.y, v1.coords.y);
             std::swap<float>(v2.coords.y, v3.coords.y);
         }
