@@ -352,7 +352,7 @@ namespace termite
     typedef bool(*PhysParticleShapeContactFilterCallback2D)(PhysParticleEmitter2D* emitter, int index, PhysShape2D* shape);
     typedef bool(*PhysParticleContactFilterCallback2D)(PhysParticleEmitter2D* emitter, int indexA, int indexB);
 
-    typedef void(*PhysShapeContactCallback2D)(PhysShape2D* shapeA, PhysShape2D* shapeB, const PhysContactInfo2D* contactInfo);
+    typedef bool(*PhysShapeContactCallback2D)(PhysShape2D* shapeA, PhysShape2D* shapeB, const PhysContactInfo2D* contactInfo);
     typedef void(*PhysParticleShapeContactCallback2D)(PhysParticleEmitter2D* emitter, int index, PhysShape2D* shape,
                                                   const vec2_t& normal, float weight);
     typedef void(*PhysParticleContactCallback2D)(PhysParticleEmitter2D* emitter, int indexA, int indexB,
@@ -438,7 +438,7 @@ namespace termite
                                                            const vec2_t& anchorA, const vec2_t& anchorB,
                                                            float maxForce/* = 0*/, float maxTorque/* = 0*/,
                                                            bool collide/* = false*/, void* userData/* = nullptr*/);
-        void (*destroyFrictionJoint)(PhysFrictionJoint2D* joint);
+        void (*destroyFrictionJoint)(PhysScene2D* scene, PhysFrictionJoint2D* joint);
 
         // Revolute Joint: Two bodies share a point that they rotate around
         PhysRevoluteJoint2D* (*createRevoluteJoint)(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB,
@@ -447,7 +447,7 @@ namespace termite
                                                            bool enableLimit/* = false*/, float lowerAngle/* = 0*/, float upperAngle/* = 0*/,
                                                            bool enableMotor/* = false*/, float motorSpeed/* = 0*/, float maxMotorTorque/* = 0*/,
                                                            bool collide/* = false*/, void* userData/* = nullptr*/);
-        void (*destroyRevoluteJoint)(PhysRevoluteJoint2D* joint);
+        void (*destroyRevoluteJoint)(PhysScene2D* scene, PhysRevoluteJoint2D* joint);
 
         // Distance Joint: Two bodies keeps a distance (like a rigid rod between bodies), can use to simulate springs too
         PhysDistanceJoint2D* (*createDistanceJoint)(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB,
@@ -455,7 +455,7 @@ namespace termite
                                                            float length, float frequencyHz/* = 0*/, float dampingRatio/* = 0.7f*/,
                                                            bool collide/* = false*/, void* userData/* = nullptr*/);
         void (*setDistanceJointLength)(PhysDistanceJoint2D* joint, float length);
-        void (*destroyDistanceJoint)(PhysDistanceJoint2D* joint);
+        void (*destroyDistanceJoint)(PhysScene2D* scene, PhysDistanceJoint2D* joint);
 
         // Prismatic Joint: Defines a line of motion using an axis and an anchor point (one degree of freedom)
         PhysPrismaticJoint2D* (*createPrismaticJoint)(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB,
@@ -463,32 +463,35 @@ namespace termite
                                                              bool enableLimit/* = false*/, float lowerTranslation/* = 0*/, float upperTranslation/* = 0*/,
                                                              bool enableMotor/* = false*/, float maxMotorForce/* = 0*/, float motorSpeed/* = 0*/,
                                                              bool collide/* = false*/, void* userData/* = nullptr*/);
-        void (*destroyPrismaticJoint)(PhysPrismaticJoint2D* joint);
+        void (*destroyPrismaticJoint)(PhysScene2D* scene, PhysPrismaticJoint2D* joint);
 
         // Pully Joint: joint between two bodies and two ground points (world-static), length1 + ratio*length2 <= constant
         PhysPulleyJoint2D* (*createPulleyJoint)(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB,
                                                        const vec2_t& groundWorldAnchorA, const vec2_t& groundWorldAnchorB,
                                                        const vec2_t& anchorA, const vec2_t& anchorB, float ratio/* = 1.0f*/,
                                                        bool collide/* = false*/, void* userData/* = nullptr*/);
-        void (*destroyPulleyJoint)(PhysPulleyJoint2D* joint);
+        void (*destroyPulleyJoint)(PhysScene2D* scene, PhysPulleyJoint2D* joint);
 
         // Weld Joint: Attaches/welds two bodies
-        PhysWeldJoint2D* (*createWeldJoint)(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB,
-                                                   const vec2_t& anchorA, const vec2_t& anchorB, void* userData);
-        void (*destroyWeldJoint)(PhysWeldJoint2D* joint);
+        PhysWeldJoint2D* (*createWeldJoint)(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB, const vec2_t& worldPt,
+                                            float dampingRatio/* = 0*/, float frequencyHz/* = 0*/, void* userData/* = nullptr*/);
+        PhysWeldJoint2D* (*createWeldJoint2Pts)(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB, 
+                                                const vec2_t& anchorA, const vec2_t& anchorB,
+                                                float dampingRatio/* = 0*/, float frequencyHz/* = 0*/, void* userData/* = nullptr*/);
+        void (*destroyWeldJoint)(PhysScene2D* scene, PhysWeldJoint2D* joint);
 
         // Gear Joint: Connects two prismatic or revolute joints together. coordsA + ratio*coordsB = constant
         PhysGearJoint2D* (*createGearJoint)(PhysScene2D* scene, PhysJoint2D* jointA, PhysJoint2D* jointB, float ratio/* = 1.0f*/,
                                                    bool collide/* = false*/, void* userData/* = nullptr*/);
-        void (*destroyGearJoint)(PhysGearJoint2D* joint);
+        void (*destroyGearJoint)(PhysScene2D* scene, PhysGearJoint2D* joint);
 
         // Mouse Joint: Makes a body track a target in world coords
         PhysMouseJoint2D* (*createMouseJoint)(PhysScene2D* scene, PhysBody2D* body, const vec2_t& target,
-                                                     float maxForce/* = 0*/, float frequencyHz/* = 5.0f*/, float dampingRatio/* = 0.7f*/,
-                                                     bool collide/* = false*/, void* userData/* = nullptr*/);
+                                              float maxForce/* = 0*/, float frequencyHz/* = 5.0f*/, float dampingRatio/* = 0.7f*/,
+                                              bool collide/* = false*/, void* userData/* = nullptr*/);
         void (*setMouseTarget)(PhysMouseJoint2D* joint, const vec2_t& target);
         vec2_t (*getMouseTarget)(PhysMouseJoint2D* joint);
-        void (*destroyMouseJoint)(PhysMouseJoint2D* joint);
+        void (*destroyMouseJoint)(PhysScene2D* scene, PhysMouseJoint2D* joint);
 
         // Motor Joint: Controls relative motion between two bodies
         PhysMotorJoint2D* (*createMotorJoint)(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB,
@@ -498,14 +501,14 @@ namespace termite
                                           bool collide/* = false*/, void* userData/* = nullptr*/);
         void (*setMotorLinearOffset)(PhysMotorJoint2D* joint, const vec2_t& linearOffset);
         void (*setMotorAngularOffset)(PhysMotorJoint2D* joint, const vec2_t& angularOffset);
-        void (*destroyMotorJoint)(PhysMotorJoint2D* joint);
+        void (*destroyMotorJoint)(PhysScene2D* scene, PhysMotorJoint2D* joint);
 
         // Rope Joint: Enforces maximum distance between two points in bodies
         PhysRopeJoint2D* (*createRopeJoint)(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB,
                                                    const vec2_t& anchorA, const vec2_t& anchorB,
                                                    float maxLength,
                                                    bool collide/* = false*/, void* userData/* = nullptr*/);
-        void (*destroyRopeJoint)(PhysRopeJoint2D* joint);
+        void (*destroyRopeJoint)(PhysScene2D* scene, PhysRopeJoint2D* joint);
 
         // Wheel Joint: provides two-degrees of freedom between two bodies. Translation along an axis fixed in bodyA
         //              and rotation in the plane, used for vehicle suspension. this is actually a combination of prismatic and revolute
@@ -514,7 +517,7 @@ namespace termite
                                                      bool enableMotor/* = false*/, float maxMotorTorque/* = 0*/, float motorSpeed/* = 0*/,
                                                      float frequencyHz/* = 2.0f*/, float dampingRatio/* = 0.7f*/,
                                                      bool collide/* = false*/, void* userData/* = nullptr*/);
-        void (*destroyWheelJoint)(PhysWheelJoint2D* joint);
+        void (*destroyWheelJoint)(PhysScene2D* scene, PhysWheelJoint2D* joint);
         void* (*getJointUserData)(PhysJoint2D* joint);
 
         PhysParticleEmitter2D* (*createParticleEmitter)(PhysScene2D* scene, const PhysParticleEmitterDef2D& def);

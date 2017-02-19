@@ -440,6 +440,7 @@ static PhysShape2D* createPolyShapeBox2d(PhysBody2D* body, const vec2_t* verts, 
         return nullptr;
     }
     shape->userData = shapeDef.userData;
+
     return shape;
 }
 
@@ -501,16 +502,16 @@ static PhysDistanceJoint2D* createDistanceJointBox2d(PhysScene2D* scene, PhysBod
     return (PhysDistanceJoint2D*)joint;
 }
 
-static PhysWeldJoint2D* createWeldJoint(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB,
-                                        const vec2_t& anchorA, const vec2_t& anchorB, void* userData)
+static PhysWeldJoint2D* createWeldJointBox2d(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB, const vec2_t& worldPt,
+                                        float dampingRatio, float frequencyHz, void* userData)
 {
     PhysJoint2D* joint = g_box2d.jointPool.newInstance<>();
     b2WeldJointDef def;
-    def.bodyA = bodyA->b;
-    def.bodyB = bodyB->b;
-    def.localAnchorA = b2vec2(anchorA);
-    def.localAnchorB = b2vec2(anchorB);
+    def.Initialize(bodyA->b, bodyB->b, b2vec2(worldPt));
+    def.dampingRatio = dampingRatio;
+    def.frequencyHz = frequencyHz;    
     def.collideConnected = false;
+    def.userData = joint;
     
     joint->j = scene->w.CreateJoint(&def);
     if (!joint->j) {
@@ -522,6 +523,53 @@ static PhysWeldJoint2D* createWeldJoint(PhysScene2D* scene, PhysBody2D* bodyA, P
     return (PhysWeldJoint2D*)joint;
 }
 
+
+PhysWeldJoint2D* createWeldJoint2PtsBox2d(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB,
+                                          const vec2_t& anchorA, const vec2_t& anchorB,
+                                          float dampingRatio/* = 0*/, float frequencyHz/* = 0*/, void* userData/* = nullptr*/)
+{
+    PhysJoint2D* joint = g_box2d.jointPool.newInstance<>();
+    b2WeldJointDef def;
+    def.bodyA = bodyA->b;
+    def.bodyB = bodyB->b;
+    def.localAnchorA = b2vec2(anchorA);
+    def.localAnchorB = b2vec2(anchorB);
+    def.referenceAngle = bodyB->b->GetAngle() - bodyA->b->GetAngle();
+    def.dampingRatio = dampingRatio;
+    def.frequencyHz = frequencyHz;
+    def.collideConnected = false;
+    def.userData = joint;
+
+    joint->j = scene->w.CreateJoint(&def);
+    if (!joint->j) {
+        g_box2d.jointPool.deleteInstance(joint);
+        return nullptr;
+    }
+    joint->userData = userData;
+
+    return (PhysWeldJoint2D*)joint;
+}
+
+static PhysMouseJoint2D* createMouseJointBox2d(PhysScene2D* scene, PhysBody2D* body, const vec2_t& target,
+                                               float maxForce/* = 0*/, float frequencyHz/* = 5.0f*/, float dampingRatio/* = 0.7f*/,
+                                               bool collide/* = false*/, void* userData/* = nullptr*/)
+{
+    PhysJoint2D* joint = g_box2d.jointPool.newInstance<>();
+    b2MouseJointDef def;
+    def.userData = joint;
+
+    joint->j = scene->w.CreateJoint(&def);
+    if (!joint->j) {
+        g_box2d.jointPool.deleteInstance(joint);
+        return nullptr;
+    }
+    joint->userData = userData;
+
+    return (PhysMouseJoint2D*)joint;
+}
+
+
+
 void ContactListenerBox2d::BeginContact(b2Contact* contact)
 {
     const b2Fixture* fixtureA = contact->GetFixtureA();
@@ -529,9 +577,10 @@ void ContactListenerBox2d::BeginContact(b2Contact* contact)
     PhysShape2D* shapeA = (PhysShape2D*)fixtureA->GetUserData();
     PhysShape2D* shapeB = (PhysShape2D*)fixtureB->GetUserData();
 
+    bool enabled = true;
     if (shapeA->beginContactFn) {
         if (!shapeA->beginContactReportInfo) {
-            shapeA->beginContactFn(shapeA, shapeB, nullptr);
+            enabled = shapeA->beginContactFn(shapeA, shapeB, nullptr);
         } else {
             b2WorldManifold manifold;
             PhysContactInfo2D cinfo;
@@ -541,13 +590,13 @@ void ContactListenerBox2d::BeginContact(b2Contact* contact)
             cinfo.points[1] = tvec2(manifold.points[1]);
             cinfo.separations[0] = manifold.separations[0];
             cinfo.separations[1] = manifold.separations[1];
-            shapeA->beginContactFn(shapeA, shapeB, &cinfo);
+            enabled = shapeA->beginContactFn(shapeA, shapeB, &cinfo);
         }
     }
 
     if (shapeB->beginContactFn) {
         if (!shapeB->beginContactReportInfo) {
-            shapeB->beginContactFn(shapeB, shapeA, nullptr);
+            enabled = shapeB->beginContactFn(shapeB, shapeA, nullptr);
         } else {
             b2WorldManifold manifold;
             PhysContactInfo2D cinfo;
@@ -557,9 +606,11 @@ void ContactListenerBox2d::BeginContact(b2Contact* contact)
             cinfo.points[1] = tvec2(manifold.points[1]);
             cinfo.separations[0] = manifold.separations[0];
             cinfo.separations[1] = manifold.separations[1];
-            shapeB->beginContactFn(shapeB, shapeA, &cinfo);
+            enabled = shapeB->beginContactFn(shapeB, shapeA, &cinfo);
         }
     }
+
+    contact->SetEnabled(enabled);
 }
 
 void ContactListenerBox2d::BeginContact(b2ParticleSystem* particleSystem, b2ParticleBodyContact* particleBodyContact)
@@ -746,9 +797,9 @@ void PhysDebugDraw::beginDraw(NVGcontext* nvg, const Camera2D& cam, int viewWidt
     
     nvgScale(nvg, scale, -scale);
     nvgTranslate(nvg, -cam.pos.x, -cam.pos.y);
-    nvgGlobalAlpha(nvg, 0.3f);
+    nvgGlobalAlpha(nvg, 0.8f);
 
-    m_strokeScale = 1.0f / scale;
+    m_strokeScale = 2.0f / scale;
     m_viewRect = g_camApi->cam2dGetRect(cam);
 }
 
@@ -938,6 +989,7 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 
     api.getWorldCenter = [](PhysBody2D* body)->vec2_t { return tvec2(body->b->GetWorldCenter()); };
     api.getWorldPoint = [](PhysBody2D* body, const vec2_t& localPt) { return tvec2(body->b->GetWorldPoint(b2vec2(localPt))); };
+    api.getLocalPoint = [](PhysBody2D* body, const vec2_t& worldPt) { return tvec2(body->b->GetLocalPoint(b2vec2(worldPt))); };
     api.applyLinearImpulse = [](PhysBody2D* body, const vec2_t& impulse, const vec2_t& worldPt, bool wake) {
         body->b->ApplyLinearImpulse(b2vec2(impulse), b2vec2(worldPt), wake);
     };
@@ -954,6 +1006,10 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     };
     api.setEndShapeContactCallback = [](PhysShape2D* shape, PhysShapeContactCallback2D callback) {
         shape->endContactFn = callback;
+    };
+
+    api.setShapeContactFilterCallback = [](PhysShape2D* shape, PhysShapeContactFilterCallback2D callback) {
+        shape->contactFilterFn = callback;
     };
 
     api.getShapeUserData = [](PhysShape2D* shape) { return shape->userData; };
@@ -980,7 +1036,13 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     };
 
     api.createDistanceJoint = createDistanceJointBox2d;
-    api.createWeldJoint = createWeldJoint;
+    api.createWeldJoint = createWeldJointBox2d;
+    api.createWeldJoint2Pts = createWeldJoint2PtsBox2d;
+    api.destroyWeldJoint = [](PhysScene2D* scene, PhysWeldJoint2D* _joint) {
+        PhysJoint2D* joint = (PhysJoint2D*)_joint;
+        assert(joint->j);
+        scene->w.DestroyJoint(joint->j);
+    };
 
     api.rayCast = box2dRayCast;
     api.getMassCenter = [](PhysBody2D* body)->vec2_t {

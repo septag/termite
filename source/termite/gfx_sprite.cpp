@@ -86,6 +86,7 @@ namespace termite
 
         bx::AllocatorI* alloc;
         vec2_t halfSize;
+        vec2_t sizeMultiplier;
         vec2_t posOffset;
         bx::Array<SpriteFrame> frames;
         int curFrameIdx;
@@ -120,6 +121,7 @@ namespace termite
         {
             tint = color1n(0xffffffff);
             posOffset = vec2f(0, 0);
+            sizeMultiplier = vec2f(1.0f, 1.0f);
         }
 
         inline const SpriteFrame& getCurFrame() const
@@ -256,6 +258,7 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
     texParams.flags = ssParams->flags;
     texParams.generateMips = ssParams->generateMips;
     texParams.skipMips = ssParams->skipMips;
+    texParams.fmt = ssParams->fmt;
     ss->texHandle = loadResource("texture", texFilepath.cstr(), &texParams);
 
     for (int i = 0; i < numFrames; i++) {
@@ -668,12 +671,14 @@ void termite::resumeSpriteAnim(Sprite* sprite)
 
 void termite::stopSpriteAnim(Sprite* sprite)
 {
+    sprite->triggerEndCallback = false;
     sprite->curFrameIdx = 0;
     sprite->playSpeed = 0;
 }
 
 void termite::replaySpriteAnim(Sprite* sprite)
 {
+    sprite->triggerEndCallback = false;
     sprite->curFrameIdx = 0;
     sprite->playSpeed = sprite->resumeSpeed;
 }
@@ -716,6 +721,11 @@ void termite::setSpriteFrameEndCallback(Sprite* sprite, SpriteFrameCallback call
     sprite->endCallback = callback;
     sprite->endUserData = userData;
     sprite->triggerEndCallback = false;
+}
+
+void termite::setSpriteSizeMultiplier(Sprite* sprite, const vec2_t& sizeMultiplier)
+{
+    sprite->sizeMultiplier = sizeMultiplier;
 }
 
 void termite::gotoSpriteFrameIndex(Sprite* sprite, int frameIdx)
@@ -861,7 +871,8 @@ void termite::convertSpritePhysicsVerts(vec2_t* ptsOut, const vec2_t* ptsIn, int
 }
 
 void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,
-                          ProgramHandle progOverride /*= ProgramHandle()*/, SetSpriteStateCallback stateCallback /*= nullptr*/)
+                          ProgramHandle progOverride /*= ProgramHandle()*/, SetSpriteStateCallback stateCallback /*= nullptr*/,
+                          void* stateUserData)
 {
     assert(sprites);
     assert(mats);
@@ -925,6 +936,7 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
             halfSize.y = halfSize.x / pixelRatio;
         else if (halfSize.x <= 0)
             halfSize.x = halfSize.y * pixelRatio;
+        halfSize = halfSize * ss.sprite->sizeMultiplier;
 
         // Encode transform matrix into vertices
         vec3_t transform1 = vec3f(mat.m11, mat.m12, mat.m21);
@@ -1027,7 +1039,7 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
         }
 
         if (stateCallback)
-            stateCallback(driver);
+            stateCallback(driver, stateUserData);
         driver->submit(viewId, prog, 0, false);
     }    
 

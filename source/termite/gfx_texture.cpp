@@ -173,10 +173,47 @@ static bool loadUncompressed(const MemoryBlock* mem, const ResourceTypeParams& p
 {
     assert(g_texLoader);
     GfxDriverApi* driver = g_texLoader->driver;
+    const LoadTextureParams* texParams = (const LoadTextureParams*)params.userParams;
+
+    int numComp = 0;
+    switch (texParams->fmt) {
+        case TextureFormat::RGBA8:
+        case TextureFormat::RGBA8S:
+        case TextureFormat::RGBA8I:
+        case TextureFormat::RGBA8U:
+            numComp = 4;
+            break;
+
+        case TextureFormat::RGB8:
+        case TextureFormat::RGB8I:
+        case TextureFormat::RGB8U:
+        case TextureFormat::RGB8S:
+            numComp = 3;
+            break;
+
+        case TextureFormat::R8:
+        case TextureFormat::R8I:
+        case TextureFormat::R8U:
+        case TextureFormat::R8S:
+            numComp = 1;
+            break;
+
+        case TextureFormat::RG8:
+        case TextureFormat::RG8I:
+        case TextureFormat::RG8U:
+        case TextureFormat::RG8S:
+            numComp = 2;
+            break;
+
+        default:
+            assert(0);  // Unsupported format
+    }
+    if (numComp == 0)
+        return false;
 
     // Note: Currently we always load RGBA8 format for non-compressed textures
     int width, height, comp;
-    uint8_t* pixels = stbi_load_from_memory(mem->data, mem->size, &width, &height, &comp, 4);
+    uint8_t* pixels = stbi_load_from_memory(mem->data, mem->size, &width, &height, &comp, numComp);
     if (!pixels)
         return false;
     
@@ -192,7 +229,6 @@ static bool loadUncompressed(const MemoryBlock* mem, const ResourceTypeParams& p
 
     // Generate mips
     int numMips = 1;    // default
-    const LoadTextureParams* texParams = (const LoadTextureParams*)params.userParams;
     const GfxMemory* gmem = nullptr;
     if (texParams->generateMips) {
         numMips = 1 + (int)bx::ffloor(bx::flog2((float)bx::uint32_max(width, height)));
@@ -204,7 +240,7 @@ static bool loadUncompressed(const MemoryBlock* mem, const ResourceTypeParams& p
         int mipWidth = width, mipHeight = height;
         for (int i = 0; i < numMips; i++) {
             if (i >= skipMips) {
-                sizeBytes += mipWidth*mipHeight * 4;
+                sizeBytes += mipWidth*mipHeight*numComp;
                 if (i == skipMips) {
                     width = mipWidth;
                     height = mipHeight;
@@ -228,9 +264,9 @@ static bool loadUncompressed(const MemoryBlock* mem, const ResourceTypeParams& p
 
         uint8_t* srcPixels = gmem->data;
         if (skipMips > 0) {
-            stbir_resize_uint8(pixels, origWidth, origHeight, 0, srcPixels, width, height, 0, 4);
+            stbir_resize_uint8(pixels, origWidth, origHeight, 0, srcPixels, width, height, 0, numComp);
         } else {
-            memcpy(srcPixels, pixels, width*height * 4);
+            memcpy(srcPixels, pixels, width*height*numComp);
         }
         stbi_image_free(pixels);
 
@@ -238,9 +274,9 @@ static bool loadUncompressed(const MemoryBlock* mem, const ResourceTypeParams& p
         mipWidth = width >> 1;   
         mipHeight = height >> 1;
         for (int i = 1; i < numMips; i++) {
-            uint8_t* destPixels = srcPixels + srcWidth*srcHeight*4;
+            uint8_t* destPixels = srcPixels + srcWidth*srcHeight*numComp;
 
-            stbir_resize_uint8(srcPixels, srcWidth, srcHeight, 0, destPixels, mipWidth, mipHeight, 0, 4);
+            stbir_resize_uint8(srcPixels, srcWidth, srcHeight, 0, destPixels, mipWidth, mipHeight, 0, numComp);
 
             srcWidth = mipWidth;
             srcHeight = mipHeight;
@@ -250,10 +286,10 @@ static bool loadUncompressed(const MemoryBlock* mem, const ResourceTypeParams& p
             mipHeight = bx::uint32_max(1, mipHeight >> 1);
         }        
     } else {
-        gmem = driver->makeRef(pixels, width*height * 4, stbCallbackFreeImage, nullptr);
+        gmem = driver->makeRef(pixels, width*height*numComp, stbCallbackFreeImage, nullptr);
     }
 
-    texture->handle = driver->createTexture2D(width, height, texParams->generateMips, 1, TextureFormat::RGBA8, 
+    texture->handle = driver->createTexture2D(width, height, texParams->generateMips, 1, texParams->fmt, 
                                               texParams->flags, gmem);
     if (!texture->handle.isValid())
         return false;
@@ -261,10 +297,10 @@ static bool loadUncompressed(const MemoryBlock* mem, const ResourceTypeParams& p
     TextureInfo* info = &texture->info;
     info->width = width;
     info->height = height;
-    info->format = TextureFormat::RGBA8;
+    info->format = texParams->fmt;
     info->numMips = 1;
-    info->storageSize = width * height * 4;
-    info->bitsPerPixel = 32;
+    info->storageSize = width * height * numComp;
+    info->bitsPerPixel = numComp * 8;
     texture->ratio = float(info->width) / float(info->height);
 
     *obj = uintptr_t(texture);
