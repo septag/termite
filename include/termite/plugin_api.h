@@ -381,6 +381,9 @@ namespace termite
 		bool (*isMouseHoveringWindow)();
 		bool (*isMouseHoveringAnyWindow)();
         bool (*isItemHovered)();
+        bool (*isWindowFocused)();
+        bool (*isRootWindowOrAnyChildFocused)();
+        bool (*isRootWindowFocused)();
 
         // ImGuizmo
         bool (*isOverGuizmo)();

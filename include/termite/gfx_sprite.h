@@ -10,6 +10,8 @@
 #include "resource_lib.h"
 #include "vec_math.h"
 
+#include <functional>
+
 namespace termite
 {
     struct Sprite;
@@ -114,6 +116,7 @@ namespace termite
     TERMITE_API void setSpriteFrameEndCallback(Sprite* sprite, SpriteFrameCallback callback, void* userData);
 
     // Set/Get Sprite props
+    TERMITE_API void setSpriteHalfSize(Sprite* sprite, const vec2_t& halfSize);
     TERMITE_API void setSpriteSizeMultiplier(Sprite* sprite, const vec2_t& sizeMultiplier);
     TERMITE_API void gotoSpriteFrameIndex(Sprite* sprite, int frameIdx);
     TERMITE_API void gotoSpriteFrameName(Sprite* sprite, const char* name);
@@ -124,6 +127,7 @@ namespace termite
     TERMITE_API void setSpriteFlip(Sprite* sprite, SpriteFlip::Bits flip);
     TERMITE_API SpriteFlip::Bits getSpriteFlip(Sprite* sprite);
     TERMITE_API void setSpritePosOffset(Sprite* sprite, const vec2_t posOffset);
+    TERMITE_API vec2_t getSpritePosOffset(Sprite* sprite);
     TERMITE_API void setSpriteCurFrameTag(Sprite* sprite, const char* frameTag);
     TERMITE_API void setSpriteOrder(Sprite* sprite, uint8_t order); // higher orders gets to draw later
     TERMITE_API void setSpritePivot(Sprite* sprite, const vec2_t pivot);

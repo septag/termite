@@ -177,6 +177,7 @@ namespace termite
 
     TERMITE_API float getRandomFloatUniform(float a, float b);
     TERMITE_API int getRandomIntUniform(int a, int b);    
+    TERMITE_API float getRandomFloatNormal(float mean, float sigma);
 
     // UI Input
     TERMITE_API void inputSendMouse(float mousePos[2], int mouseButtons[3], float mouseWheel);

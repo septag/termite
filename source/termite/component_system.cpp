@@ -347,6 +347,8 @@ void termite::shutdownComponentSystem()
 
 ComponentGroupHandle termite::createComponentGroup(bx::AllocatorI* alloc, uint16_t poolSize /*= 0*/)
 {
+    if (poolSize == 0)
+        poolSize = 200;
     ComponentGroupHandle handle = ComponentGroupHandle(g_csys->componentGroups.newHandle());
     if (handle.isValid()) {
         ComponentGroup* group = new(g_csys->componentGroups.getHandleData(0, handle)) ComponentGroup();
@@ -576,6 +578,7 @@ ComponentTypeHandle termite::findComponentTypeByNameHash(size_t nameHash)
 ComponentHandle termite::getComponent(ComponentTypeHandle handle, Entity ent)
 {
     assert(handle.isValid());
+    assert(ent.isValid());
 
     const ComponentType& ctype = g_csys->components[handle.value];
     int r = ctype.entTable.find(ent.id);

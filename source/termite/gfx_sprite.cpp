@@ -723,6 +723,11 @@ void termite::setSpriteFrameEndCallback(Sprite* sprite, SpriteFrameCallback call
     sprite->triggerEndCallback = false;
 }
 
+void termite::setSpriteHalfSize(Sprite* sprite, const vec2_t& halfSize)
+{
+    sprite->halfSize = halfSize;
+}
+
 void termite::setSpriteSizeMultiplier(Sprite* sprite, const vec2_t& sizeMultiplier)
 {
     sprite->sizeMultiplier = sizeMultiplier;
@@ -792,6 +797,11 @@ void termite::setSpritePosOffset(Sprite* sprite, const vec2_t posOffset)
     sprite->posOffset = posOffset;
 }
 
+vec2_t termite::getSpritePosOffset(Sprite* sprite)
+{
+    return sprite->posOffset;
+}
+
 void termite::setSpriteCurFrameTag(Sprite* sprite, const char* frameTag)
 {
     SpriteFrame& frame = sprite->frames[sprite->curFrameIdx];
@@ -822,39 +832,50 @@ color_t termite::getSpriteTintColor(Sprite* sprite)
 rect_t termite::getSpriteDrawRect(Sprite* sprite)
 {
     const SpriteFrame& frame = sprite->getCurFrame();
-
-    float pixelRatio = frame.pixelRatio;
     vec2_t halfSize = sprite->halfSize;
+    float pixelRatio = frame.pixelRatio;
     if (halfSize.y <= 0)
         halfSize.y = halfSize.x / pixelRatio;
     else if (halfSize.x <= 0)
         halfSize.x = halfSize.y * pixelRatio;
+    halfSize = halfSize * sprite->sizeMultiplier;
+
+    // calculate final pivot offset to make geometry
+    SpriteFlag::Bits flipX = sprite->flip | frame.flags;
+    SpriteFlag::Bits flipY = sprite->flip | frame.flags;
 
     vec2_t fullSize = halfSize * 2.0f;
-    vec2_t pivot = frame.pivot * fullSize;
-    vec2_t posOffset = frame.posOffset + sprite->posOffset * fullSize;
-    halfSize = halfSize * frame.sizeOffset;
-    vec2_t offset = posOffset * fullSize - pivot;
+    vec2_t offset = frame.posOffset + sprite->posOffset - frame.pivot;
+    if (flipX & SpriteFlip::FlipX)
+        offset.x = -offset.x;
+    if (flipY & SpriteFlip::FlipY)
+        offset.y = -offset.y;
 
-    return rectv(vec2f(-halfSize.x, -halfSize.y) + offset, vec2f(halfSize.x, halfSize.y) + offset);
+    return rectv(offset - halfSize, halfSize + offset);
 }
 
 void termite::getSpriteRealRect(Sprite* sprite, vec2_t* pHalfSize, vec2_t* pCenter)
 {
     const SpriteFrame& frame = sprite->getCurFrame();
+    SpriteFlip::Bits flip = sprite->flip & frame.flags;
     vec2_t halfSize = sprite->halfSize;
     float pixelRatio = frame.pixelRatio;
     if (halfSize.y <= 0)
         halfSize.y = halfSize.x / pixelRatio;
     else if (halfSize.x <= 0)
         halfSize.x = halfSize.y * pixelRatio;
+    vec2_t pivot = frame.pivot;
+    if (flip & SpriteFlip::FlipX)
+        pivot.x = -pivot.x;
+    if (flip & SpriteFlip::FlipY)
+        pivot.y = -pivot.y;
+
     *pHalfSize = halfSize;
-    *pCenter = frame.pivot * halfSize * 2.0f;
+    *pCenter = pivot * halfSize * 2.0f;
 }
 
 vec2_t termite::getSpriteImageSize(Sprite* sprite)
 {
-    //const SpriteFrame& frame = sprite->getCurFrame();
     return sprite->getCurFrame().sourceSize;
 }
 
@@ -864,9 +885,17 @@ void termite::convertSpritePhysicsVerts(vec2_t* ptsOut, const vec2_t* ptsIn, int
     vec2_t center;
     vec2_t imgSize = getSpriteImageSize(sprite);
     getSpriteRealRect(sprite, &halfSize, &center);
+    SpriteFlip::Bits flip = sprite->flip;
+
     for (int i = 0; i < numPts; i++) {
         vec2_t pt = ptsIn[i];
-        ptsOut[i] = vec2f(pt.x/imgSize.x, pt.y/imgSize.y) * halfSize * 2.0f - center;
+        if (flip & SpriteFlip::FlipX)
+            pt.x = -pt.x;
+        if (flip & SpriteFlip::FlipY)
+            pt.y = -pt.y;
+
+        pt = vec2f(pt.x/imgSize.x, pt.y/imgSize.y);
+        ptsOut[i] = pt * halfSize * 2.0f - center;
     }
 }
 
@@ -1038,8 +1067,9 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
                                TextureFlag::FromTexture);
         }
 
-        if (stateCallback)
+        if (stateCallback) {
             stateCallback(driver, stateUserData);
+        }
         driver->submit(viewId, prog, 0, false);
     }    
 

@@ -850,6 +850,12 @@ int termite::getRandomIntUniform(int a, int b)
     return dist(g_core->randEngine);
 }
 
+float termite::getRandomFloatNormal(float mean, float sigma)
+{
+    std::normal_distribution<float> dist(mean, sigma);
+    return dist(g_core->randEngine);
+}
+
 void termite::inputSendChars(const char* chars)
 {
 	ImGuiIO& io = ImGui::GetIO();
