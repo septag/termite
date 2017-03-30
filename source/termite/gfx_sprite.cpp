@@ -860,7 +860,6 @@ static rect_t getSpriteDrawRectFrame(Sprite* sprite, int index)
     SpriteFlag::Bits flipX = sprite->flip | frame.flags;
     SpriteFlag::Bits flipY = sprite->flip | frame.flags;
 
-    vec2_t fullSize = halfSize * 2.0f;
     vec2_t offset = frame.posOffset + sprite->posOffset - frame.pivot;
     if (flipX & SpriteFlip::FlipX)
         offset.x = -offset.x;

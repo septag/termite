@@ -36,10 +36,6 @@ struct SdlState
     bx::Array<ShortcutKey> shortcutKeys;
     float accel[3];
 
-#if BX_PLATFORM_IOS
-    void* iosLayerHandle;
-#endif
-
     SdlState(bx::AllocatorI* _alloc) : alloc(_alloc)
     {
         mouseWheel = 0;
@@ -47,13 +43,14 @@ struct SdlState
         modKeys = 0;
         memset(keysDown, 0x00, sizeof(keysDown));
         accel[0] = accel[1] = accel[2] = 0;
-#if BX_PLATFORM_IOS
-        iosLayerHandle = nullptr;
-#endif
     }
 };
 
 static SdlState* g_sdl = nullptr;
+
+#if BX_PLATFORM_IOS
+static void* g_iosLayerHandle = nullptr;
+#endif
 
 #if BX_PLATFORM_ANDROID
 #include <jni.h>
@@ -127,9 +124,9 @@ void termite::sdlGetNativeWindowHandle(SDL_Window* window, void** pWndHandle, vo
     if (pBackbuffer)
         *pBackbuffer = wmi.info.android.surface;
 #elif BX_PLATFORM_IOS
-    if (!g_sdl->iosLayerHandle)
-        g_sdl->iosLayerHandle = iosCreateNativeLayer(wmi.info.uikit.window);
-    *pWndHandle = g_sdl->iosLayerHandle;
+    if (!g_iosLayerHandle)
+        g_iosLayerHandle = iosCreateNativeLayer(wmi.info.uikit.window);
+    *pWndHandle = g_iosLayerHandle;
 #endif // BX_PLATFORM_
 }
 

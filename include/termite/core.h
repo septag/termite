@@ -123,9 +123,8 @@ namespace termite
     {
     public:
         explicit TimeStepper(float timestep) :
-            m_callback(nullptr),
-            m_timestep(timestep),
-            m_accum(0)
+            m_accum(0),
+            m_timestep(timestep)
         {
         }
 
@@ -142,7 +141,6 @@ namespace termite
         }
 
     private:
-        FixedUpdateCallback m_callback;
         float m_accum;
         float m_timestep;
     };
