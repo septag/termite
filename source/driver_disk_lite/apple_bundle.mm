@@ -25,12 +25,14 @@ bx::Path iosResolveBundlePath(int bundleId, const char* filepath)
         bx::Path pfilepath(filepath);
         bx::Path filename = pfilepath.getFilename();
         bx::Path fileext = pfilepath.getFileExt();
+        bx::Path bundlePath = pfilepath.getDirectory();
+        bundlePath.join(filename.cstr());
 
         assert(bundleId >= 0 && bundleId < g_bundles.count);
         NSUInteger index = (NSUInteger)bundleId ;
         NSBundle* bundle = [g_bundles objectAtIndex:index];
         
-        NSString* path = [bundle pathForResource:[NSString stringWithUTF8String:filename.cstr()] ofType:[NSString stringWithUTF8String:fileext.cstr()]];
+        NSString* path = [bundle pathForResource:[NSString stringWithUTF8String:bundlePath.cstr()] ofType:[NSString stringWithUTF8String:fileext.cstr()]];
         if (path)
             return bx::Path([path UTF8String]);
         else

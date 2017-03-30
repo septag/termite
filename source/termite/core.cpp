@@ -3,7 +3,6 @@
 #include "bx/readerwriter.h"
 #include "bx/os.h"
 #include "bx/cpu.h"
-#include "bx/timer.h"
 #include "bxx/path.h"
 #include "bxx/inifile.h"
 #include "bxx/pool.h"
@@ -53,6 +52,7 @@
 
 #include <dirent.h>
 #include <random>
+#include <chrono>
 
 #define MEM_POOL_BUCKET_SIZE 256
 #define IMGUI_VIEWID 255
@@ -60,6 +60,10 @@
 #define LOG_STRING_SIZE 256
 
 using namespace termite;
+
+typedef std::chrono::high_resolution_clock TClock;
+typedef std::chrono::high_resolution_clock::time_point TClockTimePt;
+
 //
 struct FrameData
 {
@@ -68,7 +72,7 @@ struct FrameData
     double fps;
     double elapsedTime;
     double avgFrameTime;
-    int64_t lastFrameTick;
+    TClockTimePt lastFrameTimePt;
     double frameTimes[32];
     double fpsTime;
 };
@@ -141,7 +145,6 @@ struct Core
     Config conf;
     RendererApi* renderer;
     FrameData frameData;
-    double hpTimerFreq;
     double timeMultiplier;
     bx::Pool<HeapMemoryImpl> memPool;
     bx::Lock memPoolLock;
@@ -165,7 +168,6 @@ struct Core
         phys2dDriver = nullptr;
         updateFn = nullptr;
         renderer = nullptr;
-        hpTimerFreq = 0;
         ioDriver = nullptr;
         timeMultiplier = 1.0;
         gfxLogCache = nullptr;
@@ -537,9 +539,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     BX_END_OK();
 #endif
 
-    g_core->hpTimerFreq = bx::getHPFrequency();
     g_core->init = true;
-
     return 0;
 }
 
@@ -662,11 +662,12 @@ void termite::doFrame()
     g_core->tempAlloc.free();
 
     FrameData& fd = g_core->frameData;
-    if (fd.lastFrameTick == 0)
-        fd.lastFrameTick = bx::getHPCounter();
+    if (fd.frame == 0)
+        fd.lastFrameTimePt = TClock::now();
 
-    int64_t frameTick = bx::getHPCounter();
-    double dt = g_core->timeMultiplier * double(frameTick - fd.lastFrameTick)/g_core->hpTimerFreq;
+    TClockTimePt frameTimePt = TClock::now();
+    std::chrono::duration<double> dt_fp = frameTimePt - fd.lastFrameTimePt;
+    double dt = g_core->timeMultiplier * dt_fp.count();
     float fdt = float(dt);
 
     if (g_core->gfxDriver) {
@@ -697,7 +698,7 @@ void termite::doFrame()
     fd.frame++;
     fd.elapsedTime += dt;
     fd.frameTime = dt;
-    fd.lastFrameTick = frameTick;
+    fd.lastFrameTimePt = frameTimePt;
     int frameTimeIter = fd.frame % BX_COUNTOF(fd.frameTimes);
     fd.frameTimes[frameTimeIter] = dt;
     fd.avgFrameTime = calcAvgFrameTime(fd);
@@ -716,12 +717,17 @@ void termite::pause()
 void termite::resume()
 {
     g_core->timeMultiplier = 1.0;
-    g_core->frameData.lastFrameTick = bx::getHPCounter();
+    g_core->frameData.lastFrameTimePt = TClock::now();
 }
 
 bool termite::isPaused()
 {
     return g_core->timeMultiplier == 0;
+}
+
+void termite::resetTempAlloc()
+{
+    g_core->tempAlloc.free();
 }
 
 double termite::getFrameTime()

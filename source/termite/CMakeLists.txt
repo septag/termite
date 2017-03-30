@@ -76,7 +76,7 @@ endif()
 
 target_link_libraries(termite 
     PRIVATE ${FCONTEXT_LIB} imgui_impl ${PLUGIN_LIBS} ${PRIVATE_LIBS}
-    PUBLIC bx ${STD_LIBS})
+    PUBLIC bx rapidjson ${STD_LIBS})
 
 # 
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)

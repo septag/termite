@@ -137,6 +137,10 @@ namespace termite
     TERMITE_API void getSpriteRealRect(Sprite* sprite, vec2_t* pHalfSize, vec2_t* pCenter);
     TERMITE_API vec2_t getSpriteImageSize(Sprite* sprite);
 
+    // For manual rendering of spritesheet frames
+    TERMITE_API void getSpriteFrameDrawData(Sprite* sprite, int frameIdx, rect_t* drawRect, rect_t* textureRect, 
+                                            ResourceHandle* textureHandle);
+
     TERMITE_API void convertSpritePhysicsVerts(vec2_t* ptsOut, const vec2_t* ptsIn, int numPts, Sprite* sprite);
 
     // Dynamically draw sprites
@@ -173,7 +177,7 @@ namespace termite
         {
             generateMips = false;
             skipMips = 0;
-            flags = TextureFlag::U_Clamp | TextureFlag::V_Clamp;
+            flags = TextureFlag::U_Clamp | TextureFlag::V_Clamp;        // Spritesheets should be CLAMP as default
             fmt = TextureFormat::RGBA8;
         }
     };

@@ -12,7 +12,7 @@
 #include "imgui.h"
 
 #if BX_PLATFORM_IOS
-void* iosGetNativeLayer(void* wnd);
+void* iosCreateNativeLayer(void* wnd);
 #endif
 
 using namespace termite;
@@ -36,6 +36,10 @@ struct SdlState
     bx::Array<ShortcutKey> shortcutKeys;
     float accel[3];
 
+#if BX_PLATFORM_IOS
+    void* iosLayerHandle;
+#endif
+
     SdlState(bx::AllocatorI* _alloc) : alloc(_alloc)
     {
         mouseWheel = 0;
@@ -43,6 +47,9 @@ struct SdlState
         modKeys = 0;
         memset(keysDown, 0x00, sizeof(keysDown));
         accel[0] = accel[1] = accel[2] = 0;
+#if BX_PLATFORM_IOS
+        iosLayerHandle = nullptr;
+#endif
     }
 };
 
@@ -120,7 +127,9 @@ void termite::sdlGetNativeWindowHandle(SDL_Window* window, void** pWndHandle, vo
     if (pBackbuffer)
         *pBackbuffer = wmi.info.android.surface;
 #elif BX_PLATFORM_IOS
-    *pWndHandle = iosGetNativeLayer(wmi.info.uikit.window);
+    if (!g_sdl->iosLayerHandle)
+        g_sdl->iosLayerHandle = iosCreateNativeLayer(wmi.info.uikit.window);
+    *pWndHandle = g_sdl->iosLayerHandle;
 #endif // BX_PLATFORM_
 }
 

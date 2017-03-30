@@ -48,7 +48,7 @@ bool termite::generateSmoothNoise(FloatMatrix* smoothNoise, const FloatMatrix* b
 }
 
 bool termite::generatePerlinNoise(FloatMatrix* perlinNoise, const FloatMatrix* baseNoise, int octaveCount,
-                         float persistance, bx::AllocatorI* alloc)
+                                  float persistance, bx::AllocatorI* alloc)
 {
     int width = baseNoise->width;
     int height = baseNoise->height;

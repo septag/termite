@@ -92,5 +92,15 @@ namespace termite
         else
             return n;
     }
+
+    // Line fgain, but goes up to 1.0 and then back to 0
+    inline float fwave(float _time, float _gain)
+    {
+        if (_time < 0.5f) {
+            return bx::fbias(_time * 2.0f, _gain);
+        } else {
+            return 1.0f - bx::fbias(_time * 2.0f - 1.0f, 1.0f - _gain);
+        }
+    }
 } // namespace termite
 

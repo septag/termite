@@ -23,7 +23,9 @@ namespace termite
         inline Entity() : id(0)        {}
 
         explicit Entity(uint32_t _id) : id(_id)      {}
-        inline Entity(uint32_t index, uint32_t generation)  { id = (index & kEntityIndexMask) | ((generation & kEntityGenerationMask) << kEntityIndexBits); }
+        inline Entity(uint32_t index, uint32_t generation)  { 
+            id = (index & kEntityIndexMask) | ((generation & kEntityGenerationMask) << kEntityIndexBits); 
+        }
 
         inline uint32_t getIndex() { return (id & kEntityIndexMask);  }
         inline uint32_t getGeneration() {   return (id >> kEntityIndexBits) & kEntityGenerationMask;  }

@@ -203,6 +203,7 @@ void termite::cam2dInit(Camera2D* cam, float refWidth, float refHeight, DisplayP
     cam->refWidth = refWidth;
     cam->refHeight = refHeight;
     cam->zoom = zoom;
+    cam->zoomPercentOffset = 0;
     cam->pos = pos;
     cam->policy = policy;
 }
@@ -227,7 +228,8 @@ mtx4x4_t termite::cam2dViewMtx(const Camera2D& cam)
 
 static vec2_t calcCam2dHalfSize(const Camera2D& cam)
 {
-    float s = 1.0f / cam.zoom;
+    float zoom = cam.getZoom();
+    float s = 1.0f / zoom;
 
     // keep the ratio in scale of 1.0
     float hw, hh;

@@ -205,6 +205,7 @@ static MemoryBlock* blockReadRaw(const char* uri, IoPathType::Enum pathType, Asy
     }
 
     *pRes = mem ? AsyncResponse::RequestReadOk : AsyncResponse::RequestReadFailed;
+
     return mem;
 }
 

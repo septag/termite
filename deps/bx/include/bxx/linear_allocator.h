@@ -32,19 +32,34 @@ namespace bx
         void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) BX_OVERRIDE
         {
             if (_size) {
-                if (m_offset + _size + sizeof(uint32_t) > m_size)
-                    return nullptr;
+                _align = _align < BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT ? BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT : _align;
+                struct Header
+                {
+                    uint32_t size;
+                    uint8_t padding;
+                };
 
-                void* p = m_ptr + m_offset + sizeof(uint32_t);
-                *((uint32_t*)((uint8_t*)p - sizeof(uint32_t))) = uint32_t(_size);
-                m_offset += _size + sizeof(uint32_t);
+                size_t total = _size + sizeof(Header) + _align;
 
+                // Allocate memory (with header)
+                if (m_offset + total > m_size)
+                    return nullptr;     // Not enough memory in the buffer
+                uint8_t* ptr = m_ptr + m_offset;
+                uint8_t* aligned = (uint8_t*)bx::alignPtr(ptr, sizeof(Header), _align);
+                Header* header = (Header*)(aligned - sizeof(Header));
+                header->size = uint32_t(_size);
+                header->padding = uint8_t(aligned - ptr);
+
+                m_offset += total;
+
+                // Realloc emulation
                 if (_ptr) {
-                    size_t prevsize = *((uint32_t*)((uint8_t*)_ptr - sizeof(uint32_t)));
-                    memcpy(p, _ptr, _size > prevsize ? prevsize : _size);
+                    Header* prevHeader = (Header*)_ptr - 1;
+                    size_t prevsize = prevHeader->size;
+                    memcpy(aligned, _ptr, _size > prevsize ? prevsize : _size);
                 }
 
-                return p;
+                return aligned;
             }
             return nullptr;
         }

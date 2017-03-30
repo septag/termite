@@ -8,7 +8,6 @@
 #include "bxx/handle_pool.h"
 #include "bxx/hash_table.h"
 #include "bxx/logger.h"
-#include "bxx/linear_allocator.h"
 
 #define MIN_FREE_INDICES 1024
 

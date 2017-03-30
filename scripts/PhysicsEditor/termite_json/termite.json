@@ -1,0 +1,4 @@
+{% for body in bodies %}{% for fixture in body.fixtures %}
+[{% for point in fixture.hull %} {% if not forloop.first %}, {% endif %}[{{point.x}}, {{point.y}}] {% endfor %}]
+{% endfor %}
+{% endfor %}

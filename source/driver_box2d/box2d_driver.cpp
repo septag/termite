@@ -141,6 +141,8 @@ namespace termite
             userData(nullptr),
             destroyFn(nullptr),
             contactFilterFn(nullptr),
+            beginContactFn(nullptr),
+            endContactFn(nullptr),
             beginContactReportInfo(false)
         {}
     };
@@ -323,6 +325,7 @@ static PhysBody2D* createBodyBox2d(PhysScene2D* scene, const PhysBodyDef2D& body
     bdef.angle = bodyDef.angle;
     bdef.angularDamping = bodyDef.angularDamping;
     bdef.linearVelocity = b2vec2(bodyDef.linearVel);
+    bdef.angularVelocity = -bodyDef.angularVel;
     bdef.bullet = (bodyDef.flags & PhysBodyFlags2D::IsBullet) ? true : false;
     bdef.fixedRotation = (bodyDef.flags & PhysBodyFlags2D::FixedRotation) ? true : false;
     bdef.gravityScale = bodyDef.gravityScale;

@@ -602,6 +602,7 @@ SceneLinkHandle termite::linkScene(SceneManager* mgr, Scene* sceneA, Scene* scen
     link->sceneB = sceneB;
     link->effectA = def.effectNameA ? findEffect(mgr, def.effectNameA) : nullptr;
     link->effectB = def.effectNameB ? findEffect(mgr, def.effectNameB) : nullptr;
+    link->loadScene = def.loadScene;
     if (link->effectA && link->effectA->paramSize > 0) {
         assert(def.effectParamsA);
         memcpy(link->effectParamsA, def.effectParamsA, std::min<uint32_t>(link->effectA->paramSize, sizeof(link->effectParamsA)));
@@ -723,10 +724,10 @@ static void updateLink(SceneManager* mgr, SceneLink* link, float dt)
         break;
 
     case SceneLink::InLoad:
-        if (link->effectA) {
+        /*if (link->effectA) {
             mgr->finalFb = mgr->effectFb;
             mgr->finalTex = mgr->effectTex;
-        }
+        }*/
 
         // add 'loading' scene to active scenes
         if (link->loadScene)
@@ -863,9 +864,9 @@ void termite::debugSceneManager(SceneManager* mgr)
         }
 
         imgui->image((ImTextureID)&mgr->mainTex, ImVec2(128, 128), ImVec2(0, 0), ImVec2(1.0f, 1.0f),
-                     ImVec4(1.0f, 1.0f, 1.0f, 1.0f), ImVec4(0, 0, 0, 0));
+                     ImVec4(1.0f, 1.0f, 1.0f, 1.0f), ImVec4(255, 255, 255, 255));
         imgui->image((ImTextureID)&mgr->effectTex, ImVec2(128, 128), ImVec2(0, 0), ImVec2(1.0f, 1.0f),
-                     ImVec4(1.0f, 1.0f, 1.0f, 1.0f), ImVec4(0, 0, 0, 0));
+                     ImVec4(1.0f, 1.0f, 1.0f, 1.0f), ImVec4(255, 255, 255, 255));
     }
     imgui->end();
 }

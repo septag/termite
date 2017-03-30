@@ -286,14 +286,14 @@ static void drawBatches(VectorGfxContext* ctx)
 
     // Allocate and fill vertices
     TransientVertexBuffer tvb;
-    if (!driver->getAvailTransientVertexBuffer(numVerts, vgVertexPosCoordColor::Decl))
+    if (driver->getAvailTransientVertexBuffer(numVerts, vgVertexPosCoordColor::Decl) != numVerts)
         return;
     driver->allocTransientVertexBuffer(&tvb, numVerts, vgVertexPosCoordColor::Decl);
     memcpy(tvb.data, ctx->vertexBuff, sizeof(vgVertexPosCoordColor)*numVerts);
 
     // Allocate and fill indices
     TransientIndexBuffer tib;
-    if (!driver->getAvailTransientIndexBuffer(numIndices))
+    if (driver->getAvailTransientIndexBuffer(numIndices) != numIndices)
         return;
     driver->allocTransientIndexBuffer(&tib, numIndices);
     memcpy(tib.data, ctx->indexBuff, sizeof(uint16_t)*numIndices);

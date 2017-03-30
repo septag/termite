@@ -94,8 +94,8 @@ static void imguiDrawLists(ImDrawData* data)
         uint32_t numVertices = (uint32_t)cmdList->VtxBuffer.size();
         uint32_t numIndices = (uint32_t)cmdList->IdxBuffer.size();
 
-        if (!driver->getAvailTransientVertexBuffer(numVertices, imVertexPosCoordColor::Decl) ||
-            !driver->getAvailTransientIndexBuffer(numIndices)) 
+        if (driver->getAvailTransientVertexBuffer(numVertices, imVertexPosCoordColor::Decl) != numVertices ||
+            driver->getAvailTransientIndexBuffer(numIndices) != numIndices) 
         {
             break;
         }

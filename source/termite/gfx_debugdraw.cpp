@@ -651,7 +651,7 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spaci
 
     // Draw
     GfxDriverApi* driver = ctx->driver;
-    if (!driver->getAvailTransientVertexBuffer(numVerts, eddVertexPosCoordColor::Decl))
+    if (driver->getAvailTransientVertexBuffer(numVerts, eddVertexPosCoordColor::Decl) != numVerts)
         return;
     TransientVertexBuffer tvb;
     driver->allocTransientVertexBuffer(&tvb, numVerts, eddVertexPosCoordColor::Decl);
@@ -726,7 +726,7 @@ void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spa
 
     // Draw
     GfxDriverApi* driver = ctx->driver;
-    if (!driver->getAvailTransientVertexBuffer(numVerts, eddVertexPosCoordColor::Decl))
+    if (driver->getAvailTransientVertexBuffer(numVerts, eddVertexPosCoordColor::Decl) != numVerts)
         return;
     TransientVertexBuffer tvb;
     driver->allocTransientVertexBuffer(&tvb, numVerts, eddVertexPosCoordColor::Decl);

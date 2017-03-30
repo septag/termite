@@ -5,8 +5,8 @@
 #include "bx/mutex.h"
 #include "bxx/linked_list.h"
 #include "bxx/pool.h"
-#include "bxx/linear_allocator.h"
 #include "bxx/logger.h"
+#include "bxx/linear_allocator.h"
 
 using namespace termite;
 

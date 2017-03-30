@@ -224,6 +224,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 # dependencies
 add_subdirectory(deps/deboost.context)
 add_subdirectory(deps/bx)
+add_subdirectory(deps/rapidjson)
 add_subdirectory(deps/nvg)
 if (NOT IOS)
     set_target_properties(fcontext PROPERTIES FOLDER Deps)

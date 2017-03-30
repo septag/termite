@@ -9,14 +9,32 @@
 #include "bxx/linked_list.h"
 #include "bxx/pool.h"
 #include "bxx/logger.h"
-#include "bxx/json.h"
+
+#include "rapidjson/error/en.h"
+#include "rapidjson/document.h"
+#include "bxx/rapidjson_allocator.h"
 
 #include T_MAKE_SHADER_PATH(shaders_h, sprite.vso)
 #include T_MAKE_SHADER_PATH(shaders_h, sprite.fso)
 
 #include <algorithm>
 
+using namespace rapidjson;
 using namespace termite;
+
+static const uint64_t kSpriteKeyOrderBits = 8;
+static const uint64_t kSpriteKeyOrderMask = (1 << kSpriteKeyOrderBits) - 1;
+static const uint64_t kSpriteKeyTextureBits = 16;
+static const uint64_t kSpriteKeyTextureMask = (1 << kSpriteKeyTextureBits) - 1;
+static const uint64_t kSpriteKeyIdBits = 32;
+static const uint64_t kSpriteKeyIdMask = (1llu << kSpriteKeyIdBits) - 1;
+
+static const uint8_t kSpriteKeyOrderShift = kSpriteKeyTextureBits + kSpriteKeyIdBits;
+static const uint8_t kSpriteKeyTextureShift = kSpriteKeyIdBits;
+
+#define MAKE_SPRITE_KEY(_Order, _Texture, _Id) \
+    (uint64_t(_Order & kSpriteKeyOrderMask) << kSpriteKeyOrderShift) | (uint64_t(_Texture & kSpriteKeyTextureMask) << kSpriteKeyTextureShift) | uint64_t(_Id & kSpriteKeyIdMask)
+#define SPRITE_KEY_GET_BATCH(_Key) uint32_t((_Key >> kSpriteKeyIdBits) & kSpriteKeyIdMask)
 
 struct SpriteVertex
 {
@@ -84,6 +102,7 @@ namespace termite
     {
         typedef bx::List<Sprite*>::Node LNode;
 
+        uint32_t id;
         bx::AllocatorI* alloc;
         vec2_t halfSize;
         vec2_t sizeMultiplier;
@@ -112,7 +131,6 @@ namespace termite
             playReverse(false),
             playSpeed(30.0f),
             resumeSpeed(30.0f),
-            order(0),
             flip(SpriteFlag::None),
             lnode(this),
             endCallback(nullptr),
@@ -199,7 +217,6 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
     const LoadSpriteSheetParams* ssParams = (const LoadSpriteSheetParams*)params.userParams;
 
     bx::AllocatorI* tmpAlloc = getTempAlloc();
-
     char* jsonStr = (char*)BX_ALLOC(tmpAlloc, mem->size + 1);
     if (!jsonStr) {
         T_ERROR("Out of Memory");
@@ -208,36 +225,33 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
     memcpy(jsonStr, mem->data, mem->size);
     jsonStr[mem->size] = 0;
 
-    bx::JsonError err;
-    bx::JsonNodeAllocator jalloc(tmpAlloc);
-    bx::JsonNode* jroot = bx::parseJson(jsonStr, &jalloc, &err);
-    if (!jroot) {
-        T_ERROR("Parse Json Error: %s (Pos: %s, Line: %d)", err.desc, err.pos, err.line);
+    BxAllocatorNoFree jalloc(tmpAlloc);
+    BxAllocator jpool(4096, &jalloc);
+    BxDocument jdoc(&jpool, 1024, &jalloc);
+
+    if (jdoc.ParseInsitu(jsonStr).HasParseError()) {
+        T_ERROR("Parse Json Error: %s (Pos: %s)", GetParseError_En(jdoc.GetParseError()), jdoc.GetErrorOffset());                 
         return false;
     }
     BX_FREE(tmpAlloc, jsonStr);
 
-    const bx::JsonNode* jframes = jroot->findChild("frames");
-    const bx::JsonNode* jmeta = jroot->findChild("meta");
-    if (jframes->isNull() || jmeta->isNull()) {
+    if (!jdoc.HasMember("frames") || !jdoc.HasMember("meta")) {
         T_ERROR("SpriteSheet Json is Invalid");
-        jroot->destroy();
         return false;
     }
+    const BxValue& jframes = jdoc["frames"];
+    const BxValue& jmeta = jdoc["meta"];
 
-    int numFrames = jframes->getArrayCount();
-    if (numFrames == 0) {
-        T_ERROR("Parse Json Error: %s (Pos: %s, Line: %d)", err.desc, err.pos, err.line);
-        jroot->destroy();
+    assert(jframes.IsArray());
+    int numFrames = jframes.Size();
+    if (numFrames == 0)
         return false;
-    }
 
     // Create sprite sheet
     size_t totalSz = sizeof(SpriteSheet) + numFrames*sizeof(SpriteSheetFrame);
     uint8_t* buff = (uint8_t*)BX_ALLOC(alloc ? alloc : g_spriteSys->alloc, totalSz);
     if (!buff) {
         T_ERROR("Out of Memory");
-        jroot->destroy();
         return false;
     }
     SpriteSheet* ss = new(buff) SpriteSheet();  buff += sizeof(SpriteSheet);
@@ -245,12 +259,12 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
     ss->numFrames = numFrames;
 
     // image width/height
-    const bx::JsonNode* jsize = jmeta->findChild("size");
-    float imgWidth = float(jsize->findChild("w")->valueInt());
-    float imgHeight = float(jsize->findChild("h")->valueInt());
+    const BxValue& jsize = jmeta["size"];
+    float imgWidth = float(jsize["w"].GetInt());
+    float imgHeight = float(jsize["h"].GetInt());
 
     // Make texture path and load it
-    const char* imageFile = jmeta->findChild("image")->valueString();
+    const char* imageFile = jmeta["image"].GetString();
     bx::Path texFilepath = bx::Path(params.uri).getDirectory();
     texFilepath.joinUnix(imageFile);
 
@@ -263,33 +277,33 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
 
     for (int i = 0; i < numFrames; i++) {
         SpriteSheetFrame& frame = ss->frames[i];
-        const bx::JsonNode* jframe = jframes->getArrayItem(i);
-        const char* filename = jframe->findChild("filename")->valueString();
+        const BxValue& jframe = jframes[i];
+        const char* filename = jframe["filename"].GetString();
         frame.filenameHash = tinystl::hash_string(filename, strlen(filename));
-        bool rotated = jframe->findChild("rotated")->valueBool();
+        bool rotated = jframe["rotated"].GetBool();
 
-        const bx::JsonNode* jframeFrame = jframe->findChild("frame");
-        float frameWidth = float(jframeFrame->findChild("w")->valueInt());
-        float frameHeight = float(jframeFrame->findChild("h")->valueInt());
+        const BxValue& jframeFrame = jframe["frame"];
+        float frameWidth = float(jframeFrame["w"].GetInt());
+        float frameHeight = float(jframeFrame["h"].GetInt());
         if (rotated)
             std::swap<float>(frameWidth, frameHeight);
 
-        frame.frame = rectwh(float(jframeFrame->findChild("x")->valueInt()) / imgWidth,
-                              float(jframeFrame->findChild("y")->valueInt()) / imgHeight,
+        frame.frame = rectwh(float(jframeFrame["x"].GetInt()) / imgWidth,
+                              float(jframeFrame["y"].GetInt()) / imgHeight,
                               frameWidth / imgWidth,
                               frameHeight / imgHeight);
 
-        const bx::JsonNode* jsourceSize = jframe->findChild("sourceSize");
-        frame.sourceSize = vec2f(float(jsourceSize->findChild("w")->valueInt()),
-                                 float(jsourceSize->findChild("h")->valueInt()));
+        const BxValue& jsourceSize = jframe["sourceSize"];
+        frame.sourceSize = vec2f(float(jsourceSize["w"].GetInt()),
+                                 float(jsourceSize["h"].GetInt()));
 
         // Normalize pos/size offsets (0~1)
         // Rotate offset can only be 90 degrees
-        const bx::JsonNode* jssFrame = jframe->findChild("spriteSourceSize");
-        float srcx = float(jssFrame->findChild("x")->valueInt());
-        float srcy = float(jssFrame->findChild("y")->valueInt());
-        float srcw = float(jssFrame->findChild("w")->valueInt());
-        float srch = float(jssFrame->findChild("h")->valueInt());
+        const BxValue& jssFrame = jframe["spriteSourceSize"];
+        float srcx = float(jssFrame["x"].GetInt());
+        float srcy = float(jssFrame["y"].GetInt());
+        float srcw = float(jssFrame["w"].GetInt());
+        float srch = float(jssFrame["h"].GetInt());
 
         frame.sizeOffset = vec2f(srcw / frame.sourceSize.x, srch / frame.sourceSize.y);
 
@@ -301,18 +315,17 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
         }
         frame.pixelRatio = frame.sourceSize.x / frame.sourceSize.y;
 
-        const bx::JsonNode* jpivot = jframe->findChild("pivot");
-        const bx::JsonNode* jpivotX = jpivot->findChild("x");
-        const bx::JsonNode* jpivotY = jpivot->findChild("y");
-        float pivotx = jpivotX->getType() == bx::JsonType::Float ?  jpivotX->valueFloat() : float(jpivotX->valueInt());
-        float pivoty = jpivotY->getType() == bx::JsonType::Float ?  jpivotX->valueFloat() : float(jpivotY->valueInt());
+        const BxValue& jpivot = jframe["pivot"];
+        const BxValue& jpivotX = jpivot["x"];
+        const BxValue& jpivotY = jpivot["y"];
+        float pivotx = jpivotX.IsFloat() ?  jpivotX.GetFloat() : float(jpivotX.GetInt());
+        float pivoty = jpivotY.IsFloat() ?  jpivotY.GetFloat() : float(jpivotY.GetInt());
         frame.pivot = vec2f(pivotx - 0.5f, -pivoty + 0.5f);     // convert to our coordinates
 
         vec2_t srcOffset = vec2f((srcx + srcw*0.5f)/frame.sourceSize.x - 0.5f, -(srcy + srch*0.5f)/frame.sourceSize.y + 0.5f);
         frame.posOffset = srcOffset;
     }
 
-    jroot->destroy();
     *obj = uintptr_t(ss);
 
     return true;
@@ -440,9 +453,12 @@ result_t termite::initSpriteSystem(GfxDriverApi* driver, bx::AllocatorI* alloc)
 
 Sprite* termite::createSprite(bx::AllocatorI* alloc, const vec2_t halfSize)
 {
+    static uint32_t id = 0;
+
     Sprite* sprite = BX_NEW(alloc, Sprite)(alloc);
     if (!sprite)
         return nullptr;
+    sprite->id = ++id;
     if (!sprite->frames.create(4, 16, alloc))
         return nullptr;
     sprite->halfSize = halfSize;
@@ -829,9 +845,9 @@ color_t termite::getSpriteTintColor(Sprite* sprite)
     return sprite->tint;
 }
 
-rect_t termite::getSpriteDrawRect(Sprite* sprite)
+static rect_t getSpriteDrawRectFrame(Sprite* sprite, int index)
 {
-    const SpriteFrame& frame = sprite->getCurFrame();
+    const SpriteFrame& frame = sprite->frames[index];
     vec2_t halfSize = sprite->halfSize;
     float pixelRatio = frame.pixelRatio;
     if (halfSize.y <= 0)
@@ -852,6 +868,11 @@ rect_t termite::getSpriteDrawRect(Sprite* sprite)
         offset.y = -offset.y;
 
     return rectv(offset - halfSize, halfSize + offset);
+}
+
+rect_t termite::getSpriteDrawRect(Sprite* sprite)
+{
+    return getSpriteDrawRectFrame(sprite, sprite->curFrameIdx);
 }
 
 void termite::getSpriteRealRect(Sprite* sprite, vec2_t* pHalfSize, vec2_t* pCenter)
@@ -877,6 +898,14 @@ void termite::getSpriteRealRect(Sprite* sprite, vec2_t* pHalfSize, vec2_t* pCent
 vec2_t termite::getSpriteImageSize(Sprite* sprite)
 {
     return sprite->getCurFrame().sourceSize;
+}
+
+void termite::getSpriteFrameDrawData(Sprite* sprite, int frameIdx, rect_t* drawRect, rect_t* textureRect, 
+                                     ResourceHandle* textureHandle)
+{
+    *drawRect = getSpriteDrawRectFrame(sprite, frameIdx);
+    *textureRect = sprite->frames[frameIdx].frame;
+    *textureHandle = sprite->frames[frameIdx].texHandle;
 }
 
 void termite::convertSpritePhysicsVerts(vec2_t* ptsOut, const vec2_t* ptsIn, int numPts, Sprite* sprite)
@@ -918,11 +947,11 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     const int numIndices = numSprites * 6;
     GfxState::Bits baseState = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::CullCCW;
 
-    if (!driver->getAvailTransientVertexBuffer(numVerts, SpriteVertex::Decl))
+    if (driver->getAvailTransientVertexBuffer(numVerts, SpriteVertex::Decl) != numVerts)
         return;
     driver->allocTransientVertexBuffer(&tvb, numVerts, SpriteVertex::Decl);
 
-    if (!driver->getAvailTransientIndexBuffer(numIndices))
+    if (driver->getAvailTransientIndexBuffer(numIndices) != numIndices)
         return;
     driver->allocTransientIndexBuffer(&tib, numIndices);
 
@@ -931,19 +960,18 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     {
         int index;
         Sprite* sprite;
+        uint64_t key;
     };
 
     SortedSprite* sortedSprites = (SortedSprite*)BX_ALLOC(tmpAlloc, sizeof(SortedSprite)*numSprites);
     for (int i = 0; i < numSprites; i++) {
+        const SpriteFrame& frame = sprites[i]->getCurFrame();
         sortedSprites[i].index = i;
         sortedSprites[i].sprite = sprites[i];
+        sortedSprites[i].key = MAKE_SPRITE_KEY(sprites[i]->order, frame.texHandle.value, sprites[i]->id);
     }
     std::sort(sortedSprites, sortedSprites + numSprites, [](const SortedSprite& a, const SortedSprite&b)->bool {
-        const SpriteFrame& fa = a.sprite->getCurFrame();
-        const SpriteFrame& fb = b.sprite->getCurFrame();
-        uint32_t keyA = (uint32_t(a.sprite->order) << 16) | uint32_t(fa.texHandle.value);
-        uint32_t keyB = (uint32_t(b.sprite->order) << 16) | uint32_t(fb.texHandle.value);
-        return keyA < keyB;
+        return a.key < b.key;
     });
 
     // Fill sprite quads
@@ -967,10 +995,6 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
             halfSize.x = halfSize.y * pixelRatio;
         halfSize = halfSize * ss.sprite->sizeMultiplier;
 
-        // Encode transform matrix into vertices
-        vec3_t transform1 = vec3f(mat.m11, mat.m12, mat.m21);
-        vec3_t transform2 = vec3f(mat.m22, mat.m31, mat.m32);
-
         // calculate final pivot offset to make geometry
         vec2_t fullSize = halfSize * 2.0f;
         vec2_t offset = frame.posOffset + ss.sprite->posOffset - frame.pivot;
@@ -982,6 +1006,10 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
         // shrink and offset to match the image inside sprite
         halfSize = halfSize * frame.sizeOffset;
         offset = offset * fullSize;
+
+        // Encode transform matrix into vertices
+        vec3_t transform1 = vec3f(mat.m11, mat.m12, mat.m21);
+        vec3_t transform2 = vec3f(mat.m22, mat.m31, mat.m32);
 
         SpriteVertex& v0 = verts[vertexIdx];
         SpriteVertex& v1 = verts[vertexIdx + 1];
@@ -1043,12 +1071,12 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     Batch* curBatch = nullptr;
     for (int i = 0; i < numSprites; i++) {
         Sprite* sprite = sortedSprites[i].sprite;
-        uint32_t key = (uint32_t(sprite->order) << 16) | uint32_t(sprite->getCurFrame().texHandle.value);
-        if (key != prevKey) {
+        uint32_t batchKey = SPRITE_KEY_GET_BATCH(sortedSprites[i].key);
+        if (batchKey != prevKey) {
             curBatch = batches.push();
             curBatch->index = i;
             curBatch->count = 0;
-            prevKey = key;
+            prevKey = batchKey;
         }
         curBatch->count++;
     }

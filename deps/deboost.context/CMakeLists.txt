@@ -10,7 +10,7 @@ endif()
 # Another target to join them together
 if (IOS)
     add_custom_target(fcontext 
-        COMMAND xcodebuild -workspace ${CMAKE_CURRENT_SOURCE_DIR}/projects/xcode/fcontext/fcontext.xcodeproj/project.xcworkspace -scheme fcontext -configuration 'Release' -sdk iphoneos10.0 CONFIGURATION_BUILD_DIR=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+        COMMAND xcodebuild -workspace ${CMAKE_CURRENT_SOURCE_DIR}/projects/xcode/fcontext/fcontext.xcodeproj/project.xcworkspace -scheme fcontext -configuration 'Release' -sdk iphoneos CONFIGURATION_BUILD_DIR=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
         COMMENT "Building deboost.context"
         VERBATIM)
     return()

@@ -127,6 +127,7 @@ namespace termite
     {
         vec2_t pos;
         float zoom;
+        float zoomPercentOffset;
         float refWidth;
         float refHeight;
         DisplayPolicy::Enum policy;
@@ -145,6 +146,11 @@ namespace termite
         inline void setZoom(float _zoom)
         {
             cam2dZoom(this, _zoom);
+        }
+
+        inline float getZoom() const
+        {
+            return zoom + zoom*zoomPercentOffset;
         }
 
         inline mtx4x4_t getViewMtx() const
