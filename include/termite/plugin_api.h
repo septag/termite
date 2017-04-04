@@ -21,6 +21,20 @@
 
 #define T_ERROR_API(_Api, _Fmt, ...) _Api->reportErrorf(__FILE__, __LINE__, _Fmt, ##__VA_ARGS__)
 
+#if RMT_ENABLED
+#  define T_PROFILE_BEGIN(_Api, name, flags)        \
+    {                                               \
+        static uint32_t rmt_sample_hash_##name = 0;   \
+        _Api->beginCPUSample(#name, flags, &rmt_sample_hash_##name);    \
+    }
+#  define T_PROFILE_END(_Api)   _Api->endCPUSample();
+#  define T_PROFILE_BEGIN_STR(_Api, name, flags) _Api->beginCPUSample(name, flags, nullptr);
+#else
+#  define T_PROFILE_BEGIN(_Api, name, flags)
+#  define T_PROFILE_END(_Api)
+#  define T_PROFILE_BEGIN_STR(_Api, name, flags)
+#endif
+
 namespace termite
 {
     struct ApiId
@@ -101,6 +115,9 @@ namespace termite {
         IoDriverApi* (*getBlockingIoDriver)();
         IoDriverApi* (*getAsyncIoDriver)();
         PhysDriver2DApi* (*getPhys2dDriver)();
+
+        void(*beginCPUSample)(const char* name, uint32_t flags, uint32_t* hashCache);
+        void(*endCPUSample)();
     };
 }
 #endif

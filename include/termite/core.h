@@ -196,6 +196,9 @@ namespace termite
     TERMITE_API const char* getCacheDir() T_THREAD_SAFE;
     TERMITE_API const char* getDataDir() T_THREAD_SAFE;
     TERMITE_API void dumpGfxLog() T_THREAD_SAFE;
+
+    // Remote Console
+    TERMITE_API void registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback);
 } // namespace termite
 
 

@@ -10,6 +10,8 @@
 #include "gfx_utils.h"
 #include "gfx_driver.h"
 
+#include "Remotery.h"
+
 using namespace termite;
 
 static void* getImGuiApi0()
@@ -309,6 +311,8 @@ void* termite::getEngineApi(uint16_t apiId, uint32_t version)
 {
     if (apiId == ApiId::Core && version == 0) {
         static CoreApi_v0 core0;
+        memset(&core0, 0x00, sizeof(core0));
+
         core0.copyMemoryBlock = copyMemoryBlock;
         core0.createMemoryBlock = createMemoryBlock;
         core0.readTextFile = readTextFile;
@@ -329,7 +333,10 @@ void* termite::getEngineApi(uint16_t apiId, uint32_t version)
         core0.getAsyncIoDriver = getAsyncIoDriver;
         core0.getBlockingIoDriver = getBlockingIoDriver;
         core0.getPhys2dDriver = getPhys2dDriver;
-
+#if RMT_ENABLED
+        core0.beginCPUSample = _rmt_BeginCPUSample;
+        core0.endCPUSample = _rmt_EndCPUSample;
+#endif
         return &core0;
     } else if (apiId == ApiId::Gfx && version == 0) {
         static GfxApi_v0 gfx0;

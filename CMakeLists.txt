@@ -44,6 +44,10 @@ else()
     option(BUILD_TOOLS "Build tools" OFF)
 endif()
 option(BUILD_TESTS "Build test programs" OFF)
+option(BUILD_EXAMPLES "Build Examples" OFF)
+if (APPLE)
+    option(USE_METAL "Force Use Metal Graphics API for macOS and iOS" OFF)
+endif()
 
 # Dependencies
 
@@ -205,16 +209,16 @@ copy_release_build_flags(PROFILE)
 copy_release_build_flags(DEVELOPMENT)
 
 # http://stackoverflow.com/questions/33829152/for-cmake-can-you-modify-the-release-debug-compiler-flags-with-add-compiler-fl
-set(DEBUG_COMPILE_OPTIONS "-DBX_CONFIG_ALLOCATOR_DEBUG" "-Dtermite_DEV=1" "-DBX_CONFIG_CHECK_ASSERT=1")
+set(DEBUG_COMPILE_OPTIONS "-DBX_CONFIG_ALLOCATOR_DEBUG" "-Dtermite_DEV=1" "-DBX_CONFIG_CHECK_ASSERT=1" "-DRMT_ENABLED=1")
 add_compile_options("$<$<CONFIG:Debug>:${DEBUG_COMPILE_OPTIONS}>")
 
-set(DEVELOPMENT_COMPILE_OPTIONS "-Dtermite_DEV=1")
+set(DEVELOPMENT_COMPILE_OPTIONS "-Dtermite_DEV=1" "-DRMT_ENABLED=1")
 add_compile_options("$<$<CONFIG:Development>:${DEVELOPMENT_COMPILE_OPTIONS}>")
 
-set(PROFILE_COMPILE_OPTIONS "-Dtermite_DEV=0")
+set(PROFILE_COMPILE_OPTIONS "-Dtermite_DEV=0" "-DRMT_ENABLED=1")
 add_compile_options("$<$<CONFIG:Profile>:${PROFILE_COMPILE_OPTIONS}>")
 
-set(RELEASE_COMPILE_OPTIONS "-Dtermite_DEV=0")
+set(RELEASE_COMPILE_OPTIONS "-Dtermite_DEV=0" "-DRMT_ENABLED=0")
 add_compile_options("$<$<CONFIG:Release>:${RELEASE_COMPILE_OPTIONS}>")
 
 # Common include directories
@@ -226,6 +230,7 @@ add_subdirectory(deps/deboost.context)
 add_subdirectory(deps/bx)
 add_subdirectory(deps/rapidjson)
 add_subdirectory(deps/nvg)
+add_subdirectory(deps/remotery)
 if (NOT IOS)
     set_target_properties(fcontext PROPERTIES FOLDER Deps)
 endif()

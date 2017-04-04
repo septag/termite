@@ -75,7 +75,7 @@ else()
 endif()
 
 target_link_libraries(termite 
-    PRIVATE ${FCONTEXT_LIB} imgui_impl ${PLUGIN_LIBS} ${PRIVATE_LIBS}
+    PRIVATE ${FCONTEXT_LIB} imgui_impl remotery ${PLUGIN_LIBS} ${PRIVATE_LIBS}
     PUBLIC bx rapidjson ${STD_LIBS})
 
 # 

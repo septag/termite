@@ -8,6 +8,8 @@
 #include "bxx/pool.h"
 #include "bxx/lock.h"
 #include "bx/crtimpl.h"
+#include "bxx/array.h"
+#include "bxx/string.h"
 
 #include "gfx_defines.h"
 #include "gfx_font.h"
@@ -53,6 +55,8 @@
 #include <dirent.h>
 #include <random>
 #include <chrono>
+
+#include "Remotery.h"
 
 #define MEM_POOL_BUCKET_SIZE 256
 #define IMGUI_VIEWID 255
@@ -139,6 +143,13 @@ struct LogCache
     char text[LOG_STRING_SIZE];
 };
 
+struct ConsoleCommand
+{
+    size_t cmdHash;
+    std::function<void(int, const char**)> callback;
+    ConsoleCommand() : cmdHash(0) {}
+};
+
 struct Core
 {
     UpdateCallback updateFn;
@@ -158,6 +169,9 @@ struct Core
 
     std::random_device randDevice;
     std::mt19937 randEngine;
+    Remotery* rmt;
+    bx::Array<ConsoleCommand> consoleCmds;
+
     bool init;
 
     Core() :
@@ -172,6 +186,7 @@ struct Core
         timeMultiplier = 1.0;
         gfxLogCache = nullptr;
         numGfxLogCache = 0;
+        rmt = nullptr;
         init = false;
         memset(&frameData, 0x00, sizeof(frameData));
     }
@@ -204,6 +219,52 @@ extern "C" JNIEXPORT void JNICALL Java_com_termite_utils_PlatformUtils_termiteIn
     env->ReleaseStringUTFChars(cacheDir, str);
 }
 #endif
+
+static void* remoteryMallocCallback(void* mm_context, rmtU32 size)
+{
+    return BX_ALLOC(g_alloc, size);
+}
+
+static void remoteryFreeCallback(void* mm_context, void* ptr)
+{
+    BX_FREE(g_alloc, ptr);
+}
+
+static void* remoteryReallocCallback(void* mm_context, void* ptr, rmtU32 size)
+{
+    return BX_REALLOC(g_alloc, ptr, size);
+}
+
+static void remoteryInputHandlerCallback(const char* text, void* context)
+{
+    assert(g_core);
+
+    const int maxArgs = 16;
+    bx::String64 args[maxArgs];
+    char cmdText[2048];
+    bx::strlcpy(cmdText, text, sizeof(cmdText));
+    char* token = strtok(cmdText, " ");
+    int numArgs = 0;
+    while (token && numArgs < maxArgs) {
+        args[numArgs++] = token;
+        token = strtok(nullptr, " ");
+    }
+
+    if (numArgs > 0) {
+        // find and execute command
+        size_t cmdHash = tinystl::hash_string(args[0].cstr(), args[0].getLength());
+        for (int i = 0; i < g_core->consoleCmds.getCount(); i++) {
+            if (g_core->consoleCmds[i].cmdHash == cmdHash) {
+                const char* cargs[maxArgs];
+                for (int k = 0; k < numArgs; k++)
+                    cargs[k] = args[k].cstr();
+
+                g_core->consoleCmds[i].callback(numArgs, cargs);
+                break;
+            }
+        }
+    }
+}
 
 static void callbackConf(const char* key, const char* value, void* userParam)
 {
@@ -539,6 +600,23 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     BX_END_OK();
 #endif
 
+#if RMT_ENABLED
+    BX_BEGINP("Initializing Remotery");
+    rmtSettings* rsettings = rmt_Settings();
+    rsettings->malloc = remoteryMallocCallback;
+    rsettings->free = remoteryFreeCallback;
+    rsettings->realloc = remoteryReallocCallback;
+#  if termite_DEV
+    g_core->consoleCmds.create(64, 64, g_alloc);
+    rsettings->input_handler = remoteryInputHandlerCallback;
+#endif
+
+    if (rmt_CreateGlobalInstance(&g_core->rmt) != RMT_ERROR_NONE) {
+        BX_END_NONFATAL();
+    }
+    BX_END_OK();
+#endif
+
     g_core->init = true;
     return 0;
 }
@@ -549,6 +627,16 @@ void termite::shutdown(ShutdownCallback callback, void* userData)
         assert(false);
         return;
     }
+
+#if RMT_ENABLED
+    if (g_core->rmt)
+        rmt_DestroyGlobalInstance(g_core->rmt);
+    for (int i = 0; i < g_core->consoleCmds.getCount(); ++i) {
+        ConsoleCommand* cmd = g_core->consoleCmds.itemPtr(i);
+        cmd->~ConsoleCommand();
+    }
+    g_core->consoleCmds.destroy();
+#endif
 
 #if termite_DEV
     BX_BEGINP("Shutting down Command System");
@@ -659,6 +747,7 @@ static double calcAvgFrameTime(const FrameData& fd)
 
 void termite::doFrame()
 {
+    rmt_BeginCPUSample(DoFrame, 0);
     g_core->tempAlloc.free();
 
     FrameData& fd = g_core->frameData;
@@ -676,24 +765,32 @@ void termite::doFrame()
         ImGuizmo::BeginFrame();
     }
 
+    rmt_BeginCPUSample(Game_Update, 0);
     if (g_core->updateFn)
         g_core->updateFn(fdt);
+    rmt_EndCPUSample(); // Game_Update
     
     runEventDispatcher(fdt);
 
+    rmt_BeginCPUSample(ImGui_Render, 0);
     if (g_core->gfxDriver) {
         ImGui::Render();
         ImGui::GetIO().MouseWheel = 0;
     }
+    rmt_EndCPUSample(); // ImGuiRender
 
     if (g_core->renderer)
         g_core->renderer->render(nullptr);
 
+    rmt_BeginCPUSample(Async_Loop, 0);
     if (g_core->ioDriver->async)
         g_core->ioDriver->async->runAsyncLoop();
+    rmt_EndCPUSample(); // Async_Loop
 
+    rmt_BeginCPUSample(Gfx_DrawFrame, 0);
     if (g_core->gfxDriver)
         g_core->gfxDriver->frame();
+    rmt_EndCPUSample(); // GfxFrame
 
     fd.frame++;
     fd.elapsedTime += dt;
@@ -707,6 +804,7 @@ void termite::doFrame()
         fd.fps = BX_COUNTOF(fd.frameTimes) / fpsTime;
         fd.fpsTime = fd.elapsedTime;
     }
+    rmt_EndCPUSample();
 }
 
 void termite::pause()
@@ -963,6 +1061,16 @@ void termite::dumpGfxLog() T_THREAD_SAFE
         g_core->gfxLogCache = nullptr;
         g_core->numGfxLogCache = 0;
     }
+}
+
+void termite::registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback)
+{
+#if termite_DEV
+    assert(g_core);
+    ConsoleCommand* cmd = new(g_core->consoleCmds.push()) ConsoleCommand;
+    cmd->cmdHash = tinystl::hash_string(name, strlen(name));
+    cmd->callback = callback;
+#endif
 }
 
 void GfxDriverEvents::onFatal(GfxFatalType::Enum type, const char* str)
