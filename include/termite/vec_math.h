@@ -5,6 +5,7 @@
 #include "bx/fpumath.h"
 #include <float.h>
 #include <cassert>
+#include <utility>
 
 #if BX_COMPILER_CLANG || BX_COMPILER_GCC
 #  include <limits.h>
@@ -114,6 +115,15 @@ namespace termite
     {
         color_t c;
         c.n = n;
+        return c;
+    }
+
+    inline color_t color1nInv(uint32_t n)
+    {
+        color_t c;
+        c.n = n;
+        std::swap<uint8_t>(c.r, c.a);
+        std::swap<uint8_t>(c.g, c.b);
         return c;
     }
 

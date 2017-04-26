@@ -343,6 +343,11 @@ static ResourceHandle loadResourceHashed(size_t nameHash, const char* uri, const
     ResourceHandle handle;
     ResourceHandle overrideHandle;
 
+    if (uri[0] == 0) {
+        BX_WARN("Cannot load resource with empty Uri");
+        return ResourceHandle();
+    }
+
     // Find resource Type
     int resTypeIdx = resLib->resourceTypesTable.find(nameHash);
     if (resTypeIdx == -1) {
@@ -733,7 +738,7 @@ void termite::ResourceLib::onReadComplete(const char* uri, MemoryBlock* mem)
     ResourceLib* resLib = g_resLib;
     int r = this->asyncLoadsTable.find(tinystl::hash_string(uri, strlen(uri)));
     if (r != -1) {
-        int handle = this->asyncLoadsTable.getValue(r);
+        int handle = this->asyncLoadsTable[r];
         AsyncLoadRequest* areq = this->asyncLoads.getHandleData<AsyncLoadRequest>(0, handle);
         this->asyncLoads.freeHandle(handle);
 

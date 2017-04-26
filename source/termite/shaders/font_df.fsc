@@ -1,0 +1,76 @@
+$input v_texcoord0, v_color0
+
+#include <bgfx_shader.sh>
+
+// Reference shader:
+//  http://www.java-gaming.org/index.php?topic=33612.0
+//  https://github.com/libgdx/libgdx/wiki/Distance-field-fonts
+
+SAMPLER2D(u_texture, 0);
+
+uniform vec4 u_params;  // x=smoothing
+                        // shadow: x=smoothing, y=shadowSmoothing, z=shadowOffset(x), w=shadowOffset(y)
+                        // outline: x=smoothing, y=outlineSmoothing, z=outline (0~0.5)
+
+#ifdef SHADOW
+uniform vec4 u_shadowColor;
+#elif OUTLINE
+uniform vec4 u_outlineColor;
+#endif
+
+float contour(float d, float w)
+{
+    return smoothstep(0.5 - w, 0.5 + w, d);
+}
+
+float samp(vec2 coords, float w)
+{
+    return contour(texture2D(u_texture, coords).a, w);
+}
+
+void main()
+{
+    float distance = texture2D(u_texture, v_texcoord0).a;
+    float width = fwidth(distance); // keep outlines constant width irrespective of scaling
+    float alpha = contour(distance, width);
+
+    // Supersampling
+    const float dscale = 0.25;//0.354;   // half of 1/sqrt2
+    vec2 duv = dscale * (dFdx(v_texcoord0) + dFdy(v_texcoord0));
+    vec4 box = vec4(v_texcoord0-duv, v_texcoord0+duv);
+    float asum = samp(box.xy, width) +
+                 samp(box.zw, width) + 
+                 samp(box.xw, width) +
+                 samp(box.zy, width);
+    // Calculate weighted avrage. each point having 0.5 weight
+    alpha = (alpha + 0.5*asum) / 3.0;
+    vec4 textColor = vec4(v_color0.xyz, v_color0.w*alpha);
+
+#ifdef SHADOW
+    vec2 shadowCoord = v_texcoord0 - u_params.zw;
+    float shadowDistance = texture2D(u_texture, shadowCoord).a;
+    float shadowAlpha = contour(shadowDistance, fwidth(shadowDistance));
+
+#if 0
+    // Supersampling
+    duv = dscale * (dFdx(shadowCoord) + dFdy(shadowCoord));
+    box = vec4(shadowCoord-duv, shadowCoord+duv);
+    asum = samp(box.xy, width) +
+           samp(box.zw, width) + 
+           samp(box.xw, width) +
+           samp(box.zy, width);
+    // Calculate weighted avrage. each point having 0.5 weight
+    shadowAlpha = (shadowAlpha + 0.5*asum) / 3.0;
+#endif
+
+    vec4 shadowColor = vec4(u_shadowColor.xyz, u_shadowColor.a * shadowAlpha);
+    gl_FragColor = mix(shadowColor, textColor, textColor.a);
+#elif OUTLINE
+    float outlineFactor = alpha;
+    vec4 color = mix(u_outlineColor, v_color0, outlineFactor);
+    alpha = smoothstep(u_params.z - u_params.x, u_params.z + u_params.x, distance);
+    gl_FragColor = vec4(color.rgb, color.a*alpha);
+#else
+    gl_FragColor = textColor;
+#endif
+}

@@ -25,6 +25,7 @@ namespace bx
         ~HashTable();
 
         bool create(int capacity, AllocatorI* alloc);
+        bool createWithBuffer(int capacity, void* buff);
         void destroy();
 
         int add(Ky key, const Ty& value);
@@ -58,6 +59,7 @@ namespace bx
         int m_blockSize;
         AllocatorI* m_alloc;
     };
+
     typedef HashTable<int> HashTableInt;
     typedef HashTable<uint16_t> HashTableUint16;
     
@@ -212,7 +214,7 @@ namespace bx
     template <typename Ty, typename Ky>
     bool HashTable<Ty, Ky>::create(int capacity, AllocatorI* alloc)
     {
-        assert(capacity);
+        assert(capacity > 0);
         assert(alloc);
 
         capacity = getClosestPrime(capacity + capacity/2);
@@ -220,12 +222,35 @@ namespace bx
         m_numTotal = capacity;
         m_numItems = 0;
         m_alloc = alloc;
-        m_values = (Ty*)BX_ALLOC(alloc, sizeof(Ty)*capacity);
-        m_keys = (Ky*)BX_ALLOC(alloc, sizeof(Ky)*capacity);
-        if (!m_values || !m_keys)
+
+        size_t totalSz = (sizeof(Ky) + sizeof(Ty))*capacity;
+        uint8_t* buff = (uint8_t*)BX_ALLOC(alloc, totalSz);
+        memset(buff, 0x00, totalSz);
+        if (!buff)
             return false;
-        memset(m_values, 0x00, sizeof(Ty)*capacity);
-        memset(m_keys, 0x00, sizeof(Ky)*capacity);
+
+        m_keys = (Ky*)buff;     buff += sizeof(Ky)*capacity;
+        m_values = (Ty*)buff;
+        return true;
+    }
+
+    template <typename Ty, typename Ky /*= size_t*/>
+    bool bx::HashTable<Ty, Ky>::createWithBuffer(int capacity, void* buff)
+    {
+        assert(capacity);
+        assert(buff);
+
+        capacity = getClosestPrime(capacity + capacity/2);
+        m_blockSize = capacity;
+        m_numTotal = capacity;
+        m_numItems = 0;
+        m_alloc = nullptr;
+
+        memset(buff, 0x00, (sizeof(Ty) + sizeof(Ky))*capacity);
+        uint8_t* bbuff = (uint8_t*)buff;
+
+        m_keys = (Ky*)bbuff;     bbuff += sizeof(Ky)*capacity;
+        m_values = (Ty*)bbuff;
 
         return true;
     }
@@ -233,12 +258,7 @@ namespace bx
     template <typename Ty, typename Ky>
     void HashTable<Ty, Ky>::destroy()
     {
-        if (!m_alloc)
-            return;
-
-        if (m_values)
-            BX_FREE(m_alloc, m_values);
-        if (m_keys)
+        if (m_alloc && m_keys)
             BX_FREE(m_alloc, m_keys);
         m_values = nullptr;
         m_keys = nullptr;
@@ -253,22 +273,27 @@ namespace bx
 
         // Grow hash table if items are more than 60% of hash table
         if (m_numItems >= (m_numTotal*60/100) && m_type == HashTableType::Mutable)   {
+            assert(m_alloc);
             int new_cnt = getClosestPrime(m_numTotal + m_blockSize);
 
-            Ty* values = (Ty*)BX_ALLOC(m_alloc, sizeof(Ty)*new_cnt);
-            Ky* keys = (Ky*)BX_ALLOC(m_alloc, sizeof(Ky)*new_cnt);
-            if (!keys || !values)
-                return -1;
-            memset(values, 0x00, sizeof(Ty)*new_cnt);
-            memset(keys, 0x00, sizeof(Ky)*new_cnt);
+            size_t totalSz = (sizeof(Ky) + sizeof(Ty))*new_cnt;
+            uint8_t* buff = (uint8_t*)BX_ALLOC(m_alloc, totalSz);
+            memset(buff, 0x00, totalSz);
+            if (!buff)
+                return false;
+            Ky* keys = (Ky*)buff;       buff += sizeof(Ky)*new_cnt;
+            Ty* values = (Ty*)buff;
+
+            m_keys = (Ky*)buff;     
+            buff += sizeof(Ky)*new_cnt;
+            m_values = (Ty*)buff;
 
             reorder(keys, values, new_cnt);
 
             m_numTotal = new_cnt;
-            BX_FREE(m_alloc, m_values);
             BX_FREE(m_alloc, m_keys);
-            m_values = values;
             m_keys = keys;
+            m_values = values;
         }
 
         int idx = key % m_numTotal;
@@ -296,15 +321,16 @@ namespace bx
     template <typename Ty, typename Ky>
     int HashTable<Ty, Ky>::find(Ky key) const
     {
-        if (!m_numItems)
+        if (m_numItems) {
+            int total = m_numTotal;
+            int idx = key % total;
+            if (m_keys[idx] == key)
+                return idx;
+
+            return probeLinear(idx, key, m_keys, total);
+        } else {
             return -1;
-
-        int total = m_numTotal;
-        int idx = key % total;
-        if (m_keys[idx] == key)
-            return idx;
-
-        return probeLinear(idx, key, m_keys, total);
+        }
     }
 
     template <typename Ty, typename Ky>
@@ -356,8 +382,8 @@ namespace bx
                 idx = probeLinear(idx, 0, keys, count);
             assert(idx != -1);
 
-            values[idx] = m_values[i];
             keys[idx] = key;
+            values[idx] = m_values[i];
         }
     }
 #pragma endregion HashTable
@@ -506,10 +532,13 @@ namespace bx
     template <typename Ty, typename Ky>
     int MultiHashTable<Ty, Ky>::find(Ky key) const
     {
-        int idx = key % m_numTotal;
-        if (m_keys[idx] != key)
-            idx = probeLinear(idx, key, m_keys, m_numTotal);
-        return idx;
+        if (m_numItems) {
+            int idx = key % m_numTotal;
+            if (m_keys[idx] != key)
+                idx = probeLinear(idx, key, m_keys, m_numTotal);
+            return idx;
+        } else
+            return -1;
     }
 
     template <typename Ty, typename Ky>

@@ -664,12 +664,12 @@ Scene* termite::findScene(SceneManager* mgr, const char* name, FindSceneMode::En
 
 int termite::findSceneByTag(SceneManager* mgr, Scene** pScenes, int maxScenes, uint32_t tag, FindSceneMode::Enum mode /*= 0*/)
 {
-    int index = 0;
+    int count = 0;
     switch (mode) {
     case FindSceneMode::Active:
-        for (int i = 0; i < mgr->numActiveScenes && index < maxScenes; i++) {
+        for (int i = 0; i < mgr->numActiveScenes && count < maxScenes; i++) {
             if (mgr->activeScenes[i]->tag == tag)
-                pScenes[index++] = mgr->activeScenes[i];
+                pScenes[count++] = mgr->activeScenes[i];
         }
         break;
     case FindSceneMode::Linked:
@@ -678,16 +678,16 @@ int termite::findSceneByTag(SceneManager* mgr, Scene** pScenes, int maxScenes, u
     default:
     {
         bx::List<Scene*>::Node* node = mgr->sceneList.getFirst();
-        while (node && index < maxScenes) {
+        while (node && count < maxScenes) {
             if (node->data->tag == tag)
-                pScenes[index++] = node->data;
+                pScenes[count++] = node->data;
             node = node->next;
         }
         break;
     }
     }
 
-    return index;
+    return count;
 }
 
 static void updateLink(SceneManager* mgr, SceneLink* link, float dt)

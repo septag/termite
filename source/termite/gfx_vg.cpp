@@ -78,7 +78,7 @@ struct VgState
     color_t fillColor;
     float alpha;
     rect_t scissor;
-    const Font* font;
+    ResourceHandle fontHandle;
     SNode snode;
 
     VgState() : 
@@ -110,7 +110,7 @@ namespace termite
         int maxBatches;
 
         rect_t viewport;
-        const Font* defaultFont;
+        ResourceHandle defaultFontHandle;
         bool readyToDraw;
 
         bx::FixedPool<VgState> statePool;
@@ -127,7 +127,6 @@ namespace termite
         {
             vertexBuff = nullptr;
             batches = nullptr;
-            defaultFont = nullptr;
             readyToDraw = false;
             maxVerts = maxBatches = 0;
             numVerts = numBatches = 0;
@@ -146,7 +145,7 @@ struct BatchParams
 
 struct TextParams : public BatchParams
 {
-    const Font* font;
+    ResourceHandle fontHandle;
     char text[MAX_TEXT_SIZE];
     vec2_t pos;
 };
@@ -207,7 +206,7 @@ void VgState::setDefault(VectorGfxContext* ctx)
     fillColor = color4u(255, 255, 255);
     alpha = 1.0f;
     scissor = ctx->viewport;
-    font = ctx->defaultFont;
+    fontHandle = ctx->defaultFontHandle;
 }
 
 static void pushBatch(VectorGfxContext* ctx, DrawHandler* handler, const void* params, size_t paramsSize)
@@ -409,8 +408,10 @@ VectorGfxContext* termite::createVectorGfxContext(int maxVerts, int maxBatches)
     }
     ctx->maxBatches = maxBatches;
     
-    ctx->defaultFont = getFont("fixedsys");
-    if (!ctx->defaultFont)
+    LoadFontParams fparams;
+    fparams.format = FontFileFormat::Binary;
+    ctx->defaultFontHandle = loadResource("font", "fonts/fixedsys.fnt", &fparams);
+    if (!ctx->defaultFontHandle.isValid())
         BX_WARN("Default font 'fixedsys' not found. Make sure to set a font to VectorGfxContext before draw");
 
     if (!ctx->statePool.create(STATE_POOL_SIZE, alloc)) {
@@ -437,6 +438,8 @@ void termite::destroyVectorGfxContext(VectorGfxContext* ctx)
     if (!ctx->alloc)
         return;
 
+    if (ctx->defaultFontHandle.isValid())
+        unloadResource(ctx->defaultFontHandle);
     if (ctx->batches)
         BX_FREE(ctx->alloc, ctx->batches);
     if (ctx->vertexBuff)
@@ -483,11 +486,11 @@ void termite::vgEnd(VectorGfxContext* ctx)
     ctx->readyToDraw = false;
 }
 
-void termite::vgSetFont(VectorGfxContext* ctx, const Font* font)
+void termite::vgSetFont(VectorGfxContext* ctx, ResourceHandle fontHandle)
 {
     VgState* state;
     ctx->stateStack.peek(&state);
-    state->font = font ? font : ctx->defaultFont;
+    state->fontHandle = fontHandle.isValid() ? fontHandle : ctx->defaultFontHandle;
 }
 
 void termite::vgText(VectorGfxContext* ctx, float x, float y, const char* text)
@@ -505,7 +508,7 @@ void termite::vgText(VectorGfxContext* ctx, float x, float y, const char* text)
     textParams.mtx = state->mtx;
     textParams.scissor = state->scissor;
     textParams.color = colorPremultiplyAlpha(state->textColor, state->alpha);
-    textParams.font = state->font;
+    textParams.fontHandle = state->fontHandle;
     textParams.pos = vec2f(x, y);
 
     pushBatch(ctx, &g_vg->textHandler, &textParams, sizeof(textParams));
@@ -704,8 +707,7 @@ TextHandler::TextHandler()
 uint32_t TextHandler::getHash(const void* params)
 {
     const TextParams* textParams = (const TextParams*)params;
-    Texture* texture = textParams->font->getTexture();
-    return (uint32_t(texture->handle.value) << 16) | TEXTHANDLER_ID;
+    return (uint32_t(textParams->fontHandle.value) << 16) | TEXTHANDLER_ID;
 }
 
 void TextHandler::writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, 
@@ -713,22 +715,20 @@ void TextHandler::writePrimitives(VectorGfxContext* ctx, const void* params, vgV
                                   int* numVertsWritten, int* numIndicesWritten)
 {
     const TextParams* textParams = (const TextParams*)params;
-    const Font* font = textParams->font;
-    Texture* texture = font->getTexture();
+    Font* font = getResourcePtr<Font>(textParams->fontHandle);
     const char* text = textParams->text;
     vec2_t pos = textParams->pos;
     color_t color = textParams->color;
 
-    float texWidth = float(texture->info.width);
-    float texHeight = float(texture->info.height);
+    vec2_t texSize = getFontTextureSize(font);
     int len = (int)strlen(text);
     int vertexIdx = 0;
     int indexIdx = 0;
 
     for (int i = 0; i < len && (vertexIdx + 4) <= maxVerts && (indexIdx + 6) <= maxIndices; i++) {
-        int gIdx = font->findGlyph(text[i]);
+        int gIdx = findFontCharGlyph(font, text[i]);
         if (gIdx != -1) {
-            const FontGlyph& glyph = font->getGlyph(gIdx);
+            const FontGlyph& glyph = getFontGlyph(font, gIdx);
 
             vgVertexPosCoordColor& v0 = verts[vertexIdx];
             vgVertexPosCoordColor& v1 = verts[vertexIdx + 1];
@@ -738,26 +738,26 @@ void TextHandler::writePrimitives(VectorGfxContext* ctx, const void* params, vgV
             // Top-Left
             v0.x = pos.x + glyph.xoffset;
             v0.y = pos.y + glyph.yoffset;
-            v0.tx = glyph.x / texWidth;
-            v0.ty = glyph.y / texHeight;
+            v0.tx = glyph.x / texSize.x;
+            v0.ty = glyph.y / texSize.y;
 
             // Top-Right
             v1.x = pos.x + glyph.xoffset + glyph.width;
             v1.y = pos.y + glyph.yoffset;
-            v1.tx = (glyph.x + glyph.width) / texWidth;
-            v1.ty = glyph.y / texHeight;
+            v1.tx = (glyph.x + glyph.width) / texSize.x;
+            v1.ty = glyph.y / texSize.y;
 
             // Bottom-Left
             v2.x = pos.x + glyph.xoffset;
             v2.y = pos.y + glyph.yoffset + glyph.height;
-            v2.tx = glyph.x / texWidth;
-            v2.ty = (glyph.y + glyph.height) / texHeight;
+            v2.tx = glyph.x / texSize.x;
+            v2.ty = (glyph.y + glyph.height) / texSize.y;
 
             // Bottom-Right
             v3.x = pos.x + glyph.xoffset + glyph.width;
             v3.y = pos.y + glyph.yoffset + glyph.height;
-            v3.tx = (glyph.x + glyph.width) / texWidth;
-            v3.ty = (glyph.y + glyph.height) / texHeight;
+            v3.tx = (glyph.x + glyph.width) / texSize.x;
+            v3.ty = (glyph.y + glyph.height) / texSize.y;
 
             v0.color = v1.color = v2.color = v3.color = color.n;
 
@@ -766,9 +766,9 @@ void TextHandler::writePrimitives(VectorGfxContext* ctx, const void* params, vgV
 
             // Kerning
             if (i < len - 1) {
-                int nextIdx = font->findGlyph(text[i + 1]);
+                int nextIdx = findFontCharGlyph(font, text[i + 1]);
                 if (nextIdx != -1)
-                    pos.x += font->applyKern(gIdx, nextIdx);
+                    pos.x += getFontGlyphKerning(font, gIdx, nextIdx);
             }
 
             // Make a quad from 4 verts
@@ -793,7 +793,7 @@ void TextHandler::writePrimitives(VectorGfxContext* ctx, const void* params, vgV
 GfxState::Bits TextHandler::setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params)
 {
     const TextParams* textParams = (const TextParams*)params;
-    Texture* texture = textParams->font->getTexture();
+    Texture* texture = getResourcePtr<Texture>(getFontTexture(getResourcePtr<Font>(textParams->fontHandle)));
     driver->setTexture(0, ctx->uTexture, texture->handle, TextureFlag::FromTexture);
     return GfxState::None;
 }

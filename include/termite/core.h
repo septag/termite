@@ -38,8 +38,7 @@ namespace termite
         {
             None = 0,
             EnableJobDispatcher = 0x1,
-            LockThreadsToCores = 0x2,
-            ScanFontsDirectory = 0x4
+            LockThreadsToCores = 0x2
         };
 
         typedef uint8_t Bits;
@@ -56,6 +55,10 @@ namespace termite
         char gfxName[32];
         char uiIniFilename[32];
         char phys2dName[32];    // Physics2D Driver name
+
+        // 
+        uint16_t refScreenWidth;
+        uint16_t refScreenHeight;
 
         // Graphics
         uint16_t gfxDeviceId;
@@ -88,6 +91,9 @@ namespace termite
             strcpy(gfxName, "Bgfx");
             strcpy(uiIniFilename, "");
             strcpy(phys2dName, "Box2D");
+
+            refScreenWidth = 0;
+            refScreenHeight = 0;
 
             gfxWidth = 0;
             gfxHeight = 0;

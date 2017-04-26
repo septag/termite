@@ -1,0 +1,24 @@
+$input v_texcoord0
+
+#include <bgfx_shader.sh>
+
+SAMPLER2D(u_texture, 0);
+
+uniform vec4 u_blurKernel[KERNEL_SIZE];     // (x, y) = coord offsets, z = blur-weight
+
+#if BGFX_SHADER_LANGUAGE_HLSL
+static const int kKernelHalf = KERNEL_SIZE/2;
+#else
+const int kKernelHalf = KERNEL_SIZE/2;
+#endif
+
+void main()
+{
+    vec4 color = vec4(0, 0, 0, 0);
+    for (int i = -kKernelHalf; i <= kKernelHalf; i++) {
+        int index = i + kKernelHalf;
+        color += texture2D(u_texture, v_texcoord0 + u_blurKernel[index].xy) * u_blurKernel[index].z;
+    }
+
+    gl_FragColor = vec4(color.xyz, 1.0);
+}

@@ -301,32 +301,6 @@ void termite::freeConfig(Config* conf)
     BX_DELETE(g_alloc, conf);
 }
 
-static void loadFontsInDirectory(const char* baseDir, const char* rootDir)
-{
-    BX_VERBOSE("Scanning for fonts in directory '%s' ...", rootDir);
-    bx::Path fullDir(baseDir);
-    fullDir.join(rootDir);
-
-    DIR* dir = opendir(fullDir.cstr());
-    if (!dir) {
-        BX_WARN("Could not open fonts directory '%s'", rootDir);
-        return;
-    }
-
-    dirent* ent;
-    while ((ent = readdir(dir)) != nullptr) {
-        if (ent->d_type == DT_REG) {
-            bx::Path fntFilepath(rootDir);
-            fntFilepath.join(ent->d_name);
-            if (fntFilepath.getFileExt().isEqualNoCase("fnt"))
-                registerFont(fntFilepath.cstr(), fntFilepath.getFilename().cstr());
-        }
-    }
-    closedir(dir);
-
-    return;
-}
-
 result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* platform)
 {
     if (g_core) {
@@ -482,14 +456,8 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
         initModelLoader(g_core->gfxDriver, g_alloc);
         registerModelToResourceLib();
 
-        // Font library
-        if (initFontLib(g_alloc, g_core->ioDriver->blocking)) {
-            T_ERROR("Initializing font library failed");
-            return T_ERR_FAILED;
-        }
-
-        if ((conf.engineFlags & InitEngineFlags::ScanFontsDirectory) == InitEngineFlags::ScanFontsDirectory)
-            loadFontsInDirectory(g_core->ioDriver->blocking->getUri(), "fonts");
+        initFontSystem(g_alloc, vec2f(float(conf.refScreenWidth), float(conf.refScreenHeight)));
+        registerFontToResourceLib();
 
         // VectorGraphics
         if (initVectorGfx(g_alloc, g_core->gfxDriver)) {
@@ -674,7 +642,7 @@ void termite::shutdown(ShutdownCallback callback, void* userData)
 	shutdownImGui();
     shutdownDebugDraw();
     shutdownVectorGfx();
-    shutdownFontLib();
+    shutdownFontSystem();
     shutdownModelLoader();
     shutdownTextureLoader();
     shutdownGfxUtils();
@@ -804,7 +772,7 @@ void termite::doFrame()
         fd.fps = BX_COUNTOF(fd.frameTimes) / fpsTime;
         fd.fpsTime = fd.elapsedTime;
     }
-    rmt_EndCPUSample();
+    rmt_EndCPUSample(); // DoFrame
 }
 
 void termite::pause()

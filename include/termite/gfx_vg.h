@@ -1,12 +1,12 @@
 #pragma once
 
 #include "vec_math.h"
+#include "resource_lib.h"
 
 namespace termite
 {
     struct GfxDriverApi;
     struct VectorGfxContext;
-    class Font;
     struct Texture;
 
     result_t initVectorGfx(bx::AllocatorI* alloc, GfxDriverApi* driver);
@@ -20,7 +20,7 @@ namespace termite
     TERMITE_API void vgEnd(VectorGfxContext* ctx);
 
     // Text
-    TERMITE_API void vgSetFont(VectorGfxContext* ctx, const Font* font);
+    TERMITE_API void vgSetFont(VectorGfxContext* ctx, ResourceHandle fontHandle);
     TERMITE_API void vgText(VectorGfxContext* ctx, float x, float y, const char* text);
     TERMITE_API void vgTextf(VectorGfxContext* ctx, float x, float y, const char* fmt, ...);
     TERMITE_API void vgTextv(VectorGfxContext* ctx, float x, float y, const char* fmt, va_list argList);
@@ -84,9 +84,9 @@ namespace termite
             vgEnd(m_ctx);
         }
 
-        inline VectorGfx& setFont(const Font* font)
+        inline VectorGfx& setFont(ResourceHandle fontHandle)
         {
-            vgSetFont(m_ctx, font);
+            vgSetFont(m_ctx, fontHandle);
             return *this;
         }
 

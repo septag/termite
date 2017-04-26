@@ -59,7 +59,8 @@ namespace termite
     {
         enum Enum
         {
-            PreUpdate = 0,
+            InputUpdate = 0,
+            PreUpdate,
             FixedUpdate,
             Update,
             PostUpdate,

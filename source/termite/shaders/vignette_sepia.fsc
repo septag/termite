@@ -1,0 +1,28 @@
+$input v_texcoord0
+
+#include <bgfx_shader.sh>
+
+SAMPLER2D(u_texture, 0);
+
+uniform vec4 u_vignetteParams;      // x=radius, y=softness, z=strength
+uniform vec4 u_sepiaParams;         // xyz=color, w=strength
+
+void main()
+{
+    vec4 color = texture2D(u_texture, v_texcoord0);
+
+    // Vignette
+    vec2 pos = gl_FragCoord.xy/u_viewRect.zw - vec2(0.5, 0.5);
+    float len = length(pos);
+    float vignette = smoothstep(u_vignetteParams.x, u_vignetteParams.x-u_vignetteParams.y, len);
+
+    color.rgb = mix(color.rgb, color.rgb * vignette, u_vignetteParams.z);
+
+    // Sepia
+    float gray = dot(color.rgb, vec3(0.2999, 0.587, 0.114));
+    vec3 sepiaColor = u_sepiaParams.rgb * gray;
+
+    color.rgb = mix(color.rgb, sepiaColor, u_sepiaParams.w);
+
+    gl_FragColor = color;
+}

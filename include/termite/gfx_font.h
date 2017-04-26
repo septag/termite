@@ -3,45 +3,52 @@
 #include "bx/allocator.h"
 #include "bxx/hash_table.h"
 #include "resource_lib.h"
+#include "vec_math.h"
 
 namespace termite
 {
-    struct MemoryBlock;
-    class Font;
-    struct IoDriverApi;
-    struct Texture;
+    struct Font;
+    struct TextBatch;
+
+    struct FontFileFormat
+    {
+        enum Enum
+        {
+            Text = 0,
+            Binary
+        };
+    };
 
     struct FontFlags
     {
         enum Enum
         {
-            Normal = 0x0,
+            Normal = 0,
             Bold = 0x1,
             Italic = 0x2,
-            Underline = 0x4
+            DistantField = 0x4
         };
 
         typedef uint8_t Bits;
     };
 
-    // Font Library
-    result_t initFontLib(bx::AllocatorI* alloc, IoDriverApi* ioDriver);
-    void shutdownFontLib();
-
-    TERMITE_API result_t registerFont(const char* fntFilepath, const char* name, uint16_t size = 0, 
-                                      FontFlags::Enum flags = FontFlags::Normal);
-    TERMITE_API void unregisterFont(const char* name, uint16_t size = 0, FontFlags::Enum flags = FontFlags::Normal);
-    TERMITE_API const Font* getFont(const char* name, uint16_t size = 0, FontFlags::Enum flags = FontFlags::Normal);
-
-    struct FontKerning
+    struct LoadFontParams
     {
-        uint32_t secondGlyph;
-        float amount;
+        FontFileFormat::Enum format;
+        bool generateMips;
+        bool distantField;
+
+        LoadFontParams()
+        {
+            format = FontFileFormat::Text;
+            generateMips = true;
+            distantField = false;
+        }
     };
 
     struct FontGlyph
     {
-        uint32_t glyphId;
+        uint16_t charId;
         float x;
         float y;
         float width;
@@ -49,73 +56,47 @@ namespace termite
         float xoffset;
         float yoffset;
         float xadvance;
-        uint16_t numKerns;
-        uint32_t kernIdx;
+        int numKerns;
+        int kernIdx;
     };
 
-    class Font
+    result_t initFontSystem(bx::AllocatorI* alloc, const vec2_t refScreenSize = vec2f(-1.0f, -1.0f));
+    void shutdownFontSystem();
+
+    // Font Info (Custom rendering)
+    TERMITE_API ResourceHandle getFontTexture(Font* font, int pageId = 0);
+    TERMITE_API vec2_t getFontTextureSize(Font* font);
+    TERMITE_API float getFontLineHeight(Font* font);
+    TERMITE_API float getFontTextWidth(Font* font, const char* text, int len, float* firstcharWidth);
+    TERMITE_API int findFontCharGlyph(Font* font, uint16_t chId);
+    TERMITE_API const FontGlyph& getFontGlyph(Font* font, int index);
+    TERMITE_API float getFontGlyphKerning(Font* font, int glyphIdx, int nextGlyphIdx);
+
+    struct TextAlign
     {
-        friend result_t termite::registerFont(const char*, const char*, uint16_t, FontFlags::Enum);
-
-    private:
-        bx::AllocatorI* m_alloc;
-        char m_name[32];
-        ResourceHandle m_textureHandle;
-        uint32_t m_numChars;
-        uint32_t m_numKerns;
-        uint16_t m_lineHeight;
-        uint16_t m_baseValue;
-        uint32_t m_fsize;
-        uint32_t m_charWidth;    // fixed width fonts
-        FontGlyph* m_glyphs;
-        FontKerning* m_kerns;
-        bx::HashTable<int, uint16_t> m_charTable;
-
-    public:
-        Font(bx::AllocatorI* alloc);
-        static Font* create(const MemoryBlock* mem, const char* fntFilepath, bx::AllocatorI* alloc);
-
-    public:
-        ~Font();
-
-        const char* getInternalName() const
+        enum Enum
         {
-            return m_name;
-        }
-
-        uint16_t getLineHeight() const
-        {
-            return m_lineHeight;
-        }
-
-        int getCharCount() const
-        {
-            return m_numChars;
-        }
-
-        uint32_t getCharWidth() const
-        {
-            return m_charWidth;
-        }
-
-        Texture* getTexture() const
-        {
-            return getResourcePtr<Texture>(m_textureHandle);
-        }
-
-        int findGlyph(uint16_t glyphId) const
-        {
-            int index = m_charTable.find(glyphId);
-            return index != -1 ? m_charTable.getValue(index) : -1;
-        }
-
-        const FontGlyph& getGlyph(int glyphIdx) const
-        {
-            assert(glyphIdx != -1);
-            return m_glyphs[glyphIdx];
-        }
-
-        float getTextWidth(const char* text, int len = -1, float* firstcharWidth = nullptr);
-        float applyKern(int glyphIdx, int nextGlyphIdx) const;
+            Center,
+            Right,
+            Left
+        };
     };
+
+    TERMITE_API TextBatch* createTextBatch(int maxChars, ResourceHandle fontHandle, bx::AllocatorI* alloc);
+    TERMITE_API void beginText(TextBatch* batch, const mtx4x4_t& viewProjMtx, const vec2_t screenSize);
+    TERMITE_API void addText(TextBatch* batch, color_t color, float scale,
+                             const rect_t& rectFit, TextAlign::Enum align, 
+                             const char* text);
+    TERMITE_API void addTextf(TextBatch* batch, color_t color, float scale,
+                              const rect_t& rectFit, TextAlign::Enum align,
+                              const char* fmt, ...);
+
+    TERMITE_API void drawText(TextBatch* batch, uint8_t viewId);
+    TERMITE_API void drawTextDropShadow(TextBatch* batch, uint8_t viewId, color_t shadowColor = color1n(0xff000000), 
+                                        vec2_t shadowAmount = vec2f(2.0f, 2.0f));
+    TERMITE_API void drawTextOutline(TextBatch* batch, uint8_t viewId, float smoothing = 1.0f/16.0f, 
+                                     color_t outlineColor = color1n(0xff000000), float outlineAmount = 0.5f);
+    TERMITE_API void destroyTextBatch(TextBatch* batch);
+
+    void registerFontToResourceLib();
 } // namespace termite

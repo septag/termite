@@ -129,13 +129,15 @@ namespace termite
     TERMITE_API void setSpritePosOffset(Sprite* sprite, const vec2_t posOffset);
     TERMITE_API vec2_t getSpritePosOffset(Sprite* sprite);
     TERMITE_API void setSpriteCurFrameTag(Sprite* sprite, const char* frameTag);
-    TERMITE_API void setSpriteOrder(Sprite* sprite, uint8_t order); // higher orders gets to draw later
+    TERMITE_API void setSpriteOrder(Sprite* sprite, uint8_t order); // higher orders gets to draw on top
+    TERMITE_API int getSpriteOrder(Sprite* sprite);
     TERMITE_API void setSpritePivot(Sprite* sprite, const vec2_t pivot);
     TERMITE_API void setSpriteTintColor(Sprite* sprite, color_t color);
     TERMITE_API color_t getSpriteTintColor(Sprite* sprite);
     TERMITE_API rect_t getSpriteDrawRect(Sprite* sprite);
     TERMITE_API void getSpriteRealRect(Sprite* sprite, vec2_t* pHalfSize, vec2_t* pCenter);
     TERMITE_API vec2_t getSpriteImageSize(Sprite* sprite);
+    TERMITE_API rect_t getSpriteTexelRect(Sprite* sprite);
 
     // For manual rendering of spritesheet frames
     TERMITE_API void getSpriteFrameDrawData(Sprite* sprite, int frameIdx, rect_t* drawRect, rect_t* textureRect, 

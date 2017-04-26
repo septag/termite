@@ -68,7 +68,7 @@ struct DebugDrawState
     vec4_t color;
     float alpha;
     rect_t scissor;
-    const Font* font;
+    ResourceHandle fontHandle;
     SNode snode;
 
     DebugDrawState() :
@@ -89,7 +89,7 @@ namespace termite
         bx::FixedPool<DebugDrawState> statePool;
         bx::Stack<DebugDrawState*> stateStack;
         rect_t viewport;
-        const Font* defaultFont;
+        ResourceHandle defaultFontHandle;
         bool readyToDraw;
         VectorGfxContext* vgCtx;
         mtx4x4_t billboardMtx;
@@ -100,7 +100,6 @@ namespace termite
             driver = nullptr;
             viewId = 0;
             viewport = rectf(0, 0, 0, 0);
-            defaultFont = nullptr;
             readyToDraw = false;
             vgCtx = nullptr;
             viewProjMtx = mtx4x4Ident();
@@ -463,8 +462,10 @@ DebugDrawContext* termite::createDebugDrawContext()
     DebugDrawContext* ctx = BX_NEW(alloc, DebugDrawContext)(alloc);
     ctx->driver = g_dbg->driver;
 
-    ctx->defaultFont = getFont("fixedsys");
-    if (!ctx->defaultFont) {
+    LoadFontParams fparams;
+    fparams.format = FontFileFormat::Binary;
+    ctx->defaultFontHandle = loadResource("font", "fonts/fixedsys.fnt", &fparams);
+    if (!ctx->defaultFontHandle.isValid()) {
         destroyDebugDrawContext(ctx);
         return nullptr;
     }
@@ -488,6 +489,9 @@ void termite::destroyDebugDrawContext(DebugDrawContext* ctx)
 
     if (!ctx->alloc)
         return;
+
+    if (ctx->defaultFontHandle.isValid())
+        unloadResource(ctx->defaultFontHandle);
 
     ctx->statePool.destroy();
     BX_DELETE(ctx->alloc, ctx);
@@ -533,7 +537,7 @@ void termite::ddText(DebugDrawContext* ctx, const vec3_t pos, const char* text)
             DebugDrawState* state;
             ctx->stateStack.peek(&state);
 
-            vgSetFont(ctx->vgCtx, state->font);
+            vgSetFont(ctx->vgCtx, state->fontHandle);
             vec4_t c = state->color;
             vgTextColor(ctx->vgCtx, colorRGBAf(c.x, c.y, c.z, c.w));
             vgText(ctx->vgCtx, screenPt.x, screenPt.y, text);
@@ -742,11 +746,11 @@ void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spa
         DebugDrawState* state;
         ctx->stateStack.peek(&state);
 
-        vgSetFont(ctx->vgCtx, state->font);
+        vgSetFont(ctx->vgCtx, state->fontHandle);
         vec4_t c = state->color;
         color_t color = colorRGBAf(c.x, c.y, c.z, c.w);
         vgTextColor(ctx->vgCtx, color);
-        fontHH = bx::ffloor(state->font->getLineHeight() * 0.5f);
+        fontHH = bx::ffloor(getFontLineHeight(getResourcePtr<Font>(state->fontHandle)) * 0.5f);
     }
 
     // Horizontal Lines
@@ -829,7 +833,7 @@ void termite::ddBoundingBox(DebugDrawContext* ctx, const aabb_t bb, bool showInf
             DebugDrawState* state;
             ctx->stateStack.peek(&state);
 
-            vgSetFont(ctx->vgCtx, state->font);
+            vgSetFont(ctx->vgCtx, state->fontHandle);
             vec4_t c = state->color;
             color_t color = colorRGBAf(c.x, c.y, c.z, c.w);
             vgTextColor(ctx->vgCtx, color);
@@ -866,7 +870,7 @@ void termite::ddBoundingSphere(DebugDrawContext* ctx, const sphere_t sphere, boo
     if (showInfo) {
         vec2_t center2d;
         if (projectToScreen(&center2d, sphere.center, ctx->viewport, ctx->viewProjMtx)) {
-            vgSetFont(ctx->vgCtx, state->font);
+            vgSetFont(ctx->vgCtx, state->fontHandle);
             vec4_t c = state->color;
             color_t color = colorRGBAf(c.x, c.y, c.z, c.w);
             vgTextColor(ctx->vgCtx, color);
@@ -892,12 +896,12 @@ void termite::ddAxis(DebugDrawContext* ctx, const vec3_t axis, const mtx4x4_t* m
 	assert(false);
 }
 
-void termite::ddSetFont(DebugDrawContext* ctx, Font* font)
+void termite::ddSetFont(DebugDrawContext* ctx, ResourceHandle fontHandle)
 {
     DebugDrawState* state;
     ctx->stateStack.peek(&state);
 
-    state->font = font ? font : ctx->defaultFont;
+    state->fontHandle = fontHandle.isValid() ? fontHandle : ctx->defaultFontHandle;
 }
 
 void termite::ddAlpha(DebugDrawContext* ctx, float alpha)
@@ -952,7 +956,7 @@ void DebugDrawState::setDefault(DebugDrawContext* ctx)
     color = vec4f(1.0f, 1.0f, 1.0f, 1.0f);
     alpha = 1.0f;
     scissor = ctx->viewport;
-    font = ctx->defaultFont;
+    fontHandle = ctx->defaultFontHandle;
 }
 
 void termite::ddReset(DebugDrawContext* ctx)

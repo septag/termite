@@ -290,12 +290,26 @@ namespace termite
 
     struct GfxStats
     {
-        uint64_t cpuTimeBegin;
-        uint64_t cpuTimeEnd;
-        uint64_t cpuTimerFreq;
-        uint64_t gpuTimeBegin;
-        uint64_t gpuTimeEnd;
-        uint64_t gpuTimerFreq;
+        uint64_t cpuTimeBegin;  //!< CPU frame begin time.
+        uint64_t cpuTimeEnd;    //!< CPU frame end time.
+        uint64_t cpuTimerFreq;  //!< CPU timer frequency.
+
+        uint64_t gpuTimeBegin;  //!< GPU frame begin time.
+        uint64_t gpuTimeEnd;    //!< GPU frame end time.
+        uint64_t gpuTimerFreq;  //!< GPU timer frequency.
+
+        int64_t waitRender;     //!< Time spent waiting for render backend thread to finish issuing
+                                //!  draw commands to underlying graphics API.
+        int64_t waitSubmit;     //!< Time spent waiting for submit thread to advance to next frame.
+
+        uint32_t numDraw;       //!< Number of draw calls submitted.
+        uint32_t numCompute;    //!< Number of compute calls submitted.
+        uint32_t maxGpuLatency; //!< GPU driver latency.
+
+        uint16_t width;         //!< Backbuffer width in pixels.
+        uint16_t height;        //!< Backbuffer height in pixels.
+        uint16_t textWidth;     //!< Debug text width in characters.
+        uint16_t textHeight;    //!< Debug text height in characters.
     };
 
     struct HMDDesc

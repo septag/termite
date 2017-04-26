@@ -224,6 +224,18 @@ static const GfxStats& getStats()
     g_bgfx.stats.gpuTimeBegin = stats->gpuTimeBegin;
     g_bgfx.stats.gpuTimeEnd = stats->gpuTimeEnd;
     g_bgfx.stats.gpuTimerFreq = stats->gpuTimerFreq;
+
+    g_bgfx.stats.waitRender = stats->waitRender;
+    g_bgfx.stats.waitSubmit = stats->waitSubmit;
+
+    g_bgfx.stats.numDraw = stats->numDraw;
+    g_bgfx.stats.numCompute = stats->numCompute;
+    g_bgfx.stats.maxGpuLatency = stats->maxGpuLatency;
+
+    g_bgfx.stats.width = stats->width;
+    g_bgfx.stats.height = stats->height;
+    g_bgfx.stats.textWidth = stats->textWidth;
+    g_bgfx.stats.textHeight = stats->textHeight;
     return g_bgfx.stats;
 }
 
@@ -869,6 +881,14 @@ static void destroyFrameBuffer(FrameBufferHandle handle)
     bgfx::destroyFrameBuffer(h);
 }
 
+static TextureHandle getFrameBufferTexture(FrameBufferHandle handle, uint8_t attachment)
+{
+    BGFX_DECLARE_HANDLE(FrameBufferHandle, h, handle);
+    TextureHandle r;
+    r.value = bgfx::getTexture(h, attachment).idx;
+    return r;
+}
+
 static uint32_t getAvailInstanceDataBuffer(uint32_t num, uint16_t stride)
 {
     return bgfx::getAvailInstanceDataBuffer(num, stride);
@@ -1058,6 +1078,7 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.createFrameBufferNative = createFrameBufferNative;
     api.createFrameBufferAttachment = createFrameBufferAttachment;
     api.destroyFrameBuffer = destroyFrameBuffer;
+    api.getFrameBufferTexture = getFrameBufferTexture;
     api.getAvailInstanceDataBuffer = getAvailInstanceDataBuffer;
     api.allocInstanceDataBuffer = allocInstanceDataBuffer;
     api.createIndirectBuffer = createIndirectBuffer;

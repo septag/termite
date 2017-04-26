@@ -131,6 +131,7 @@ namespace termite
             playReverse(false),
             playSpeed(30.0f),
             resumeSpeed(30.0f),
+            order(0),
             flip(SpriteFlag::None),
             lnode(this),
             endCallback(nullptr),
@@ -273,7 +274,7 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
     texParams.generateMips = ssParams->generateMips;
     texParams.skipMips = ssParams->skipMips;
     texParams.fmt = ssParams->fmt;
-    ss->texHandle = loadResource("texture", texFilepath.cstr(), &texParams);
+    ss->texHandle = loadResource("texture", texFilepath.cstr(), &texParams, params.flags, alloc ? alloc : nullptr);
 
     for (int i = 0; i < numFrames; i++) {
         SpriteSheetFrame& frame = ss->frames[i];
@@ -631,7 +632,8 @@ void termite::animateSprites(Sprite** sprites, uint16_t numSprites, float dt)
             t = reminder / sprite->playSpeed;
 
             // Progress sprite frame
-            int frameIdx = sprite->curFrameIdx;
+            int curFrameIdx = sprite->curFrameIdx;
+            int frameIdx = curFrameIdx;
             int iframes = int(frames);
             if (sprite->endCallback == nullptr) {
                 frameIdx = iwrap(!sprite->playReverse ? (frameIdx + iframes) : (frameIdx - iframes),
@@ -651,10 +653,13 @@ void termite::animateSprites(Sprite** sprites, uint16_t numSprites, float dt)
 
             // Check if we hit any callbacks
             const SpriteFrame& frame = sprite->frames[frameIdx];
+
             if (frame.frameCallback)
                 frame.frameCallback(sprite, frameIdx, frame.frameCallbackUserData);
 
-            sprite->curFrameIdx = frameIdx;
+            // Update the frame index only if it's not modified inside any callbacks
+            if (curFrameIdx == sprite->curFrameIdx)
+                sprite->curFrameIdx = frameIdx;
             sprite->animTm = t;
         }
     }
@@ -829,6 +834,11 @@ void termite::setSpriteOrder(Sprite* sprite, uint8_t order)
     sprite->order = order;
 }
 
+int termite::getSpriteOrder(Sprite* sprite)
+{
+    return sprite->order;
+}
+
 void termite::setSpritePivot(Sprite* sprite, const vec2_t pivot)
 {
     for (int i = 0, c = sprite->frames.getCount(); i < c; i++)
@@ -855,6 +865,7 @@ static rect_t getSpriteDrawRectFrame(Sprite* sprite, int index)
     else if (halfSize.x <= 0)
         halfSize.x = halfSize.y * pixelRatio;
     halfSize = halfSize * sprite->sizeMultiplier;
+    vec2_t fullSize = halfSize * 2.0f;
 
     // calculate final pivot offset to make geometry
     SpriteFlag::Bits flipX = sprite->flip | frame.flags;
@@ -865,6 +876,9 @@ static rect_t getSpriteDrawRectFrame(Sprite* sprite, int index)
         offset.x = -offset.x;
     if (flipY & SpriteFlip::FlipY)
         offset.y = -offset.y;
+
+    halfSize = halfSize * frame.sizeOffset;
+    offset = offset * fullSize;
 
     return rectv(offset - halfSize, halfSize + offset);
 }
@@ -897,6 +911,11 @@ void termite::getSpriteRealRect(Sprite* sprite, vec2_t* pHalfSize, vec2_t* pCent
 vec2_t termite::getSpriteImageSize(Sprite* sprite)
 {
     return sprite->getCurFrame().sourceSize;
+}
+
+rect_t termite::getSpriteTexelRect(Sprite* sprite)
+{
+    return sprite->getCurFrame().frame;
 }
 
 void termite::getSpriteFrameDrawData(Sprite* sprite, int frameIdx, rect_t* drawRect, rect_t* textureRect, 

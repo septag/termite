@@ -83,6 +83,13 @@ namespace termite
         return kLowerBound + (kX - kLowerBound) % range_size;
     }
 
+    inline float fwrapRange(float x, float vmin, float vmax)
+    {
+        vmax -= vmin;
+        x = fmod(x, vmax);
+        return x + vmin;
+    }
+
     inline int iclamp(int n, const int _min, const int _max)
     {
         if (n < _min)
@@ -91,6 +98,11 @@ namespace termite
             return _max;
         else
             return n;
+    }
+
+    inline float falign(float value, float size)
+    {
+        return value - bx::fabsolute(bx::fmod(value, size));
     }
 
     // Line fgain, but goes up to 1.0 and then back to 0

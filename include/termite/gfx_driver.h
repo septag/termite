@@ -279,6 +279,7 @@ namespace termite
         FrameBufferHandle(*createFrameBufferAttachment)(uint8_t num, const GfxAttachment* attachment, bool destroyTextures/* = false*/);
         FrameBufferHandle(*createFrameBufferNative)(void* nwh, uint16_t width, uint16_t height, TextureFormat::Enum depthFmt/* = TextureFormat::UnknownDepth*/);
         void(*destroyFrameBuffer)(FrameBufferHandle handle);
+        TextureHandle(*getFrameBufferTexture)(FrameBufferHandle handle, uint8_t attachment/* = 0*/);
 
         // Instance Buffer
         uint32_t(*getAvailInstanceDataBuffer)(uint32_t num, uint16_t stride);

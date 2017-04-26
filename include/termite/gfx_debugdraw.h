@@ -11,7 +11,6 @@ namespace termite
     struct Camera;
     struct Camera2D;
 	struct Texture;
-	class Font;
 
     result_t initDebugDraw(bx::AllocatorI* alloc, GfxDriverApi* driver);
     void shutdownDebugDraw();
@@ -49,7 +48,7 @@ namespace termite
 	TERMITE_API void ddLine(DebugDrawContext* ctx, const vec3_t& startPt, const vec3_t& endPt, const mtx4x4_t* modelMtx = nullptr);
 
     // State
-    TERMITE_API void ddSetFont(DebugDrawContext* ctx, Font* font);
+    TERMITE_API void ddSetFont(DebugDrawContext* ctx, ResourceHandle fontHandle);
     TERMITE_API void ddAlpha(DebugDrawContext* ctx, float alpha);
     TERMITE_API void ddColor(DebugDrawContext* ctx, const vec4_t& color);
     TERMITE_API void ddTransform(DebugDrawContext* ctx, const mtx4x4_t& mtx);
@@ -185,9 +184,9 @@ namespace termite
             return *this;
         }
 
-        inline DebugDraw& setFont(Font* font)
+        inline DebugDraw& setFont(ResourceHandle fontHandle)
         {
-            ddSetFont(m_ctx, font);
+            ddSetFont(m_ctx, fontHandle);
             return *this;
         }
 
