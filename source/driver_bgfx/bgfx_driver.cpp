@@ -8,7 +8,7 @@
 
 #include <cstdarg>
 #include <cstdio>
-#include <assert.h>
+#include <cassert>
 //
 
 using namespace termite;

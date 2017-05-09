@@ -281,12 +281,9 @@ namespace bx
             memset(buff, 0x00, totalSz);
             if (!buff)
                 return false;
-            Ky* keys = (Ky*)buff;       buff += sizeof(Ky)*new_cnt;
-            Ty* values = (Ty*)buff;
-
-            m_keys = (Ky*)buff;     
+            Ky* keys = (Ky*)buff;       
             buff += sizeof(Ky)*new_cnt;
-            m_values = (Ty*)buff;
+            Ty* values = (Ty*)buff;
 
             reorder(keys, values, new_cnt);
 

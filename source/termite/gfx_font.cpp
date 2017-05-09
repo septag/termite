@@ -892,14 +892,15 @@ namespace termite
         assert(index < font->numGlyphs);
         return font->glyphs[index];
     }
+
     TextBatch* createTextBatch(int maxChars, ResourceHandle fontHandle, bx::AllocatorI* alloc)
     {
         assert(g_fontSys);
         assert(fontHandle.isValid());
 
         TextBatch* tbatch = g_fontSys->batchPool.newInstance<bx::AllocatorI*>(alloc);
-        tbatch->verts = (TextVertex*)BX_ALLOC(alloc, sizeof(TextBatch)*maxChars);
-        tbatch->indices = (uint16_t*)BX_ALLOC(alloc, sizeof(uint16_t)*maxChars);
+        tbatch->verts = (TextVertex*)BX_ALLOC(alloc, sizeof(TextVertex)*maxChars*4);
+        tbatch->indices = (uint16_t*)BX_ALLOC(alloc, sizeof(uint16_t)*maxChars*6);
         if (!tbatch->verts || !tbatch->indices)
             return nullptr;
         tbatch->maxChars = maxChars;
@@ -1090,7 +1091,8 @@ namespace termite
         int reqVertices = batch->numChars * 4;
         int reqIndices = batch->numChars * 6;
         if (reqVertices == gDriver->getAvailTransientVertexBuffer(reqVertices, TextVertex::Decl) &&
-            reqIndices == gDriver->getAvailTransientIndexBuffer(reqIndices)) {
+            reqIndices == gDriver->getAvailTransientIndexBuffer(reqIndices))
+        {
             TransientVertexBuffer tvb;
             TransientIndexBuffer tib;
             gDriver->allocTransientVertexBuffer(&tvb, reqVertices, TextVertex::Decl);

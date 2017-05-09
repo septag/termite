@@ -70,11 +70,11 @@ if (ANDROID)
     set(FIND_EXTRA_FLAG NO_CMAKE_FIND_ROOT_PATH)
     set(SDL2_ANDROID_MAIN_ENTRY ${SDL2_PATH}/src/main/android/SDL_android_main.c)
 elseif (IOS)
-	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/sdl2_ios_arm CACHE PATH "SDL2 root directory")
+	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/SDL2_ios CACHE PATH "SDL2 root directory")
 	set(FIND_EXTRA_FLAG NO_CMAKE_FIND_ROOT_PATH NO_DEFAULT_PATH)
 	set(SDL2_BUILDING_LIBRARY 1)
 elseif (WIN32)
-	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/sdl CACHE PATH "SDL2 root directory")
+	set(SDL2_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/SDL2 CACHE PATH "SDL2 root directory")
 endif()
 
 SET(SDL2_SEARCH_PATHS
@@ -98,8 +98,16 @@ FIND_PATH(SDL2_INCLUDE_DIR SDL.h
     ${FIND_EXTRA_FLAG}
 )
 
+FIND_PATH(SDL2_MIXER_INCLUDE_DIR SDL_mixer.h
+	HINTS
+	$ENV{SDL2DIR}
+	PATH_SUFFIXES include/SDL2_mixer include
+	PATHS ${SDL2_SEARCH_PATHS}
+    ${FIND_EXTRA_FLAG}
+)
+
 if (MSVC)
-    FIND_PATH(SDL2_BIN_DIR SDL2.dll
+    FIND_PATH(SDL2_BIN_DIR SDL2.dll 
 	HINTS
 	$ENV{SDL2DIR}
 	PATH_SUFFIXES bin bin64 lib lib64
@@ -110,6 +118,15 @@ endif()
 
 FIND_LIBRARY(SDL2_LIBRARY_TEMP
 	NAMES SDL2
+	HINTS
+	$ENV{SDL2DIR}
+	PATH_SUFFIXES lib64 lib lib/armeabi-v7a lib/x86
+	PATHS ${SDL2_SEARCH_PATHS}
+    ${FIND_EXTRA_FLAG}
+)
+
+FIND_LIBRARY(SDL2_MIXER_LIBRARY
+	NAMES SDL2_mixer
 	HINTS
 	$ENV{SDL2DIR}
 	PATH_SUFFIXES lib64 lib lib/armeabi-v7a lib/x86
@@ -195,6 +212,7 @@ IF(SDL2_LIBRARY_TEMP)
 
 	if(SDL2_BIN_DIR)
 		SET(SDL2_DLL ${SDL2_BIN_DIR}/SDL2.dll CACHE PATH "Where the SDL2 DLL can be found")
+		SET(SDL2_MIXER_DLL ${SDL2_BIN_DIR}/SDL2_mixer.dll CACHE PATH "Where the SDL2_mixer DLL can be found")
 		SET(SDL2_BIN_DIR ${SDL2_BIN_DIR} CACHE INTERNAL "")
 	endif()
 
@@ -214,4 +232,12 @@ if (SDL2_FOUND AND WIN32)
         COMMENT "Copying SDL2 binaries to '${TargetDirectory}'"
         VERBATIM)
     endfunction()  	
+
+    function(sdl2_mixer_copy_binaries TargetDirectory)
+        add_custom_target(SDL2MixerCopyBinaries
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SDL2_PATH}/bin/SDL2_mixer.dll ${TargetDirectory}/SDL2_mixer.dll
+        COMMENT "Copying SDL2_mixer binaries to '${TargetDirectory}'"
+        VERBATIM)
+    endfunction()  	
+
 endif()

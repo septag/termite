@@ -114,5 +114,14 @@ namespace termite
             return 1.0f - bx::fbias(_time * 2.0f - 1.0f, 1.0f - _gain);
         }
     }
+
+    inline float fwave2(float _time, float _gain)
+    {
+        if (_time < 0.5f) {
+            return bx::fbias(_time * 2.0f, _gain);
+        } else {
+            return 1.0f - bx::fbias(_time * 2.0f - 1.0f, _gain);
+        }
+    }
 } // namespace termite
 

@@ -17,6 +17,8 @@
 
 #include "types.h"
 #include "error_report.h"
+#include "gfx_defines.h"
+#include "sound_driver.h"
 
 // For self-documenting code
 #define T_THREAD_SAFE
@@ -55,6 +57,7 @@ namespace termite
         char gfxName[32];
         char uiIniFilename[32];
         char phys2dName[32];    // Physics2D Driver name
+        char soundName[32];     // Sound driver name
 
         // 
         uint16_t refScreenWidth;
@@ -64,8 +67,13 @@ namespace termite
         uint16_t gfxDeviceId;
         uint16_t gfxWidth;
         uint16_t gfxHeight;
-        uint32_t gfxDriverFlags; 
+        GfxResetFlag::Bits gfxDriverFlags; 
         int keymap[19];
+
+        // Sound
+        AudioFreq::Enum audioFreq;
+        AudioChannels::Enum audioChannels;
+        int audioBufferSize;
 
         // Job Dispatcher
         uint16_t maxSmallFibers;
@@ -91,6 +99,7 @@ namespace termite
             strcpy(gfxName, "Bgfx");
             strcpy(uiIniFilename, "");
             strcpy(phys2dName, "Box2D");
+            strcpy(soundName, "SDL_mixer");
 
             refScreenWidth = 0;
             refScreenHeight = 0;
@@ -100,6 +109,10 @@ namespace termite
             gfxDeviceId = 0;
             gfxDriverFlags = 0;
             memset(keymap, 0x00, sizeof(keymap));
+
+            audioFreq = AudioFreq::Freq22Khz;
+            audioChannels = AudioChannels::Mono;
+            audioBufferSize = 4096;
 
             maxSmallFibers = maxBigFibers = 0;
             smallFiberSize = bigFiberSize = 0;
@@ -194,6 +207,7 @@ namespace termite
     TERMITE_API IoDriverApi* getBlockingIoDriver() T_THREAD_SAFE;
     TERMITE_API IoDriverApi* getAsyncIoDriver() T_THREAD_SAFE;
     TERMITE_API RendererApi* getRenderer() T_THREAD_SAFE;
+    TERMITE_API SoundDriverApi* getSoundDriver() T_THREAD_SAFE;
     TERMITE_API PhysDriver2DApi* getPhys2dDriver() T_THREAD_SAFE;
     TERMITE_API uint32_t getEngineVersion() T_THREAD_SAFE;
     TERMITE_API bx::AllocatorI* getHeapAlloc() T_THREAD_SAFE;

@@ -228,7 +228,8 @@ inline uint32_t hashResource(const char* uri, const void* userParams, int userPa
     bx::HashMurmur2A hash;
     hash.begin();
     hash.add(uri, (int)strlen(uri));
-    hash.add(userParams, userParamsSize);
+    if (userParamsSize > 0)
+        hash.add(userParams, userParamsSize);
     hash.add(&objAllocu, sizeof(objAllocu));
     return hash.end();
 }
@@ -254,7 +255,8 @@ static ResourceHandle newResource(ResourceCallbacksI* callbacks, const char* uri
     rs->typeNameHash = typeNameHash;
     rs->objAlloc = objAlloc;
 
-    if (userParams) {
+    if (userParamsSize > 0) {
+        assert(userParamsSize);
         memcpy(rs->userParams, userParams, userParamsSize);
         rs->paramsHash = bx::hashMurmur2A(userParams, userParamsSize);
     }
@@ -320,7 +322,8 @@ static ResourceHandle addResource(ResourceCallbacksI* callbacks, const char* uri
         rs->uri = uri;
         rs->obj = obj;
         rs->callbacks = callbacks;
-        memcpy(rs->userParams, userParams, userParamsSize);
+        if (userParamsSize > 0)
+            memcpy(rs->userParams, userParams, userParamsSize);
     } else {
         handle = newResource(callbacks, uri, userParams, userParamsSize, obj, typeNameHash, objAlloc);
     }
@@ -334,7 +337,7 @@ static void setResourceLoadFlag(ResourceHandle resHandle, ResourceLoadState::Enu
     Resource* res = resLib->resources.getHandleData<Resource>(0, resHandle.value);
     res->loadState = flag;
 }
-
+#include "gfx_texture.h"
 static ResourceHandle loadResourceHashed(size_t nameHash, const char* uri, const void* userParams, ResourceFlag::Bits flags,
                                          bx::AllocatorI* objAlloc)
 {
@@ -439,8 +442,11 @@ static ResourceHandle getResourceHandleInPlace(const ResourceTypeData* tdata, si
                                                uintptr_t obj)
 {
     ResourceLib* resLib = g_resLib;
-    void* userParams = alloca(tdata->userParamsSize);
-    memset(userParams, 0x00, tdata->userParamsSize);
+    void* userParams = nullptr;
+    if (tdata->userParamsSize > 0) {
+        userParams = alloca(tdata->userParamsSize);
+        memset(userParams, 0x00, tdata->userParamsSize);
+    }
 
     // Find the possible already loaded handle by uri+params hash value
     int rresult = resLib->resourcesTable.find(hashResource(uri, userParams, tdata->userParamsSize, nullptr));

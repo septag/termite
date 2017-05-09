@@ -64,7 +64,8 @@ namespace termite
             GraphicsDriver,
             IoDriver,
             Renderer,
-            Physics2dDriver
+            Physics2dDriver,
+            SoundDriver
         };
     };
 
@@ -89,6 +90,7 @@ namespace termite
 #ifdef T_CORE_API
 #include "core.h"
 #include "bxx/logger.h"
+#include "resource_lib.h"
 
 namespace termite {
     struct CoreApi_v0
@@ -118,6 +120,10 @@ namespace termite {
 
         void(*beginCPUSample)(const char* name, uint32_t flags, uint32_t* hashCache);
         void(*endCPUSample)();
+
+        ResourceTypeHandle(*registerResourceType)(const char* name, ResourceCallbacksI* callbacks,
+                                                  int userParamsSize /*= 0*/, uintptr_t failObj /*= 0*/,
+                                                  uintptr_t asyncProgressObj /*= 0*/);
     };
 }
 #endif

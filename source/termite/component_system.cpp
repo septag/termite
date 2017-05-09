@@ -50,6 +50,7 @@ namespace termite
         EntityHashTable destroyTable; // keep a multi-hash for all components that entity has to destroy
         EntityHashTable deactiveTable;
 		bx::Pool<EntityHashTable::Node> nodePool;
+        uint16_t numEnts;
         
         EntityManager(bx::AllocatorI* _alloc) : 
             alloc(_alloc),
@@ -57,6 +58,7 @@ namespace termite
             destroyTable(bx::HashTableType::Mutable),
             deactiveTable(bx::HashTableType::Mutable)
         {
+            numEnts = 0;
         }
     };
 }
@@ -161,7 +163,8 @@ Entity termite::createEntity(EntityManager* emgr)
         *gen = 1;
         assert(idx < (1 << kEntityIndexBits));
     }
-    return Entity(idx, emgr->generations[idx]);
+    Entity ent = Entity(idx, emgr->generations[idx]);
+    return ent;
 }
 
 static void addToComponentGroup(ComponentGroupHandle handle, ComponentHandle component)
@@ -214,7 +217,6 @@ static void destroyComponentNoImmAction(Entity ent, ComponentHandle handle)
     if (r != -1)
         ctype.entTable.remove(r);
 }
-
 
 void termite::destroyEntity(EntityManager* emgr, Entity ent)
 {
@@ -432,6 +434,46 @@ void termite::garbageCollectComponents(EntityManager* emgr)
             }
         }
     }
+}
+
+void termite::garbageCollectComponentsAggressive(EntityManager* emgr)
+{
+    // For each component type, Go through all instances and destroy them
+    struct DestroyItem
+    {
+        Entity ent;
+        ComponentHandle handle;
+    };
+
+    bx::Array<DestroyItem> destroyArr;
+    destroyArr.create(100, 100, getTempAlloc());
+    int index = 0;
+
+    for (int i = 0, c = g_csys->components.getCount(); i < c; i++) {
+        ComponentType& ctype = g_csys->components[i];
+
+        if ((ctype.flags & ComponentFlag::ImmediateDestroy) == 0) {
+            for (int k = 0, kc = ctype.dataPool.getCount(); k < kc; k++) {
+                uint16_t r = ctype.dataPool.handleAt(k);
+                Entity ent = *ctype.dataPool.getHandleData<Entity>(0, r);
+                if (isEntityAlive(emgr, ent))
+                    continue;
+                DestroyItem* item = destroyArr.push();
+                item->ent = ent;
+                item->handle = COMPONENT_MAKE_HANDLE(i, r);
+            }
+
+            for (int k = 0, kc = destroyArr.getCount(); k < kc; k++) {
+                DestroyItem item = destroyArr[k];
+                destroyComponent(emgr, item.ent, item.handle);
+            }
+
+            destroyArr.clear();
+        }
+    }
+
+
+    destroyArr.destroy();
 }
 
 ComponentHandle termite::createComponent(EntityManager* emgr, Entity ent, ComponentTypeHandle handle, 

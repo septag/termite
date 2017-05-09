@@ -333,6 +333,7 @@ void* termite::getEngineApi(uint16_t apiId, uint32_t version)
         core0.getAsyncIoDriver = getAsyncIoDriver;
         core0.getBlockingIoDriver = getBlockingIoDriver;
         core0.getPhys2dDriver = getPhys2dDriver;
+        core0.registerResourceType = registerResourceType;
 #if RMT_ENABLED
         core0.beginCPUSample = _rmt_BeginCPUSample;
         core0.endCPUSample = _rmt_EndCPUSample;

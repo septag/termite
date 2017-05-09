@@ -12,17 +12,19 @@ namespace termite
     // Use this structure to load texture with params
     struct LoadTextureParams
     {
-        bool generateMips;
-        uint8_t skipMips;
         TextureFlag::Bits flags;
         TextureFormat::Enum fmt;        // Requested texture format
+        uint8_t skipMips;
+        bool generateMips;
+        uint8_t padding[2];
 
         LoadTextureParams()
         {
-            generateMips = false;
-            skipMips = 0;
             flags = 0;
             fmt = TextureFormat::RGBA8;
+            skipMips = 0;
+            generateMips = false;
+            padding[0] = padding[1] = 0;
         }
     };
 

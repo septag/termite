@@ -138,6 +138,7 @@ namespace termite
     TERMITE_API void getSpriteRealRect(Sprite* sprite, vec2_t* pHalfSize, vec2_t* pCenter);
     TERMITE_API vec2_t getSpriteImageSize(Sprite* sprite);
     TERMITE_API rect_t getSpriteTexelRect(Sprite* sprite);
+    TERMITE_API termite::ProgramHandle getSpriteColorAddProgram();
 
     // For manual rendering of spritesheet frames
     TERMITE_API void getSpriteFrameDrawData(Sprite* sprite, int frameIdx, rect_t* drawRect, rect_t* textureRect, 
@@ -170,19 +171,23 @@ namespace termite
     // Registers "spritesheet" resource type and Loads SpriteSheet object
     struct LoadSpriteSheetParams
     {
-        bool generateMips;
-        uint8_t skipMips;
         TextureFlag::Bits flags;
         TextureFormat::Enum fmt;
+        uint8_t skipMips;
+        bool generateMips;
+        uint8_t padding[2];
 
         LoadSpriteSheetParams()
         {
-            generateMips = false;
-            skipMips = 0;
             flags = TextureFlag::U_Clamp | TextureFlag::V_Clamp;        // Spritesheets should be CLAMP as default
             fmt = TextureFormat::RGBA8;
+            skipMips = 0;
+            generateMips = false;
+            padding[0] = padding[1] = 0;
         }
     };
 
     void registerSpriteSheetToResourceLib();
+    TERMITE_API rect_t getSpriteSheetTextureFrame(ResourceHandle spritesheet, const char* name);
+    TERMITE_API ResourceHandle getSpriteSheetTexture(ResourceHandle spritesheet);
 } // namespace termite

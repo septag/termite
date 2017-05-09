@@ -2,6 +2,8 @@
 
 #include "bx/bx.h"
 
+struct SDL_RWops;
+
 namespace termite
 {
     struct Config;

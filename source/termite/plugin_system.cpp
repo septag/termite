@@ -53,6 +53,10 @@ PluginDesc* getBox2dDriverDesc();
 void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi);
 void shutdownBox2dDriver();
 
+PluginDesc* getSdlMixerDriverDesc();
+void* initSdlMixerDriver(bx::AllocatorI* alloc, GetApiFunc getApi);
+void shutdownSdlMixerDriver();
+
 static void loadStaticPlugins()
 {
     // IoDriver
@@ -96,6 +100,16 @@ static void loadStaticPlugins()
     box2dApi.init = initBox2dDriver;
     box2dApi.shutdown = shutdownBox2dDriver;
     p->api = &box2dApi;
+
+    // Sound driver
+    static PluginApi_v0 soundApi;
+    p = g_pluginSys->plugins.push();
+    memset(p, 0x00, sizeof(*p));
+    memcpy(&p->desc, getSdlMixerDriverDesc(), sizeof(p->desc));
+    soundApi.init = initSdlMixerDriver;
+    soundApi.shutdown = shutdownSdlMixerDriver;
+    soundApi.getDesc = getSdlMixerDriverDesc;
+    p->api = &soundApi;
 }
 #endif
 

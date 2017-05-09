@@ -12,7 +12,6 @@ source_group(include FILES ${INCLUDE_FILES})
 
 ## Shaders
 set(SHADER_SOURCES "shaders/ddraw.vsc"          "shaders/ddraw.fsc" 
-                   "shaders/sprite.vsc"         "shaders/sprite.fsc"
                    "shaders/vg.vsc"             "shaders/vg.fsc"
                    "shaders/blit.vsc"           "shaders/blit.fsc"
                    "shaders/font_normal.vsc"    "shaders/font_normal.fsc"
@@ -21,6 +20,14 @@ set(SHADER_SOURCES "shaders/ddraw.vsc"          "shaders/ddraw.fsc"
 source_group(shaders FILES ${SHADER_SOURCES})
 bgfx_add_shaders("${SHADER_SOURCES}" IGNORE "../shaders" "shaders_h" TRUE IGNORE SHADER_GEN_FILES)
 source_group(shaders\\compiled FILES ${SHADER_GEN_FILES})
+
+# Sprite shaders
+set(SPRITE_SHADER_SOURCES "shaders/sprite.vsc" "shaders/sprite.fsc")
+source_group(shaders FILES ${SPRITE_SHADER_SOURCES})
+bgfx_add_shaders("${SPRITE_SHADER_SOURCES}" IGNORE "../shaders" "shaders_h" TRUE IGNORE SPRITE_NORMAL_FILES) 
+source_group(shaders\\compiled FILES ${SPRITE_NORMAL_FILES})
+bgfx_add_shaders("${SPRITE_SHADER_SOURCES}" "COLOR_ADD=1" "../shaders" "shaders_h" TRUE "add" SPRITE_COLOR_ADD_FILES) 
+source_group(shaders\\compiled FILES ${SPRITE_COLOR_ADD_FILES})
 
 # Fade shaders
 set(FADE_SHADER_SOURCES "shaders/effect_fade.vsc" "shaders/effect_fade.fsc")
@@ -57,9 +64,12 @@ add_library(termite ${BUILD_LIBRARY_TYPE}
             ${SOURCE_FILES} 
             ${INCLUDE_FILES} 
             ${SHADER_SOURCES} 
+            ${SPRITE_SHADER_SOURCES}
             ${FADE_SHADER_SOURCES} 
             ${BLUR_SHADER_SOURCES}
             ${SHADER_GEN_FILES} 
+            ${SPRITE_NORMAL_FILES}
+            ${SPRITE_COLOR_ADD_FILES}
             ${FADEOUT_COLOR_FILES} 
             ${FADEIN_COLOR_FILES} 
             ${FADEOUT_ALPHA_FILES} 
@@ -95,6 +105,10 @@ if (BUILD_STATIC)
         set(DISK_DRIVER disk_driver)
     endif()
     set(PLUGIN_LIBS bgfx_driver box2d_driver ${DISK_DRIVER})
+
+    if (USE_SDL2_MIXER)
+        set(PLUGIN_LIBS ${PLUGIN_LIBS} sdl_mixer_driver)
+    endif()
 endif()
 
 if (NOT IOS)
@@ -107,7 +121,7 @@ endif()
 
 target_link_libraries(termite 
     PRIVATE ${FCONTEXT_LIB} imgui_impl remotery ${PLUGIN_LIBS} ${PRIVATE_LIBS}
-    PUBLIC bx rapidjson ${STD_LIBS})
+    PUBLIC bx rapidjson AHEasing ${STD_LIBS})
 
 # 
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)

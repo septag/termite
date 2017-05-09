@@ -45,7 +45,7 @@ out
 deps/assimp
 deps/bgfx
 deps/libuv
-deps/sdl
+deps/SDL2
 deps/SDL2_android
 deps/libuv_android_arm
 deps/bgfx_android

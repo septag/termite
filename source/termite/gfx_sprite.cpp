@@ -16,6 +16,8 @@
 
 #include T_MAKE_SHADER_PATH(shaders_h, sprite.vso)
 #include T_MAKE_SHADER_PATH(shaders_h, sprite.fso)
+#include T_MAKE_SHADER_PATH(shaders_h, sprite_add.vso)
+#include T_MAKE_SHADER_PATH(shaders_h, sprite_add.fso)
 
 #include <algorithm>
 
@@ -180,6 +182,7 @@ struct SpriteSystem
     GfxDriverApi* driver;
     bx::AllocatorI* alloc;
     ProgramHandle spriteProg;
+    ProgramHandle spriteAddProg;
     UniformHandle u_texture;
     SpriteSheetLoader loader;
     SpriteSheet* failSheet;
@@ -439,6 +442,14 @@ result_t termite::initSpriteSystem(GfxDriverApi* driver, bx::AllocatorI* alloc)
                               true);
     if (!g_spriteSys->spriteProg.isValid())
         return T_ERR_FAILED;
+
+    g_spriteSys->spriteAddProg = 
+        driver->createProgram(driver->createShader(driver->makeRef(sprite_add_vso, sizeof(sprite_add_vso), nullptr, nullptr)),
+                              driver->createShader(driver->makeRef(sprite_add_fso, sizeof(sprite_add_fso), nullptr, nullptr)),
+                              true);
+    if (!g_spriteSys->spriteAddProg.isValid())
+        return T_ERR_FAILED;
+
     g_spriteSys->u_texture = driver->createUniform("u_texture", UniformType::Int1, 1);
 
     // Create fail spritesheet
@@ -498,6 +509,9 @@ void termite::shutdownSpriteSystem()
 
     if (g_spriteSys->spriteProg.isValid())
         driver->destroyProgram(g_spriteSys->spriteProg);
+    if (g_spriteSys->spriteAddProg.isValid())
+        driver->destroyProgram(g_spriteSys->spriteAddProg);
+
     if (g_spriteSys->u_texture.isValid())
         driver->destroyUniform(g_spriteSys->u_texture);
 
@@ -622,6 +636,7 @@ void termite::animateSprites(Sprite** sprites, uint16_t numSprites, float dt)
 {
     for (int i = 0; i < numSprites; i++) {
         Sprite* sprite = sprites[i];
+        bool playReverse = sprite->playReverse;
 
         if (!bx::fequal(sprite->playSpeed, 0, 0.00001f)) {
             float t = sprite->animTm;
@@ -636,7 +651,7 @@ void termite::animateSprites(Sprite** sprites, uint16_t numSprites, float dt)
             int frameIdx = curFrameIdx;
             int iframes = int(frames);
             if (sprite->endCallback == nullptr) {
-                frameIdx = iwrap(!sprite->playReverse ? (frameIdx + iframes) : (frameIdx - iframes),
+                frameIdx = iwrap(!playReverse ? (frameIdx + iframes) : (frameIdx - iframes),
                                  0, sprite->frames.getCount() - 1);
             } else {
                 if (sprite->triggerEndCallback && iframes > 0) {
@@ -644,11 +659,12 @@ void termite::animateSprites(Sprite** sprites, uint16_t numSprites, float dt)
                     sprite->endCallback(sprite, frameIdx, sprite->endUserData);
                 }
 
-                int nextFrame = !sprite->playReverse ? (frameIdx + iframes) : (frameIdx - iframes);
+                int nextFrame = !playReverse ? (frameIdx + iframes) : (frameIdx - iframes);
                 frameIdx = iclamp(nextFrame, 0, sprite->frames.getCount() - 1);
 
-                if (frameIdx != nextFrame)
-                    sprite->triggerEndCallback = true;
+                if (frameIdx != nextFrame && sprite->playSpeed != 0) {
+                    sprite->triggerEndCallback = true;  // Tigger callback on the next update
+                }
             }
 
             // Check if we hit any callbacks
@@ -918,6 +934,11 @@ rect_t termite::getSpriteTexelRect(Sprite* sprite)
     return sprite->getCurFrame().frame;
 }
 
+ProgramHandle termite::getSpriteColorAddProgram()
+{
+    return g_spriteSys->spriteAddProg;
+}
+
 void termite::getSpriteFrameDrawData(Sprite* sprite, int frameIdx, rect_t* drawRect, rect_t* textureRect, 
                                      ResourceHandle* textureHandle)
 {
@@ -982,6 +1003,7 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     };
 
     SortedSprite* sortedSprites = (SortedSprite*)BX_ALLOC(tmpAlloc, sizeof(SortedSprite)*numSprites);
+    size_t s = sizeof(Sprite);
     for (int i = 0; i < numSprites; i++) {
         const SpriteFrame& frame = sprites[i]->getCurFrame();
         sortedSprites[i].index = i;
@@ -1129,4 +1151,23 @@ void termite::registerSpriteSheetToResourceLib()
     handle = registerResourceType("spritesheet", &g_spriteSys->loader, sizeof(LoadSpriteSheetParams), 
                                   uintptr_t(g_spriteSys->failSheet), uintptr_t(g_spriteSys->asyncSheet));
     assert(handle.isValid());
+}
+
+rect_t termite::getSpriteSheetTextureFrame(ResourceHandle spritesheet, const char* name)
+{
+    SpriteSheet* ss = getResourcePtr<SpriteSheet>(spritesheet);
+    size_t filenameHash = tinystl::hash_string(name, strlen(name));
+    for (int i = 0, c = ss->numFrames; i < c; i++) {
+        if (ss->frames[i].filenameHash != filenameHash)
+            continue;
+        
+        return ss->frames[i].frame;
+    }
+    return rectf(0, 0, 1.0f, 1.0f);
+}
+
+ResourceHandle termite::getSpriteSheetTexture(ResourceHandle spritesheet)
+{
+    SpriteSheet* ss = getResourcePtr<SpriteSheet>(spritesheet);
+    return ss->texHandle;
 }

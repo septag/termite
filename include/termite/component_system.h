@@ -106,7 +106,12 @@ namespace termite
 							                              const ComponentCallbacks* callbacks, ComponentFlag::Bits flags,
 										                  uint32_t dataSize, uint16_t poolSize, uint16_t growSize,
                                                           bx::AllocatorI* alloc = nullptr);
+
+    /// Garbage collect dead entities 4 ents per call randomly
 	TERMITE_API void garbageCollectComponents(EntityManager* emgr);
+
+    /// Garbage collect dead entities aggressively by searching all dead components and destroy them at once
+    TERMITE_API void garbageCollectComponentsAggressive(EntityManager* emgr);
 
 	TERMITE_API ComponentHandle createComponent(EntityManager* emgr, Entity ent, ComponentTypeHandle handle, 
                                                 ComponentGroupHandle group = ComponentGroupHandle());

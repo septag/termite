@@ -100,5 +100,11 @@ namespace termite
         return (Ty*)getResourceObj(handle);
     }
 
+    template <typename Ty>
+    Ty getResourceCast(ResourceHandle handle)
+    {
+        return Ty((void*)getResourceObj(handle));
+    }
+
 } // namespace termite
 

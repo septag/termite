@@ -37,12 +37,14 @@ namespace termite
         FontFileFormat::Enum format;
         bool generateMips;
         bool distantField;
+        uint8_t padding[2];
 
         LoadFontParams()
         {
             format = FontFileFormat::Text;
             generateMips = true;
             distantField = false;
+            padding[0] = padding[1] = 0;
         }
     };
 

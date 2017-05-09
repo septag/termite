@@ -29,6 +29,7 @@
 #include "event_dispatcher.h"
 #include "physics_2d.h"
 #include "command_system.h"
+#include "sound_driver.h"
 
 #ifdef termite_SDL2
 #  include <SDL.h>
@@ -162,6 +163,7 @@ struct Core
     GfxDriverApi* gfxDriver;
     IoDriverDual* ioDriver;
     PhysDriver2DApi* phys2dDriver;
+    SoundDriverApi* sndDriver;
     PageAllocator tempAlloc;
     GfxDriverEvents gfxDriverEvents;
     LogCache* gfxLogCache;
@@ -180,6 +182,7 @@ struct Core
     {
         gfxDriver = nullptr;
         phys2dDriver = nullptr;
+        sndDriver = nullptr;
         updateFn = nullptr;
         renderer = nullptr;
         ioDriver = nullptr;
@@ -516,6 +519,28 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
         BX_END_OK();
     }
 
+    // Sound device
+    if (conf.soundName[0] != 0) {
+        r = findPluginByName(conf.soundName, 0, &pluginHandle, 1, PluginType::SoundDriver);
+        if (r > 0) {
+            g_core->sndDriver = (SoundDriverApi*)initPlugin(pluginHandle, g_alloc);
+        }
+
+        if (!g_core->sndDriver) {
+            T_ERROR("Core init failed: Could not detect Sound driver: %s", conf.soundName);
+            return T_ERR_FAILED;
+        }
+
+        const PluginDesc& desc = getPluginDesc(pluginHandle);
+        BX_BEGINP("Initializing Sound Driver: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version), T_VERSION_MINOR(desc.version));
+        if (T_FAILED(g_core->sndDriver->init(conf.audioFreq, conf.audioChannels, conf.audioBufferSize))) {
+            BX_END_FATAL();
+            T_ERROR("Core init failed: Could not initialize Sound driver");
+            return T_ERR_FAILED;
+        }
+        BX_END_OK();
+    }
+
     // Job Dispatcher
     if ((conf.engineFlags & InitEngineFlags::EnableJobDispatcher) == InitEngineFlags::EnableJobDispatcher) {
         BX_BEGINP("Initializing Job Dispatcher");
@@ -661,6 +686,13 @@ void termite::shutdown(ShutdownCallback callback, void* userData)
         g_core->gfxDriver = nullptr;
         BX_END_OK();
         dumpGfxLog();
+    }
+
+    if (g_core->sndDriver) {
+        BX_BEGINP("Shutting down Sound Driver");
+        g_core->sndDriver->shutdown();
+        g_core->sndDriver = nullptr;
+        BX_END_OK();
     }
 
     shutdownResourceLib();
@@ -977,9 +1009,14 @@ IoDriverApi* termite::getAsyncIoDriver() T_THREAD_SAFE
     return g_core->ioDriver->async;
 }
 
-RendererApi* termite::getRenderer()
+RendererApi* termite::getRenderer() T_THREAD_SAFE
 {
     return g_core->renderer;
+}
+
+SoundDriverApi* termite::getSoundDriver() T_THREAD_SAFE
+{
+    return g_core->sndDriver;
 }
 
 PhysDriver2DApi* termite::getPhys2dDriver() T_THREAD_SAFE
@@ -987,7 +1024,7 @@ PhysDriver2DApi* termite::getPhys2dDriver() T_THREAD_SAFE
     return g_core->phys2dDriver;
 }
 
-uint32_t termite::getEngineVersion()
+uint32_t termite::getEngineVersion() T_THREAD_SAFE
 {
     return T_MAKE_VERSION(0, 1);
 }
