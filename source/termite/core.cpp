@@ -72,7 +72,7 @@ typedef std::chrono::high_resolution_clock::time_point TClockTimePt;
 //
 struct FrameData
 {
-    int64_t frame;
+    uint64_t frame;
     double frameTime;
     double fps;
     double elapsedTime;
@@ -848,7 +848,7 @@ double termite::getSmoothFrameTime()
     return g_core->frameData.avgFrameTime;
 }
 
-int64_t termite::getFrameIndex()
+uint64_t termite::getFrameIndex()
 {
     return g_core->frameData.frame;
 }
@@ -1070,7 +1070,7 @@ void termite::dumpGfxLog() T_THREAD_SAFE
 
 void termite::registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback)
 {
-#if termite_DEV
+#if termite_DEV && RMT_ENABLED
     assert(g_core);
     ConsoleCommand* cmd = new(g_core->consoleCmds.push()) ConsoleCommand;
     cmd->cmdHash = tinystl::hash_string(name, strlen(name));

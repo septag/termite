@@ -49,7 +49,7 @@ namespace termite
 	TERMITE_API Entity createEntity(EntityManager* emgr);
 	TERMITE_API void destroyEntity(EntityManager* emgr, Entity ent);
 	TERMITE_API bool isEntityAlive(EntityManager* emgr, Entity ent);
-    TERMITE_API void setEntityActive(Entity ent, bool active);
+    TERMITE_API void setEntityActive(Entity ent, bool active, uint32_t flags = 0);
 
     // Component System
     result_t initComponentSystem(bx::AllocatorI* alloc);
@@ -68,19 +68,23 @@ namespace termite
         };
     };
 
+    struct ImGuiApi_v0;
     struct ComponentCallbacks
     {
         bool(*createInstance)(Entity ent, ComponentHandle handle, void* data);
         void(*destroyInstance)(Entity ent, ComponentHandle handle, void* data);
-        void(*setActive)(ComponentHandle handle, void* data, bool active);
+        void(*setActive)(ComponentHandle handle, void* data, bool active, uint32_t flags);
 
         typedef void (*UpdateStageFunc)(const ComponentHandle* handles, uint16_t count, float dt);
         UpdateStageFunc updateStageFn[ComponentUpdateStage::Count];
 
+        void(*debug)(const ComponentHandle* handles, uint16_t count, ImGuiApi_v0* imgui, void* userData);
+
         ComponentCallbacks() :
             createInstance(nullptr),
             destroyInstance(nullptr),
-            setActive(nullptr)
+            setActive(nullptr),
+            debug(nullptr)
         {
             memset(updateStageFn, 0x00, sizeof(UpdateStageFunc)*ComponentUpdateStage::Count);
         }
@@ -118,6 +122,10 @@ namespace termite
 	TERMITE_API void destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle handle);
 
     TERMITE_API void runComponentGroup(ComponentUpdateStage::Enum stage, ComponentGroupHandle groupHandle, float dt);
+
+    /// Calls 'debug' callbacks on all components
+    TERMITE_API void debugComponents(ImGuiApi_v0* imgui, void* userData);
+    TERMITE_API void debugComponentType(ComponentTypeHandle typeHandle, ImGuiApi_v0* imgui, void* userData);
 
 	TERMITE_API ComponentTypeHandle findComponentTypeByName(const char* name);
 	TERMITE_API ComponentTypeHandle findComponentTypeByNameHash(size_t nameHash);

@@ -139,6 +139,8 @@ namespace termite
     TERMITE_API vec2_t getSpriteImageSize(Sprite* sprite);
     TERMITE_API rect_t getSpriteTexelRect(Sprite* sprite);
     TERMITE_API termite::ProgramHandle getSpriteColorAddProgram();
+    TERMITE_API void setSpriteUserData(Sprite* sprite, void* userData);
+    TERMITE_API void* getSpriteUserData(Sprite* sprite);
 
     // For manual rendering of spritesheet frames
     TERMITE_API void getSpriteFrameDrawData(Sprite* sprite, int frameIdx, rect_t* drawRect, rect_t* textureRect, 

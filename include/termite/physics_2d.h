@@ -366,6 +366,10 @@ namespace termite
     ///         return fraction shrinks the ray after this callback, do this and keep recent result for closest hit
     typedef float(*PhysRayCastCallback2D)(PhysShape2D* shape, const vec2_t& point, const vec2_t& normal, float fraction, void* userData);
 
+    /// @param shape shape that collides the shape queried
+    /// @return Return false if you want to stop the query
+    typedef bool(*PhysQueryShapeCallback2D)(PhysShape2D* shape, void* userData);
+
     struct PhysDriver2DApi
     {
         result_t (*init)(bx::AllocatorI* alloc, PhysFlags2D::Bits flags/*=0*/, uint8_t debugViewId/*=255*/);
@@ -419,6 +423,7 @@ namespace termite
         vec2_t (*getMassCenter)(PhysBody2D* body);
         void (*setMassCenter)(PhysBody2D* body, const vec2_t& center);
         float (*getMass)(PhysBody2D* body);
+        float(*getInertia)(PhysBody2D* body);
 
         // Shape
         void* (*getShapeUserData)(PhysShape2D* shape);
@@ -427,8 +432,9 @@ namespace termite
         PhysBody2D* (*getShapeBody)(PhysShape2D* shape);
         rect_t (*getShapeAABB)(PhysShape2D* shape);
 
-        // Ray Cast
+        // Ray Cast/Query
         void (*rayCast)(PhysScene2D* scene, const vec2_t& p1, const vec2_t& p2, PhysRayCastCallback2D callback, void* userData);
+        void(*queryShapeCircle)(PhysScene2D* scene, float radius, const vec2_t pos, PhysQueryShapeCallback2D callback, void *userData);
 
         // Joints
 

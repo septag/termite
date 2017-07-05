@@ -157,6 +157,8 @@ namespace termite {
 #ifdef T_IMGUI_API
 #include "imgui/imgui.h"
 #include "ImGuizmo/ImGuizmo.h"
+#include "imgui_custom_controls.h"
+
 namespace termite
 {
 	struct ImGuiApi_v0
@@ -416,6 +418,11 @@ namespace termite
         void (*manipulateGuizmo)(const float *view, const float *projection, ImGuizmo::OPERATION operation, ImGuizmo::MODE mode, 
                                float *matrix, float *deltaMatrix/* = 0*/, float *snap/* = 0*/);
         void (*drawCubeGuizmo)(const float *view, const float *projection, float *matrix);
+
+        // Customs
+        void (*bezierEditor)(ImGuiBezierEd* bezier, const char* strId, const ImVec2& size, bool lockEnds, bool showText, bool showMirrorY);
+        void (*fishLayout)(ImGuiFishLayout* layout, const char* strId, const ImVec2& size);
+        void (*gaunt)(const char* strId, ImVec2* values, int numValues, int changeIdx, const ImVec2& size);
 	};
 }
 #endif

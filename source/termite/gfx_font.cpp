@@ -978,10 +978,12 @@ namespace termite
         float x = 0;
         vec2_t offsetPos = vec2f(0, 0);
         float xpadding = 0;
+        /*
         if (font->flags & FontFlags::DistantField) {
             offsetPos.y -= float(font->spacing[1]);
             xpadding = font->padding[0];
         }
+        */
 
         int firstVertIdx = batch->numChars*4;
         TextVertex* verts = batch->verts + firstVertIdx;
@@ -1030,7 +1032,7 @@ namespace termite
 
                 v0.color = v1.color = v2.color = v3.color = color.n;
 
-                x += (glyph.xadvance - xpadding)*scale;
+                x += (glyph.xadvance/* - xpadding*/)*scale;
 
                 // Kerning
                 int nextGlyphIdx = font->glyphTable.find(text[i+1]);
@@ -1061,7 +1063,7 @@ namespace termite
             pos = pos + ((screenRect.vmax + screenRect.vmin)*0.5f - vec2f(x*0.5f, 0));
             break;
         case TextAlign::Left:
-            pos = pos + vec2f(0, (screenRect.ymax + screenRect.ymin)*0.5f);
+            pos = pos + vec2f(screenRect.xmin, (screenRect.ymax + screenRect.ymin)*0.5f);
             break;
         case TextAlign::Right:
             pos = pos + vec2f(screenRect.xmax - x, (screenRect.ymax + screenRect.ymin)*0.5f);

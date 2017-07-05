@@ -4,8 +4,6 @@
 #include "termite/plugin_api.h"
 #include "termite/resource_lib.h"
 
-#include "bxx/handle_pool.h"
-
 #include "SDL_mixer.h"
 #include "beep_ogg.h"
 
@@ -21,16 +19,43 @@ public:
     void onReload(ResourceHandle handle, bx::AllocatorI* alloc) override;
 };
 
+class MusicLoader : public ResourceCallbacksI
+{
+public:
+    MusicLoader() {}
+
+    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc) override;
+    void unloadObj(uintptr_t obj, bx::AllocatorI* alloc) override;
+    void onReload(ResourceHandle handle, bx::AllocatorI* alloc) override;
+};
+
+struct MusicData
+{
+    void* buff;
+    uint32_t size;
+    Mix_Music* mus;
+
+    MusicData() :
+        buff(nullptr),
+        size(0),
+        mus(nullptr)
+    {
+    }
+};
+
 struct MixerWrapper
 {
     bx::AllocatorI* alloc;
     CoreApi_v0* core;
 
     SoundLoader loader;
-    bx::HandlePool musics;
+    MusicLoader musLoader;
 
     SoundFinishedCallback soundFinishedFn;
     void* soundFinishedUserData;
+
+    MusicFinishedCallback musicFinishedFn;
+    void* musicFinishedUserData;
 
     Mix_Chunk* failChunk;
 
@@ -41,6 +66,8 @@ struct MixerWrapper
         soundFinishedFn = nullptr;
         soundFinishedUserData = nullptr;
         failChunk = nullptr;
+        musicFinishedFn = nullptr;
+        musicFinishedUserData = nullptr;
     }
 };
 
@@ -50,6 +77,12 @@ static void mixerSoundFinishedCallback(int channelId)
 {
     assert(g_mixer.soundFinishedFn);
     g_mixer.soundFinishedFn(channelId, g_mixer.soundFinishedUserData);
+}
+
+static void mixerMusicFinishedCallback()
+{
+    assert(g_mixer.musicFinishedFn);
+    g_mixer.musicFinishedFn(g_mixer.musicFinishedUserData);
 }
 
 static result_t mixerInit(AudioFreq::Enum freq/* = AudioFreq::Freq22Khz*/,
@@ -72,6 +105,9 @@ static result_t mixerInit(AudioFreq::Enum freq/* = AudioFreq::Freq22Khz*/,
 
     // Register sound loader to resource_lib
     g_mixer.core->registerResourceType("sound", &g_mixer.loader, 0, uintptr_t(g_mixer.failChunk), 0);
+    g_mixer.core->registerResourceType("music", &g_mixer.musLoader, 0, 0, 0);
+
+    uint32_t itemSize = (uint32_t)sizeof(MusicData);
 
     return 0;
 }
@@ -80,8 +116,6 @@ static void mixerShutdown()
 {
     assert(g_mixer.core);
     assert(g_mixer.alloc);
-
-    g_mixer.musics.destroy();
 
     if (g_mixer.failChunk)
         Mix_FreeChunk(g_mixer.failChunk);
@@ -249,56 +283,73 @@ int mixerPlayFadeInTimed(int channelId, SoundChunkHandle handle, int numLoops/* 
 
 bool mixerPlayMusic(MusicHandle handle, int numLoops/* = -1*/)
 {
-    return false;
+    if (handle.isValid()) 
+        return Mix_PlayMusic(((MusicData*)handle.value)->mus, numLoops) == 0 ? true : false;
+    else
+        return false;
 }
 
 bool mixerPlayMusicFadeIn(MusicHandle handle, int numLoops/* = -1*/, int timeMilli)
 {
-    return false;
+    if (handle.isValid())
+        return Mix_FadeInMusic(((MusicData*)handle.value)->mus, numLoops, timeMilli) == 0 ? true : false;
+    else
+        return false;
 }
 
 bool mixerPlayMusicFadeInPos(MusicHandle handle, int numLoops/* = -1*/, int timeMilli, double posTime)
 {
-    return false;
+    if (handle.isValid())
+        return Mix_FadeInMusicPos(((MusicData*)handle.value)->mus, numLoops, timeMilli, posTime) == 0 ? true : false;
+    else
+        return false;
 }
 
-bool mixerSetMusicPos(MusicHandle handle, double posTime)
+bool mixerSetMusicPos(double posTime)
 {
-    return false;
+    return Mix_SetMusicPosition(posTime) == 0 ? true : false;
 }
 
 void mixerPauseMusic()
 {
+    Mix_PauseMusic();
 }
 
 void mixerResumeMusic()
 {
+    Mix_ResumeMusic();
 }
 
 void mixerRewindMusic()
 {
+    Mix_RewindMusic();
 }
 
 void mixerStopMusic()
 {
+    Mix_HaltMusic();
 }
 
 void mixerFadeoutMusic(int timeMilli)
 {
+    Mix_FadeOutMusic(timeMilli);
 }
 
 void mixerSetMusicFinishedCallback(MusicFinishedCallback callback, void* userData)
 {
+    g_mixer.musicFinishedFn = callback;
+    g_mixer.musicFinishedUserData = userData;
+    Mix_HookMusicFinished(callback ? mixerMusicFinishedCallback : nullptr);
 }
 
 bool mixerIsMusicPlaying()
 {
-    return false;
+    return Mix_PlayingMusic() ? true : false;
 }
 
 bool mixerIsMusicPaused()
 {
-    return false;
+    return Mix_PausedMusic() ? true : false;
 }
 
 SoundFadeStatus::Enum mixerGetMusicStatus()
@@ -327,6 +378,50 @@ void SoundLoader::unloadObj(uintptr_t obj, bx::AllocatorI* alloc)
 
 void SoundLoader::onReload(ResourceHandle handle, bx::AllocatorI* alloc)
 {
+}
+
+
+bool MusicLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
+{
+    MusicData* mdata;
+    if (alloc)
+        mdata = BX_NEW(alloc, MusicData);
+    else
+        mdata = BX_NEW(g_mixer.alloc, MusicData);
+
+    // Copy memory to data
+    mdata->buff = BX_ALLOC(alloc ? alloc : g_mixer.alloc, mem->size);
+    if (!mdata->buff)
+        return false;
+    memcpy(mdata->buff, mem->data, mem->size);
+    mdata->size = mem->size;
+
+    // Create music
+    SDL_RWops* rw = SDL_RWFromConstMem(mdata->buff, mdata->size);
+    mdata->mus = Mix_LoadMUS_RW(rw, 1);
+    if (!mdata->mus)
+        return false;
+
+    *obj = uintptr_t(mdata);
+    return true;
+}
+
+void MusicLoader::unloadObj(uintptr_t obj, bx::AllocatorI* alloc)
+{
+    MusicData* mdata = (MusicData*)obj;
+    if (mdata->mus) {
+        Mix_FreeMusic(mdata->mus);
+    }
+
+    if (mdata->buff) {
+        BX_FREE(alloc ? alloc : g_mixer.alloc, mdata->buff);
+    }
+    BX_DELETE(alloc ? alloc : g_mixer.alloc, mdata);
+}
+
+void MusicLoader::onReload(ResourceHandle handle, bx::AllocatorI* alloc)
+{
+
 }
 
 //

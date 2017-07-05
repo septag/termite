@@ -124,6 +124,7 @@ namespace termite
 
         SpriteFrameCallback endCallback;
         void* endUserData;
+        void* userData;
         bool triggerEndCallback;
 
         Sprite(bx::AllocatorI* _alloc) :
@@ -143,6 +144,7 @@ namespace termite
             tint = color1n(0xffffffff);
             posOffset = vec2f(0, 0);
             sizeMultiplier = vec2f(1.0f, 1.0f);
+            userData = nullptr;
         }
 
         inline const SpriteFrame& getCurFrame() const
@@ -939,6 +941,16 @@ ProgramHandle termite::getSpriteColorAddProgram()
     return g_spriteSys->spriteAddProg;
 }
 
+void termite::setSpriteUserData(Sprite* sprite, void* userData)
+{
+    sprite->userData = userData;
+}
+
+void* termite::getSpriteUserData(Sprite* sprite)
+{
+    return sprite->userData;
+}
+
 void termite::getSpriteFrameDrawData(Sprite* sprite, int frameIdx, rect_t* drawRect, rect_t* textureRect, 
                                      ResourceHandle* textureHandle)
 {
@@ -1082,8 +1094,8 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
         }
 
         if (flipY & SpriteFlip::FlipY) {
-            std::swap<float>(v0.coords.y, v1.coords.y);
-            std::swap<float>(v2.coords.y, v3.coords.y);
+            std::swap<float>(v0.coords.y, v2.coords.y);
+            std::swap<float>(v1.coords.y, v3.coords.y);
         }
 
         // Make a quad from 4 verts

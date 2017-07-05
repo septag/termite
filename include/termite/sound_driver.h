@@ -37,7 +37,7 @@ namespace termite
     struct SoundChunkT {};
     struct MusicT {};
     typedef PhantomType<void*, SoundChunkT, nullptr> SoundChunkHandle;
-    typedef PhantomType<uint16_t, MusicT, UINT16_MAX> MusicHandle;
+    typedef PhantomType<void*, MusicT, nullptr> MusicHandle;
 
     typedef void (*SoundFinishedCallback)(int channelId, void* userData);
     typedef void (*MusicFinishedCallback)(void* userData);
@@ -107,7 +107,7 @@ namespace termite
         bool(*playMusic)(MusicHandle handle, int numLoops/* = -1*/);
         bool(*playMusicFadeIn)(MusicHandle handle, int numLoops/* = -1*/, int timeMilli);
         bool(*playMusicFadeInPos)(MusicHandle handle, int numLoops/* = -1*/, int timeMilli, double posTime);
-        bool(*setMusicPos)(MusicHandle handle, double posTime);
+        bool(*setMusicPos)(double posTime);
         void(*pauseMusic)();
         void(*resumeMusic)();
         void(*rewindMusic)();

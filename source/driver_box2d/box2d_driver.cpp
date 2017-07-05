@@ -340,7 +340,7 @@ static PhysBody2D* createBodyBox2d(PhysScene2D* scene, const PhysBodyDef2D& body
     }
 
     pbody->b = bbody;
-    pbody->userData = bdef.userData;
+    pbody->userData = bodyDef.userData;
     return pbody;
 }
 
@@ -780,6 +780,35 @@ static void box2dRayCast(PhysScene2D* scene, const vec2_t& p1, const vec2_t& p2,
     scene->w.RayCast(&b2callback, b2vec2(p1), b2vec2(p2));
 }
 
+static void box2dQueryShapeCircle(PhysScene2D* scene, float radius, const vec2_t pos, PhysQueryShapeCallback2D callback, void *userData)
+{
+    class QueryCircleCallback : public b2QueryCallback
+    {
+    private:
+        PhysQueryShapeCallback2D m_callback;
+        void* m_userData;
+
+    public:
+        QueryCircleCallback(PhysQueryShapeCallback2D _callback, void* _userData) :
+            m_callback(_callback),
+            m_userData(_userData)
+        {
+        }
+
+        bool ReportFixture(b2Fixture* fixture) override
+        {
+            return m_callback((PhysShape2D*)fixture->GetUserData(), m_userData);
+        }
+    };
+
+    QueryCircleCallback b2callback(callback, userData);
+    b2AABB aabb;
+    aabb.lowerBound = b2vec2(pos - vec2f(radius, radius));
+    aabb.upperBound = b2vec2(pos + vec2f(radius, radius));
+
+    scene->w.QueryAABB(&b2callback, aabb);
+}
+
 void PhysDebugDraw::beginDraw(NVGcontext* nvg, const Camera2D& cam, int viewWidth, int viewHeight)
 {
     assert(nvg);
@@ -979,6 +1008,7 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     };
     api.getPosition = [](PhysBody2D* body)->vec2_t { return tvec2(body->b->GetPosition()); };
     api.getAngle = [](PhysBody2D* body)->float { return -body->b->GetAngle(); };
+    api.getBodyUserData = [](PhysBody2D* body)->void* { return body->userData; };
     
     api.setLinearVelocity = [](PhysBody2D* body, const vec2_t& vel) { body->b->SetLinearVelocity(b2vec2(vel)); };
     api.setAngularVelocity = [](PhysBody2D* body, float omega) { body->b->SetAngularVelocity(-omega); };
@@ -995,6 +1025,9 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.getLocalPoint = [](PhysBody2D* body, const vec2_t& worldPt) { return tvec2(body->b->GetLocalPoint(b2vec2(worldPt))); };
     api.applyLinearImpulse = [](PhysBody2D* body, const vec2_t& impulse, const vec2_t& worldPt, bool wake) {
         body->b->ApplyLinearImpulse(b2vec2(impulse), b2vec2(worldPt), wake);
+    };
+    api.applyAngularImpulse = [](PhysBody2D* body, float impulse, bool wake) {
+        body->b->ApplyAngularImpulse(-impulse, true);
     };
     api.applyForce = [](PhysBody2D* body, const vec2_t& force, const vec2_t& worldPt, bool wake) {
         body->b->ApplyForce(b2vec2(force), b2vec2(worldPt), wake);
@@ -1048,6 +1081,7 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     };
 
     api.rayCast = box2dRayCast;
+    api.queryShapeCircle = box2dQueryShapeCircle;
     api.getMassCenter = [](PhysBody2D* body)->vec2_t {
         b2MassData massData;
         body->b->GetMassData(&massData);
@@ -1063,6 +1097,9 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
         b2MassData massData;
         body->b->GetMassData(&massData);
         return massData.mass;
+    };
+    api.getInertia = [](PhysBody2D* body)->float {
+        return body->b->GetInertia();
     };
 
     static_assert(b2_maxManifoldPoints >= 2, "Manifold points mistmatch");

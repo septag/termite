@@ -1,7 +1,7 @@
 #pragma once
 
 #include "bx/allocator.h"
-#include "bx/fpumath.h"
+#include "vec_math.h"
 
 namespace termite
 {
@@ -115,6 +115,7 @@ namespace termite
         }
     }
 
+    // Like fwave, but with saw-tooth like shape (drops fast after 0.5)
     inline float fwave2(float _time, float _gain)
     {
         if (_time < 0.5f) {
@@ -123,5 +124,24 @@ namespace termite
             return 1.0f - bx::fbias(_time * 2.0f - 1.0f, _gain);
         }
     }
+
+    inline vec2_t bezierCubic(const vec2_t pts[4], float t)
+    {
+        float ti = 1.0f - t;
+        float ti2 = ti*ti;
+        float ti3 = ti2*ti;
+
+        vec2_t p = pts[0]*ti3 + pts[1]*3.0f*ti2*t + pts[2]*3.0f*ti*t*t + pts[3]*t*t*t;
+        return p;
+    }
+
+    inline vec2_t bezierQuadric(const vec2_t pts[3], float t)
+    {
+        float ti = 1.0f - t;
+
+        vec2_t p = pts[0]*ti*ti + pts[1]*2.0f*ti*t + pts[2]*t*t;
+        return p;
+    }
+
 } // namespace termite
 

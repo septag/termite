@@ -12,6 +12,8 @@
 
 #include "Remotery.h"
 
+#include "imgui_custom_controls.h"
+
 using namespace termite;
 
 static void* getImGuiApi0()
@@ -246,6 +248,10 @@ static void* getImGuiApi0()
     api.recomposeMatrixFromComponents = ImGuizmo::RecomposeMatrixFromComponents;
     api.manipulateGuizmo = ImGuizmo::Manipulate;
     api.drawCubeGuizmo = ImGuizmo::DrawCube;
+
+    api.bezierEditor = imguiBezierEditor;
+    api.fishLayout = imguiFishLayout;
+    api.gaunt = imguiGaunt;
 
 	return &api;
 }

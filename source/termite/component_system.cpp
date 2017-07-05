@@ -237,7 +237,7 @@ void termite::destroyEntity(EntityManager* emgr, Entity ent)
                 uint16_t cHandle = COMPONENT_INSTANCE_HANDLE(handle);
                 *(ctype.dataPool.getHandleData<bool>(3, cHandle)) = false;
                 if (ctype.callbacks.setActive)
-                    ctype.callbacks.setActive(handle, ctype.dataPool.getHandleData(1, cHandle), false);
+                    ctype.callbacks.setActive(handle, ctype.dataPool.getHandleData(1, cHandle), false, 0);
             }
 
             emgr->deactiveTable.remove(entIdx, node);
@@ -274,7 +274,7 @@ bool termite::isEntityAlive(EntityManager* emgr, Entity ent)
     return emgr->generations[ent.getIndex()] == ent.getGeneration();
 }
 
-void termite::setEntityActive(Entity ent, bool active)
+void termite::setEntityActive(Entity ent, bool active, uint32_t flags)
 {
     const int maxHandles = 100;
     ComponentHandle* handles = (ComponentHandle*)alloca(maxHandles*sizeof(ComponentHandle));
@@ -287,7 +287,7 @@ void termite::setEntityActive(Entity ent, bool active)
         if (prevActive != active) {
             *ctype.dataPool.getHandleData<bool>(3, cHandle) = active;
             if (ctype.callbacks.setActive)
-                ctype.callbacks.setActive(handles[i], ctype.dataPool.getHandleData(1, handles[i]), active);
+                ctype.callbacks.setActive(handles[i], ctype.dataPool.getHandleData(1, handles[i]), active, flags);
 
             ComponentGroupHandle groupHandle = *ctype.dataPool.getHandleData<ComponentGroupHandle>(2, cHandle);
             if (groupHandle.isValid()) {
@@ -595,6 +595,48 @@ void termite::runComponentGroup(ComponentUpdateStage::Enum stage, ComponentGroup
         const ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(group->components[batch.index])];
         if (ctype.callbacks.updateStageFn[stage])
             ctype.callbacks.updateStageFn[stage](group->components.itemPtr(batch.index), batch.count, dt);
+    }
+}
+
+void termite::debugComponents(ImGuiApi_v0* imgui, void* userData)
+{
+    for (int i = 0, c = g_csys->components.getCount(); i < c; i++) {
+        const ComponentType& ctype = g_csys->components[i];
+        if (ctype.callbacks.debug) {
+            uint16_t count = ctype.dataPool.getCount();
+            if (count > 0) {
+                ComponentHandle* handles = (ComponentHandle*)alloca(count*sizeof(ComponentHandle));
+                if (!handles) {
+                    handles = (ComponentHandle*)BX_ALLOC(getTempAlloc(), sizeof(ComponentHandle)*count);
+                    if (!handles)
+                        return;
+                }
+
+                for (int k = 0; k < count; k++)
+                    handles[k] = COMPONENT_MAKE_HANDLE(i, ctype.dataPool.handleAt(k));
+                ctype.callbacks.debug(handles, count, imgui, userData);
+            }
+        }
+    }
+}
+
+void termite::debugComponentType(ComponentTypeHandle typeHandle, ImGuiApi_v0* imgui, void* userData)
+{
+    const ComponentType& ctype = g_csys->components[typeHandle.value];
+    if (ctype.callbacks.debug) {
+        uint16_t count = ctype.dataPool.getCount();
+        if (count > 0) {
+            ComponentHandle* handles = (ComponentHandle*)alloca(count*sizeof(ComponentHandle));
+            if (!handles) {
+                handles = (ComponentHandle*)BX_ALLOC(getTempAlloc(), sizeof(ComponentHandle)*count);
+                if (!handles)
+                    return;
+            }
+
+            for (int k = 0; k < count; k++)
+                handles[k] = COMPONENT_MAKE_HANDLE(typeHandle.value, ctype.dataPool.handleAt(k));
+            ctype.callbacks.debug(handles, count, imgui, userData);
+        }
     }
 }
 
