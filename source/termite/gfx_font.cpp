@@ -945,7 +945,6 @@ namespace termite
         }
         
         Font* font = getResourcePtr<Font>(batch->fontHandle);
-        float ratio = float(font->charWidth) / float(font->lineHeight);
         
         vec2_t texSize = vec2f(font->scaleW, font->scaleH);
         int len = (int)strlen(text);
@@ -976,14 +975,6 @@ namespace termite
         int indexIdx = 0;
         int maxVerts = len*4;
         float x = 0;
-        vec2_t offsetPos = vec2f(0, 0);
-        float xpadding = 0;
-        /*
-        if (font->flags & FontFlags::DistantField) {
-            offsetPos.y -= float(font->spacing[1]);
-            xpadding = font->padding[0];
-        }
-        */
 
         int firstVertIdx = batch->numChars*4;
         TextVertex* verts = batch->verts + firstVertIdx;
@@ -1082,7 +1073,7 @@ namespace termite
         char text[256];
         va_list args;
         va_start(args, fmt);
-        int w = bx::vsnprintf(text, sizeof(text), fmt, args);
+        bx::vsnprintf(text, sizeof(text), fmt, args);
         va_end(args);
 
         addText(batch, color, scale, rectFit, align, text);

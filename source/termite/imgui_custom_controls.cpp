@@ -14,14 +14,12 @@ namespace termite
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         ImVec2 curvePos = ImGui::GetCursorScreenPos();
         ImVec2 curveSize = ImGui::GetContentRegionAvail();
-        ImGuiID id = ImGui::GetCurrentWindow()->GetID(strId);
 
         if (size.x > 0)
             curveSize.x = size.x;
         if (size.y > 0)
             curveSize.y = size.y;
 
-        ImVec2 ctrlSize = curveSize;
         if (curveSize.x < 50.0f)
             curveSize.x = 50.0f;
         if (curveSize.y < 50.0f)
@@ -75,7 +73,6 @@ namespace termite
         //bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held, 0);
         if (ImGui::IsItemHovered()) {
             if (ImGui::IsMouseDown(0)) {
-                ImVec2 mousePos = ImGui::GetCursorScreenPos();
                 if (bezier->selectedPt == -1) {
                     for (int i = 0; i < 4; i++) {
                         if (ImGui::IsMouseHoveringRect(ImVec2(cps[i].x - hsize, cps[i].y - hsize),

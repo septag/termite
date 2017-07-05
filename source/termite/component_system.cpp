@@ -447,7 +447,6 @@ void termite::garbageCollectComponentsAggressive(EntityManager* emgr)
 
     bx::Array<DestroyItem> destroyArr;
     destroyArr.create(100, 100, getTempAlloc());
-    int index = 0;
 
     for (int i = 0, c = g_csys->components.getCount(); i < c; i++) {
         ComponentType& ctype = g_csys->components[i];

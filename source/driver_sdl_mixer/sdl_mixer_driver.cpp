@@ -107,8 +107,6 @@ static result_t mixerInit(AudioFreq::Enum freq/* = AudioFreq::Freq22Khz*/,
     g_mixer.core->registerResourceType("sound", &g_mixer.loader, 0, uintptr_t(g_mixer.failChunk), 0);
     g_mixer.core->registerResourceType("music", &g_mixer.musLoader, 0, 0, 0);
 
-    uint32_t itemSize = (uint32_t)sizeof(MusicData);
-
     return 0;
 }
 

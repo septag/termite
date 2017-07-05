@@ -1015,7 +1015,6 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     };
 
     SortedSprite* sortedSprites = (SortedSprite*)BX_ALLOC(tmpAlloc, sizeof(SortedSprite)*numSprites);
-    size_t s = sizeof(Sprite);
     for (int i = 0; i < numSprites; i++) {
         const SpriteFrame& frame = sprites[i]->getCurFrame();
         sortedSprites[i].index = i;
@@ -1122,7 +1121,6 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     uint32_t prevKey = UINT32_MAX;
     Batch* curBatch = nullptr;
     for (int i = 0; i < numSprites; i++) {
-        Sprite* sprite = sortedSprites[i].sprite;
         uint32_t batchKey = SPRITE_KEY_GET_BATCH(sortedSprites[i].key);
         if (batchKey != prevKey) {
             curBatch = batches.push();

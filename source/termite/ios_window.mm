@@ -1,4 +1,5 @@
 #include <UIKit/UIKit.h>
+#include <AVFoundation/AVFoundation.h>
 #include "vec_math.h"
 
 void* iosCreateNativeLayer(void* wnd)
@@ -21,4 +22,10 @@ termite::vec2_t iosGetScreenSize()
     CGFloat screenScale = [[UIScreen mainScreen] scale];
     
     return termite::vec2f(screenBounds.size.width*screenScale, screenBounds.size.height*screenScale);
+}
+
+void iosTurnOnAudioSession()
+{
+    [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback withOptions:AVAudioSessionCategoryOptionMixWithOthers error:nil];
+    [[AVAudioSession sharedInstance] setActive:true error:nil];
 }
