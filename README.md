@@ -23,6 +23,10 @@ My strategy is to provide various low-level building blocks that is used to buil
 - ImGui wrapper/renderer for tools development
 - General purpose Scene-Management state machine for load/unload/transitioning between multiple scenes.
 
+Here is a shot from my own game _fisherboy_ editor running on _termite_:  
+![Fisherboy](https://raw.githubusercontent.com/septag/termite/master/wiki/img/fisherboy.jpg)
+
+
 ## Supported Platforms
 Note that the engine is in heavy development, and some of them may be broken on latest commits. Currently I'm developing my game on Windows/android/iOS, so these platforms will likely build successfully.  
 
