@@ -35,8 +35,8 @@ namespace termite
     {
         bx::AllocatorI* alloc;
         BackbufferRatio::Enum ratio;
-        float width;
-        float height;
+        uint16_t width;
+        uint16_t height;
         vec4_t kernel[BLUR_KERNEL_SIZE];
         FrameBufferHandle fbs[2];
         TextureHandle textures[2];
@@ -59,8 +59,8 @@ namespace termite
         UniformHandle uVignetteParams;
         UniformHandle uSepiaParams;
 
-        float width;
-        float height;
+        uint16_t width;
+        uint16_t height;
         float radius;
         float softness;     // Vignette softness, 0 ~ 0.5
         float vignetteIntensity;
@@ -227,29 +227,11 @@ namespace termite
         return driver->createProgram(vs, fs, true);
     }
 
-    void blitToBackbuffer(uint8_t viewId, TextureHandle texture)
+    void blitToFramebuffer(uint8_t viewId, TextureHandle texture)
     {
         assert(texture.isValid());
 
         GfxDriverApi* driver = g_gutils->driver;
-
-        driver->setViewRectRatio(viewId, 0, 0, BackbufferRatio::Equal);
-        driver->setViewFrameBuffer(viewId, FrameBufferHandle());
-
-        driver->setState(GfxState::RGBWrite | GfxState::AlphaWrite, 0);
-        driver->setTexture(0, g_gutils->uTexture, texture, TextureFlag::FromTexture);
-        drawFullscreenQuad(viewId, g_gutils->blitProg);
-    }
-
-    void blitToFramebuffer(uint8_t viewId, FrameBufferHandle framebuffer, BackbufferRatio::Enum ratio, TextureHandle texture)
-    {
-        assert(framebuffer.isValid());
-        assert(texture.isValid());
-
-        GfxDriverApi* driver = g_gutils->driver;
-
-        driver->setViewRectRatio(viewId, 0, 0, ratio);
-        driver->setViewFrameBuffer(viewId, framebuffer);
 
         driver->setState(GfxState::RGBWrite | GfxState::AlphaWrite, 0);
         driver->setTexture(0, g_gutils->uTexture, texture, TextureFlag::FromTexture);
@@ -287,7 +269,7 @@ namespace termite
         return vec2i(int(w), int(h));
     }
 
-    PostProcessBlur* createBlurPostProcess(bx::AllocatorI* alloc, BackbufferRatio::Enum ratio, float stdDev,
+    PostProcessBlur* createBlurPostProcess(bx::AllocatorI* alloc, uint16_t width, uint16_t height, float stdDev,
                                            TextureFormat::Enum fmt /*= TextureFormat::RGBA8*/)
     {
         PostProcessBlur* blur = BX_NEW(alloc, PostProcessBlur)(alloc);
@@ -296,51 +278,17 @@ namespace termite
 
         GfxDriverApi* driver = g_gutils->driver;
         for (int i = 0; i < 2; i++) {
-            blur->fbs[i] = driver->createFrameBufferRatio(ratio, fmt,
-                                                          TextureFlag::RT |
-                                                          TextureFlag::MagPoint | TextureFlag::MinPoint |
-                                                          TextureFlag::U_Clamp | TextureFlag::V_Clamp);
+            blur->fbs[i] = driver->createFrameBuffer(width, height, fmt,
+                                                     TextureFlag::RT |
+                                                     TextureFlag::MagPoint | TextureFlag::MinPoint |
+                                                     TextureFlag::U_Clamp | TextureFlag::V_Clamp);
             assert(blur->fbs[i].isValid());
             blur->textures[i] = driver->getFrameBufferTexture(blur->fbs[i], 0);
         }
 
-        const Config& conf = getConfig();
-        uint16_t width = conf.gfxWidth;
-        uint16_t height = conf.gfxHeight;
-        switch (ratio) {
-        case BackbufferRatio::Half:
-            width >>= 1;
-            height >>= 1;
-            break;
-
-        case BackbufferRatio::Quarter:
-            width >>= 2;
-            height >>= 2;
-            break;
-
-        case BackbufferRatio::Eighth:
-            width >>= 3;
-            height >>= 3;
-            break;
-
-        case BackbufferRatio::Sixteenth:
-            width >>= 4;
-            height >>= 4;
-            break;
-
-        case BackbufferRatio::Double:
-            width <<= 1;
-            height <<= 1;
-            break;
-
-        default:
-            break;
-        }
-
         calcGaussKernel(blur->kernel, BLUR_KERNEL_SIZE, stdDev, 1.0f);
-        blur->ratio = ratio;
-        blur->width = float(width);
-        blur->height = float(height);
+        blur->width = width;
+        blur->height = height;
 
         blur->prog = driver->createProgram(
             driver->createShader(driver->makeRef(blur_vso, sizeof(blur_vso), nullptr, nullptr)),
@@ -358,12 +306,14 @@ namespace termite
         GfxDriverApi* driver = g_gutils->driver;
 
         // Downsample to our first blur frameBuffer
-        blitToFramebuffer(vid, blur->fbs[0], blur->ratio, sourceTexture);
+        driver->setViewFrameBuffer(vid, blur->fbs[0]);
+        driver->setViewRect(vid, 0, 0, blur->width, blur->height);
+        blitToFramebuffer(vid, sourceTexture);
         vid++;
 
         vec4_t kernel[BLUR_KERNEL_SIZE];
-        float hRadius = radius / blur->width;
-        float vRadius = radius / blur->height;
+        float hRadius = radius / float(blur->width);
+        float vRadius = radius / float(blur->height);
 
         // Blur horizontally to 2nd framebuffer
         memcpy(kernel, blur->kernel, sizeof(kernel));
@@ -372,7 +322,7 @@ namespace termite
             kernel[i].y = 0;
         }
 
-        driver->setViewRectRatio(vid, 0, 0, blur->ratio);
+        driver->setViewRect(vid, 0, 0, blur->width, blur->height);
         driver->setViewFrameBuffer(vid, blur->fbs[1]);
         driver->setState(GfxState::RGBWrite, 0);
         driver->setTexture(0, blur->uTexture, blur->textures[0], TextureFlag::FromTexture);
@@ -386,7 +336,7 @@ namespace termite
             kernel[i].x = 0;
             kernel[i].y *= vRadius;
         }
-        driver->setViewRectRatio(vid, 0, 0, blur->ratio);
+        driver->setViewRect(vid, 0, 0, blur->width, blur->height);
         driver->setViewFrameBuffer(vid, blur->fbs[0]);
         driver->setState(GfxState::RGBWrite, 0);
         driver->setTexture(0, blur->uTexture, blur->textures[1], TextureFlag::FromTexture);
@@ -431,8 +381,8 @@ namespace termite
         GfxDriverApi* driver = g_gutils->driver;
 
         PostProcessVignetteSepia* vignette = BX_NEW(alloc, PostProcessVignetteSepia)(alloc);
-        vignette->width = float(width);
-        vignette->height = float(height);
+        vignette->width = width;
+        vignette->height = height;
         vignette->radius = radius;
         vignette->softness = bx::fclamp(softness, 0, 0.5f);
         vignette->sepiaColor = colorToVec4(sepiaColor);
@@ -457,14 +407,11 @@ namespace termite
     {
         GfxDriverApi* driver = g_gutils->driver;
 
-        float w = vignette->width;
-        float h = vignette->height;
-
         vec4_t vigParams = vec4f(vignette->radius, vignette->softness, intensity*vignette->vignetteIntensity, 0);
         vec4_t sepiaParams = vec4f(vignette->sepiaColor.x, vignette->sepiaColor.y, vignette->sepiaColor.z, 
                                    intensity*vignette->sepiaIntensity);
 
-        driver->setViewRect(viewId, 0, 0, uint16_t(w), uint16_t(h));
+        driver->setViewRect(viewId, 0, 0, vignette->width, vignette->height);
         driver->setViewFrameBuffer(viewId, targetFb);
         driver->setState(GfxState::RGBWrite, 0);
         driver->setTexture(0, vignette->uTexture, sourceTexture, TextureFlag::FromTexture);

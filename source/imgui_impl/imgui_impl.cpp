@@ -148,7 +148,7 @@ static void imguiDrawLists(ImDrawData* data)
     }
 }
 
-int termite::initImGui(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, GfxDriverApi* driver,
+int termite::initImGui(uint8_t viewId, GfxDriverApi* driver,
 					   bx::AllocatorI* alloc, const int* keymap, const char* iniFilename, void* nativeWindowHandle)
 {
     if (g_Im) {
@@ -184,7 +184,7 @@ int termite::initImGui(uint8_t viewId, uint16_t viewWidth, uint16_t viewHeight, 
 
     // Setup ImGui
     ImGuiIO& conf = ImGui::GetIO();
-    conf.DisplaySize = ImVec2((float)viewWidth, (float)viewHeight);
+    conf.DisplaySize = ImVec2(100, 100);
     conf.IniFilename = (iniFilename == nullptr || iniFilename[0] == 0) ? "imgui.ini" : iniFilename;
     conf.RenderDrawListsFn = imguiDrawLists;
     conf.MemAllocFn = imguiAlloc;

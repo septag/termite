@@ -240,6 +240,10 @@ static void* getImGuiApi0()
     api.isWindowFocused = ImGui::IsWindowFocused;
     api.isRootWindowOrAnyChildFocused = ImGui::IsRootWindowOrAnyChildFocused;
     api.isRootWindowFocused = ImGui::IsRootWindowFocused;
+    api.isMouseClicked = ImGui::IsMouseClicked;
+    api.isMouseDoubleClicked = ImGui::IsMouseDoubleClicked;
+    api.isAnyItemActive = ImGui::IsAnyItemActive;
+    api.isAnyItemHovered = ImGui::IsAnyItemHovered;
 
     api.isOverGuizmo = ImGuizmo::IsOver;
     api.isUsingGuizmo = ImGuizmo::IsUsing;

@@ -147,8 +147,8 @@ namespace termite
         if (ctrlSize.y < 50.0f)
             ctrlSize.y = 50.0f;
 
-        float logicalWidth = layout->padding.x*2.0f + cellLS*3.0f;
-        float logicalHeight = layout->padding.y*2.0f + cellLS*3.0f;
+        float logicalWidth = layout->padding.x*3.0f + cellLS*4.0f;
+        float logicalHeight = layout->padding.y*3.0f + cellLS*4.0f;
         float cellWidth = (cellLS/logicalWidth)*ctrlSize.x;
         float cellHeight = (cellLS/logicalHeight)*ctrlSize.y;
         ImVec2 padding = ImVec2((layout->padding.x / logicalWidth)*ctrlSize.x,
@@ -165,9 +165,9 @@ namespace termite
             mouseDown[0] = ImGui::IsMouseDown(0);
             mouseDown[1] = ImGui::IsMouseDown(1);
 
-            for (int i = 0; i < 9; i++) {
-                float ix = float(i%3);
-                float iy = float(i/3);
+            for (int i = 0; i < 16; i++) {
+                float ix = float(i%4);
+                float iy = float(i/4);
 
                 float x = ctrlPos.x + ix*(padding.x + cellWidth);
                 float y = ctrlPos.y + iy*(padding.y + cellHeight);
@@ -183,7 +183,7 @@ namespace termite
                         if (layout->layout[i] != ImGuiFishLayout::None) {
                             layout->layout[i] = ImGuiFishLayout::None;
                         } else {
-                            for (int k = 0; k < 9; k++) {
+                            for (int k = 0; k < 16; k++) {
                                 if (layout->layout[k] == ImGuiFishLayout::EnemyFish)
                                     layout->layout[k] = ImGuiFishLayout::None;
                             }
@@ -198,12 +198,12 @@ namespace termite
         }
 
         // Cells
-        for (int i = 0; i < 9; i++) {
+        for (int i = 0; i < 16; i++) {
             if (layout->layout[i] != ImGuiFishLayout::Fish)
                 continue;
 
-            float ix = float(i%3);
-            float iy = float(i/3);
+            float ix = float(i%4);
+            float iy = float(i/4);
 
             float x = ctrlPos.x + ix*(padding.x + cellWidth);
             float y = ctrlPos.y + iy*(padding.y + cellHeight);
@@ -214,11 +214,11 @@ namespace termite
             drawList->AddRectFilled(ra, rb, ImColor(0, 110, 50));
         }
 
-        for (int i = 0; i < 9; i++) {
+        for (int i = 0; i < 16; i++) {
             if (layout->layout[i] != ImGuiFishLayout::EnemyFish)
                 continue;
-            float ix = float(i%3);
-            float iy = float(i/3);
+            float ix = float(i%4);
+            float iy = float(i/4);
 
             float x = ctrlPos.x + ix*(padding.x + cellWidth);
             float y = ctrlPos.y + iy*(padding.y + cellHeight);
@@ -229,9 +229,9 @@ namespace termite
             drawList->AddRectFilled(ra, rb, ImColor(156, 25, 0));
         }
 
-        for (int i = 0; i < 9; i++) {
-            float ix = float(i%3);
-            float iy = float(i/3);
+        for (int i = 0; i < 16; i++) {
+            float ix = float(i%4);
+            float iy = float(i/4);
 
             float x = ctrlPos.x + ix*(padding.x + cellWidth);
             float y = ctrlPos.y + iy*(padding.y + cellHeight);

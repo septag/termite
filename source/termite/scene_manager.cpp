@@ -242,7 +242,7 @@ public:
         m_finished = false;
     }
 
-    void render(float dt, uint8_t viewId, FrameBufferHandle renderFb, TextureHandle sourceTex) override
+    void render(float dt, uint8_t viewId, FrameBufferHandle renderFb, TextureHandle sourceTex, const vec2i_t& renderSize) override
     {
         m_elapsedTm += dt;
         float normTm = bx::fmin(1.0f, m_elapsedTm / m_params.duration);
@@ -250,7 +250,7 @@ public:
         uint64_t extraState = (m_mode != FadeEffect::FadeOutAlpha && m_mode != FadeEffect::FadeInAlpha) ? 0 : 
             gfxStateBlendAlpha();
         m_driver->setViewFrameBuffer(viewId, renderFb);
-        m_driver->setViewRectRatio(viewId, 0, 0, BackbufferRatio::Equal);
+        m_driver->setViewRect(viewId, 0, 0, renderSize.x, renderSize.y);
         m_driver->setState(GfxState::RGBWrite | GfxState::AlphaWrite | extraState, 0);
         m_driver->setTexture(0, m_utexture, sourceTex, TextureFlag::FromTexture);
         m_driver->setUniform(m_ufadeColor, m_params.fadeColor.f, 1);
@@ -690,7 +690,7 @@ int termite::findSceneByTag(SceneManager* mgr, Scene** pScenes, int maxScenes, u
     return count;
 }
 
-static void updateLink(SceneManager* mgr, SceneLink* link, float dt)
+static void updateLink(SceneManager* mgr, SceneLink* link, float dt, const vec2i_t& renderSize)
 {
     switch (link->state) {
     case SceneLink::InA:
@@ -702,11 +702,11 @@ static void updateLink(SceneManager* mgr, SceneLink* link, float dt)
             }
 
             if (!(link->sceneA->flags & SceneFlag::Overlay)) {
-                link->effectA->callbacks->render(dt, mgr->viewId, mgr->effectFb, mgr->mainTex);
+                link->effectA->callbacks->render(dt, mgr->viewId, mgr->effectFb, mgr->mainTex, renderSize);
                 mgr->finalFb = mgr->effectFb;
                 mgr->finalTex = mgr->effectTex;
             } else {
-                link->effectA->callbacks->render(dt, mgr->viewId, mgr->mainFb, mgr->effectTex);
+                link->effectA->callbacks->render(dt, mgr->viewId, mgr->mainFb, mgr->effectTex, renderSize);
             }
 
             if (link->effectA->callbacks->isDone()) {
@@ -715,11 +715,11 @@ static void updateLink(SceneManager* mgr, SceneLink* link, float dt)
                 link->sceneA->drawOnEffectFb = false;
 
                 link->state = SceneLink::InLoad;
-                updateLink(mgr, link, dt);
+                updateLink(mgr, link, dt, renderSize);
             }
         } else {
             link->state = SceneLink::InLoad;
-            updateLink(mgr, link, dt);
+            updateLink(mgr, link, dt, renderSize);
         }
         break;
 
@@ -757,7 +757,7 @@ static void updateLink(SceneManager* mgr, SceneLink* link, float dt)
                     removeActiveScene(mgr, link->loadScene);
                 addActiveScene(mgr, link->sceneB);
                 link->sceneB->callbacks->onEnter(link->sceneB, link->sceneA);
-                updateLink(mgr, link, dt);
+                updateLink(mgr, link, dt, renderSize);
             }                
         } else {
             updateScene(mgr, link->sceneB, dt, true);   // update sceneB until Ready
@@ -773,11 +773,11 @@ static void updateLink(SceneManager* mgr, SceneLink* link, float dt)
             }
 
             if (!(link->sceneB->flags & SceneFlag::Overlay)) {
-                link->effectB->callbacks->render(dt, mgr->viewId, mgr->effectFb, mgr->mainTex);
+                link->effectB->callbacks->render(dt, mgr->viewId, mgr->effectFb, mgr->mainTex, renderSize);
                 mgr->finalFb = mgr->effectFb;
                 mgr->finalTex = mgr->effectTex;
             } else {
-                link->effectB->callbacks->render(dt, mgr->viewId, mgr->mainFb, mgr->effectTex);
+                link->effectB->callbacks->render(dt, mgr->viewId, mgr->mainFb, mgr->effectTex, renderSize);
             }
 
             if (link->effectB->callbacks->isDone()) {
@@ -801,7 +801,7 @@ static void updateLink(SceneManager* mgr, SceneLink* link, float dt)
 }
 
 void termite::updateSceneManager(SceneManager* mgr, float dt, uint8_t* viewId,
-                                 FrameBufferHandle* pRenderFb, TextureHandle* pRenderTex)
+                                 const vec2i_t renderSize, FrameBufferHandle* pRenderFb, TextureHandle* pRenderTex)
 {
     assert(viewId);
     mgr->viewId = *viewId;
@@ -816,7 +816,7 @@ void termite::updateSceneManager(SceneManager* mgr, float dt, uint8_t* viewId,
 
     if (mgr->numActiveLinks) {
         SceneLinkHandle handle = mgr->activeLinks[0];
-        updateLink(mgr, mgr->linkPool.getHandleData<SceneLink>(0,  handle), dt);
+        updateLink(mgr, mgr->linkPool.getHandleData<SceneLink>(0,  handle), dt, renderSize);
     }
 
     *viewId = mgr->viewId;
@@ -826,17 +826,17 @@ void termite::updateSceneManager(SceneManager* mgr, float dt, uint8_t* viewId,
         *pRenderTex = mgr->finalTex;
 }
 
-void termite::startSceneManager(SceneManager* mgr, Scene* entryScene,
-                                FrameBufferHandle mainFb, TextureHandle mainTex,
-                                FrameBufferHandle effectFb, TextureHandle effectTex)
+void termite::startSceneManager(SceneManager* mgr, Scene* entryScene, FrameBufferHandle mainFb, FrameBufferHandle effectFb)
 {
     assert(entryScene);
+    GfxDriverApi* gDriver = getGfxDriver();
+
     mgr->numActiveScenes = 0;
     mgr->numActiveLinks = 0;
     mgr->mainFb = mainFb;
-    mgr->mainTex = mainTex;
+    mgr->mainTex = gDriver->getFrameBufferTexture(mainFb, 0);
     mgr->effectFb = effectFb;
-    mgr->effectTex = effectTex;
+    mgr->effectTex = gDriver->getFrameBufferTexture(effectFb, 0);
 
     // PreLoad First scene
     if (entryScene->state != Scene::Ready) {

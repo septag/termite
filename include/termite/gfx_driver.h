@@ -295,7 +295,7 @@ namespace termite
         void(*destroyOccQuery)(OcclusionQueryHandle handle);
 
         // Debug
-        void(*dbgTextClear)(uint8_t attr, bool small/* = false*/);
+        void(*dbgTextClear)(uint8_t attr, bool smallText/* = false*/);
         void(*dbgTextPrintf)(uint16_t x, uint16_t y, uint8_t attr, const char* format, ...);
         void(*dbgTextImage)(uint16_t x, uint16_t y, uint16_t width, uint16_t height, const void* data, uint16_t pitch);
     };

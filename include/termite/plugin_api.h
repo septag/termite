@@ -408,6 +408,10 @@ namespace termite
         bool (*isWindowFocused)();
         bool (*isRootWindowOrAnyChildFocused)();
         bool (*isRootWindowFocused)();
+        bool (*isMouseClicked)(int button, bool repeat);
+        bool (*isMouseDoubleClicked)(int button);
+        bool (*isAnyItemActive)();
+        bool (*isAnyItemHovered)();
 
         // ImGuizmo
         bool (*isOverGuizmo)();

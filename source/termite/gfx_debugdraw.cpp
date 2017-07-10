@@ -67,7 +67,7 @@ struct DebugDrawState
     mtx4x4_t mtx;
     vec4_t color;
     float alpha;
-    rect_t scissor;
+    recti_t scissor;
     ResourceHandle fontHandle;
     SNode snode;
 
@@ -88,7 +88,7 @@ namespace termite
         uint8_t viewId;
         bx::FixedPool<DebugDrawState> statePool;
         bx::Stack<DebugDrawState*> stateStack;
-        rect_t viewport;
+        recti_t viewport;
         ResourceHandle defaultFontHandle;
         bool readyToDraw;
         VectorGfxContext* vgCtx;
@@ -99,7 +99,7 @@ namespace termite
         {
             driver = nullptr;
             viewId = 0;
-            viewport = rectf(0, 0, 0, 0);
+            viewport = recti(0, 0, 0, 0);
             readyToDraw = false;
             vgCtx = nullptr;
             viewProjMtx = mtx4x4Ident();
@@ -147,10 +147,10 @@ struct dbgMgr
 
 static dbgMgr* g_dbg = nullptr;
 
-static bool projectToScreen(vec2_t* result, const vec3_t point, const rect_t& rect, const mtx4x4_t& viewProjMtx)
+static bool projectToScreen(vec2_t* result, const vec3_t point, const recti_t& rect, const mtx4x4_t& viewProjMtx)
 {
-    float w = rect.xmax - rect.xmin;
-    float h = rect.ymax - rect.ymin;
+    float w = float(rect.xmax - rect.xmin);
+    float h = float(rect.ymax - rect.ymin);
     float wh = w*0.5f;
     float hh = h*0.5f;
 
@@ -497,14 +497,14 @@ void termite::destroyDebugDrawContext(DebugDrawContext* ctx)
     BX_DELETE(ctx->alloc, ctx);
 }
 
-void termite::ddBegin(DebugDrawContext* ctx, uint8_t viewId, float viewWidth, float viewHeight, const mtx4x4_t& viewMtx, 
-                      const mtx4x4_t& projMtx, VectorGfxContext* vg)
+void termite::ddBegin(DebugDrawContext* ctx, uint8_t viewId, const recti_t& viewport, 
+                      const mtx4x4_t& viewMtx, const mtx4x4_t& projMtx, VectorGfxContext* vg)
 {
     assert(ctx);
     ddReset(ctx);
     ctx->viewId = viewId;
     ctx->vgCtx = vg;
-    ctx->viewport = rectf(0, 0, viewWidth, viewHeight);
+    ctx->viewport = viewport;
     ctx->readyToDraw = true;
 
     bx::mtxMul(ctx->viewProjMtx.f, viewMtx.f, projMtx.f);
@@ -514,11 +514,11 @@ void termite::ddBegin(DebugDrawContext* ctx, uint8_t viewId, float viewWidth, fl
                                  0.0f, 0.0f, 0.0f);
 
     if (vg) {
-        vgBegin(ctx->vgCtx, viewId + 1, viewWidth, viewHeight);
+        vgBegin(ctx->vgCtx, viewId + 1, viewport);
     }
 
     GfxDriverApi* driver = ctx->driver;
-    driver->setViewRectRatio(viewId, 0, 0, BackbufferRatio::Equal);
+    driver->setViewRect(viewId, viewport.xmin, viewport.ymin, viewport.xmax-viewport.xmin, viewport.ymax-viewport.ymin);
     driver->setViewTransform(viewId, viewMtx.f, projMtx.f, GfxViewFlag::Stereo, nullptr);
 }
 
@@ -619,7 +619,7 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spaci
     spacing = bx::fceil(bx::fclamp(spacing, 1.0f, 20.0f));
 
     vec3_t corners[8];
-    float ratio = (ctx->viewport.xmax - ctx->viewport.xmin) / (ctx->viewport.ymax - ctx->viewport.ymin);
+    float ratio = float(ctx->viewport.xmax - ctx->viewport.xmin) / float(ctx->viewport.ymax - ctx->viewport.ymin);
     cam.calcFrustumCorners(corners, ratio, -2.0f, bx::fmin(maxDepth, cam.ffar));
 
     mtx4x4_t projToXz;

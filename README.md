@@ -1,12 +1,13 @@
-# Termite: A Lightweight multiplatform game library
-v0.3
+# Termite: A Lightweight multiplatform game framework
+v0.4
 
-_termite_ is a collection of multiplatform tools and libraries that can be used to make games and realtime applications. Currently it can not be defined as _engine_, It's more of a framework for making simple games. It's rather low-level, fast, memory and cache efficient and runs in different platforms.  
+_termite_ is a collection of multiplatform tools and libraries that can be used to make games and realtime applications. Currently it can not be defined as _engine_, It's more of a framework for making simple games from scratch. It's rather low-level, fast and memory efficient and runs in different platforms.  
+My strategy is to provide various low-level building blocks that is used to build higher level games and tools.  
 
 ## Features and Components
-- A Fast Multiplatform Base library (mostly from _bx_), various memory allocators, containers, hash tables, threading, vector math, SIMD math, sockets, logger, json parsing, etc..
+- A Fast Multiplatform Base library (forked from _bx_), various memory allocators, containers, hash tables, threading, vector math, SIMD math, sockets, logger, json parsing, etc..
 - 2D Camera with zoom/pan. Simple First Person 3D Camera
-- Command System for making Undo/Redo system in editors
+- Command System for making Undo/Redo system in tools pipeline
 - Error Reporting
 - Event Dispatcher (loading, timers, ...)
 - Debug Drawing 2D/3D
@@ -18,14 +19,18 @@ _termite_ is a collection of multiplatform tools and libraries that can be used 
 - Tag based Memory pools (Naghty Dog GDC 2015)
 - Progressive Scene Loader
 - Sprites and Texture animations with support for [TexturePacker](https://www.codeandweb.com/texturepacker) spritesheets
-
+- Simple 2D sound (wav/ogg) support through SDL_mixer
+- ImGui wrapper/renderer for tools development
+- General purpose Scene-Management state machine for load/unload/transitioning between multiple scenes.
 
 ## Supported Platforms
+Note that the engine is in heavy development, and some of them may be broken on latest commits. Currently I'm developing my game on Windows/android/iOS, so these platforms will likely build successfully.  
+
 - Windows: Tested on Windows10 + Visual Studio 2015
 - Linux: Tested on Ubuntu
 - MacOS: Tested on MacOS Sierra
 - Android: Tested on KitKat 4.4
-- OSX: WIP
+- iOS: Tested on iOS 10.0
 
 ## Build
 _Termite_ uses [cmake](https://cmake.org) build system, so you have to install cmake on your host computer in order be able to build. 
@@ -81,8 +86,9 @@ Currently there are two test apps and sources are under ```tests``` directory:
 
 ## Open Source Libraries
 - [__Bgfx__](https://github.com/bkaradzic/bgfx) Low-level graphics.
-- [__libuv__](https://github.com/libuv/libuv) AsyncIO
+- [__libuv__](https://github.com/libuv/libuv) AsyncIO for PC platforms
 - [__SDL2__](https://www.libsdl.org) Window and input
+- [__SDL_mixer__](https://www.libsdl.org/projects/SDL_mixer/) 2D sound library
 - [__NanoVg__](https://github.com/memononen/nanovg) Vector based debug drawing
 - [__ImGui__](https://github.com/ocornut/imgui) Debugging and Tools GUI
 - [__Assimp__](http://www.assimp.org/) 3D model importing

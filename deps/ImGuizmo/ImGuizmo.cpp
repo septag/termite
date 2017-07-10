@@ -958,8 +958,8 @@ namespace ImGuizmo
          // draw axis
          if (belowAxisLimit)
          {
-            ImVec2 baseSSpace = worldToPos(dirPlaneX * 0.1f * gContext.mScreenFactor, gContext.mMVP);
-            ImVec2 worldDirSSpace = worldToPos(dirPlaneX * gContext.mScreenFactor, gContext.mMVP);
+            ImVec2 baseSSpace = worldToPos(dirPlaneX * 0.1f * gContext.mScreenFactor * 3.0f, gContext.mMVP);
+            ImVec2 worldDirSSpace = worldToPos(dirPlaneX * gContext.mScreenFactor * 3.0f, gContext.mMVP);
 
             drawList->AddLine(baseSSpace, worldDirSSpace, colors[i + 1], 6.f);
             

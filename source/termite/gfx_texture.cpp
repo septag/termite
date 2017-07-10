@@ -38,6 +38,7 @@ struct TextureLoader
     TextureLoaderAll loader;
     bx::AllocatorI* alloc;
     Texture* whiteTexture;
+    Texture* blackTexture;
     Texture* asyncBlankTexture;
     Texture* failTexture;
     GfxDriverApi* driver;
@@ -73,9 +74,6 @@ result_t termite::initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc,
     // Create a default async object (1x1 RGBA white)
     static uint32_t whitePixel = 0xffffffff;
     g_texLoader->whiteTexture = loader->texturePool.newInstance();
-    if (!g_texLoader->whiteTexture)
-        return T_ERR_OUTOFMEM;
-
     g_texLoader->whiteTexture->handle = driver->createTexture2D(1, 1, false, 1, TextureFormat::RGBA8,
         TextureFlag::U_Clamp|TextureFlag::V_Clamp|TextureFlag::MinPoint|TextureFlag::MagPoint,
         driver->makeRef(&whitePixel, sizeof(uint32_t), nullptr, nullptr));
@@ -87,6 +85,19 @@ result_t termite::initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc,
         return T_ERR_FAILED;
     }
     g_texLoader->asyncBlankTexture = g_texLoader->whiteTexture;
+
+    static uint32_t blackPixel = 0xff000000;
+    g_texLoader->blackTexture = loader->texturePool.newInstance();
+    g_texLoader->blackTexture->handle = driver->createTexture2D(1, 1, false, 1, TextureFormat::RGBA8,
+                                                                TextureFlag::U_Clamp|TextureFlag::V_Clamp|TextureFlag::MinPoint|TextureFlag::MagPoint,
+                                                                driver->makeRef(&blackPixel, sizeof(uint32_t), nullptr, nullptr));
+    g_texLoader->blackTexture->info.width = 1;
+    g_texLoader->blackTexture->info.height = 1;
+    g_texLoader->blackTexture->info.format = TextureFormat::RGBA8;
+    if (!g_texLoader->blackTexture->handle.isValid()) {
+        T_ERROR("Creating Blank 1x1 texture failed");
+        return T_ERR_FAILED;
+    }
 
     // Fail texture (Checkers 2x2)
     static uint32_t checkerPixels[] = {
@@ -130,6 +141,11 @@ void termite::shutdownTextureLoader()
             g_texLoader->driver->destroyTexture(g_texLoader->whiteTexture->handle);
     }
 
+    if (g_texLoader->blackTexture) {
+        if (g_texLoader->blackTexture->handle.isValid())
+            g_texLoader->driver->destroyTexture(g_texLoader->blackTexture->handle);
+    }
+
     if (g_texLoader->failTexture) {
         if (g_texLoader->failTexture->handle.isValid())
             g_texLoader->driver->destroyTexture(g_texLoader->failTexture->handle);
@@ -144,6 +160,11 @@ void termite::shutdownTextureLoader()
 TextureHandle termite::getWhiteTexture1x1()
 {
     return g_texLoader->whiteTexture->handle;
+}
+
+termite::TextureHandle termite::getBlackTexture1x1()
+{
+    return g_texLoader->blackTexture->handle;
 }
 
 bool termite::blitRawPixels(uint8_t* dest, int destX, int destY, int destWidth, int destHeight, const uint8_t* src, 

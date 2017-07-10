@@ -96,7 +96,7 @@ namespace termite
         virtual bool create() = 0;
         virtual void destroy() = 0;
         virtual void begin(const void* params, uint8_t viewId) = 0;
-        virtual void render(float dt, uint8_t viewId, FrameBufferHandle renderFb, TextureHandle srcTex) = 0;
+        virtual void render(float dt, uint8_t viewId, FrameBufferHandle renderFb, TextureHandle srcTex, const vec2i_t& renderSize) = 0;
         virtual void end() = 0;
         virtual bool isDone() const = 0;
     };
@@ -130,10 +130,10 @@ namespace termite
 
     // 
     TERMITE_API void updateSceneManager(SceneManager* mgr, float dt, uint8_t* viewId,
+                                        const vec2i_t renderSize,
                                         FrameBufferHandle* pRenderFb = nullptr, TextureHandle* pRenderTex = nullptr);
     TERMITE_API void startSceneManager(SceneManager* mgr, Scene* entryScene, 
-                                       FrameBufferHandle mainFb, TextureHandle mainTex,
-                                       FrameBufferHandle effectFb, TextureHandle effectTex);
+                                       FrameBufferHandle mainFb, FrameBufferHandle effectFb);
     TERMITE_API void debugSceneManager(SceneManager* mgr);
 
     // "FadeIn"/"FadeOut" Effect Params

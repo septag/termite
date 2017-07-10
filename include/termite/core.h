@@ -179,6 +179,7 @@ namespace termite
     TERMITE_API void resume();
     TERMITE_API bool isPaused();
     TERMITE_API void resetTempAlloc();
+    TERMITE_API void resetBackbuffer(uint16_t width, uint16_t height);
 
     TERMITE_API double getFrameTime();
     TERMITE_API double getElapsedTime();

@@ -41,7 +41,7 @@ namespace termite
         };
 
         ImVec2 padding;
-        LayoutState layout[9];
+        LayoutState layout[16];
         bool mouseDown[2];
 
         ImGuiFishLayout()

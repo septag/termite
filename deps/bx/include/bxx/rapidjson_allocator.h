@@ -1,9 +1,11 @@
 #pragma once
 
+#include <algorithm>
 #include "bx/allocator.h"
 
 #include "rapidjson/allocators.h"
 #include "rapidjson/stringbuffer.h"
+#include "rapidjson/document.h"
 
 namespace rapidjson
 {
@@ -45,7 +47,7 @@ namespace rapidjson
     class BxAllocatorStatic
     {
     public:
-        static const bool kNeedFree = false;
+        static const bool kNeedFree = true;
         static bx::AllocatorI* Alloc;
 
         BxAllocatorStatic()
@@ -78,8 +80,14 @@ namespace rapidjson
     typedef GenericDocument<UTF8<>, MemoryPoolAllocator<BxAllocatorNoFree>, BxAllocatorNoFree> BxDocument;
     typedef GenericValue<UTF8<>, MemoryPoolAllocator<BxAllocatorNoFree>> BxValue;
     typedef GenericStringBuffer<UTF8<>, BxAllocatorNoFree> BxStringBuffer;
+
+    typedef MemoryPoolAllocator<BxAllocatorStatic> BxsAllocator;
+    typedef GenericDocument<UTF8<>, MemoryPoolAllocator<BxAllocatorStatic>, BxAllocatorStatic> BxsDocument;
+    typedef GenericValue<UTF8<>, MemoryPoolAllocator<BxAllocatorStatic>> BxsValue;
+    typedef GenericStringBuffer<UTF8<>, BxAllocatorStatic> BxsStringBuffer;
     
-    inline void getFloatArray(const BxValue& jvalue, float* f, int num)
+    template <typename _T> 
+    void getFloatArray(const _T& jvalue, float* f, int num)
     {
         assert(jvalue.IsArray());
         num = std::min<int>(jvalue.Size(), num);
@@ -87,7 +95,8 @@ namespace rapidjson
             f[i] = jvalue[i].GetFloat();
     }
 
-    inline void getIntArray(const BxValue& jvalue, int* n, int num)
+    template <typename _T>
+    inline void getIntArray(const _T& jvalue, int* n, int num)
     {
         assert(jvalue.IsArray());
         num = std::min<int>(jvalue.Size(), num);
@@ -95,19 +104,21 @@ namespace rapidjson
             n[i] = jvalue[i].GetInt();
     }
 
-    inline BxValue createFloatArray(const float* f, int num, BxDocument::AllocatorType& alloc)
+    template <typename _T, typename _AllocT>
+    _T createFloatArray(const float* f, int num, _AllocT& alloc)
     {
-        BxValue value(kArrayType);
+        _T value(kArrayType);
         for (int i = 0; i < num; i++)
-            value.PushBack(BxValue(f[i]).Move(), alloc);
+            value.PushBack(_T(f[i]).Move(), alloc);
         return value;
     }
 
-    inline BxValue createIntArray(const int* n, int num, BxDocument::AllocatorType& alloc)
+    template <typename _T, typename _AllocT>
+    _T createIntArray(const int* n, int num, _AllocT& alloc)
     {
-        BxValue value(kArrayType);
+        _T value(kArrayType);
         for (int i = 0; i < num; i++)
-            value.PushBack(BxValue(n[i]).Move(), alloc);
+            value.PushBack(_T(n[i]).Move(), alloc);
         return value;
     }
 }

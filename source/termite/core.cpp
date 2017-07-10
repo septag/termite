@@ -481,7 +481,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
         }
 
         // ImGui initialize
-        if (T_FAILED(initImGui(IMGUI_VIEWID, conf.gfxWidth, conf.gfxHeight, g_core->gfxDriver, g_alloc, conf.keymap,
+        if (T_FAILED(initImGui(IMGUI_VIEWID, g_core->gfxDriver, g_alloc, conf.keymap,
                                conf.uiIniFilename, platform ? platform->nwh : nullptr))) {
             T_ERROR("Initializing ImGui failed");
             return T_ERR_FAILED;
@@ -760,7 +760,7 @@ void termite::doFrame()
     float fdt = float(dt);
 
     if (g_core->gfxDriver) {
-        ImGui::GetIO().DeltaTime = fdt;
+        ImGui::GetIO().DeltaTime = float(dt_fp.count());
         ImGui::NewFrame();
         ImGuizmo::BeginFrame();
     }
@@ -826,6 +826,17 @@ bool termite::isPaused()
 void termite::resetTempAlloc()
 {
     g_core->tempAlloc.free();
+}
+
+void termite::resetBackbuffer(uint16_t width, uint16_t height)
+{
+    if (g_core->gfxDriver)
+        g_core->gfxDriver->reset(width, height, g_core->conf.gfxDriverFlags);
+    g_core->conf.gfxWidth = width;
+    g_core->conf.gfxHeight = height;
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.DisplaySize = ImVec2(float(width), float(height));
 }
 
 double termite::getFrameTime()
@@ -964,13 +975,15 @@ void termite::inputSendChars(const char* chars)
 {
 	ImGuiIO& io = ImGui::GetIO();
 
-	int i = 0;
+    io.AddInputCharactersUTF8(chars);
+    /*
+    int i = 0;
 	char c;
 	while ((c = chars[i++]) > 0) {
         if (c > 0 && c <  0x7f)
-		    io.AddInputCharacter((ImWchar)c);
 		i++;
 	}
+    */
 }
 
 void termite::inputSendKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl)

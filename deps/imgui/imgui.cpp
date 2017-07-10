@@ -1941,8 +1941,9 @@ void ImGui::NewFrame()
         }
     }
     memcpy(g.IO.KeysDownDurationPrev, g.IO.KeysDownDuration, sizeof(g.IO.KeysDownDuration));
-    for (int i = 0; i < IM_ARRAYSIZE(g.IO.KeysDown); i++)
+    for (int i = 0; i < IM_ARRAYSIZE(g.IO.KeysDown); i++) {
         g.IO.KeysDownDuration[i] = g.IO.KeysDown[i] ? (g.IO.KeysDownDuration[i] < 0.0f ? 0.0f : g.IO.KeysDownDuration[i] + g.IO.DeltaTime) : -1.0f;
+    }
 
     // Calculate frame-rate for the user, as a purely luxurious feature
     g.FramerateSecPerFrameAccum += g.IO.DeltaTime - g.FramerateSecPerFrame[g.FramerateSecPerFrameIdx];
@@ -2873,8 +2874,9 @@ bool ImGui::IsKeyPressed(int key_index, bool repeat)
     if (key_index < 0) return false;
     IM_ASSERT(key_index >= 0 && key_index < IM_ARRAYSIZE(g.IO.KeysDown));
     const float t = g.IO.KeysDownDuration[key_index];
-    if (t == 0.0f) //-V550
+    if (t == 0.0f) {
         return true;
+    }
 
     if (repeat && t > g.IO.KeyRepeatDelay)
     {

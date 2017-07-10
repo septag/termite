@@ -64,7 +64,7 @@ struct Batch
     int numVerts;
     int firstIdx;
     int numIndices;
-    rect_t scissorRect;
+    recti_t scissorRect;
     mtx3x3_t xformMtx;
 };
 
@@ -77,7 +77,7 @@ struct VgState
     color_t strokeColor;
     color_t fillColor;
     float alpha;
-    rect_t scissor;
+    recti_t scissor;
     ResourceHandle fontHandle;
     SNode snode;
 
@@ -109,7 +109,7 @@ namespace termite
         int numBatches;
         int maxBatches;
 
-        rect_t viewport;
+        recti_t viewport;
         ResourceHandle defaultFontHandle;
         bool readyToDraw;
 
@@ -131,7 +131,7 @@ namespace termite
             maxVerts = maxBatches = 0;
             numVerts = numBatches = 0;
             numIndices = maxIndices = 0;
-            viewport = rectf(0, 0, 0, 0);
+            viewport = recti(0, 0, 0, 0);
         }
     };
 } // namespace termite
@@ -139,7 +139,7 @@ namespace termite
 struct BatchParams
 {
     mtx3x3_t mtx;
-    rect_t scissor;
+    recti_t scissor;
     color_t color;
 };
 
@@ -238,7 +238,7 @@ static void pushBatch(VectorGfxContext* ctx, DrawHandler* handler, const void* p
     bx::HashMurmur2A hasher;
     hasher.begin();
     hasher.add<uint32_t>(handler->getHash(params));
-    hasher.add<rect_t>(bparams->scissor);
+    hasher.add<recti_t>(bparams->scissor);
     hasher.add<mtx3x3_t>(bparams->mtx);
     uint32_t hash = hasher.end();
 
@@ -273,12 +273,11 @@ static void drawBatches(VectorGfxContext* ctx)
     GfxState::Bits baseState = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite;
 
     uint8_t viewId = ctx->viewId;
-    rect_t vp = ctx->viewport;
+    recti_t vp = ctx->viewport;
     int numVerts = ctx->numVerts;
     int numIndices = ctx->numIndices;
 
-    driver->setViewRect(viewId, uint16_t(vp.xmin), uint16_t(vp.ymin), 
-                        uint16_t(vp.xmax - vp.xmin), uint16_t(vp.ymax - vp.ymin));
+    driver->setViewRect(viewId, vp.xmin, vp.ymin, vp.xmax - vp.xmin, vp.ymax - vp.ymin);
 
     driver->setViewTransform(viewId, ctx->viewMtx.f, ctx->projMtx.f, GfxViewFlag::Stereo, nullptr);
     driver->setViewSeq(viewId, true);
@@ -309,10 +308,10 @@ static void drawBatches(VectorGfxContext* ctx)
                                      xf.m31, xf.m32, 0.0f);
         driver->setTransform(&worldMtx, 1);
         driver->setState(state, 0);
-        driver->setScissor(uint16_t(batch.scissorRect.xmin),
-                           uint16_t(batch.scissorRect.ymin),
-                           uint16_t(batch.scissorRect.xmax - batch.scissorRect.xmin),
-                           uint16_t(batch.scissorRect.ymax - batch.scissorRect.ymin));
+        driver->setScissor(batch.scissorRect.xmin,
+                           batch.scissorRect.ymin,
+                           batch.scissorRect.xmax - batch.scissorRect.xmin,
+                           batch.scissorRect.ymax - batch.scissorRect.ymin);
         driver->setTransientIndexBufferI(&tib, batch.firstIdx, batch.numIndices);
         driver->setTransientVertexBufferI(&tvb, 0, batch.numVerts);       
         driver->submit(viewId, ctx->program, 0, false); 
@@ -451,14 +450,14 @@ void termite::destroyVectorGfxContext(VectorGfxContext* ctx)
     BX_DELETE(ctx->alloc, ctx);
 }
 
-void termite::vgBegin(VectorGfxContext* ctx, uint8_t viewId, float viewWidth, float viewHeight,
+void termite::vgBegin(VectorGfxContext* ctx, uint8_t viewId, const recti_t& viewport,
                       const mtx4x4_t* viewMtx, const mtx4x4_t* projMtx)
 {
     assert(ctx);
     if (ctx->readyToDraw)
         return;
 
-    ctx->viewport = rectf(0, 0, viewWidth, viewHeight);
+    ctx->viewport = viewport;
     vgReset(ctx);
     ctx->numVerts = 0;
     ctx->numBatches = 0;
@@ -473,7 +472,9 @@ void termite::vgBegin(VectorGfxContext* ctx, uint8_t viewId, float viewWidth, fl
     if (projMtx)
         ctx->projMtx = *projMtx;
     else
-        bx::mtxOrtho(ctx->projMtx.f, 0, viewWidth, viewHeight, 0, -1.0f, 1.0f);
+        bx::mtxOrtho(ctx->projMtx.f, 0,
+                     float(viewport.xmax - viewport.xmin), 
+                     float(viewport.ymax - viewport.ymin), 0, -1.0f, 1.0f);
 }
 
 void termite::vgEnd(VectorGfxContext* ctx)
@@ -593,7 +594,7 @@ void termite::vgImageRect(VectorGfxContext* ctx, const rect_t& rect, const Textu
     pushBatch(ctx, &g_vg->rectHandler, &rectParams, sizeof(rectParams));
 }
 
-void termite::vgScissor(VectorGfxContext* ctx, const rect_t& rect)
+void termite::vgScissor(VectorGfxContext* ctx, const recti_t& rect)
 {
     VgState* state;
     ctx->stateStack.peek(&state);
