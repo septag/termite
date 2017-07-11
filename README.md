@@ -105,3 +105,6 @@ Currently there are two test apps and sources are under ```tests``` directory:
 - [__deboost.context__](https://github.com/septag/deboost.context) Boost's _deboostified_ fiber library (without boost dependency of course)
 - [__remotery__](https://github.com/Celtoys/Remotery) Remotery remote profiler
 - [__Box2D__](http://box2d.org/) 2D Physics library
+
+## License
+[BSD 2-clause](https://github.com/septag/termite/blob/master/LICENSE)
