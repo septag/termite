@@ -22,6 +22,8 @@ My strategy is to provide various low-level building blocks that is used to buil
 - Simple 2D sound (wav/ogg) support through SDL_mixer
 - ImGui wrapper/renderer for tools development
 - General purpose Scene-Management state machine for load/unload/transitioning between multiple scenes.
+- Remotery profiler integration
+- Box2D physics wrapper
 
 Here is a shot from my own game _fisherboy_ editor running on _termite_:  
 ![Fisherboy](https://raw.githubusercontent.com/septag/termite/master/wiki/img/fisherboy.jpg)
@@ -101,3 +103,8 @@ Currently there are two test apps and sources are under ```tests``` directory:
 - [__OpenAL Soft__](http://kcat.strangesoft.net/openal.html) Audio
 - [__stb__](https://github.com/nothings/stb) Sean Barrett's single header libraries 
 - [__deboost.context__](https://github.com/septag/deboost.context) Boost's _deboostified_ fiber library (without boost dependency of course)
+- [__remotery__](https://github.com/Celtoys/Remotery) Remotery remote profiler
+- [__Box2D__](http://box2d.org/) 2D Physics library
+
+## License
+[BSD 2-clause](https://github.com/septag/termite/blob/master/LICENSE)
