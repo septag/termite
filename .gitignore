@@ -51,6 +51,8 @@ deps/libuv_android_arm
 deps/bgfx_android
 deps/bgfx_ios_arm
 deps/sdl2_ios_arm
+deps/curl
+deps/curl_android
 
 # Compiled binaries
 *.so

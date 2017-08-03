@@ -36,7 +36,7 @@ option(USE_BOX2D "Build Box2D Physics engine" ON)
 option(BUILD_FISHERBOY "Build Fisherboy Game" OFF)
 option(USE_SDL2 "Use SDL2 with the engine" ON)
 option(USE_SDL2_MIXER "Use SDL2 Mixer sound driver, this option implies that you set USE_SDL2 too" ON)
-
+option(USE_CURL "Use Curl and OpenSSL libraries" ON)
 option(BUILD_STATIC "Force Static library builds" OFF)
 if (NOT ANDROID AND NOT IOS)
     option(USE_DISK_LITE_DRIVER "Use Disk-Lite IO Driver for PC builds. So there will be no Hot-Loading and LibUV dependency" OFF)
@@ -51,11 +51,14 @@ if (APPLE)
     option(USE_METAL "Force Use Metal Graphics API for macOS and iOS" OFF)
 endif()
 
-# Dependencies
+# Dependencies #
 
 # Run find package scripts
 if (USE_SDL2)
     include(FindSDL2)
+endif()
+if (USE_CURL)
+    include(FindCurl)
 endif()
 
 include(FindBgfx)
@@ -63,7 +66,7 @@ include(FindBgfx)
 if (BUILD_TOOLS)
     include(FindAssimp)
 endif()
-    
+
 if (NOT USE_DISK_LITE_DRIVER AND NOT ANDROID AND NOT IOS)
     include(FindLibuv)
 endif()
@@ -148,6 +151,18 @@ if (USE_SDL2)
     endif()
 endif()
 
+if (USE_CURL)
+    if (CURL_FOUND)
+        if (WIN32)
+            message(STATUS "Found Curl library")
+        else()
+            message(STATUS "Found Curl Library: ${CURL_LIBRARY}")
+        endif()
+    else()
+        message(FATAL_ERROR "Curl library not found")
+    endif()
+endif()
+
 if (BUILD_TOOLS)
     if (ASSIMP_FOUND)
         if (WIN32)
@@ -207,6 +222,10 @@ if (USE_SDL2)
     add_definitions(-Dtermite_SDL2)
 endif()
 
+if (USE_CURL)
+    add_definitions(-Dtermite_CURL)
+endif()
+
 if (USE_SDL2_MIXER AND NOT USE_SDL2)
     message(FATAL_ERROR "To use SDL2_mixer you must set USE_SDL2 option too")
 elseif (USE_SDL2_MIXER)
@@ -243,8 +262,14 @@ add_subdirectory(deps/rapidjson)
 add_subdirectory(deps/nvg)
 add_subdirectory(deps/remotery)
 add_subdirectory(deps/AHEasing)
+add_subdirectory(deps/utf8)
+add_subdirectory(deps/tiny-AES128-C)
+add_subdirectory(deps/lz4)
 if (NOT IOS)
     set_target_properties(fcontext PROPERTIES FOLDER Deps)
+endif()
+if (USE_CURL)
+    add_subdirectory(deps/restclient-cpp)
 endif()
 
 # common

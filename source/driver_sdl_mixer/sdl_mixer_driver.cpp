@@ -50,6 +50,8 @@ struct MixerWrapper
 
     SoundLoader loader;
     MusicLoader musLoader;
+    bool soundEnabled;
+    bool musicEnabled;
 
     SoundFinishedCallback soundFinishedFn;
     void* soundFinishedUserData;
@@ -68,6 +70,8 @@ struct MixerWrapper
         failChunk = nullptr;
         musicFinishedFn = nullptr;
         musicFinishedUserData = nullptr;
+        soundEnabled = true;
+        musicEnabled = true;
     }
 };
 
@@ -226,6 +230,16 @@ bool mixerIsPaused(int channelId)
     return Mix_Paused(channelId) ? true : false;
 }
 
+void mixerSetGlobalSoundEnabled(bool enabled)
+{
+    g_mixer.soundEnabled = enabled;
+}
+
+void mixerSetGlobalMusicEnabled(bool enabled)
+{
+    g_mixer.musicEnabled = enabled;
+}
+
 SoundFadeStatus::Enum mixerGetFadingStatus(int channelId)
 {
     switch (Mix_FadingChannel(channelId)) {
@@ -249,7 +263,7 @@ SoundChunkHandle mixerGetChannelChunk(int channelId)
 
 int mixerPlay(int channelId, SoundChunkHandle handle, int numLoops/* = 0*/)
 {
-    if (handle.isValid())
+    if (handle.isValid() && g_mixer.soundEnabled)
         return Mix_PlayChannel(channelId, (Mix_Chunk*)handle.value, numLoops);
     else
         return 0;
@@ -257,7 +271,7 @@ int mixerPlay(int channelId, SoundChunkHandle handle, int numLoops/* = 0*/)
 
 int mixerPlayTimed(int channelId, SoundChunkHandle handle, int numLoops/* = 0*/, int maxTimeMilli/* = -1*/)
 {
-    if (handle.isValid())
+    if (handle.isValid() && g_mixer.soundEnabled)
         return Mix_PlayChannelTimed(channelId, (Mix_Chunk*)handle.value, numLoops, maxTimeMilli);
     else
         return 0;
@@ -265,7 +279,7 @@ int mixerPlayTimed(int channelId, SoundChunkHandle handle, int numLoops/* = 0*/,
 
 int mixerPlayFadeIn(int channelId, SoundChunkHandle handle, int numLoops, int timeMilli)
 {
-    if (handle.isValid())
+    if (handle.isValid() && g_mixer.soundEnabled)
         return Mix_FadeInChannel(channelId, (Mix_Chunk*)handle.value, numLoops, timeMilli);
     else
         return 0;
@@ -273,7 +287,7 @@ int mixerPlayFadeIn(int channelId, SoundChunkHandle handle, int numLoops, int ti
 
 int mixerPlayFadeInTimed(int channelId, SoundChunkHandle handle, int numLoops/* = 0*/, int timeMilli, int maxTimeMilli/* = -1*/)
 {
-    if (handle.isValid())
+    if (handle.isValid() && g_mixer.soundEnabled)
         return Mix_FadeInChannelTimed(channelId, (Mix_Chunk*)handle.value, numLoops, timeMilli, maxTimeMilli);
     else
         return 0;
@@ -281,7 +295,7 @@ int mixerPlayFadeInTimed(int channelId, SoundChunkHandle handle, int numLoops/* 
 
 bool mixerPlayMusic(MusicHandle handle, int numLoops/* = -1*/)
 {
-    if (handle.isValid()) 
+    if (handle.isValid() && g_mixer.musicEnabled)
         return Mix_PlayMusic(((MusicData*)handle.value)->mus, numLoops) == 0 ? true : false;
     else
         return false;
@@ -289,7 +303,7 @@ bool mixerPlayMusic(MusicHandle handle, int numLoops/* = -1*/)
 
 bool mixerPlayMusicFadeIn(MusicHandle handle, int numLoops/* = -1*/, int timeMilli)
 {
-    if (handle.isValid())
+    if (handle.isValid() && g_mixer.musicEnabled)
         return Mix_FadeInMusic(((MusicData*)handle.value)->mus, numLoops, timeMilli) == 0 ? true : false;
     else
         return false;
@@ -297,7 +311,7 @@ bool mixerPlayMusicFadeIn(MusicHandle handle, int numLoops/* = -1*/, int timeMil
 
 bool mixerPlayMusicFadeInPos(MusicHandle handle, int numLoops/* = -1*/, int timeMilli, double posTime)
 {
-    if (handle.isValid())
+    if (handle.isValid() && g_mixer.musicEnabled)
         return Mix_FadeInMusicPos(((MusicData*)handle.value)->mus, numLoops, timeMilli, posTime) == 0 ? true : false;
     else
         return false;
@@ -484,6 +498,8 @@ void* initSdlMixerDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     soundApi.isMusicPlaying = mixerIsMusicPlaying;
     soundApi.isMusicPaused = mixerIsMusicPaused;
     soundApi.getMusicStatus = mixerGetMusicStatus;
+    soundApi.setGlobalMusicEnabled = mixerSetGlobalMusicEnabled;
+    soundApi.setGlobalSoundEnabled = mixerSetGlobalSoundEnabled;
 
     return &soundApi;
 }

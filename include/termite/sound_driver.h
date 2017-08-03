@@ -117,5 +117,8 @@ namespace termite
         bool(*isMusicPlaying)();
         bool(*isMusicPaused)();
         SoundFadeStatus::Enum(*getMusicStatus)();
+
+        void(*setGlobalSoundEnabled)(bool enabled);
+        void(*setGlobalMusicEnabled)(bool enabled);
     };
 };

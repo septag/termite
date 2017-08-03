@@ -30,6 +30,7 @@
 #include "physics_2d.h"
 #include "command_system.h"
 #include "sound_driver.h"
+#include "lang.h"
 
 #ifdef termite_SDL2
 #  include <SDL.h>
@@ -57,17 +58,28 @@
 #include <random>
 #include <chrono>
 
-#include "Remotery.h"
+#include "remotery/Remotery.h"
+#include "lz4/lz4.h"
+#include "tiny-AES128-c/aes.h"
 
 #define MEM_POOL_BUCKET_SIZE 256
 #define IMGUI_VIEWID 255
 #define NANOVG_VIEWID 254
 #define LOG_STRING_SIZE 256
 
+#define T_ENC_SIGN 0x54454e43        // TENC
+#define T_ENC_VERSION T_MAKE_VERSION(1, 0)       
+
+#include "bxx/rapidjson_allocator.h"
+
 using namespace termite;
 
 typedef std::chrono::high_resolution_clock TClock;
 typedef std::chrono::high_resolution_clock::time_point TClockTimePt;
+
+// default AES encryption keys
+static const uint8_t kAESKey[] = {0x32, 0xBF, 0xE7, 0x76, 0x41, 0x21, 0xF6, 0xA5, 0xEE, 0x70, 0xDC, 0xC8, 0x73, 0xBC, 0x9E, 0x37};
+static const uint8_t kAESIv[] = {0x0A, 0x2D, 0x76, 0x63, 0x9F, 0x28, 0x10, 0xCD, 0x24, 0x22, 0x26, 0x68, 0xC1, 0x5A, 0x82, 0x5A};
 
 //
 struct FrameData
@@ -96,6 +108,16 @@ struct HeapMemoryImpl
         alloc = nullptr;
     }
 };
+
+#pragma pack(push, 1)
+struct EncodeHeader
+{
+    uint32_t sign;
+    uint32_t version;
+    int decodeSize;
+    int uncompSize;
+};
+#pragma pack(pop)
 
 class GfxDriverEvents : public GfxDriverEventsI
 {
@@ -205,6 +227,9 @@ static bx::AllocatorI* g_alloc = &g_allocStub;
 static bx::Path g_dataDir;
 static bx::Path g_cacheDir;
 static Core* g_core = nullptr;
+
+// Define rapidjson static allocator 
+bx::AllocatorI* rapidjson::BxAllocatorStatic::Alloc = g_alloc;
 
 #if BX_PLATFORM_ANDROID
 #include <jni.h>
@@ -610,6 +635,8 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     BX_END_OK();
 #endif
 
+    registerLangToResourceLib();
+
     g_core->init = true;
     return 0;
 }
@@ -927,15 +954,11 @@ void termite::releaseMemoryBlock(termite::MemoryBlock* mem)
     }
 }
 
-MemoryBlock* termite::readTextFile(const char* filepath)
+MemoryBlock* termite::readTextFile(const char* absFilepath)
 {
-    const char* rootPath = g_core->ioDriver->blocking ? g_core->ioDriver->blocking->getUri() : "";
-    bx::Path fullpath(rootPath);
-    fullpath.join(filepath);
-
     bx::CrtFileReader file;
     bx::Error err;
-    if (!file.open(fullpath.cstr(), &err))
+    if (!file.open(absFilepath, &err))
         return nullptr;
     uint32_t size = (uint32_t)file.seek(0, bx::Whence::End);
 
@@ -951,6 +974,128 @@ MemoryBlock* termite::readTextFile(const char* filepath)
     file.close();
 
     return mem;
+}
+
+MemoryBlock* termite::readBinaryFile(const char* absFilepath)
+{
+    bx::CrtFileReader file;
+    bx::Error err;
+    if (!file.open(absFilepath, &err))
+        return nullptr;
+    uint32_t size = (uint32_t)file.seek(0, bx::Whence::End);
+    if (size == 0) {
+        file.close();
+        return nullptr;
+    }
+
+    MemoryBlock* mem = createMemoryBlock(size, g_alloc);
+    if (!mem) {
+        file.close();
+        return nullptr;
+    }
+
+    file.seek(0, bx::Whence::Begin);
+    file.read(mem->data, size, &err);
+    file.close();
+
+    return mem;
+}
+
+bool termite::saveBinaryFile(const char* absFilepath, const MemoryBlock* mem)
+{
+    bx::CrtFileWriter file;
+    bx::Error err;
+    if (mem->size == 0 || !file.open(absFilepath, false, &err)) {
+        return false;
+    }
+
+    int wb = file.write(mem->data, mem->size, &err);
+    file.close();
+    return wb == mem->size ? true : false;
+}
+
+MemoryBlock* termite::encodeMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
+{
+    assert(mem);
+    if (key == nullptr)
+        key = kAESKey;
+    if (iv == nullptr)
+        iv = kAESIv;
+    if (alloc == nullptr)
+        alloc = g_alloc;
+
+    EncodeHeader header;
+    header.sign = T_ENC_SIGN;
+    header.version = T_ENC_VERSION;
+    
+    // Compress LZ4
+    int maxSize = BX_ALIGN_16(LZ4_compressBound(mem->size));
+    void* compressedBuff = BX_ALLOC(alloc, maxSize);
+    if (!compressedBuff)
+        return nullptr;
+    int compressSize = LZ4_compress_default((const char*)mem->data, (char*)compressedBuff, mem->size, maxSize);
+    int alignedCompressSize = BX_ALIGN_16(compressSize);
+    assert(alignedCompressSize <= maxSize);
+    memset((uint8_t*)compressedBuff + compressSize, 0x00, alignedCompressSize - compressSize);
+
+    // AES Encode
+    MemoryBlock* encMem = createMemoryBlock(alignedCompressSize + sizeof(header), alloc);
+    if (encMem) {
+        AES_CBC_encrypt_buffer((uint8_t*)encMem->data + sizeof(header), (uint8_t*)compressedBuff, alignedCompressSize, key, iv);
+
+        // finalize header and slap it at the begining of the output buffer
+        header.decodeSize = compressSize;
+        header.uncompSize = (int)mem->size;
+        *((EncodeHeader*)encMem->data) = header;
+    }
+
+    BX_FREE(alloc, compressedBuff);
+    return encMem;
+}
+
+MemoryBlock* termite::decodeMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
+{
+    assert(mem);
+    if (key == nullptr)
+        key = kAESKey;
+    if (iv == nullptr)
+        iv = kAESIv;
+    if (alloc == nullptr)
+        alloc = g_alloc;
+
+    // AES Decode
+    const EncodeHeader header = *((const EncodeHeader*)mem->data);
+    if (header.sign != T_ENC_SIGN ||
+        header.version != T_ENC_VERSION)
+    {
+        return nullptr;
+    }
+
+    uint8_t* encBuff = (uint8_t*)mem->data + sizeof(header);
+    uint32_t encSize = mem->size - sizeof(header);
+    assert(encSize % 16 == 0);
+
+    void* decBuff = BX_ALLOC(alloc, encSize);
+    if (!decBuff)
+        return nullptr;
+    AES_CBC_decrypt_buffer((uint8_t*)decBuff, encBuff, encSize, key, iv);
+    
+    // Uncompress LZ4
+    MemoryBlock* rmem = createMemoryBlock(header.uncompSize, alloc);
+    if (rmem)
+        LZ4_decompress_safe((const char*)decBuff, (char*)rmem->data, header.decodeSize, header.uncompSize);
+
+    BX_FREE(alloc, decBuff);
+    return rmem;
+}
+
+void termite::xorCipher(uint8_t* outputBuff, uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize)
+{
+    assert(buffSize > 0);
+    assert(keySize > 0);
+    for (size_t i = 0; i < buffSize; i++) {
+        outputBuff[i] = inputBuff[i] ^ key[i % keySize];
+    }
 }
 
 float termite::getRandomFloatUniform(float a, float b)

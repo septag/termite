@@ -426,7 +426,7 @@ namespace termite
         // Customs
         void (*bezierEditor)(ImGuiBezierEd* bezier, const char* strId, const ImVec2& size, bool lockEnds, bool showText, bool showMirrorY);
         void (*fishLayout)(ImGuiFishLayout* layout, const char* strId, const ImVec2& size);
-        void (*gaunt)(const char* strId, ImVec2* values, int numValues, int changeIdx, const ImVec2& size);
+        bool (*gaunt)(const char* strId, ImVec2* values, int numValues, int* changeIdx, const ImVec2& size);
 	};
 }
 #endif

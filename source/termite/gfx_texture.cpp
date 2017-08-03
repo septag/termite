@@ -315,8 +315,8 @@ static bool loadUncompressed(const MemoryBlock* mem, const ResourceTypeParams& p
         stbi_image_free(pixels);
 
         int srcWidth = width, srcHeight = height;
-        mipWidth = width >> 1;   
-        mipHeight = height >> 1;
+        mipWidth = std::max<int>(1, width >> 1);   
+        mipHeight = std::max<int>(1, height >> 1);
         for (int i = 1; i < numMips; i++) {
             uint8_t* destPixels = srcPixels + srcWidth*srcHeight*numComp;
 

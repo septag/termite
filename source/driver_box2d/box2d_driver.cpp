@@ -44,7 +44,7 @@ public:
     {
     }
 
-    void beginDraw(NVGcontext* nvg, const Camera2D& cam, int viewWidth, int viewHeight);
+    void beginDraw(NVGcontext* nvg, const Camera2D& cam, const recti_t& viewport);
     void endDraw();
     bool intersectVerts(const b2Vec2* verts, int vertexCount) const;
     
@@ -293,7 +293,7 @@ static void stepSceneBox2d(PhysScene2D* scene, float dt)
     scene->w.Step(dt, 8, 3, 2);
 }
 
-static void debugSceneBox2d(PhysScene2D* scene, int viewWidth, int viewHeight, const Camera2D& cam,
+static void debugSceneBox2d(PhysScene2D* scene, const recti_t viewport, const Camera2D& cam,
                             PhysDebugFlags2D::Bits flags)
  {
     assert(scene);
@@ -301,7 +301,7 @@ static void debugSceneBox2d(PhysScene2D* scene, int viewWidth, int viewHeight, c
     if (g_box2d.nvg) {
         scene->debugDraw.SetFlags(flags);
         scene->w.SetDebugDraw(&scene->debugDraw);
-        scene->debugDraw.beginDraw(g_box2d.nvg, cam, viewWidth, viewHeight);
+        scene->debugDraw.beginDraw(g_box2d.nvg, cam, viewport);
         scene->w.DrawDebugData();
         scene->debugDraw.endDraw();
     }
@@ -809,11 +809,13 @@ static void box2dQueryShapeCircle(PhysScene2D* scene, float radius, const vec2_t
     scene->w.QueryAABB(&b2callback, aabb);
 }
 
-void PhysDebugDraw::beginDraw(NVGcontext* nvg, const Camera2D& cam, int viewWidth, int viewHeight)
+void PhysDebugDraw::beginDraw(NVGcontext* nvg, const Camera2D& cam, const recti_t& viewport)
 {
     assert(nvg);
     m_nvg = nvg;
-    nvgBeginFrame(nvg, viewWidth, viewHeight, 1.0f);
+    int viewWidth = viewport.xmax - viewport.xmin;
+    int viewHeight = viewport.ymax - viewport.ymin;
+    nvgBeginFrame(nvg, viewport.xmin, viewport.ymin, viewWidth, viewHeight, 1.0f);
 
     // Adjust nvg to camera
     nvgTranslate(nvg, float(viewWidth)*0.5f, float(viewHeight)*0.5f);

@@ -382,7 +382,7 @@ namespace termite
         // Returns blending coeff for interpolating between frames
         // State = currentState * alpha + prevState * (1 - alpha)
         void (*stepScene)(PhysScene2D* scene, float dt);   
-        void (*debugScene)(PhysScene2D* scene, int viewWidth, int viewHeight, const Camera2D& cam, 
+        void (*debugScene)(PhysScene2D* scene, const recti_t viewport, const Camera2D& cam, 
                            PhysDebugFlags2D::Bits flags/* = PhysDebugFlags2D::All*/);
 
         PhysBody2D* (*createBody)(PhysScene2D* scene, const PhysBodyDef2D& bodyDef);

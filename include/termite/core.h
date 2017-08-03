@@ -192,7 +192,16 @@ namespace termite
     TERMITE_API MemoryBlock* refMemoryBlock(MemoryBlock* mem);
     TERMITE_API MemoryBlock* copyMemoryBlock(const void* data, uint32_t size, bx::AllocatorI* alloc = nullptr);
     TERMITE_API void releaseMemoryBlock(MemoryBlock* mem);
-    TERMITE_API MemoryBlock* readTextFile(const char* filepath);
+
+    TERMITE_API MemoryBlock* readTextFile(const char* absFilepath);
+    TERMITE_API MemoryBlock* readBinaryFile(const char* absFilepath);
+    TERMITE_API bool saveBinaryFile(const char* absFilepath, const MemoryBlock* mem);
+
+    TERMITE_API MemoryBlock* encodeMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc = nullptr, 
+                                                const uint8_t* key = nullptr, const uint8_t* iv = nullptr);
+    TERMITE_API MemoryBlock* decodeMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc = nullptr, 
+                                                const uint8_t* key = nullptr, const uint8_t* iv = nullptr);
+    TERMITE_API void xorCipher(uint8_t* outputBuff, uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize);
 
     TERMITE_API float getRandomFloatUniform(float a, float b);
     TERMITE_API int getRandomIntUniform(int a, int b);    

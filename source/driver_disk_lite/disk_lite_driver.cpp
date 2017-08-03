@@ -8,12 +8,11 @@
 #include "bxx/pool.h"
 #include "bxx/queue.h"
 #include "bx/thread.h"
+#include "bx/mutex.h"
+#include "bx/sem.h"
 
 #define T_CORE_API
 #include "termite/plugin_api.h"
-
-#include <mutex>
-#include <condition_variable>
 
 using namespace termite;
 
@@ -42,6 +41,14 @@ struct AsyncRequest
     bx::Path uri;
     MemoryBlock* mem;
     IoPathType::Enum pathType;
+    bx::Queue<AsyncRequest*>::Node qnode;
+
+    AsyncRequest() :
+        mem(nullptr),
+        qnode(this)
+    {
+    }
+
 };
 
 struct AsyncResponse
@@ -59,6 +66,14 @@ struct AsyncResponse
     bx::Path uri;
     MemoryBlock* mem;
     size_t bytesWritten;
+    bx::Queue<AsyncResponse*>::Node qnode;
+
+    AsyncResponse() :
+        mem(nullptr),
+        bytesWritten(0),
+        qnode(this)
+    {
+    }
 };
 
 struct AsyncAssetDriver
@@ -68,29 +83,22 @@ struct AsyncAssetDriver
     bx::Thread loadThread;
     bx::Path rootDir;
 
-    bx::Pool<bx::SpScUnboundedQueuePool<AsyncRequest>::Node> requestPool;
-    bx::SpScUnboundedQueuePool<AsyncRequest>* requestQueue;
-
-    bx::Pool<bx::SpScUnboundedQueuePool<AsyncResponse>::Node> responsePool;
-    bx::SpScUnboundedQueuePool<AsyncResponse>* responseQueue;
+    bx::Mutex reqQueueMtx;
+    bx::Mutex resQueueMtx;
+    bx::Queue<AsyncRequest*> reqQueue;
+    bx::Queue<AsyncResponse*> resQueue;
 
     volatile int32_t stop;
 
-    // Used to wake-up request thread
-    int32_t numRequests;
-    std::mutex reqMutex;
-    std::condition_variable reqCv;
-
-    //bx::Semaphore semaphore;
+    bx::Semaphore reqSem;
+    bx::Pool<AsyncRequest> reqPool;
+    bx::Pool<AsyncResponse> resPool;
 
     AsyncAssetDriver()
     {
         alloc = nullptr;
         callbacks = nullptr;
-        requestQueue = nullptr;
-        responseQueue = nullptr;
         stop = 0;
-        numRequests = 0;
     }
 };
 
@@ -256,32 +264,40 @@ static const char* blockGetUri()
 static int32_t asyncThread(void* userData)
 {
     AsyncAssetDriver* driver = (AsyncAssetDriver*)userData;
-    AsyncRequest request;
-    AsyncResponse response;
 
     while (!driver->stop) {
-        while (driver->requestQueue->pop(&request)) {
-            {
-                std::lock_guard<std::mutex> lk(driver->reqMutex);
-                driver->numRequests--;
-            }
-
-            if (request.type == AsyncRequest::Read) {
-                MemoryBlock* mem = blockReadRaw(request.uri.cstr(), request.pathType, &response.type);
-                response.uri = request.uri;
-                response.mem = mem;
-                driver->responseQueue->push(response);
-            } else if (request.type == AsyncRequest::Write) {
-                size_t size = blockWriteRaw(request.uri.cstr(), request.mem, request.pathType, &response.type);
-                response.bytesWritten = size;
-                driver->responseQueue->push(response);
-            }
-        }   // dequeue all requests and process them
-
         // Wait for incoming requests
+        driver->reqSem.wait();
+
+        AsyncRequest req;
+        // Pull one request and execute it
         {
-            std::unique_lock<std::mutex> lk(driver->reqMutex);
-            driver->reqCv.wait(lk, [&driver] { return driver->numRequests > 0; });
+            bx::MutexScope mtx(driver->reqQueueMtx);
+            AsyncRequest* pReq;
+            if (!driver->reqQueue.pop(&pReq))
+                continue;
+            memcpy(&req, pReq, sizeof(AsyncRequest));
+            driver->reqPool.deleteInstance(pReq);
+        }
+
+        AsyncResponse::Type resType;
+        if (req.type == AsyncRequest::Read) {
+            MemoryBlock* mem = blockReadRaw(req.uri.cstr(), req.pathType, &resType);
+
+            bx::MutexScope mtx(driver->resQueueMtx);
+            AsyncResponse* res = driver->resPool.newInstance<>();
+            res->type = resType;
+            res->uri = req.uri;
+            res->mem = mem;
+            driver->resQueue.push(&res->qnode);
+        } else if (req.type == AsyncRequest::Write) {
+            size_t size = blockWriteRaw(req.uri.cstr(), req.mem, req.pathType, &resType);
+
+            bx::MutexScope mtx(driver->resQueueMtx);
+            AsyncResponse* res = driver->resPool.newInstance<>();
+            res->type = resType;
+            res->bytesWritten = size;
+            driver->resQueue.push(&res->qnode);
         }
     }
 
@@ -296,13 +312,11 @@ static int asyncInit(bx::AllocatorI* alloc, const char* uri, const void* params,
     g_async.callbacks = callbacks;
 
     // Initialize pools and their queues
-    if (!g_async.requestPool.create(32, alloc))
+    if (!g_async.reqPool.create(32, alloc))
         return T_ERR_OUTOFMEM;
-    g_async.requestQueue = BX_NEW(alloc, bx::SpScUnboundedQueuePool<AsyncRequest>)(&g_async.requestPool);
 
-    if (!g_async.responsePool.create(32, alloc))
+    if (!g_async.resPool.create(32, alloc))
         return T_ERR_OUTOFMEM;
-    g_async.responseQueue = BX_NEW(alloc, bx::SpScUnboundedQueuePool<AsyncResponse>)(&g_async.responsePool);
 
     // Start the load thread
     g_async.loadThread.init(asyncThread, &g_async, 128*1024, "AsyncLoadThread");
@@ -317,18 +331,11 @@ static void asyncShutdown()
     bx::AllocatorI* alloc = g_async.alloc;
     bx::atomicExchange<int32_t>(&g_async.stop, 1);
 
-    {
-        std::lock_guard<std::mutex> lk(g_async.reqMutex);
-        g_async.numRequests+=100;
-    }
-    g_async.reqCv.notify_one();
+    g_async.reqSem.post(100);
     g_async.loadThread.shutdown();
     
-    BX_DELETE(alloc, g_async.responseQueue);
-    g_async.responsePool.destroy();
-
-    BX_DELETE(alloc, g_async.requestQueue);
-    g_async.requestPool.destroy();
+    g_async.resPool.destroy();
+    g_async.reqPool.destroy();
 }
 
 static void asyncSetCallbacks(IoDriverEventsI* callbacks)
@@ -343,35 +350,31 @@ static IoDriverEventsI* asyncGetCallbacks()
 
 static MemoryBlock* asyncRead(const char* uri, IoPathType::Enum pathType)
 {
-    AsyncRequest request;
-    request.type = AsyncRequest::Read;
-    request.uri = uri;
-    request.pathType = pathType;
+    bx::MutexScope mtx(g_async.reqQueueMtx);
 
-    g_async.reqMutex.lock();
-    g_async.numRequests++;
-    g_async.reqMutex.unlock();
+    AsyncRequest* req = g_async.reqPool.newInstance<>();
+    req->type = AsyncRequest::Read;
+    req->uri = uri;
+    req->pathType = pathType;
 
-    g_async.requestQueue->push(request);
-    g_async.reqCv.notify_one();
+    g_async.reqQueue.push(&req->qnode);
+    g_async.reqSem.post();
 
     return nullptr;
 }
 
 static size_t asyncWrite(const char* uri, const MemoryBlock* mem, IoPathType::Enum pathType)
 {
-    AsyncRequest request;
-    request.type = AsyncRequest::Write;
-    request.uri = uri;
-    request.pathType = pathType;
-    request.mem = g_core->refMemoryBlock(const_cast<MemoryBlock*>(mem));
+    bx::MutexScope mtx(g_async.reqQueueMtx);
 
-    g_async.reqMutex.lock();
-    g_async.numRequests++;
-    g_async.reqMutex.unlock();
+    AsyncRequest* req = g_async.reqPool.newInstance<>();
+    req->type = AsyncRequest::Write;
+    req->uri = uri;
+    req->pathType = pathType;
+    req->mem = g_core->refMemoryBlock(const_cast<MemoryBlock*>(mem));
 
-    g_async.requestQueue->push(request);
-    g_async.reqCv.notify_one();
+    g_async.reqQueue.push(&req->qnode);
+    g_async.reqSem.post();
 
     return 0;
 }
@@ -381,26 +384,33 @@ static void asyncRunAsyncLoop()
     if (!g_async.callbacks)
         return;
 
-    AsyncResponse response;
-    while (g_async.responseQueue->pop(&response)) {
-        switch (response.type) {
+    AsyncResponse* res;
+    g_async.resQueueMtx.lock();
+    while (g_async.resQueue.pop(&res)) {
+        g_async.resQueueMtx.unlock();
+
+        switch (res->type) {
         case AsyncResponse::RequestReadOk:
-            g_async.callbacks->onReadComplete(response.uri.cstr(), response.mem);
+            g_async.callbacks->onReadComplete(res->uri.cstr(), res->mem);
             break;
         case AsyncResponse::RequestOpenFailed:
-            g_async.callbacks->onOpenError(response.uri.cstr());
+            g_async.callbacks->onOpenError(res->uri.cstr());
             break;
         case AsyncResponse::RequestReadFailed:
-            g_async.callbacks->onReadError(response.uri.cstr());
+            g_async.callbacks->onReadError(res->uri.cstr());
             break;
         case AsyncResponse::RequestWriteOk:
-            g_async.callbacks->onWriteComplete(response.uri.cstr(), response.bytesWritten);
+            g_async.callbacks->onWriteComplete(res->uri.cstr(), res->bytesWritten);
             break;
         case AsyncResponse::RequestWriteFailed:
-            g_async.callbacks->onWriteError(response.uri.cstr());
+            g_async.callbacks->onWriteError(res->uri.cstr());
             break;
         }
+
+        g_async.resQueueMtx.lock();
+        g_async.resPool.deleteInstance(res);
     }
+    g_async.resQueueMtx.unlock();
 }
 
 static IoOperationMode::Enum asyncGetOpMode()
@@ -478,9 +488,9 @@ T_PLUGIN_EXPORT void* termiteGetPluginApi(uint16_t apiId, uint32_t version)
     static PluginApi_v0 v0;
 
     if (T_VERSION_MAJOR(version) == 0) {
-        v0.init = initAndroidAssetDriver;
-        v0.shutdown = shutdownAndroidAssetDriver;
-        v0.getDesc = getAndroidAssetDriverDesc;
+        v0.init = initDiskLiteDriver;
+        v0.shutdown = shutdownDiskLiteDriver;
+        v0.getDesc = getDiskLiteDriverDesc;
         return &v0;
     } else {
         return nullptr;

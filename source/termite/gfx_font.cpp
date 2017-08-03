@@ -14,8 +14,15 @@
 #include "bxx/pool.h"
 #include "bx/string.h"
 
+#include "utf8/utf8.h"
+
 #include T_MAKE_SHADER_PATH(shaders_h, font_normal.vso)
 #include T_MAKE_SHADER_PATH(shaders_h, font_normal.fso)
+#include T_MAKE_SHADER_PATH(shaders_h, font_normal_shadow.vso)
+#include T_MAKE_SHADER_PATH(shaders_h, font_normal_shadow.fso)
+#include T_MAKE_SHADER_PATH(shaders_h, font_normal_outline.vso)
+#include T_MAKE_SHADER_PATH(shaders_h, font_normal_outline.fso)
+
 #include T_MAKE_SHADER_PATH(shaders_h, font_df.vso)
 #include T_MAKE_SHADER_PATH(shaders_h, font_df.fso)
 #include T_MAKE_SHADER_PATH(shaders_h, font_df_shadow.vso)
@@ -94,6 +101,57 @@ namespace termite
         uint32_t size;
     };
 #pragma pack(pop)
+
+    struct UnicodeReplaceRule
+    {
+        uint32_t code;
+        uint32_t after;     // If character comes after another word
+        uint32_t before;    // If character comes in before another word
+        uint32_t middle;    // if character comes in the middle
+        UnicodeReplaceRule(uint32_t _code, uint32_t _after, uint32_t _before = 0, uint32_t _middle = 0) :
+            code(_code),
+            after(_after),
+            before(_before),
+            middle(_middle)
+        {
+        }
+    };
+
+    // Persian glyph bindings
+    static const UnicodeReplaceRule kPersianGlyphs[] = {
+        UnicodeReplaceRule(1575, 65166), // Alef
+        UnicodeReplaceRule(1576, 65168, 65169, 65170), // Be
+        UnicodeReplaceRule(1662, 64343, 64344, 64345), // Pe
+        UnicodeReplaceRule(1578, 65174, 65175, 65176), // Te
+        UnicodeReplaceRule(1579, 65178, 65179, 65180), // Tse
+        UnicodeReplaceRule(1580, 65182, 65183, 65184), // jim
+        UnicodeReplaceRule(1670, 64379, 64380, 64381), // che
+        UnicodeReplaceRule(1581, 65186, 65187, 65188), // He
+        UnicodeReplaceRule(1582, 65190, 65191, 65192), // Khe
+        UnicodeReplaceRule(1583, 65194), // De
+        UnicodeReplaceRule(1584, 65196), // Dal zal
+        UnicodeReplaceRule(1585, 65198), // Re
+        UnicodeReplaceRule(1586, 65200), // Ze
+        UnicodeReplaceRule(1688, 64395), // Zhe
+        UnicodeReplaceRule(1587, 65202, 65203, 65204), // Se
+        UnicodeReplaceRule(1588, 65206, 65207, 65208), // She
+        UnicodeReplaceRule(1589, 65210, 65211, 65212), // Sa, zaad
+        UnicodeReplaceRule(1590, 65214, 65215, 65216), // Ze zaad
+        UnicodeReplaceRule(1591, 65218), // Taa daste dar
+        UnicodeReplaceRule(1592, 65222, 65223, 65224), // Ze daste dar
+        UnicodeReplaceRule(1593, 65226, 65227, 65228), // Eyn
+        UnicodeReplaceRule(1594, 65230, 65231, 65232), // Gheyn
+        UnicodeReplaceRule(1601, 65234, 65235, 65236), // Fe
+        UnicodeReplaceRule(1602, 65238, 65239, 65240), // Ghaf
+        UnicodeReplaceRule(1705, 65242, 65243, 65244), // Ke
+        UnicodeReplaceRule(1711, 64403, 64404, 64405), // Gaf
+        UnicodeReplaceRule(1604, 65246, 65247, 65248), // Laam
+        UnicodeReplaceRule(1605, 65250, 65251, 65252), // mim
+        UnicodeReplaceRule(1606, 65254, 65255, 65256), // Ne
+        UnicodeReplaceRule(1608, 65262), // Ve
+        UnicodeReplaceRule(1607, 65258, 65259, 65260), // He
+        UnicodeReplaceRule(1740, 65266, 65267, 65268)  // Ye
+    };
 
     class FontLoader : public ResourceCallbacksI
     {
@@ -203,11 +261,14 @@ namespace termite
         bx::Pool<TextBatch> batchPool;
         vec2_t refScreenSize;
         ProgramHandle normalProg;
+        ProgramHandle normalShadowProg;
+        ProgramHandle normalOutlineProg;
         ProgramHandle dfProg;
         ProgramHandle dfShadowProg;
         ProgramHandle dfOutlineProg;
         UniformHandle uTexture;
         UniformHandle uParams;
+        UniformHandle uTextureSize;
         UniformHandle uShadowColor;
         UniformHandle uOutlineColor;
         UniformHandle uTransformMtx;
@@ -257,64 +318,56 @@ namespace termite
         TextVertex::init();
 
         GfxDriverApi* gDriver = getGfxDriver();
-        {
-            ShaderHandle vs = gDriver->createShader(gDriver->makeRef(font_normal_vso, sizeof(font_normal_vso), nullptr, nullptr));
-            ShaderHandle fs = gDriver->createShader(gDriver->makeRef(font_normal_fso, sizeof(font_normal_fso), nullptr, nullptr));
-            if (!vs.isValid() || !fs.isValid()) {
-                T_ERROR("Creating shaders failed");
-                return T_ERR_FAILED;
-            }
-            g_fontSys->normalProg = gDriver->createProgram(vs, fs, true);
-            if (!g_fontSys->normalProg.isValid()) {
-                T_ERROR("Creating font shader failed");
-                return T_ERR_FAILED;
-            }
+        g_fontSys->normalProg = gDriver->createProgram(
+            gDriver->createShader(gDriver->makeRef(font_normal_vso, sizeof(font_normal_vso), nullptr, nullptr)),
+            gDriver->createShader(gDriver->makeRef(font_normal_fso, sizeof(font_normal_fso), nullptr, nullptr)), true);
+        if (!g_fontSys->normalProg.isValid()) {
+            T_ERROR("Creating font shader failed");
+            return T_ERR_FAILED;
+        }
+        g_fontSys->normalShadowProg = gDriver->createProgram(
+            gDriver->createShader(gDriver->makeRef(font_normal_shadow_vso, sizeof(font_normal_shadow_vso), nullptr, nullptr)),
+            gDriver->createShader(gDriver->makeRef(font_normal_shadow_fso, sizeof(font_normal_shadow_fso), nullptr, nullptr)), true);
+        if (!g_fontSys->normalShadowProg.isValid()) {
+            T_ERROR("Creating font shader failed");
+            return T_ERR_FAILED;
         }
 
-        {
-            ShaderHandle vs = gDriver->createShader(gDriver->makeRef(font_df_vso, sizeof(font_df_vso), nullptr, nullptr));
-            ShaderHandle fs = gDriver->createShader(gDriver->makeRef(font_df_fso, sizeof(font_df_fso), nullptr, nullptr));
-            if (!vs.isValid() || !fs.isValid()) {
-                T_ERROR("Creating shaders failed");
-                return T_ERR_FAILED;
-            }
-            g_fontSys->dfProg = gDriver->createProgram(vs, fs, true);
-            if (!g_fontSys->dfProg.isValid()) {
-                T_ERROR("Creating font shader failed");
-                return T_ERR_FAILED;
-            }
+        g_fontSys->normalOutlineProg = gDriver->createProgram(
+            gDriver->createShader(gDriver->makeRef(font_normal_outline_vso, sizeof(font_normal_outline_vso), nullptr, nullptr)),
+            gDriver->createShader(gDriver->makeRef(font_normal_outline_fso, sizeof(font_normal_outline_fso), nullptr, nullptr)), true);
+        if (!g_fontSys->normalOutlineProg.isValid()) {
+            T_ERROR("Creating font shader failed");
+            return T_ERR_FAILED;
         }
 
-        {
-            ShaderHandle vs = gDriver->createShader(gDriver->makeRef(font_df_shadow_vso, sizeof(font_df_shadow_vso), nullptr, nullptr));
-            ShaderHandle fs = gDriver->createShader(gDriver->makeRef(font_df_shadow_fso, sizeof(font_df_shadow_fso), nullptr, nullptr));
-            if (!vs.isValid() || !fs.isValid()) {
-                T_ERROR("Creating shaders failed");
-                return T_ERR_FAILED;
-            }
-            g_fontSys->dfShadowProg = gDriver->createProgram(vs, fs, true);
-            if (!g_fontSys->dfShadowProg.isValid()) {
-                T_ERROR("Creating font shader failed");
-                return T_ERR_FAILED;
-            }
+        g_fontSys->dfProg = gDriver->createProgram(
+            gDriver->createShader(gDriver->makeRef(font_df_vso, sizeof(font_df_vso), nullptr, nullptr)),
+            gDriver->createShader(gDriver->makeRef(font_df_fso, sizeof(font_df_fso), nullptr, nullptr)), true);
+        if (!g_fontSys->dfProg.isValid()) {
+            T_ERROR("Creating font shader failed");
+            return T_ERR_FAILED;
         }
 
-        {
-            ShaderHandle vs = gDriver->createShader(gDriver->makeRef(font_df_outline_vso, sizeof(font_df_outline_vso), nullptr, nullptr));
-            ShaderHandle fs = gDriver->createShader(gDriver->makeRef(font_df_outline_fso, sizeof(font_df_outline_fso), nullptr, nullptr));
-            if (!vs.isValid() || !fs.isValid()) {
-                T_ERROR("Creating shaders failed");
-                return T_ERR_FAILED;
-            }
-            g_fontSys->dfOutlineProg = gDriver->createProgram(vs, fs, true);
-            if (!g_fontSys->dfOutlineProg.isValid()) {
-                T_ERROR("Creating font shader failed");
-                return T_ERR_FAILED;
-            }
+        g_fontSys->dfShadowProg = gDriver->createProgram(
+            gDriver->createShader(gDriver->makeRef(font_df_shadow_vso, sizeof(font_df_shadow_vso), nullptr, nullptr)), 
+            gDriver->createShader(gDriver->makeRef(font_df_shadow_fso, sizeof(font_df_shadow_fso), nullptr, nullptr)), true);
+        if (!g_fontSys->dfShadowProg.isValid()) {
+            T_ERROR("Creating font shader failed");
+            return T_ERR_FAILED;
+        }
+
+        g_fontSys->dfOutlineProg = gDriver->createProgram(
+            gDriver->createShader(gDriver->makeRef(font_df_outline_vso, sizeof(font_df_outline_vso), nullptr, nullptr)), 
+            gDriver->createShader(gDriver->makeRef(font_df_outline_fso, sizeof(font_df_outline_fso), nullptr, nullptr)), true);
+        if (!g_fontSys->dfOutlineProg.isValid()) {
+            T_ERROR("Creating font shader failed");
+            return T_ERR_FAILED;
         }
 
         g_fontSys->uTexture = gDriver->createUniform("u_texture", UniformType::Int1, 1);
         g_fontSys->uParams = gDriver->createUniform("u_params", UniformType::Vec4, 1);
+        g_fontSys->uTextureSize = gDriver->createUniform("u_textureSize", UniformType::Vec4, 1);
         g_fontSys->uShadowColor = gDriver->createUniform("u_shadowColor", UniformType::Vec4, 1);
         g_fontSys->uOutlineColor = gDriver->createUniform("u_outlineColor", UniformType::Vec4, 1);
         g_fontSys->uTransformMtx = gDriver->createUniform("u_transformMtx", UniformType::Mat4, 1);
@@ -334,6 +387,10 @@ namespace termite
         GfxDriverApi* gDriver = getGfxDriver();
         if (g_fontSys->normalProg.isValid())
             gDriver->destroyProgram(g_fontSys->normalProg);
+        if (g_fontSys->normalShadowProg.isValid())
+            gDriver->destroyProgram(g_fontSys->normalShadowProg);
+        if (g_fontSys->normalOutlineProg.isValid())
+            gDriver->destroyProgram(g_fontSys->normalOutlineProg);
         if (g_fontSys->dfProg.isValid())
             gDriver->destroyProgram(g_fontSys->dfProg);
         if (g_fontSys->dfShadowProg.isValid())
@@ -351,6 +408,8 @@ namespace termite
             gDriver->destroyUniform(g_fontSys->uOutlineColor);
         if (g_fontSys->uTransformMtx.isValid())
             gDriver->destroyUniform(g_fontSys->uTransformMtx);
+        if (g_fontSys->uTextureSize.isValid())
+            gDriver->destroyUniform(g_fontSys->uTextureSize);
 
         g_fontSys->batchPool.destroy();
 
@@ -627,8 +686,7 @@ namespace termite
         font->scaleW = scaleW;
         font->flags = flags;
         font->size = size;
-        if (params.distantField)
-            font->flags |= FontFlags::DistantField;
+        font->flags |= params.flags;
 
         font->numGlyphs = numGlyphs;
         font->numKerns = numKernings;
@@ -737,8 +795,7 @@ namespace termite
         font->base = common.base;
         font->scaleW = common.scale_w;
         font->scaleH = common.scale_h;
-        if (params.distantField)
-            font->flags |= FontFlags::DistantField;
+        font->flags |= params.flags;
 
         LoadTextureParams tparams;
         tparams.generateMips = params.generateMips;
@@ -930,11 +987,136 @@ namespace termite
         batch->numChars = 0;
     }
 
+    inline void inverseGlyphs(FontGlyph* glyphs, int startIdx, int endIdx)
+    {
+        int sz = endIdx - startIdx;
+        if (sz > 1) {
+            int midIdx = startIdx + sz/2;
+            for (int i = startIdx; i < midIdx; i++) {
+                std::swap<FontGlyph>(glyphs[i], glyphs[endIdx-i-1]);
+            }
+        }
+    }
+
+    // Resolves glyphs from text (UTF8/ASCII)
+    // Returns number of glyphs resolved
+    static int resolveGlyphs(const char* text, Font* font, FontGlyph* glyphs, int maxChars, float* kerns = nullptr)
+    {
+        auto getUnicodeReplaceRule = [](uint32_t code, const UnicodeReplaceRule* glyphs, int numGlyphs)->int
+        {
+            for (int i = 0; i < numGlyphs; i++) {
+                if (glyphs[i].code == code)
+                    return i;
+            }
+            return -1;
+        };
+
+        if (!(font->flags & (FontFlags::Persian | FontFlags::Unicode))) {
+            // Normal font (ascii)
+            int len = std::min<int>(maxChars, (int)strlen(text));
+            for (int i = 0; i < len; i++) {
+                int gIdx = font->glyphTable.find(text[i]);
+                if (gIdx != -1) {
+                    memcpy(&glyphs[i], &font->glyphs[font->glyphTable[gIdx]], sizeof(FontGlyph));
+
+                    if (kerns) {
+                        int nextGlyphIdx = font->glyphTable.find(text[i+1]);
+                        if (nextGlyphIdx != -1)
+                            kerns[i] = getFontGlyphKerning(font, font->glyphTable[gIdx], font->glyphTable[nextGlyphIdx]);
+                        else
+                            kerns[i] = 0;
+                    }                    
+                } else {
+                    gIdx = font->glyphTable.find('?');
+                    if (gIdx != -1) {
+                        memcpy(&glyphs[i], &font->glyphs[font->glyphTable[gIdx]], sizeof(FontGlyph));
+                    } else {
+                        return i;
+                    }
+                }
+            }
+            return len;
+        } else if (font->flags & FontFlags::Persian) {
+            // Persian (Unicode)
+            uint32_t* utext = (uint32_t*)alloca(sizeof(uint32_t)*(maxChars + 1));
+            int len = u8_toucs(utext, maxChars+1, text, -1);
+
+            const UnicodeReplaceRule* rules = kPersianGlyphs;
+            int ruleCount = BX_COUNTOF(kPersianGlyphs);
+            int digitIdx = -1;
+
+            for (int i = 0; i < len; i++) {
+                uint32_t code = utext[i];
+                bool isdigit = (code >= '0' && code <= '9');
+
+                // Replace character code (glyphId) by the rules we have for each language
+                // If current character has "before" glyph, look for the next character and see if it has middle or after glyph
+                // If current character has "after" glyph, look for previous character and see if it has middle or before glyph
+                // If both of the conditions above are met, we have middle glyph for current character
+                int curRuleIdx = getUnicodeReplaceRule(code, rules, ruleCount);
+                if (curRuleIdx != -1) {
+                    int prevRuleIdx = i > 0 ? getUnicodeReplaceRule(utext[i-1], rules, ruleCount) : -1;
+                    int nextRuleIdx = i < len - 1 ? getUnicodeReplaceRule(utext[i+1], rules, ruleCount) : -1;
+                    uint8_t ruleBits = 0;
+                    const UnicodeReplaceRule& curRule = rules[curRuleIdx];
+                    if (curRule.after != 0 && prevRuleIdx != -1 && (rules[prevRuleIdx].before + rules[prevRuleIdx].middle) > 0) {
+                        code = curRule.after;
+                        ruleBits |= 0x1;
+                    }
+
+                    if (curRule.before != 0 && nextRuleIdx != -1 && (rules[nextRuleIdx].after + rules[nextRuleIdx].middle) > 0) {
+                        code = curRule.before;
+                        ruleBits |= 0x2;
+                    }
+
+                    if (ruleBits == 0x3 && curRule.middle != 0)
+                        code = curRule.middle;
+                }
+
+                int gIdx = font->glyphTable.find(code);
+                if (gIdx != -1) {
+                    memcpy(&glyphs[i], &font->glyphs[font->glyphTable[gIdx]], sizeof(FontGlyph));
+                    if (kerns) {
+                        int nextGlyphIdx = font->glyphTable.find(utext[i+1]);
+                        if (nextGlyphIdx != -1)
+                            kerns[i] = getFontGlyphKerning(font, font->glyphTable[gIdx], font->glyphTable[nextGlyphIdx]);
+                        else
+                            kerns[i] = 0;
+                    }
+                } else {
+                    return i;
+                }
+
+                if (isdigit && digitIdx == -1) {
+                    digitIdx = i;
+                } else if (!isdigit && digitIdx != -1) {
+                    inverseGlyphs(glyphs, digitIdx, i);
+                    digitIdx = -1;
+                }
+            }
+
+            if (digitIdx != -1)
+                inverseGlyphs(glyphs, digitIdx, len);
+
+            return len;
+        }
+
+        return 0;
+    }
+
     void addText(TextBatch* batch, color_t color, float scale,
-                 const rect_t& rectFit, TextAlign::Enum align,
+                 const rect_t& rectFit, TextFlags::Bits flags,
                  const char* text)
     {
         assert(batch);
+
+        Font* font = getResourcePtr<Font>(batch->fontHandle);
+        if ((flags & (TextFlags::AlignLeft | TextFlags::AlignRight | TextFlags::AlignCenter)) == 0) {
+            flags |= TextFlags::AlignCenter;
+        }
+        if ((flags & (TextFlags::RightToLeft | TextFlags::LeftToRight)) == 0) {
+            flags |= !(font->flags & FontFlags::Persian) ? TextFlags::LeftToRight : TextFlags::RightToLeft;
+        }
 
         vec2_t screenSize = batch->screenSize;
         mtx4x4_t viewProjMtx = batch->viewProjMtx;
@@ -944,10 +1126,11 @@ namespace termite
             scale *= screenRefFactor;
         }
         
-        Font* font = getResourcePtr<Font>(batch->fontHandle);
-        
         vec2_t texSize = vec2f(font->scaleW, font->scaleH);
-        int len = (int)strlen(text);
+        FontGlyph glyphs[256];
+        int len = resolveGlyphs(text, font, glyphs, BX_COUNTOF(glyphs));
+        if (len == 0)
+            return;
 
         // Crop Characters
         len = std::min<int>(len, batch->maxChars - batch->numChars);
@@ -980,68 +1163,79 @@ namespace termite
         TextVertex* verts = batch->verts + firstVertIdx;
         uint16_t* indices = batch->indices + batch->numChars*6;
 
+        float dir = 1.0f;
+        float dirInvFactor = 0;
+        if (flags & TextFlags::RightToLeft) {
+            dir = -1.0f;
+            dirInvFactor = 1.0f;
+        }
+        float advanceScale = 1.0f;
+        if (flags & TextFlags::Narrow)
+            advanceScale = 0.9f;
+       
         for (int i = 0; i < len; i++) {
-            int gIdx = font->glyphTable.find(text[i]);
-            if (gIdx != -1) {
-                const FontGlyph& glyph = font->glyphs[font->glyphTable[gIdx]];
+            const FontGlyph& glyph = glyphs[i];
                 
-                TextVertex& v0 = verts[vertexIdx];
-                TextVertex& v1 = verts[vertexIdx + 1];
-                TextVertex& v2 = verts[vertexIdx + 2];
-                TextVertex& v3 = verts[vertexIdx + 3];
+            TextVertex& v0 = verts[vertexIdx];
+            TextVertex& v1 = verts[vertexIdx + 1];
+            TextVertex& v2 = verts[vertexIdx + 2];
+            TextVertex& v3 = verts[vertexIdx + 3];
 
-                float gw = glyph.width*scale;
-                float gh = glyph.height*scale;
-                float xoffset = glyph.xoffset*scale;
-                float yoffset = glyph.yoffset*scale;
-                float gx = glyph.x;
-                float gy = glyph.y;
+            float gw = glyph.width*scale;
+            float gh = glyph.height*scale;
+            float xoffset = glyph.xoffset*scale;
+            float yoffset = glyph.yoffset*scale;
+            float gx = glyph.x;
+            float gy = glyph.y;
 
-                // Top-Left
-                v0.x = x + xoffset;
-                v0.y = yoffset;
-                v0.tx = gx / texSize.x;
-                v0.ty = gy / texSize.y;
+            x -= glyph.xadvance*scale*dirInvFactor*advanceScale;
 
-                // Top-Right
-                v1.x = x + xoffset + gw;
-                v1.y = yoffset;
-                v1.tx = (gx + glyph.width) / texSize.x;
-                v1.ty = gy / texSize.y;
+            // Top-Left
+            v0.x = x + xoffset;
+            v0.y = yoffset;
+            v0.tx = gx / texSize.x;
+            v0.ty = gy / texSize.y;
 
-                // Bottom-Left
-                v2.x = x + xoffset;
-                v2.y = yoffset + gh;
-                v2.tx = gx / texSize.x;
-                v2.ty = (gy + glyph.height) / texSize.y;
+            // Top-Right
+            v1.x = x + xoffset + gw;
+            v1.y = yoffset;
+            v1.tx = (gx + glyph.width) / texSize.x;
+            v1.ty = gy / texSize.y;
 
-                // Bottom-Right
-                v3.x = x + xoffset + gw;
-                v3.y = yoffset + gh;
-                v3.tx = (gx + glyph.width) / texSize.x;
-                v3.ty = (gy + glyph.height) / texSize.y;
+            // Bottom-Left
+            v2.x = x + xoffset;
+            v2.y = yoffset + gh;
+            v2.tx = gx / texSize.x;
+            v2.ty = (gy + glyph.height) / texSize.y;
 
-                v0.color = v1.color = v2.color = v3.color = color.n;
+            // Bottom-Right
+            v3.x = x + xoffset + gw;
+            v3.y = yoffset + gh;
+            v3.tx = (gx + glyph.width) / texSize.x;
+            v3.ty = (gy + glyph.height) / texSize.y;
 
-                x += (glyph.xadvance/* - xpadding*/)*scale;
+            v0.color = v1.color = v2.color = v3.color = color.n;
 
-                // Kerning
-                int nextGlyphIdx = font->glyphTable.find(text[i+1]);
-                if (nextGlyphIdx != -1)
-                    x += getFontGlyphKerning(font, font->glyphTable[gIdx], font->glyphTable[nextGlyphIdx])*scale;
+            x += glyph.xadvance*scale*(1.0f - dirInvFactor)*advanceScale;
 
-                // Make Glyph Quad
-                int startVtx = firstVertIdx + vertexIdx;
-                indices[indexIdx] = startVtx;
-                indices[indexIdx + 1] = startVtx + 1;
-                indices[indexIdx + 2] = startVtx + 2;
-                indices[indexIdx + 3] = startVtx + 2;
-                indices[indexIdx + 4] = startVtx + 1;
-                indices[indexIdx + 5] = startVtx + 3;
+#if 0
+            // Kerning
+            int nextGlyphIdx = font->glyphTable.find(text[i+1]);
+            if (nextGlyphIdx != -1)
+                x += getFontGlyphKerning(font, font->glyphTable[gIdx], font->glyphTable[nextGlyphIdx])*scale;
+#endif
 
-                vertexIdx += 4;
-                indexIdx += 6;
-            }
+            // Make Glyph Quad
+            int startVtx = firstVertIdx + vertexIdx;
+            indices[indexIdx] = startVtx;
+            indices[indexIdx + 1] = startVtx + 1;
+            indices[indexIdx + 2] = startVtx + 2;
+            indices[indexIdx + 3] = startVtx + 2;
+            indices[indexIdx + 4] = startVtx + 1;
+            indices[indexIdx + 5] = startVtx + 3;
+
+            vertexIdx += 4;
+            indexIdx += 6;
         }
 
         batch->numChars += len;
@@ -1049,16 +1243,12 @@ namespace termite
         // We have the final width, Calculate alignment
         vec2_t pos = vec2f(0, -font->lineHeight*0.5f*scale);
 
-        switch (align) {
-        case TextAlign::Center:
+        if (flags & TextFlags::AlignCenter) {
             pos = pos + ((screenRect.vmax + screenRect.vmin)*0.5f - vec2f(x*0.5f, 0));
-            break;
-        case TextAlign::Left:
-            pos = pos + vec2f(screenRect.xmin, (screenRect.ymax + screenRect.ymin)*0.5f);
-            break;
-        case TextAlign::Right:
-            pos = pos + vec2f(screenRect.xmax - x, (screenRect.ymax + screenRect.ymin)*0.5f);
-            break;
+        } else if (flags & TextFlags::AlignLeft) {
+            pos = pos + vec2f(screenRect.xmin + x*dirInvFactor, (screenRect.ymax + screenRect.ymin)*0.5f);
+        } else if (flags & TextFlags::AlignRight) {
+            pos = pos + vec2f(screenRect.xmax - x*(1.0f - dirInvFactor), (screenRect.ymax + screenRect.ymin)*0.5f);
         }
 
         // Transform vertices by pos
@@ -1068,7 +1258,7 @@ namespace termite
         }
     }
 
-    void addTextf(TextBatch* batch, color_t color, float scale, const rect_t& rectFit, TextAlign::Enum align, const char* fmt, ...)
+    void addTextf(TextBatch* batch, color_t color, float scale, const rect_t& rectFit, TextFlags::Bits flags, const char* fmt, ...)
     {
         char text[256];
         va_list args;
@@ -1076,7 +1266,7 @@ namespace termite
         bx::vsnprintf(text, sizeof(text), fmt, args);
         va_end(args);
 
-        addText(batch, color, scale, rectFit, align, text);
+        addText(batch, color, scale, rectFit, flags, text);
     }
 
     static void drawTextBatch(GfxDriverApi* gDriver, TextBatch* batch, uint8_t viewId, ProgramHandle prog, Font* font)
@@ -1115,8 +1305,7 @@ namespace termite
         }
     }
 
-    void drawTextDropShadow(TextBatch* batch, uint8_t viewId, color_t shadowColor /*= color1n(0xff000000)*/, 
-                            vec2_t shadowAmount /*= 2.0f*/)
+    void drawTextDropShadow(TextBatch* batch, uint8_t viewId, color_t shadowColor, vec2_t shadowAmount)
     {
         if (batch->numChars > 0) {
             GfxDriverApi* gDriver = getGfxDriver();
@@ -1125,7 +1314,7 @@ namespace termite
             vec2_t shadowOffset = vec2f(shadowAmount.x/font->scaleW, shadowAmount.y/font->scaleH);
             gDriver->setUniform(g_fontSys->uParams, vec4f(0, 0, shadowOffset.x, shadowOffset.y).f, 1);
             gDriver->setUniform(g_fontSys->uShadowColor, colorToVec4(shadowColor).f, 1);
-            ProgramHandle prog = (font->flags & FontFlags::DistantField) ? g_fontSys->dfShadowProg : g_fontSys->normalProg;
+            ProgramHandle prog = (font->flags & FontFlags::DistantField) ? g_fontSys->dfShadowProg : g_fontSys->normalShadowProg;
             drawTextBatch(gDriver, batch, viewId, prog, font);
         }
     }
@@ -1139,7 +1328,8 @@ namespace termite
             float outline = 0.5f*outlineAmount;
             gDriver->setUniform(g_fontSys->uParams, vec4f(0, 0, outline, 0).f, 1);
             gDriver->setUniform(g_fontSys->uOutlineColor, colorToVec4(outlineColor).f, 1);
-            ProgramHandle prog = (font->flags & FontFlags::DistantField) ? g_fontSys->dfOutlineProg : g_fontSys->normalProg;
+            gDriver->setUniform(g_fontSys->uTextureSize, vec4f(float(font->scaleW), float(font->scaleH), 0, 0).f, 1);
+            ProgramHandle prog = (font->flags & FontFlags::DistantField) ? g_fontSys->dfOutlineProg : g_fontSys->normalOutlineProg;
             drawTextBatch(gDriver, batch, viewId, prog, font);
         }
     }

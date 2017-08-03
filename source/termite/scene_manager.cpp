@@ -592,7 +592,6 @@ bool termite::registerSceneTransitionEffect(SceneManager* mgr, const char* name,
 SceneLinkHandle termite::linkScene(SceneManager* mgr, Scene* sceneA, Scene* sceneB, const SceneLinkDef& def /*= SceneLinkDef()*/)
 {
     assert(sceneA);
-    assert(sceneB);
 
     SceneLinkHandle handle = SceneLinkHandle(mgr->linkPool.newHandle());
     if (!handle.isValid())
@@ -633,6 +632,12 @@ void termite::triggerSceneLink(SceneManager* mgr, SceneLinkHandle handle)
             return;
         }
     }
+}
+
+void termite::changeSceneLink(SceneManager* mgr, SceneLinkHandle handle, Scene* sceneB)
+{
+    SceneLink* link = mgr->linkPool.getHandleData<SceneLink>(0, handle);
+    link->sceneB = sceneB;
 }
 
 Scene* termite::findScene(SceneManager* mgr, const char* name, FindSceneMode::Enum mode /*= 0*/)

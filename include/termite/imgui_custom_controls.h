@@ -54,5 +54,5 @@ namespace termite
     void imguiFishLayout(ImGuiFishLayout* layout, const char* strId, const ImVec2& size);
 
     /// Values: x=start, y=end
-    void imguiGaunt(const char* strId, ImVec2* values, int numValues, int changeIdx, const ImVec2& size);
+    bool imguiGaunt(const char* strId, ImVec2* values, int numValues, int* changeIdx, const ImVec2& size);
 }

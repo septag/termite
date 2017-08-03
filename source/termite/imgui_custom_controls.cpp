@@ -245,7 +245,7 @@ namespace termite
 
     }
 
-    void imguiGaunt(const char* strId, ImVec2* values, int numValues, int changeIdx, const ImVec2& size)
+    bool imguiGaunt(const char* strId, ImVec2* values, int numValues, int* changeIdx, const ImVec2& size)
     {
         ImDrawList* drawList = ImGui::GetWindowDrawList();
 
@@ -286,11 +286,13 @@ namespace termite
         };
 
         float yOffset = 0;
+        ImRect* rects = (ImRect*)alloca(sizeof(ImRect)*numValues);
         ImRect changeRect;
+        int selIdx = *changeIdx;
         for (int i = 0; i < numValues; i++) {
             float lastOffset = yOffset;
             const ImColor* colors;
-            if (i != changeIdx) {
+            if (i != selIdx) {
                 yOffset += fixedItemHeight;
                 colors = fixedItemColors;
             } else {
@@ -300,8 +302,9 @@ namespace termite
 
             ImVec2 a = ImVec2(totalWidth*values[i].x/maxValue + ctrlPos.x, lastOffset + ctrlPos.y);
             ImVec2 b = ImVec2(totalWidth*values[i].y/maxValue + ctrlPos.x, yOffset + ctrlPos.y);
-            if (i == changeIdx)
+            if (i == selIdx)
                 changeRect = ImRect(a, b);
+            rects[i] = ImRect(a, b);
             drawList->AddRectFilledMultiColor(a, b, colors[1], colors[1], colors[0], colors[0]);
             drawList->AddRect(a, b, ImColor(128, 128, 128));
 
@@ -312,6 +315,7 @@ namespace termite
         }
 
         // Interaction
+        bool selectedNew = false;
         if (ImGui::IsItemHovered()) {
             if (ImGui::IsMouseDown(0) && ImGui::IsMouseHoveringRect(changeRect.Min, changeRect.Max)) {
                 if (ImGui::IsMouseDragging(0)) {
@@ -320,14 +324,24 @@ namespace termite
                         changeRect.Min.x += delta.x;
                         changeRect.Max.x += delta.x;
 
-                        values[changeIdx].x = (changeRect.Min.x - ctrlPos.x)*maxValue/totalWidth;
+                        values[selIdx].x = (changeRect.Min.x - ctrlPos.x)*maxValue/totalWidth;
                     }
                     ImGui::ResetMouseDragDelta(0);
+                }
+            } else if (ImGui::IsMouseClicked(0)&& 
+                       ImGui::IsMouseHoveringRect(ctrlPos, ImVec2(ctrlPos.x + totalWidth, ctrlPos.y + totalHeight)))
+            {
+                for (int i = 0; i < numValues && !selectedNew; i++) {
+                    if (ImGui::IsMouseHoveringRect(rects[i].Min, rects[i].Max) && i != selIdx) {
+                        *changeIdx = i;
+                        selectedNew = true;
+                    }
                 }
             }
         }
 
         ImGui::PopClipRect();
+        return selectedNew;
     }
 
 }

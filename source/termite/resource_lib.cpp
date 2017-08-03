@@ -337,7 +337,7 @@ static void setResourceLoadFlag(ResourceHandle resHandle, ResourceLoadState::Enu
     Resource* res = resLib->resources.getHandleData<Resource>(0, resHandle.value);
     res->loadState = flag;
 }
-#include "gfx_texture.h"
+
 static ResourceHandle loadResourceHashed(size_t nameHash, const char* uri, const void* userParams, ResourceFlag::Bits flags,
                                          bx::AllocatorI* objAlloc)
 {

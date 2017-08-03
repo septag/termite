@@ -26,7 +26,9 @@ namespace termite
             Normal = 0,
             Bold = 0x1,
             Italic = 0x2,
-            DistantField = 0x4
+            DistantField = 0x4,
+            Unicode = 0x8,
+            Persian = 0x10
         };
 
         typedef uint8_t Bits;
@@ -36,14 +38,14 @@ namespace termite
     {
         FontFileFormat::Enum format;
         bool generateMips;
-        bool distantField;
+        FontFlags::Bits flags;
         uint8_t padding[2];
 
         LoadFontParams()
         {
             format = FontFileFormat::Text;
             generateMips = true;
-            distantField = false;
+            flags = 0;
             padding[0] = padding[1] = 0;
         }
     };
@@ -74,30 +76,35 @@ namespace termite
     TERMITE_API const FontGlyph& getFontGlyph(Font* font, int index);
     TERMITE_API float getFontGlyphKerning(Font* font, int glyphIdx, int nextGlyphIdx);
 
-    struct TextAlign
+    struct TextFlags
     {
         enum Enum
         {
-            Center,
-            Right,
-            Left
+            AlignCenter = 0x1,
+            AlignRight = 0x2,
+            AlignLeft = 0x4,
+            RightToLeft = 0x8,
+            LeftToRight = 0x10,
+            Narrow = 0x20
         };
+
+        typedef uint8_t Bits;
     };
 
     TERMITE_API TextBatch* createTextBatch(int maxChars, ResourceHandle fontHandle, bx::AllocatorI* alloc);
     TERMITE_API void beginText(TextBatch* batch, const mtx4x4_t& viewProjMtx, const vec2_t screenSize);
     TERMITE_API void addText(TextBatch* batch, color_t color, float scale,
-                             const rect_t& rectFit, TextAlign::Enum align, 
+                             const rect_t& rectFit, TextFlags::Bits flags,
                              const char* text);
     TERMITE_API void addTextf(TextBatch* batch, color_t color, float scale,
-                              const rect_t& rectFit, TextAlign::Enum align,
+                              const rect_t& rectFit, TextFlags::Bits flags,
                               const char* fmt, ...);
 
     TERMITE_API void drawText(TextBatch* batch, uint8_t viewId);
     TERMITE_API void drawTextDropShadow(TextBatch* batch, uint8_t viewId, color_t shadowColor = color1n(0xff000000), 
                                         vec2_t shadowAmount = vec2f(2.0f, 2.0f));
-    TERMITE_API void drawTextOutline(TextBatch* batch, uint8_t viewId, float smoothing = 1.0f/16.0f, 
-                                     color_t outlineColor = color1n(0xff000000), float outlineAmount = 0.5f);
+    TERMITE_API void drawTextOutline(TextBatch* batch, uint8_t viewId, color_t outlineColor = color1n(0xff000000), 
+                                     float outlineAmount = 0.5f);
     TERMITE_API void destroyTextBatch(TextBatch* batch);
 
     void registerFontToResourceLib();

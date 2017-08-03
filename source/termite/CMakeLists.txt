@@ -14,7 +14,6 @@ source_group(include FILES ${INCLUDE_FILES})
 set(SHADER_SOURCES "shaders/ddraw.vsc"          "shaders/ddraw.fsc" 
                    "shaders/vg.vsc"             "shaders/vg.fsc"
                    "shaders/blit.vsc"           "shaders/blit.fsc"
-                   "shaders/font_normal.vsc"    "shaders/font_normal.fsc"
                    "shaders/vignette_sepia.vsc" "shaders/vignette_sepia.fsc")
 
 source_group(shaders FILES ${SHADER_SOURCES})
@@ -42,7 +41,7 @@ bgfx_add_shaders("${FADE_SHADER_SOURCES}" "FADE_IN;FADE_ALPHA" "../shaders" "sha
 source_group(shaders\\compiled FILES ${FADEIN_ALPHA_FILES})
 
 # Font shaders
-set(FONT_SHADER_SOURCES "shaders/font_df.vsc" "shaders/font_df.fsc")
+set(FONT_SHADER_SOURCES "shaders/font_df.vsc" "shaders/font_df.fsc" "shaders/font_normal.vsc" "shaders/font_normal.fsc")
 source_group(shaders FILES ${FONT_SHADER_SOURCES})
 bgfx_add_shaders("${FONT_SHADER_SOURCES}" IGNORE "../shaders" "shaders_h" TRUE IGNORE FONT_DF_FILES)
 source_group(shaders\\compiled FILES ${FONT_DF_FILES})
@@ -79,12 +78,16 @@ add_library(termite ${BUILD_LIBRARY_TYPE}
             ${FONT_DF_OUTLINE_FILES} 
             ${BLUR_SHADER_FILES})
 
-# STD_LIBS
+# PUBLIC_LIBS
 # libraries for unix/posix
 if (ANDROID)
-    set(STD_LIBS log dl GLESv2 EGL android)
+    set(PUBLIC_LIBS log dl GLESv2 EGL android)
 elseif (UNIX)
-    set(STD_LIBS pthread dl)
+    set(PUBLIC_LIBS pthread dl)
+endif()
+
+if (USE_CURL)
+    list(APPEND PUBLIC_LIBS restclient-cpp)
 endif()
 
 # PRIVATE_LIBS
@@ -120,8 +123,8 @@ else()
 endif()
 
 target_link_libraries(termite 
-    PRIVATE ${FCONTEXT_LIB} imgui imgui_impl remotery ${PLUGIN_LIBS} ${PRIVATE_LIBS}
-    PUBLIC bx rapidjson AHEasing ${STD_LIBS})
+    PRIVATE ${FCONTEXT_LIB} imgui imgui_impl remotery utf8 ${PLUGIN_LIBS} ${PRIVATE_LIBS} tiny-AES128-C 
+    PUBLIC bx rapidjson AHEasing ${PUBLIC_LIBS} lz4)
 
 # 
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)

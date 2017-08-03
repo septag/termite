@@ -10,7 +10,7 @@
 #include "gfx_utils.h"
 #include "gfx_driver.h"
 
-#include "Remotery.h"
+#include "remotery/Remotery.h"
 
 #include "imgui_custom_controls.h"
 

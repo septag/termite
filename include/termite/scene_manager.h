@@ -123,6 +123,7 @@ namespace termite
                                           const SceneLinkDef& def = SceneLinkDef());
     TERMITE_API void removeSceneLink(SceneManager* mgr, SceneLinkHandle handle);
     TERMITE_API void triggerSceneLink(SceneManager* mgr, SceneLinkHandle handle);
+    TERMITE_API void changeSceneLink(SceneManager* mgr, SceneLinkHandle handle, Scene* sceneB);
 
     // 
     TERMITE_API Scene* findScene(SceneManager* mgr, const char* name, FindSceneMode::Enum mode = FindSceneMode::All);

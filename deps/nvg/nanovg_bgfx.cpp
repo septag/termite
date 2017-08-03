@@ -529,12 +529,12 @@ namespace
 		gl->th = handle;
 	}
 
-	static void nvgRenderViewport(void* _userPtr, int width, int height)
+	static void nvgRenderViewport(void* _userPtr, int x, int y, int width, int height)
 	{
 		struct GLNVGcontext* gl = (struct GLNVGcontext*)_userPtr;
 		gl->view[0] = (float)width;
 		gl->view[1] = (float)height;
-		gl->driver->setViewRect(gl->m_viewId, 0, 0, width, height);
+		gl->driver->setViewRect(gl->m_viewId, x, y, width, height);
 	}
 
 	static void fan(GLNVGcontext* gl, uint32_t _start, uint32_t _count)
