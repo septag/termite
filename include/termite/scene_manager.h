@@ -14,6 +14,8 @@ namespace termite
 
     TERMITE_API SceneManager* createSceneManager(bx::AllocatorI* alloc);
     TERMITE_API void destroySceneManager(SceneManager* smgr);
+    TERMITE_API void destroySceneManagerGraphics(SceneManager* smgr);
+    TERMITE_API bool resetSceneManagerGraphics(SceneManager* smgr, FrameBufferHandle mainFb, FrameBufferHandle effectFb);
 
     struct SceneFlag
     {

@@ -43,6 +43,7 @@ namespace termite
 
     result_t initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc, int texturePoolSize = 64);
     void shutdownTextureLoader();
+
     void registerTextureToResourceLib();
 
     TERMITE_API TextureHandle getWhiteTexture1x1();
@@ -51,5 +52,4 @@ namespace termite
     TERMITE_API bool blitRawPixels(uint8_t* dest, int destX, int destY, int destWidth, int destHeight, 
                                    const uint8_t* src, int srcX, int srcY, int srcWidth, int srcHeight,
                                    int pixelSize);
-
 } // namespace termite

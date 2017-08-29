@@ -135,17 +135,17 @@ namespace termite
                                          /// This results in an expensive operation compared to using
                                          /// b2_fixtureContactFilterParticle to detect collisions between
                                          /// particles.
-                                         FixtureContactListenerParticle = 1 << 14,
+            FixtureContactListenerParticle = 1 << 14,
                                          /// Call b2ContactListener when this particle is about to interact with
                                          /// another particle or stops interacting with another particle.
                                          /// This results in an expensive operation compared to using
                                          /// b2_particleContactFilterParticle to detect collisions between
                                          /// particles.
-                                         ParticleContactListenerParticle = 1 << 15,
+            ParticleContactListenerParticle = 1 << 15,
                                          /// Call b2ContactFilter when this particle interacts with rigid bodies.
-                                         FixtureContactFilterParticle = 1 << 16,
+            FixtureContactFilterParticle = 1 << 16,
                                          /// Call b2ContactFilter when this particle interacts with other particles.
-                                         ParticleContactFilterParticle = 1 << 17,
+            ParticleContactFilterParticle = 1 << 17,
         };
 
         typedef uint32_t Bits;
@@ -354,7 +354,7 @@ namespace termite
 
     typedef bool(*PhysShapeContactCallback2D)(PhysShape2D* shapeA, PhysShape2D* shapeB, const PhysContactInfo2D* contactInfo);
     typedef void(*PhysParticleShapeContactCallback2D)(PhysParticleEmitter2D* emitter, int index, PhysShape2D* shape,
-                                                  const vec2_t& normal, float weight);
+                                                      const vec2_t& normal, float weight);
     typedef void(*PhysParticleContactCallback2D)(PhysParticleEmitter2D* emitter, int indexA, int indexB,
                                                  const vec2_t& normal, float weight);
 
@@ -374,6 +374,9 @@ namespace termite
     {
         result_t (*init)(bx::AllocatorI* alloc, PhysFlags2D::Bits flags/*=0*/, uint8_t debugViewId/*=255*/);
         void (*shutdown)();
+
+        bool (*initGraphicsObjects)();
+        void (*shutdownGraphicsObjects)();
 
         PhysScene2D* (*createScene)(const PhysSceneDef2D& worldDef);
         void (*destroyScene)(PhysScene2D* scene);
@@ -527,7 +530,7 @@ namespace termite
         void* (*getJointUserData)(PhysJoint2D* joint);
 
         PhysParticleEmitter2D* (*createParticleEmitter)(PhysScene2D* scene, const PhysParticleEmitterDef2D& def);
-        void (*destroyParticleEmitter)(PhysScene2D* scene);
+        void (*destroyParticleEmitter)(PhysScene2D* scene, PhysParticleEmitter2D* emitter);
         void* (*getParticleEmitterUserData)(PhysParticleEmitter2D* emitter);
 
         int (*createParticle)(PhysParticleEmitter2D* emitter, const PhysParticleDef2D& particleDef);
@@ -540,11 +543,9 @@ namespace termite
         void (*applyParticleImpulseBatch)(PhysParticleEmitter2D* emitter, int firstIdx, int lastIdx, const vec2_t& impulse);
         void (*applyParticleForce)(PhysParticleEmitter2D* emitter, int index, const vec2_t& force);
         void (*applyParticleImpulse)(PhysParticleEmitter2D* emitter, int index, const vec2_t& impulse);
-        void* (*getParticleUserData)(PhysParticleEmitter2D* emitter, int index);
 
-        PhysParticleGroup2D* (*createParticleGroup)(PhysParticleEmitter2D* emitter, const PhysParticleGroupDef2D& groupDef,
-                                                    PhysShape2D* shape);
-        void (*destroyParticleGroup)(PhysParticleGroup2D* pgroup);
+        PhysParticleGroup2D* (*createParticleGroupCircleShape)
+            (PhysParticleEmitter2D* emitter, const PhysParticleGroupDef2D& groupDef, float radius);
         void (*applyParticleGroupImpulse)(PhysParticleGroup2D* group, const vec2_t& impulse);
         void (*applyParticleGroupForce)(PhysParticleGroup2D* group, const vec2_t& force);
         void (*destroyParticleGroupParticles)(PhysParticleGroup2D* group, bool callDestructionCallback/* = false*/);
@@ -552,6 +553,10 @@ namespace termite
         void (*setParticleGroupFlags)(PhysParticleGroup2D* group, uint32_t flags);
         uint32_t (*getParticleGroupFlags)(PhysParticleGroup2D* group);
 
+        int (*getEmitterPositionBuffer)(PhysParticleEmitter2D* emitter, vec2_t* poss, int maxItems);
+        int (*getEmitterVelocityBuffer)(PhysParticleEmitter2D* emitter, vec2_t* vels, int maxItems);
+        int (*getEmitterColorBuffer)(PhysParticleEmitter2D* emitter, color_t* colors, int maxItems);
+                
         // Callbacks
         void (*setJointDestroyCallback)(PhysJoint2D* joint, PhysJointDestroyCallback2D callback);
         void (*setShapeDestroyCallback)(PhysShape2D* shape, PhysShapeDestroyCallback2D callback);

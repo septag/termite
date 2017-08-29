@@ -320,6 +320,32 @@ void termite::destroySceneManager(SceneManager* smgr)
     BX_DELETE(smgr->alloc, smgr);
 }
 
+void termite::destroySceneManagerGraphics(SceneManager* smgr)
+{
+    // destroy all effects
+    for (int i = 0, c = smgr->effects.getCount(); i < c; i++)
+        smgr->effects[i].callbacks->destroy();
+
+    smgr->effectFb.reset();
+    smgr->mainFb.reset();
+}
+
+bool termite::resetSceneManagerGraphics(SceneManager* smgr, FrameBufferHandle mainFb, FrameBufferHandle effectFb)
+{
+    GfxDriverApi* gDriver = getGfxDriver();
+
+    smgr->mainFb = mainFb;
+    smgr->mainTex = gDriver->getFrameBufferTexture(mainFb, 0);
+    smgr->effectFb = effectFb;
+    smgr->effectTex = gDriver->getFrameBufferTexture(effectFb, 0);
+
+    bool r = true;
+    for (int i = 0, c = smgr->effects.getCount(); i < c; i++)
+        r &= smgr->effects[i].callbacks->create();
+
+    return r;
+}
+
 static void updateScene(SceneManager* mgr, Scene* scene, float dt, bool loadIfDead = false)
 {
     if (loadIfDead) {

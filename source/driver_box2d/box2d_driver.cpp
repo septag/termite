@@ -87,7 +87,7 @@ public:
 
     void SayGoodbye(b2Joint* joint) override;
     void SayGoodbye(b2Fixture* fixture) override;
-    void SayGoodbye(b2ParticleGroup* group) override;
+    //void SayGoodbye(b2ParticleGroup* group) override;
     void SayGoodbye(b2ParticleSystem* particleSystem, int32 index) override;
 };
 
@@ -175,10 +175,17 @@ namespace termite
         PhysParticleEmitter2D() :
             p(nullptr),
             userData(nullptr),
-            destroyFn(nullptr)
+            destroyFn(nullptr),
+            shapeContactFilterFn(nullptr),
+            particleContactFilterFn(nullptr),
+            shapeBeginContactFn(nullptr),
+            particleBeginContactFn(nullptr),
+            shapeEndContactFn(nullptr),
+            particleEndContactFn(nullptr)
         {}
     };
 
+    /*
     struct PhysParticleGroup2D
     {
         b2ParticleGroup* g;
@@ -191,6 +198,7 @@ namespace termite
             destroyFn(nullptr)
         {}
     };
+    */
 } // namespace termite
 
 
@@ -203,14 +211,18 @@ struct Box2dDriver
     bx::Pool<PhysShape2D> shapePool;
     bx::Pool<PhysJoint2D> jointPool;
     bx::Pool<PhysParticleEmitter2D> emitterPool;
-    bx::Pool<PhysParticleGroup2D> pgroupPool;
     bx::HashTable<PhysParticleEmitter2D*, uintptr_t> emitterTable;   // key=pointer-to-b2ParticleSystem -> ParticleEmitter
     NVGcontext* nvg;
+    uint8_t debugViewId;
+    PhysFlags2D::Bits initFlags;
 
     Box2dDriver() :
         emitterTable(bx::HashTableType::Mutable),
         nvg(nullptr)
-    {}
+    {
+        debugViewId = 0;
+        initFlags = 0;
+    }
 };
 
 static Box2dDriver g_box2d;
@@ -218,45 +230,23 @@ static CoreApi_v0* g_coreApi = nullptr;
 static GfxApi_v0* g_gfxApi = nullptr;
 static CameraApi_v0* g_camApi = nullptr;
 
-static result_t initBox2d(bx::AllocatorI* alloc, PhysFlags2D::Bits flags, uint8_t debugViewId)
+static bool initBox2dGraphicsObjects()
 {
-    if (!g_box2d.scenePool.create(6, alloc) ||
-        !g_box2d.bodyPool.create(200, alloc) ||
-        !g_box2d.shapePool.create(200, alloc) ||
-        !g_box2d.jointPool.create(100, alloc) ||
-        !g_box2d.emitterPool.create(30, alloc) ||
-        !g_box2d.pgroupPool.create(30, alloc))
-    {
-        return T_ERR_OUTOFMEM;
+    if ((g_box2d.initFlags & PhysFlags2D::EnableDebug) && g_coreApi->getGfxDriver()) {
+        g_box2d.nvg = nvgCreate(0, g_box2d.debugViewId, g_coreApi->getGfxDriver(), g_gfxApi, g_box2d.alloc);
+        if (!g_box2d.nvg)
+            return false;
     }
 
-    if (!g_box2d.emitterTable.create(30, alloc))
-        return T_ERR_OUTOFMEM;
-
-    if ((flags & PhysFlags2D::EnableDebug)	 && g_coreApi->getGfxDriver()) {
-        g_box2d.nvg = nvgCreate(0, debugViewId, g_coreApi->getGfxDriver(), g_gfxApi, alloc);
-        if (!g_box2d.nvg) {
-            BX_WARN_API(g_coreApi, "Initializing NanoVg for Debugging Physics failed");
-        }
-    }
-
-    g_box2d.alloc = alloc;
-    return 0;
+    return true;
 }
 
-static void shutdownBox2d()
+static void shutdownBox2dGraphicsObjects()
 {
-    if (g_box2d.nvg)
+    if (g_box2d.nvg) {
         nvgDelete(g_box2d.nvg);
-
-    g_box2d.emitterTable.destroy();
-    g_box2d.pgroupPool.destroy();
-    g_box2d.emitterPool.destroy();
-    g_box2d.jointPool.destroy();
-    g_box2d.shapePool.destroy();
-    g_box2d.bodyPool.destroy();
-    g_box2d.scenePool.destroy();
-    g_box2d.alloc = nullptr;
+        g_box2d.nvg = nullptr;
+    }
 }
 
 static void* b2AllocCallback(int32 size, void* callbackData)
@@ -271,9 +261,53 @@ static void b2FreeCallback(void* mem, void* callbackData)
     BX_FREE(g_box2d.alloc, mem);
 }
 
+
+static result_t initBox2d(bx::AllocatorI* alloc, PhysFlags2D::Bits flags, uint8_t debugViewId)
+{
+    if (!g_box2d.scenePool.create(6, alloc) ||
+        !g_box2d.bodyPool.create(200, alloc) ||
+        !g_box2d.shapePool.create(200, alloc) ||
+        !g_box2d.jointPool.create(100, alloc) ||
+        !g_box2d.emitterPool.create(30, alloc))
+    {
+        return T_ERR_OUTOFMEM;
+    }
+
+    if (!g_box2d.emitterTable.create(30, alloc))
+        return T_ERR_OUTOFMEM;
+
+    if ((flags & PhysFlags2D::EnableDebug) && g_coreApi->getGfxDriver()) {
+        g_box2d.nvg = nvgCreate(0, debugViewId, g_coreApi->getGfxDriver(), g_gfxApi, alloc);
+        if (!g_box2d.nvg) {
+            BX_WARN_API(g_coreApi, "Initializing NanoVg for Debugging Physics failed");
+        }
+        debugViewId = debugViewId;
+    }
+
+    g_box2d.alloc = alloc;
+    g_box2d.initFlags = flags;
+
+    b2SetAllocFreeCallbacks(b2AllocCallback, b2FreeCallback, nullptr);
+
+    return 0;
+}
+
+static void shutdownBox2d()
+{
+    shutdownBox2dGraphicsObjects();
+
+    g_box2d.emitterTable.destroy();
+//    g_box2d.pgroupPool.destroy();
+    g_box2d.emitterPool.destroy();
+    g_box2d.jointPool.destroy();
+    g_box2d.shapePool.destroy();
+    g_box2d.bodyPool.destroy();
+    g_box2d.scenePool.destroy();
+    g_box2d.alloc = nullptr;
+}
+
 static PhysScene2D* createSceneBox2d(const PhysSceneDef2D& worldDef)
 {
-    b2SetAllocFreeCallbacks(b2AllocCallback, b2FreeCallback, nullptr);
     PhysScene2D* scene = g_box2d.scenePool.newInstance<const PhysSceneDef2D&>(worldDef);
     if (!scene)
         return nullptr;
@@ -737,14 +771,6 @@ void DestructionListenerBox2d::SayGoodbye(b2Fixture* fixture)
     g_box2d.shapePool.deleteInstance(shape);
 }
 
-void DestructionListenerBox2d::SayGoodbye(b2ParticleGroup* group)
-{
-    PhysParticleGroup2D* pgroup = (PhysParticleGroup2D*)group->GetUserData();
-    if (pgroup->destroyFn)
-        pgroup->destroyFn(pgroup);
-    g_box2d.pgroupPool.deleteInstance(pgroup);
-}
-
 void DestructionListenerBox2d::SayGoodbye(b2ParticleSystem* particleSystem, int32 index)
 {
     int r = g_box2d.emitterTable.find(uintptr_t(particleSystem));
@@ -807,6 +833,202 @@ static void box2dQueryShapeCircle(PhysScene2D* scene, float radius, const vec2_t
     aabb.upperBound = b2vec2(pos + vec2f(radius, radius));
 
     scene->w.QueryAABB(&b2callback, aabb);
+}
+
+static PhysParticleEmitter2D* box2dCreateParticleEmitter(PhysScene2D* scene, const PhysParticleEmitterDef2D& def)
+{
+    b2ParticleSystemDef b2def;
+    b2def.strictContactCheck = (def.flags & PhysEmitterFlags2D::StrictContactCheck) ? true : false;
+    b2def.density = def.density;
+    b2def.gravityScale = def.gravityScale;
+    b2def.radius = def.radius;
+    b2def.maxCount = def.maxCount;
+
+    b2def.pressureStrength = 0.05f;
+    b2def.dampingStrength = 1.0f;
+    b2def.elasticStrength = 0.25f;
+    b2def.springStrength = 0.25f;
+    b2def.viscousStrength = 0.25f;
+    b2def.surfaceTensionPressureStrength = 0.2f;
+    b2def.surfaceTensionNormalStrength = 0.2f;
+    b2def.repulsiveStrength = 1.0f;
+    b2def.powderStrength = 0.5f;
+    b2def.ejectionStrength = 0.5f;
+    b2def.staticPressureStrength = 0.2f;
+    b2def.staticPressureRelaxation = 0.2f;
+    b2def.staticPressureIterations = 8;
+    b2def.colorMixingStrength = 0.5f;
+    b2def.destroyByAge = (def.flags & PhysEmitterFlags2D::DestroyByAge) ? true : false;
+    b2def.lifetimeGranularity = 1.0f / 60.0f;
+    
+
+    PhysParticleEmitter2D* emitter = g_box2d.emitterPool.newInstance<>();
+    emitter->p = scene->w.CreateParticleSystem(&b2def);
+    if (!emitter->p) {
+        g_box2d.emitterPool.deleteInstance(emitter);
+        return nullptr;
+    }
+
+    emitter->userData = def.userData;
+    g_box2d.emitterTable.add(uintptr_t(emitter->p), emitter);
+    return emitter;    
+}
+
+static void box2dDestroyParticleEmitter(PhysScene2D* scene, PhysParticleEmitter2D* emitter)
+{
+    assert(emitter);
+
+    scene->w.DestroyParticleSystem(emitter->p);
+    
+    int r = g_box2d.emitterTable.find(uintptr_t(emitter->p));
+    if (r != -1)
+        g_box2d.emitterTable.remove(r);
+    g_box2d.emitterPool.deleteInstance(emitter);
+}
+
+static void* box2dGetParticleEmitterUserData(PhysParticleEmitter2D* emitter)
+{
+    assert(emitter);
+    return emitter->userData;
+}
+
+static int box2dCreateParticle(PhysParticleEmitter2D* emitter, const PhysParticleDef2D& particleDef)
+{
+    assert(emitter);
+    b2ParticleDef b2def;
+    b2def.flags = particleDef.flags;
+    b2def.position = b2vec2(particleDef.position);
+    b2def.velocity = b2vec2(particleDef.velocity);
+    b2def.group = (b2ParticleGroup*)particleDef.group;
+    b2def.lifetime = particleDef.lifetime;
+    b2def.userData = particleDef.userData;
+    b2def.color = b2ParticleColor(particleDef.color.r, particleDef.color.g, particleDef.color.b, particleDef.color.a);
+    return emitter->p->CreateParticle(b2def);
+}
+
+static void box2dDestroyParticle(PhysParticleEmitter2D* emitter, int index, bool callDestructionCallback)
+{
+    assert(emitter);
+    emitter->p->DestroyParticle(index, callDestructionCallback);
+}
+
+static int box2dGetParticleCount(PhysParticleEmitter2D* emitter)
+{
+    assert(emitter);
+    return emitter->p->GetParticleCount();
+}
+
+static void box2dSetMaxParticleCount(PhysParticleEmitter2D* emitter, int maxCount)
+{
+    assert(emitter);
+    emitter->p->SetMaxParticleCount(maxCount);
+}
+
+static int box2dGetMaxParticleCount(PhysParticleEmitter2D* emitter)
+{
+    assert(emitter);
+    return emitter->p->GetMaxParticleCount();
+}
+
+static void box2dApplyParticleForceBatch(PhysParticleEmitter2D* emitter, int firstIdx, int lastIdx, const vec2_t& force)
+{
+    assert(emitter);
+    emitter->p->ApplyForce(firstIdx, lastIdx, b2vec2(force));
+}
+
+static void box2dApplyParticleImpulseBatch(PhysParticleEmitter2D* emitter, int firstIdx, int lastIdx, const vec2_t& impulse)
+{
+    assert(emitter);
+    emitter->p->ApplyLinearImpulse(firstIdx, lastIdx, b2vec2(impulse));
+}
+
+static void box2dApplyParticleForce(PhysParticleEmitter2D* emitter, int index, const vec2_t& force)
+{
+    assert(emitter);
+    emitter->p->ParticleApplyForce(index, b2vec2(force));
+}
+
+static void box2dApplyParticleImpulse(PhysParticleEmitter2D* emitter, int index, const vec2_t& impulse)
+{
+    assert(emitter);
+    emitter->p->ParticleApplyLinearImpulse(index, b2vec2(impulse));
+}
+
+static int box2dGetEmitterPositionBuffer(PhysParticleEmitter2D* emitter, vec2_t* poss, int maxItems)
+{
+    assert(emitter);
+    int count = std::min<int>(emitter->p->GetParticleCount(), maxItems);
+    memcpy(poss, emitter->p->GetPositionBuffer(), count*sizeof(vec2_t));
+    return count;
+}
+
+static int box2dGetEmitterVelocityBuffer(PhysParticleEmitter2D* emitter, vec2_t* vels, int maxItems)
+{
+    assert(emitter);
+    int count = std::min<int>(emitter->p->GetParticleCount(), maxItems);
+    memcpy(vels, emitter->p->GetVelocityBuffer(), count*sizeof(vec2_t));
+    return count;
+}
+
+static int box2dGetEmitterColorBuffer(PhysParticleEmitter2D* emitter, color_t* colors, int maxItems)
+{
+    assert(emitter);
+    int count = std::min<int>(emitter->p->GetParticleCount(), maxItems);
+    memcpy(colors, emitter->p->GetColorBuffer(), count*sizeof(color_t));
+    return count;
+}
+
+static PhysParticleGroup2D* box2dCreateParticleGroupCircleShape(PhysParticleEmitter2D* emitter, 
+                                                                const PhysParticleGroupDef2D& groupDef, float radius)
+{
+    b2ParticleGroupDef b2def;
+    b2def.groupFlags = groupDef.flags;
+    b2def.flags = groupDef.particleFlags;
+    b2def.angle = groupDef.angle;
+    b2def.angularVelocity = groupDef.angularVelocity;
+    b2def.linearVelocity = b2vec2(groupDef.linearVelocity);
+    b2def.color = b2ParticleColor(groupDef.color.r, groupDef.color.g, groupDef.color.b, groupDef.color.a);
+    b2def.position = b2vec2(groupDef.position);
+    b2def.strength = groupDef.strength;
+    b2def.lifetime = groupDef.lifetime;
+    b2def.userData = groupDef.userData;
+
+    b2CircleShape shape;
+    shape.m_radius = radius;
+    b2def.shapeCount = 1;
+    b2def.shape = &shape;
+
+    return (PhysParticleGroup2D*)emitter->p->CreateParticleGroup(b2def);
+}
+
+static void box2dApplyParticleGroupImpulse(PhysParticleGroup2D* group, const vec2_t& impulse)
+{
+    ((b2ParticleGroup*)group)->ApplyLinearImpulse(b2vec2(impulse));
+}
+
+static void box2dApplyParticleGroupForce(PhysParticleGroup2D* group, const vec2_t& force)
+{
+    ((b2ParticleGroup*)group)->ApplyForce(b2vec2(force));
+}
+
+static void box2dDestroyParticleGroupParticles(PhysParticleGroup2D* group, bool callDestructionCallback/* = false*/)
+{
+    ((b2ParticleGroup*)group)->DestroyParticles();
+}
+
+static void* box2dGetParticleGroupUserData(PhysParticleGroup2D* group)
+{
+    return ((b2ParticleGroup*)group)->GetUserData();
+}
+
+static void box2dSetParticleGroupFlags(PhysParticleGroup2D* group, uint32_t flags)
+{
+    ((b2ParticleGroup*)group)->SetGroupFlags(flags);
+}
+
+static uint32_t box2dGetParticleGroupFlags(PhysParticleGroup2D* group)
+{
+    return ((b2ParticleGroup*)group)->GetGroupFlags();
 }
 
 void PhysDebugDraw::beginDraw(NVGcontext* nvg, const Camera2D& cam, const recti_t& viewport)
@@ -990,6 +1212,8 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 
     api.init = initBox2d;
     api.shutdown = shutdownBox2d;
+    api.initGraphicsObjects = initBox2dGraphicsObjects;
+    api.shutdownGraphicsObjects = shutdownBox2dGraphicsObjects;
     api.createScene = createSceneBox2d;
     api.destroyScene = destroySceneBox2d;
     api.getSceneTimeStep = [](PhysScene2D* scene)->float { return scene->timestep; };
@@ -1103,6 +1327,31 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.getInertia = [](PhysBody2D* body)->float {
         return body->b->GetInertia();
     };
+
+    api.createParticleEmitter = box2dCreateParticleEmitter;
+    api.destroyParticleEmitter = box2dDestroyParticleEmitter;
+    api.createParticle = box2dCreateParticle;
+    api.destroyParticle = box2dDestroyParticle;
+    api.getParticleEmitterUserData = box2dGetParticleEmitterUserData;
+    api.getParticleCount = box2dGetParticleCount;
+    api.setMaxParticleCount = box2dSetMaxParticleCount;
+    api.getMaxParticleCount = box2dGetMaxParticleCount;
+    api.applyParticleForceBatch = box2dApplyParticleForceBatch;
+    api.applyParticleImpulseBatch = box2dApplyParticleImpulseBatch;
+    api.applyParticleForce = box2dApplyParticleForce;
+    api.applyParticleImpulse = box2dApplyParticleImpulse;
+    api.getEmitterColorBuffer = box2dGetEmitterColorBuffer;
+    api.getEmitterPositionBuffer = box2dGetEmitterPositionBuffer;
+    api.getEmitterVelocityBuffer = box2dGetEmitterVelocityBuffer;
+    api.setParticleShapeContactFilterCallback = [](PhysParticleEmitter2D* emitter, PhysParticleShapeContactFilterCallback2D callback) {
+        emitter->shapeContactFilterFn = callback;
+    };
+    api.createParticleGroupCircleShape = box2dCreateParticleGroupCircleShape;
+    api.destroyParticleGroupParticles = box2dDestroyParticleGroupParticles;
+    api.getParticleGroupFlags = box2dGetParticleGroupFlags;
+    api.getParticleGroupUserData = box2dGetParticleGroupUserData;
+    api.applyParticleGroupForce = box2dApplyParticleGroupForce;
+    api.applyParticleGroupImpulse = box2dApplyParticleGroupImpulse;
 
     static_assert(b2_maxManifoldPoints >= 2, "Manifold points mistmatch");
 

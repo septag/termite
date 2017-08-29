@@ -513,7 +513,6 @@ void termite::shutdownSpriteSystem()
         driver->destroyProgram(g_spriteSys->spriteProg);
     if (g_spriteSys->spriteAddProg.isValid())
         driver->destroyProgram(g_spriteSys->spriteAddProg);
-
     if (g_spriteSys->u_texture.isValid())
         driver->destroyUniform(g_spriteSys->u_texture);
 
@@ -532,6 +531,41 @@ void termite::shutdownSpriteSystem()
 
     BX_DELETE(alloc, g_spriteSys);
     g_spriteSys = nullptr;
+}
+
+bool termite::initSpriteSystemGraphics(GfxDriverApi* driver)
+{
+    g_spriteSys->driver = driver;
+
+    g_spriteSys->spriteProg =
+        driver->createProgram(driver->createShader(driver->makeRef(sprite_vso, sizeof(sprite_vso), nullptr, nullptr)),
+                              driver->createShader(driver->makeRef(sprite_fso, sizeof(sprite_fso), nullptr, nullptr)),
+                              true);
+    if (!g_spriteSys->spriteProg.isValid())
+        return false;
+
+    g_spriteSys->spriteAddProg =
+        driver->createProgram(driver->createShader(driver->makeRef(sprite_add_vso, sizeof(sprite_add_vso), nullptr, nullptr)),
+                              driver->createShader(driver->makeRef(sprite_add_fso, sizeof(sprite_add_fso), nullptr, nullptr)),
+                              true);
+    if (!g_spriteSys->spriteAddProg.isValid())
+        return false;
+
+    g_spriteSys->u_texture = driver->createUniform("u_texture", UniformType::Int1, 1);
+
+    return true;
+}
+
+void termite::shutdownSpriteSystemGraphics()
+{
+    GfxDriverApi* driver = g_spriteSys->driver;
+
+    if (g_spriteSys->spriteProg.isValid())
+        driver->destroyProgram(g_spriteSys->spriteProg);
+    if (g_spriteSys->spriteAddProg.isValid())
+        driver->destroyProgram(g_spriteSys->spriteAddProg);
+    if (g_spriteSys->u_texture.isValid())
+        driver->destroyUniform(g_spriteSys->u_texture);
 }
 
 void termite::addSpriteFrameTexture(Sprite* sprite, 
@@ -767,6 +801,11 @@ void termite::setSpriteHalfSize(Sprite* sprite, const vec2_t& halfSize)
     sprite->halfSize = halfSize;
 }
 
+vec2_t termite::getSpriteHalfSize(Sprite* sprite)
+{
+    return sprite->halfSize;
+}
+
 void termite::setSpriteSizeMultiplier(Sprite* sprite, const vec2_t& sizeMultiplier)
 {
     sprite->sizeMultiplier = sizeMultiplier;
@@ -981,7 +1020,7 @@ void termite::convertSpritePhysicsVerts(vec2_t* ptsOut, const vec2_t* ptsIn, int
 
 void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,
                           ProgramHandle progOverride /*= ProgramHandle()*/, SetSpriteStateCallback stateCallback /*= nullptr*/,
-                          void* stateUserData)
+                          void* stateUserData, const color_t* colors)
 {
     assert(sprites);
     assert(mats);
@@ -1085,7 +1124,11 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
 
         v0.transform1 = v1.transform1 = v2.transform1 = v3.transform1 = transform1;
         v0.transform2 = v1.transform2 = v2.transform2 = v3.transform2 = transform2;
-        v0.color = v1.color = v2.color = v3.color = ss.sprite->tint.n;
+
+        if (!colors)
+            v0.color = v1.color = v2.color = v3.color = ss.sprite->tint.n;
+        else 
+            v0.color = v1.color = v2.color = v3.color = colors[ss.index].n;
 
         if (flipX & SpriteFlip::FlipX) {
             std::swap<float>(v0.coords.x, v1.coords.x);

@@ -116,7 +116,7 @@ static AsyncAssetDriver g_async;
 static AAssetManager* g_amgr = nullptr;
 
 // JNI
-extern "C" JNIEXPORT void JNICALL Java_com_termite_utils_PlatformUtils_termiteInitAssetManager(JNIEnv* env, jclass cls, jobject jassetManager)
+extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteInitAssetManager(JNIEnv* env, jclass cls, jobject jassetManager)
 {
     BX_UNUSED(cls);
     g_amgr = AAssetManager_fromJava(env, jassetManager);

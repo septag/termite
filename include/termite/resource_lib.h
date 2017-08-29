@@ -93,6 +93,8 @@ namespace termite
     TERMITE_API ResourceHandle getResourceAsyncHandle(const char* name);
     TERMITE_API ResourceHandle addResourceRef(ResourceHandle handle);
     TERMITE_API uint32_t getResourceRefCount(ResourceHandle handle);
+    TERMITE_API void reloadResourceType(const char* name);
+    TERMITE_API void unloadAllResources(const char* name);
 
     template <typename Ty>
     Ty* getResourcePtr(ResourceHandle handle)

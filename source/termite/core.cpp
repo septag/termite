@@ -197,6 +197,7 @@ struct Core
     bx::Array<ConsoleCommand> consoleCmds;
 
     bool init;
+    bool gfxReset;
 
     Core() :
         tempAlloc(T_MID_TEMP),
@@ -213,6 +214,7 @@ struct Core
         numGfxLogCache = 0;
         rmt = nullptr;
         init = false;
+        gfxReset = false;
         memset(&frameData, 0x00, sizeof(frameData));
     }
 };
@@ -232,11 +234,19 @@ static Core* g_core = nullptr;
 bx::AllocatorI* rapidjson::BxAllocatorStatic::Alloc = g_alloc;
 
 #if BX_PLATFORM_ANDROID
-#include <jni.h>
-extern "C" JNIEXPORT void JNICALL Java_com_termite_utils_PlatformUtils_termiteInitPaths(JNIEnv* env, jclass cls, 
-                                                                                        jstring dataDir, jstring cacheDir)
+static JavaVM* g_javaVM = nullptr;
+static jclass g_activityClass = 0;
+static jobject g_activityObj = 0;
+
+extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteInitEngineVars(JNIEnv* env, jclass cls, 
+                                                                                       jobject obj, jstring dataDir, 
+                                                                                       jstring cacheDir)
 {
     BX_UNUSED(cls);
+
+    env->GetJavaVM(&g_javaVM);
+    g_activityClass = (jclass)env->NewGlobalRef(env->GetObjectClass(obj));
+    g_activityObj = env->NewGlobalRef(obj);
     
     const char* str = env->GetStringUTFChars(dataDir, nullptr);
     bx::strlcpy(g_dataDir.getBuffer(), str, sizeof(g_dataDir));
@@ -246,7 +256,59 @@ extern "C" JNIEXPORT void JNICALL Java_com_termite_utils_PlatformUtils_termiteIn
     bx::strlcpy(g_cacheDir.getBuffer(), str, sizeof(g_cacheDir));
     env->ReleaseStringUTFChars(cacheDir, str);
 }
+
+
+extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteSetGraphicsReset(JNIEnv* env, jclass cls)
+{
+    if (g_core)
+        g_core->gfxReset = true;
+}
+
+JavaMethod termite::androidFindMethod(const char* methodName, const char* methodSig, const char* classPath,
+                                      JavaMethodType::Enum type)
+{
+    assert(g_javaVM);
+
+    JavaMethod m;
+    memset(&m, 0x00, sizeof(m));
+
+    if (type == JavaMethodType::Method) {
+        g_javaVM->AttachCurrentThread(&m.env, nullptr);
+    } else if (type == JavaMethodType::StaticMethod) {
+        g_javaVM->GetEnv((void**)&m.env, JNI_VERSION_1_6);
+    }
+
+    if (m.env == nullptr) {
+        BX_WARN("Calling Java method '%s' failed: Cannot retreive Java Env", methodName);
+        return m;
+    }
+
+    if (classPath == nullptr) {
+        m.cls = g_activityClass;
+        m.obj = g_activityObj;
+    } else {
+        m.cls = m.env->FindClass(classPath);
+        if (m.cls == 0) {
+            BX_WARN("Calling Java method '%s' failed: Cannot find class '%s'", methodName, classPath);
+            return m;
+        }
+    }
+
+
+    if (type == JavaMethodType::Method) {
+        m.methodId = m.env->GetMethodID(m.cls, methodName, methodSig);
+    } else if (type == JavaMethodType::StaticMethod) {
+        m.methodId = m.env->GetStaticMethodID(m.cls, methodName, methodSig);
+    }
+    if (m.methodId == 0) {
+        BX_WARN("Finding Java method '%s' failed: Cannot find method in class '%s'", methodName, classPath);
+        return m;
+    }
+
+    return m;
+}
 #endif
+
 
 static void* remoteryMallocCallback(void* mm_context, rmtU32 size)
 {
@@ -1089,7 +1151,7 @@ MemoryBlock* termite::decodeMemoryAES128(const MemoryBlock* mem, bx::AllocatorI*
     return rmem;
 }
 
-void termite::xorCipher(uint8_t* outputBuff, uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize)
+void termite::cipherXOR(uint8_t* outputBuff, const uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize)
 {
     assert(buffSize > 0);
     assert(keySize > 0);
@@ -1119,16 +1181,7 @@ float termite::getRandomFloatNormal(float mean, float sigma)
 void termite::inputSendChars(const char* chars)
 {
 	ImGuiIO& io = ImGui::GetIO();
-
     io.AddInputCharactersUTF8(chars);
-    /*
-    int i = 0;
-	char c;
-	while ((c = chars[i++]) > 0) {
-        if (c > 0 && c <  0x7f)
-		i++;
-	}
-    */
 }
 
 void termite::inputSendKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl)
@@ -1224,6 +1277,129 @@ void termite::dumpGfxLog() T_THREAD_SAFE
         g_core->gfxLogCache = nullptr;
         g_core->numGfxLogCache = 0;
     }
+}
+
+bool termite::needGfxReset() T_THREAD_SAFE
+{
+    return g_core->gfxReset;
+}
+
+void termite::shutdownGraphics()
+{
+    // Unload all graphics resources
+    unloadAllResources("texture");
+
+    // Unload subsystems
+    shutdownSpriteSystemGraphics();
+    shutdownImGui();
+    shutdownDebugDraw();
+    shutdownVectorGfx();
+    shutdownFontSystemGraphics();
+    shutdownModelLoader();
+    shutdownTextureLoader();
+    shutdownGfxUtils();
+
+    if (g_core->phys2dDriver) {
+        g_core->phys2dDriver->shutdownGraphicsObjects();
+    }
+
+    // Shutdown driver
+    if (g_core->gfxDriver) {
+        g_core->gfxDriver->shutdown();
+        g_core->gfxDriver = nullptr;
+        dumpGfxLog();
+    }
+}
+
+bool termite::resetGraphics(const GfxPlatformData* platform)
+{
+    int r;
+    PluginHandle pluginHandle;
+    const Config& conf = g_core->conf;
+
+    r = findPluginByName(conf.gfxName, 0, &pluginHandle, 1, PluginType::GraphicsDriver);
+    if (r > 0) {
+        g_core->gfxDriver = (GfxDriverApi*)initPlugin(pluginHandle, g_alloc);
+    }
+
+    if (!g_core->gfxDriver) {
+        T_ERROR("Core init failed: Could not detect Graphics driver: %s", conf.gfxName);
+        return false;
+    }
+
+    const PluginDesc& desc = getPluginDesc(pluginHandle);
+    BX_BEGINP("Initializing Graphics Driver: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version),
+              T_VERSION_MINOR(desc.version));
+    if (platform)
+        g_core->gfxDriver->setPlatformData(*platform);
+    if (T_FAILED(g_core->gfxDriver->init(conf.gfxDeviceId, &g_core->gfxDriverEvents, g_alloc))) {
+        BX_END_FATAL();
+        dumpGfxLog();
+        T_ERROR("Core init failed: Could not initialize Graphics driver");
+        return false;
+    }
+    BX_END_OK();
+    dumpGfxLog();
+
+    // Initialize Renderer with Gfx Driver
+    if (g_core->renderer) {
+        BX_BEGINP("Initializing Renderer");
+        if (T_FAILED(g_core->renderer->init(g_alloc, g_core->gfxDriver))) {
+            BX_END_FATAL();
+            T_ERROR("Core init failed: Could not initialize Renderer");
+            return false;
+        }
+        BX_END_OK();
+    }
+
+    // Init and Register graphics resource loaders
+    initTextureLoader(g_core->gfxDriver, g_alloc);
+    registerTextureToResourceLib();
+
+    initModelLoader(g_core->gfxDriver, g_alloc);
+    registerModelToResourceLib();
+
+    initFontSystemGraphics();
+
+    // VectorGraphics
+    if (initVectorGfx(g_alloc, g_core->gfxDriver)) {
+        T_ERROR("Initializing Vector Graphics failed");
+        return false;
+    }
+
+    // Debug graphics
+    if (initDebugDraw(g_alloc, g_core->gfxDriver)) {
+        T_ERROR("Initializing Editor Draw failed");
+        return false;
+    }
+
+    // Graphics Utilities
+    if (initGfxUtils(g_core->gfxDriver)) {
+        T_ERROR("Initializing Graphics Utilities failed");
+        return false;
+    }
+
+    // ImGui initialize
+    if (T_FAILED(initImGui(IMGUI_VIEWID, g_core->gfxDriver, g_alloc, conf.keymap,
+                           conf.uiIniFilename, platform ? platform->nwh : nullptr))) {
+        T_ERROR("Initializing ImGui failed");
+        return false;
+    }
+
+    if (!initSpriteSystemGraphics(g_core->gfxDriver)) {
+        T_ERROR("Initializing Sprite System failed");
+        return false;
+    }
+
+    if (g_core->phys2dDriver) {
+        g_core->phys2dDriver->initGraphicsObjects();
+    }
+
+    // Reload resources
+    reloadResourceType("texture");
+
+    g_core->gfxReset = false;
+    return true;
 }
 
 void termite::registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback)

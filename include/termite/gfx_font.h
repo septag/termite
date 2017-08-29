@@ -67,6 +67,9 @@ namespace termite
     result_t initFontSystem(bx::AllocatorI* alloc, const vec2_t refScreenSize = vec2f(-1.0f, -1.0f));
     void shutdownFontSystem();
 
+    bool initFontSystemGraphics();
+    void shutdownFontSystemGraphics();
+
     // Font Info (Custom rendering)
     TERMITE_API ResourceHandle getFontTexture(Font* font, int pageId = 0);
     TERMITE_API vec2_t getFontTextureSize(Font* font);
@@ -99,12 +102,14 @@ namespace termite
     TERMITE_API void addTextf(TextBatch* batch, color_t color, float scale,
                               const rect_t& rectFit, TextFlags::Bits flags,
                               const char* fmt, ...);
-
     TERMITE_API void drawText(TextBatch* batch, uint8_t viewId);
     TERMITE_API void drawTextDropShadow(TextBatch* batch, uint8_t viewId, color_t shadowColor = color1n(0xff000000), 
                                         vec2_t shadowAmount = vec2f(2.0f, 2.0f));
     TERMITE_API void drawTextOutline(TextBatch* batch, uint8_t viewId, color_t outlineColor = color1n(0xff000000), 
                                      float outlineAmount = 0.5f);
+    TERMITE_API void drawTextDropShadowTwoPass(TextBatch* batch, uint8_t viewId, color_t shadowColor = color1n(0xff000000),
+                                               vec2_t shadowAmount = vec2f(2.0f, 2.0f));
+
     TERMITE_API void destroyTextBatch(TextBatch* batch);
 
     void registerFontToResourceLib();

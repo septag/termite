@@ -54,8 +54,8 @@ static void* g_iosLayerHandle = nullptr;
 
 #if BX_PLATFORM_ANDROID
 #include <jni.h>
-extern "C" JNIEXPORT void JNICALL Java_com_termite_utils_PlatformUtils_termiteSetAccelData(JNIEnv* env, jclass cls,
-                                                                                           jfloat x, jfloat y, jfloat z)
+extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteSetAccelData(JNIEnv* env, jclass cls,
+                                                                                     jfloat x, jfloat y, jfloat z)
 {
     BX_UNUSED(cls);
 
@@ -79,7 +79,6 @@ result_t termite::initSdlUtils(bx::AllocatorI* alloc)
         return T_ERR_OUTOFMEM;
     if (!g_sdl->shortcutKeys.create(16, 32, alloc))
         return T_ERR_OUTOFMEM;
-
     return 0;
 }
 

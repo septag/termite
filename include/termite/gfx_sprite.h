@@ -48,6 +48,9 @@ namespace termite
     result_t initSpriteSystem(GfxDriverApi* driver, bx::AllocatorI* alloc);
     void shutdownSpriteSystem();
 
+    bool initSpriteSystemGraphics(GfxDriverApi* driver);
+    void shutdownSpriteSystemGraphics();
+
     TERMITE_API Sprite* createSprite(bx::AllocatorI* alloc, const vec2_t halfSize);
     TERMITE_API void destroySprite(Sprite* sprite);
 
@@ -117,6 +120,7 @@ namespace termite
 
     // Set/Get Sprite props
     TERMITE_API void setSpriteHalfSize(Sprite* sprite, const vec2_t& halfSize);
+    TERMITE_API vec2_t getSpriteHalfSize(Sprite* sprite);
     TERMITE_API void setSpriteSizeMultiplier(Sprite* sprite, const vec2_t& sizeMultiplier);
     TERMITE_API void gotoSpriteFrameIndex(Sprite* sprite, int frameIdx);
     TERMITE_API void gotoSpriteFrameName(Sprite* sprite, const char* name);
@@ -151,7 +155,7 @@ namespace termite
     // Dynamically draw sprites
     TERMITE_API void drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,
                                  ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr,
-                                 void* stateUserData = nullptr);
+                                 void* stateUserData = nullptr, const color_t* colors = nullptr);
     inline void drawSprite(uint8_t viewId, Sprite* sprite, const mtx3x3_t& mat,
                            ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr,
                            void* stateUserData = nullptr)

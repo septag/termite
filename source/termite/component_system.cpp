@@ -276,8 +276,8 @@ bool termite::isEntityAlive(EntityManager* emgr, Entity ent)
 
 void termite::setEntityActive(Entity ent, bool active, uint32_t flags)
 {
-    const int maxHandles = 100;
-    ComponentHandle* handles = (ComponentHandle*)alloca(maxHandles*sizeof(ComponentHandle));
+    const int maxHandles = 200;
+    ComponentHandle handles[maxHandles];
     int numHandles = getEntityComponents(ent, handles, maxHandles);
     for (int i = 0; i < numHandles; i++) {
         ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handles[i])];
@@ -298,6 +298,20 @@ void termite::setEntityActive(Entity ent, bool active, uint32_t flags)
             }
         }
     }
+}
+
+bool termite::isEntityActive(Entity ent)
+{
+    const int maxHandles = 200;
+    ComponentHandle handles[maxHandles];
+    int numHandles = getEntityComponents(ent, handles, maxHandles);
+    bool active = false;
+    for (int i = 0; i < numHandles; i++) {
+        ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(handles[i])];
+        uint16_t cHandle = COMPONENT_INSTANCE_HANDLE(handles[i]);
+        active |= *ctype.dataPool.getHandleData<bool>(3, cHandle);
+    }
+    return active;
 }
 
 result_t termite::initComponentSystem(bx::AllocatorI* alloc)

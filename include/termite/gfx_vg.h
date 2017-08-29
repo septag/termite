@@ -25,11 +25,13 @@ namespace termite
     TERMITE_API void vgTextf(VectorGfxContext* ctx, float x, float y, const char* fmt, ...);
     TERMITE_API void vgTextv(VectorGfxContext* ctx, float x, float y, const char* fmt, va_list argList);
 
-    // Rect/Image
+    // Rect/Image/Line
     TERMITE_API void vgRectf(VectorGfxContext* ctx, float x, float y, float width, float height);
     TERMITE_API void vgRect(VectorGfxContext* ctx, const rect_t& rect);
     TERMITE_API void vgImageRect(VectorGfxContext* ctx, const rect_t& rect, const Texture* image);
     TERMITE_API void vgImage(VectorGfxContext* ctx, float x, float y, const Texture* image);
+    TERMITE_API void vgLine(VectorGfxContext* ctx, const vec2_t& p1, const vec2_t& p2, float lineWidth);
+    TERMITE_API void vgArrow(VectorGfxContext* ctx, const vec2_t& p1, const vec2_t& p2, float lineWidth, float arrowLength);
 
     // States
     TERMITE_API void vgScissor(VectorGfxContext* ctx, const recti_t& rect);

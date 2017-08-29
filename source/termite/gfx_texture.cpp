@@ -382,7 +382,7 @@ bool TextureLoaderAll::loadObj(const MemoryBlock* mem, const ResourceTypeParams&
     bx::Path path(params.uri);
     bx::Path ext = path.getFileExt();
     ext.toLower();
-    if (ext.isEqual("ktx") || ext.isEqual("dds")) {
+    if (ext.isEqual("ktx") || ext.isEqual("dds") || ext.isEqual("pvr")) {
         return loadCompressed(mem, params, obj, alloc);
     } else if (ext.isEqual("png") || ext.isEqual("tga") || ext.isEqual("jpg") || ext.isEqual("bmp") ||
                ext.isEqual("jpeg") || ext.isEqual("psd") || ext.isEqual("hdr") || ext.isEqual("gif"))

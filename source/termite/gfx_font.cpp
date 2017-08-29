@@ -137,7 +137,7 @@ namespace termite
         UnicodeReplaceRule(1588, 65206, 65207, 65208), // She
         UnicodeReplaceRule(1589, 65210, 65211, 65212), // Sa, zaad
         UnicodeReplaceRule(1590, 65214, 65215, 65216), // Ze zaad
-        UnicodeReplaceRule(1591, 65218), // Taa daste dar
+        UnicodeReplaceRule(1591, 65218, 65219, 65220), // Taa daste dar
         UnicodeReplaceRule(1592, 65222, 65223, 65224), // Ze daste dar
         UnicodeReplaceRule(1593, 65226, 65227, 65228), // Eyn
         UnicodeReplaceRule(1594, 65230, 65231, 65232), // Gheyn
@@ -272,6 +272,7 @@ namespace termite
         UniformHandle uShadowColor;
         UniformHandle uOutlineColor;
         UniformHandle uTransformMtx;
+        UniformHandle uColor;
 
         FontSystem(bx::AllocatorI* _alloc) :
             alloc(_alloc),
@@ -312,65 +313,14 @@ namespace termite
         if (!g_fontSys->batchPool.create(16, alloc))
             return T_ERR_OUTOFMEM;            
 
+        TextVertex::init();
+
         g_fontSys->failFont = createDummyFont();
         g_fontSys->asyncFont = createDummyFont();
 
-        TextVertex::init();
-
-        GfxDriverApi* gDriver = getGfxDriver();
-        g_fontSys->normalProg = gDriver->createProgram(
-            gDriver->createShader(gDriver->makeRef(font_normal_vso, sizeof(font_normal_vso), nullptr, nullptr)),
-            gDriver->createShader(gDriver->makeRef(font_normal_fso, sizeof(font_normal_fso), nullptr, nullptr)), true);
-        if (!g_fontSys->normalProg.isValid()) {
-            T_ERROR("Creating font shader failed");
+        if (!initFontSystemGraphics()) {
             return T_ERR_FAILED;
         }
-        g_fontSys->normalShadowProg = gDriver->createProgram(
-            gDriver->createShader(gDriver->makeRef(font_normal_shadow_vso, sizeof(font_normal_shadow_vso), nullptr, nullptr)),
-            gDriver->createShader(gDriver->makeRef(font_normal_shadow_fso, sizeof(font_normal_shadow_fso), nullptr, nullptr)), true);
-        if (!g_fontSys->normalShadowProg.isValid()) {
-            T_ERROR("Creating font shader failed");
-            return T_ERR_FAILED;
-        }
-
-        g_fontSys->normalOutlineProg = gDriver->createProgram(
-            gDriver->createShader(gDriver->makeRef(font_normal_outline_vso, sizeof(font_normal_outline_vso), nullptr, nullptr)),
-            gDriver->createShader(gDriver->makeRef(font_normal_outline_fso, sizeof(font_normal_outline_fso), nullptr, nullptr)), true);
-        if (!g_fontSys->normalOutlineProg.isValid()) {
-            T_ERROR("Creating font shader failed");
-            return T_ERR_FAILED;
-        }
-
-        g_fontSys->dfProg = gDriver->createProgram(
-            gDriver->createShader(gDriver->makeRef(font_df_vso, sizeof(font_df_vso), nullptr, nullptr)),
-            gDriver->createShader(gDriver->makeRef(font_df_fso, sizeof(font_df_fso), nullptr, nullptr)), true);
-        if (!g_fontSys->dfProg.isValid()) {
-            T_ERROR("Creating font shader failed");
-            return T_ERR_FAILED;
-        }
-
-        g_fontSys->dfShadowProg = gDriver->createProgram(
-            gDriver->createShader(gDriver->makeRef(font_df_shadow_vso, sizeof(font_df_shadow_vso), nullptr, nullptr)), 
-            gDriver->createShader(gDriver->makeRef(font_df_shadow_fso, sizeof(font_df_shadow_fso), nullptr, nullptr)), true);
-        if (!g_fontSys->dfShadowProg.isValid()) {
-            T_ERROR("Creating font shader failed");
-            return T_ERR_FAILED;
-        }
-
-        g_fontSys->dfOutlineProg = gDriver->createProgram(
-            gDriver->createShader(gDriver->makeRef(font_df_outline_vso, sizeof(font_df_outline_vso), nullptr, nullptr)), 
-            gDriver->createShader(gDriver->makeRef(font_df_outline_fso, sizeof(font_df_outline_fso), nullptr, nullptr)), true);
-        if (!g_fontSys->dfOutlineProg.isValid()) {
-            T_ERROR("Creating font shader failed");
-            return T_ERR_FAILED;
-        }
-
-        g_fontSys->uTexture = gDriver->createUniform("u_texture", UniformType::Int1, 1);
-        g_fontSys->uParams = gDriver->createUniform("u_params", UniformType::Vec4, 1);
-        g_fontSys->uTextureSize = gDriver->createUniform("u_textureSize", UniformType::Vec4, 1);
-        g_fontSys->uShadowColor = gDriver->createUniform("u_shadowColor", UniformType::Vec4, 1);
-        g_fontSys->uOutlineColor = gDriver->createUniform("u_outlineColor", UniformType::Vec4, 1);
-        g_fontSys->uTransformMtx = gDriver->createUniform("u_transformMtx", UniformType::Mat4, 1);
 
         g_fontSys->refScreenSize = refScreenSize;
 
@@ -383,6 +333,83 @@ namespace termite
             return;
 
         bx::AllocatorI* alloc = g_fontSys->alloc;
+
+        shutdownFontSystemGraphics();
+
+        if (g_fontSys->failFont)
+            g_fontSys->loader.unloadObj(uintptr_t(g_fontSys->failFont), g_fontSys->alloc);
+        if (g_fontSys->asyncFont)
+            g_fontSys->loader.unloadObj(uintptr_t(g_fontSys->asyncFont), g_fontSys->alloc);
+
+        g_fontSys->batchPool.destroy();
+        BX_DELETE(alloc, g_fontSys);
+        g_fontSys = nullptr;
+    }
+
+    bool initFontSystemGraphics()
+    {
+        GfxDriverApi* gDriver = getGfxDriver();
+
+        g_fontSys->normalProg = gDriver->createProgram(
+            gDriver->createShader(gDriver->makeRef(font_normal_vso, sizeof(font_normal_vso), nullptr, nullptr)),
+            gDriver->createShader(gDriver->makeRef(font_normal_fso, sizeof(font_normal_fso), nullptr, nullptr)), true);
+        if (!g_fontSys->normalProg.isValid()) {
+            T_ERROR("Creating font shader failed");
+            return false;
+        }
+        g_fontSys->normalShadowProg = gDriver->createProgram(
+            gDriver->createShader(gDriver->makeRef(font_normal_shadow_vso, sizeof(font_normal_shadow_vso), nullptr, nullptr)),
+            gDriver->createShader(gDriver->makeRef(font_normal_shadow_fso, sizeof(font_normal_shadow_fso), nullptr, nullptr)), true);
+        if (!g_fontSys->normalShadowProg.isValid()) {
+            T_ERROR("Creating font shader failed");
+            return false;
+        }
+
+        g_fontSys->normalOutlineProg = gDriver->createProgram(
+            gDriver->createShader(gDriver->makeRef(font_normal_outline_vso, sizeof(font_normal_outline_vso), nullptr, nullptr)),
+            gDriver->createShader(gDriver->makeRef(font_normal_outline_fso, sizeof(font_normal_outline_fso), nullptr, nullptr)), true);
+        if (!g_fontSys->normalOutlineProg.isValid()) {
+            T_ERROR("Creating font shader failed");
+            return false;
+        }
+
+        g_fontSys->dfProg = gDriver->createProgram(
+            gDriver->createShader(gDriver->makeRef(font_df_vso, sizeof(font_df_vso), nullptr, nullptr)),
+            gDriver->createShader(gDriver->makeRef(font_df_fso, sizeof(font_df_fso), nullptr, nullptr)), true);
+        if (!g_fontSys->dfProg.isValid()) {
+            T_ERROR("Creating font shader failed");
+            return false;
+        }
+
+        g_fontSys->dfShadowProg = gDriver->createProgram(
+            gDriver->createShader(gDriver->makeRef(font_df_shadow_vso, sizeof(font_df_shadow_vso), nullptr, nullptr)),
+            gDriver->createShader(gDriver->makeRef(font_df_shadow_fso, sizeof(font_df_shadow_fso), nullptr, nullptr)), true);
+        if (!g_fontSys->dfShadowProg.isValid()) {
+            T_ERROR("Creating font shader failed");
+            return false;
+        }
+
+        g_fontSys->dfOutlineProg = gDriver->createProgram(
+            gDriver->createShader(gDriver->makeRef(font_df_outline_vso, sizeof(font_df_outline_vso), nullptr, nullptr)),
+            gDriver->createShader(gDriver->makeRef(font_df_outline_fso, sizeof(font_df_outline_fso), nullptr, nullptr)), true);
+        if (!g_fontSys->dfOutlineProg.isValid()) {
+            T_ERROR("Creating font shader failed");
+            return false;
+        }
+
+        g_fontSys->uTexture = gDriver->createUniform("u_texture", UniformType::Int1, 1);
+        g_fontSys->uParams = gDriver->createUniform("u_params", UniformType::Vec4, 1);
+        g_fontSys->uTextureSize = gDriver->createUniform("u_textureSize", UniformType::Vec4, 1);
+        g_fontSys->uShadowColor = gDriver->createUniform("u_shadowColor", UniformType::Vec4, 1);
+        g_fontSys->uOutlineColor = gDriver->createUniform("u_outlineColor", UniformType::Vec4, 1);
+        g_fontSys->uTransformMtx = gDriver->createUniform("u_transformMtx", UniformType::Mat4, 1);
+        g_fontSys->uColor = gDriver->createUniform("u_color", UniformType::Vec4, 1);
+        return true;
+
+    }
+
+    void shutdownFontSystemGraphics()
+    {
 
         GfxDriverApi* gDriver = getGfxDriver();
         if (g_fontSys->normalProg.isValid())
@@ -402,6 +429,8 @@ namespace termite
             gDriver->destroyUniform(g_fontSys->uTexture);
         if (g_fontSys->uParams.isValid())
             gDriver->destroyUniform(g_fontSys->uParams);
+        if (g_fontSys->uColor.isValid())
+            gDriver->destroyUniform(g_fontSys->uColor);
         if (g_fontSys->uShadowColor.isValid())
             gDriver->destroyUniform(g_fontSys->uShadowColor);
         if (g_fontSys->uOutlineColor.isValid())
@@ -410,16 +439,6 @@ namespace termite
             gDriver->destroyUniform(g_fontSys->uTransformMtx);
         if (g_fontSys->uTextureSize.isValid())
             gDriver->destroyUniform(g_fontSys->uTextureSize);
-
-        g_fontSys->batchPool.destroy();
-
-        if (g_fontSys->failFont)
-            g_fontSys->loader.unloadObj(uintptr_t(g_fontSys->failFont), g_fontSys->alloc);
-        if (g_fontSys->asyncFont)
-            g_fontSys->loader.unloadObj(uintptr_t(g_fontSys->asyncFont), g_fontSys->alloc);
-
-        BX_DELETE(alloc, g_fontSys);
-        g_fontSys = nullptr;
     }
 
     void registerFontToResourceLib()
@@ -1246,7 +1265,7 @@ namespace termite
         if (flags & TextFlags::AlignCenter) {
             pos = pos + ((screenRect.vmax + screenRect.vmin)*0.5f - vec2f(x*0.5f, 0));
         } else if (flags & TextFlags::AlignLeft) {
-            pos = pos + vec2f(screenRect.xmin + x*dirInvFactor, (screenRect.ymax + screenRect.ymin)*0.5f);
+            pos = pos + vec2f(screenRect.xmin - x*dirInvFactor, (screenRect.ymax + screenRect.ymin)*0.5f);
         } else if (flags & TextFlags::AlignRight) {
             pos = pos + vec2f(screenRect.xmax - x*(1.0f - dirInvFactor), (screenRect.ymax + screenRect.ymin)*0.5f);
         }
@@ -1269,7 +1288,8 @@ namespace termite
         addText(batch, color, scale, rectFit, flags, text);
     }
 
-    static void drawTextBatch(GfxDriverApi* gDriver, TextBatch* batch, uint8_t viewId, ProgramHandle prog, Font* font)
+    static void drawTextBatch(GfxDriverApi* gDriver, TextBatch* batch, uint8_t viewId, ProgramHandle prog, Font* font,
+                              const vec2_t offsetPos, const vec4_t& color)
     {
         int reqVertices = batch->numChars * 4;
         int reqIndices = batch->numChars * 6;
@@ -1283,7 +1303,11 @@ namespace termite
             memcpy(tvb.data, batch->verts, reqVertices*sizeof(TextVertex));
             memcpy(tib.data, batch->indices, reqIndices*sizeof(uint16_t));
 
-            gDriver->setUniform(g_fontSys->uTransformMtx, batch->transformMtx.f, 1);
+            mtx4x4_t transformMat = batch->transformMtx;
+            transformMat.m31 += offsetPos.x;
+            transformMat.m32 += offsetPos.y;
+            gDriver->setUniform(g_fontSys->uTransformMtx, transformMat.f, 1);
+            gDriver->setUniform(g_fontSys->uColor, color.f, 1);
             gDriver->setState(gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite, 0);
             gDriver->setTexture(0, g_fontSys->uTexture, getResourcePtr<Texture>(font->texHandles[0])->handle,
                                 TextureFlag::FromTexture);
@@ -1293,7 +1317,7 @@ namespace termite
         }
     }
 
-    void drawText(TextBatch* batch, uint8_t viewId)
+    void drawText(TextBatch* batch, uint8_t viewId, const vec2_t& offset, const vec4_t& color)
     {
         if (batch->numChars > 0) {
             GfxDriverApi* gDriver = getGfxDriver();
@@ -1301,7 +1325,7 @@ namespace termite
 
             gDriver->setUniform(g_fontSys->uParams, vec4f(0, 0, 0, 0).f, 1);
             ProgramHandle prog = (font->flags & FontFlags::DistantField) ? g_fontSys->dfProg : g_fontSys->normalProg;
-            drawTextBatch(gDriver, batch, viewId, prog, font);
+            drawTextBatch(gDriver, batch, viewId, prog, font, offset, color);
         }
     }
 
@@ -1315,7 +1339,7 @@ namespace termite
             gDriver->setUniform(g_fontSys->uParams, vec4f(0, 0, shadowOffset.x, shadowOffset.y).f, 1);
             gDriver->setUniform(g_fontSys->uShadowColor, colorToVec4(shadowColor).f, 1);
             ProgramHandle prog = (font->flags & FontFlags::DistantField) ? g_fontSys->dfShadowProg : g_fontSys->normalShadowProg;
-            drawTextBatch(gDriver, batch, viewId, prog, font);
+            drawTextBatch(gDriver, batch, viewId, prog, font, vec2f(0, 0), vec4f(1.0f, 1.0f, 1.0f, 1.0f));
         }
     }
 
@@ -1330,8 +1354,15 @@ namespace termite
             gDriver->setUniform(g_fontSys->uOutlineColor, colorToVec4(outlineColor).f, 1);
             gDriver->setUniform(g_fontSys->uTextureSize, vec4f(float(font->scaleW), float(font->scaleH), 0, 0).f, 1);
             ProgramHandle prog = (font->flags & FontFlags::DistantField) ? g_fontSys->dfOutlineProg : g_fontSys->normalOutlineProg;
-            drawTextBatch(gDriver, batch, viewId, prog, font);
+            drawTextBatch(gDriver, batch, viewId, prog, font, vec2f(0, 0), vec4f(1.0f, 1.0f, 1.0f, 1.0f));
         }
+    }
+
+    void drawTextDropShadowTwoPass(TextBatch* batch, uint8_t viewId, color_t shadowColor, vec2_t shadowAmount)
+    {
+        // Draw shadow with offset
+        drawText(batch, viewId, shadowAmount, colorToVec4(shadowColor));
+        drawText(batch, viewId, vec2f(0, 0), vec4f(1.0f, 1.0f, 1.0f, 1.0f));
     }
 
     void destroyTextBatch(TextBatch* batch)

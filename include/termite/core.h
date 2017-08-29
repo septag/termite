@@ -25,6 +25,10 @@
 
 #define T_MID_TEMP 0x1fece76b992f595e 
 
+#if BX_PLATFORM_ANDROID
+#include <jni.h>
+#endif
+
 namespace termite
 {
     struct GfxPlatformData;
@@ -201,7 +205,7 @@ namespace termite
                                                 const uint8_t* key = nullptr, const uint8_t* iv = nullptr);
     TERMITE_API MemoryBlock* decodeMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc = nullptr, 
                                                 const uint8_t* key = nullptr, const uint8_t* iv = nullptr);
-    TERMITE_API void xorCipher(uint8_t* outputBuff, uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize);
+    TERMITE_API void cipherXOR(uint8_t* outputBuff, const uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize);
 
     TERMITE_API float getRandomFloatUniform(float a, float b);
     TERMITE_API int getRandomIntUniform(int a, int b);    
@@ -226,9 +230,37 @@ namespace termite
     TERMITE_API const char* getCacheDir() T_THREAD_SAFE;
     TERMITE_API const char* getDataDir() T_THREAD_SAFE;
     TERMITE_API void dumpGfxLog() T_THREAD_SAFE;
+    TERMITE_API bool needGfxReset() T_THREAD_SAFE;
+
+    TERMITE_API void shutdownGraphics();
+    TERMITE_API bool resetGraphics(const GfxPlatformData* platform);
 
     // Remote Console
     TERMITE_API void registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback);
-} // namespace termite
 
+#if BX_PLATFORM_ANDROID
+    struct JavaMethod
+    {
+        JNIEnv* env;
+        jclass cls;
+        jobject obj;
+        jmethodID methodId;
+    };
+
+    struct JavaMethodType
+    {
+        enum Enum {
+            Method,
+            StaticMethod
+        };
+    };
+
+    // Calls a method in java
+    // for classPath, methodName and methodSig parameters, see:
+    //      http://journals.ecs.soton.ac.uk/java/tutorial/native1.1/implementing/method.html
+    TERMITE_API JavaMethod androidFindMethod(const char* methodName, const char* methodSig, const char* classPath = nullptr,
+                                             JavaMethodType::Enum type = JavaMethodType::Method);
+#endif
+
+} // namespace termite
 

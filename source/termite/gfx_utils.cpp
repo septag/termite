@@ -110,12 +110,14 @@ namespace termite
             { -1.0f, -1.0f,  0,    1.0f },     // bottom-left
             {  1.0f, -1.0f,  1.0f, 1.0f }      // bottom-right
         };
+        static bool flipped = false;
 
-        if (driver->getRendererType() == RendererType::OpenGL || driver->getRendererType() == RendererType::OpenGLES) {
+        if ((driver->getRendererType() == RendererType::OpenGL || driver->getRendererType() == RendererType::OpenGLES) && !flipped) {
             fsQuad[0].ty = 1.0f - fsQuad[0].ty;
             fsQuad[1].ty = 1.0f - fsQuad[1].ty;
             fsQuad[2].ty = 1.0f - fsQuad[2].ty;
             fsQuad[3].ty = 1.0f - fsQuad[3].ty;
+            flipped = true;
         }
 
         static uint16_t indices[] = {

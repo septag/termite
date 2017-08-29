@@ -15,8 +15,6 @@
 #include T_MAKE_SHADER_PATH(shaders_h, vg.fso)
 #include T_MAKE_SHADER_PATH(shaders_h, vg.vso)
 
-using namespace termite;
-
 #define MAX_BATCHES 256
 #define MAX_VERTICES 2048
 #define MAX_TEXT_SIZE 256
@@ -24,73 +22,74 @@ using namespace termite;
 #define STATE_POOL_SIZE 8
 #define TEXTHANDLER_ID 0x26d5 
 #define RECTHANDLER_ID 0xed2c
-
-struct vgVertexPosCoordColor
-{
-    float x;
-    float y;
-    float tx;
-    float ty;
-    uint32_t color;
-
-    static void init()
-    {
-        vdeclBegin(&Decl);
-        vdeclAdd(&Decl, VertexAttrib::Position, 2, VertexAttribType::Float);
-        vdeclAdd(&Decl, VertexAttrib::TexCoord0, 2, VertexAttribType::Float);
-        vdeclAdd(&Decl, VertexAttrib::Color0, 4, VertexAttribType::Uint8, true);
-        vdeclEnd(&Decl);
-    }
-    static VertexDecl Decl;
-};
-VertexDecl vgVertexPosCoordColor::Decl;
-
-class BX_NO_VTABLE DrawHandler
-{
-public:
-    virtual uint32_t getHash(const void* params) = 0;
-    virtual void writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, int maxVerts,
-                                 uint16_t* indices, int firstVertIdx, int maxIndices, 
-                                 int* numVertsWritten, int* numIndicesWritten) = 0;
-    virtual GfxState::Bits setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) = 0;
-};
-
-struct Batch
-{
-    uint32_t hash;
-    uint8_t params[MAX_PARAM_SIZE];
-    DrawHandler* handler;
-    int startVertex;
-    int numVerts;
-    int firstIdx;
-    int numIndices;
-    recti_t scissorRect;
-    mtx3x3_t xformMtx;
-};
-
-struct VgState
-{
-    typedef bx::Stack<VgState*>::Node SNode;
-
-    mtx3x3_t mtx;
-    color_t textColor;
-    color_t strokeColor;
-    color_t fillColor;
-    float alpha;
-    recti_t scissor;
-    ResourceHandle fontHandle;
-    SNode snode;
-
-    VgState() : 
-        snode(this)
-    {
-    }
-
-    void setDefault(VectorGfxContext* ctx);
-};
+#define LINEHANDLER_ID 0xbd2a
 
 namespace termite
 {
+    struct vgVertexPosCoordColor
+    {
+        float x;
+        float y;
+        float tx;
+        float ty;
+        uint32_t color;
+
+        static void init()
+        {
+            vdeclBegin(&Decl);
+            vdeclAdd(&Decl, VertexAttrib::Position, 2, VertexAttribType::Float);
+            vdeclAdd(&Decl, VertexAttrib::TexCoord0, 2, VertexAttribType::Float);
+            vdeclAdd(&Decl, VertexAttrib::Color0, 4, VertexAttribType::Uint8, true);
+            vdeclEnd(&Decl);
+        }
+        static VertexDecl Decl;
+    };
+    VertexDecl vgVertexPosCoordColor::Decl;
+
+    class BX_NO_VTABLE DrawHandler
+    {
+    public:
+        virtual uint32_t getHash(const void* params) = 0;
+        virtual void writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, int maxVerts,
+                                     uint16_t* indices, int firstVertIdx, int maxIndices,
+                                     int* numVertsWritten, int* numIndicesWritten) = 0;
+        virtual GfxState::Bits setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) = 0;
+    };
+
+    struct Batch
+    {
+        uint32_t hash;
+        uint8_t params[MAX_PARAM_SIZE];
+        DrawHandler* handler;
+        int startVertex;
+        int numVerts;
+        int firstIdx;
+        int numIndices;
+        recti_t scissorRect;
+        mtx3x3_t xformMtx;
+    };
+
+    struct VgState
+    {
+        typedef bx::Stack<VgState*>::Node SNode;
+
+        mtx3x3_t mtx;
+        color_t textColor;
+        color_t strokeColor;
+        color_t fillColor;
+        float alpha;
+        recti_t scissor;
+        ResourceHandle fontHandle;
+        SNode snode;
+
+        VgState() :
+            snode(this)
+        {
+        }
+
+        void setDefault(VectorGfxContext* ctx);
+    };
+
     struct VectorGfxContext
     {
         bx::AllocatorI* alloc;
@@ -134,7 +133,6 @@ namespace termite
             viewport = recti(0, 0, 0, 0);
         }
     };
-} // namespace termite
 
 struct BatchParams
 {
@@ -167,6 +165,13 @@ struct RectParams : public BatchParams
     const Texture* image;
 };
 
+struct LineParams : public BatchParams
+{
+    vec2_t p1;
+    vec2_t p2;
+    float width;
+};
+
 class RectHandler : public DrawHandler
 {
 public:
@@ -175,6 +180,17 @@ public:
     void writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, int maxVerts,
         uint16_t* indices, int firstVertIdx, int maxIndices,
         int* numVertsWritten, int* numIndicesWritten) override;
+    GfxState::Bits setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) override;
+};
+
+class LineHandler : public DrawHandler
+{
+public:
+    LineHandler();
+    uint32_t getHash(const void* params) override;
+    void writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, int maxVerts,
+                         uint16_t* indices, int firstVertIdx, int maxIndices,
+                         int* numVertsWritten, int* numIndicesWritten) override;
     GfxState::Bits setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params) override;
 };
 
@@ -188,6 +204,7 @@ struct VgMgr
     
     TextHandler textHandler;
     RectHandler rectHandler;
+    LineHandler lineHandler;
     
     VgMgr(bx::AllocatorI* _alloc)
     {
@@ -318,7 +335,7 @@ static void drawBatches(VectorGfxContext* ctx)
     }
 }
 
-result_t termite::initVectorGfx(bx::AllocatorI* alloc, GfxDriverApi* driver)
+result_t initVectorGfx(bx::AllocatorI* alloc, GfxDriverApi* driver)
 {
     assert(driver);
     if (g_vg) {
@@ -359,7 +376,7 @@ result_t termite::initVectorGfx(bx::AllocatorI* alloc, GfxDriverApi* driver)
     return 0;
 }
 
-void termite::shutdownVectorGfx()
+void shutdownVectorGfx()
 {
     if (!g_vg)
         return;
@@ -372,7 +389,7 @@ void termite::shutdownVectorGfx()
     g_vg = nullptr;
 }
 
-VectorGfxContext* termite::createVectorGfxContext(int maxVerts, int maxBatches)
+VectorGfxContext* createVectorGfxContext(int maxVerts, int maxBatches)
 {
     assert(g_vg);
 
@@ -429,7 +446,7 @@ VectorGfxContext* termite::createVectorGfxContext(int maxVerts, int maxBatches)
     return ctx;
 }
 
-void termite::destroyVectorGfxContext(VectorGfxContext* ctx)
+void destroyVectorGfxContext(VectorGfxContext* ctx)
 {
     assert(g_vg);
     assert(ctx);
@@ -450,7 +467,7 @@ void termite::destroyVectorGfxContext(VectorGfxContext* ctx)
     BX_DELETE(ctx->alloc, ctx);
 }
 
-void termite::vgBegin(VectorGfxContext* ctx, uint8_t viewId, const recti_t& viewport,
+void vgBegin(VectorGfxContext* ctx, uint8_t viewId, const recti_t& viewport,
                       const mtx4x4_t* viewMtx, const mtx4x4_t* projMtx)
 {
     assert(ctx);
@@ -477,7 +494,7 @@ void termite::vgBegin(VectorGfxContext* ctx, uint8_t viewId, const recti_t& view
                      float(viewport.ymax - viewport.ymin), 0, -1.0f, 1.0f);
 }
 
-void termite::vgEnd(VectorGfxContext* ctx)
+void vgEnd(VectorGfxContext* ctx)
 {
     if (!ctx->readyToDraw)
         return;
@@ -487,14 +504,14 @@ void termite::vgEnd(VectorGfxContext* ctx)
     ctx->readyToDraw = false;
 }
 
-void termite::vgSetFont(VectorGfxContext* ctx, ResourceHandle fontHandle)
+void vgSetFont(VectorGfxContext* ctx, ResourceHandle fontHandle)
 {
     VgState* state;
     ctx->stateStack.peek(&state);
     state->fontHandle = fontHandle.isValid() ? fontHandle : ctx->defaultFontHandle;
 }
 
-void termite::vgText(VectorGfxContext* ctx, float x, float y, const char* text)
+void vgText(VectorGfxContext* ctx, float x, float y, const char* text)
 {
     if (!ctx->readyToDraw)
         return;
@@ -515,7 +532,7 @@ void termite::vgText(VectorGfxContext* ctx, float x, float y, const char* text)
     pushBatch(ctx, &g_vg->textHandler, &textParams, sizeof(textParams));
 }
 
-void termite::vgTextf(VectorGfxContext* ctx, float x, float y, const char* fmt, ...)
+void vgTextf(VectorGfxContext* ctx, float x, float y, const char* fmt, ...)
 {
     if (!ctx->readyToDraw)
         return;
@@ -530,7 +547,7 @@ void termite::vgTextf(VectorGfxContext* ctx, float x, float y, const char* fmt, 
     vgText(ctx, x, y, text);
 }
 
-void termite::vgTextv(VectorGfxContext* ctx, float x, float y, const char* fmt, va_list argList)
+void vgTextv(VectorGfxContext* ctx, float x, float y, const char* fmt, va_list argList)
 {
     if (!ctx->readyToDraw)
         return;
@@ -540,14 +557,14 @@ void termite::vgTextv(VectorGfxContext* ctx, float x, float y, const char* fmt, 
     vgText(ctx, x, y, text);
 }
 
-void termite::vgRectf(VectorGfxContext* ctx, float x, float y, float width, float height)
+void vgRectf(VectorGfxContext* ctx, float x, float y, float width, float height)
 {
     if (!ctx->readyToDraw)
         return;
     vgRect(ctx, rectwh(x, y, width, height));
 }
 
-void termite::vgRect(VectorGfxContext* ctx, const rect_t& rect)
+void vgRect(VectorGfxContext* ctx, const rect_t& rect)
 {
     if (!ctx->readyToDraw)
         return;
@@ -564,7 +581,7 @@ void termite::vgRect(VectorGfxContext* ctx, const rect_t& rect)
     pushBatch(ctx, &g_vg->rectHandler, &rectParams, sizeof(rectParams));
 }
 
-void termite::vgImage(VectorGfxContext* ctx, float x, float y, const Texture* image)
+void vgImage(VectorGfxContext* ctx, float x, float y, const Texture* image)
 {
     if (!ctx->readyToDraw)
         return;
@@ -574,7 +591,62 @@ void termite::vgImage(VectorGfxContext* ctx, float x, float y, const Texture* im
     vgImageRect(ctx, rectwh(x, y, image->info.width, image->info.height), image);
 }
 
-void termite::vgImageRect(VectorGfxContext* ctx, const rect_t& rect, const Texture* image)
+void vgLine(VectorGfxContext* ctx, const vec2_t& p1, const vec2_t& p2, float lineWidth)
+{
+    if (!ctx->readyToDraw)
+        return;
+    VgState* state;
+    ctx->stateStack.peek(&state);
+    
+    LineParams lineParams;
+    lineParams.p1 = p1;
+    lineParams.p2 = p2;
+    lineParams.width = lineWidth;
+    lineParams.color = colorPremultiplyAlpha(state->strokeColor, state->alpha);
+    lineParams.scissor = state->scissor;
+    lineParams.mtx = state->mtx;
+
+    pushBatch(ctx, &g_vg->lineHandler, &lineParams, sizeof(lineParams));
+}
+
+void vgArrow(VectorGfxContext* ctx, const vec2_t& p1, const vec2_t& p2, float lineWidth, float arrowLength)
+{
+    if (!ctx->readyToDraw)
+        return;
+    VgState* state;
+    ctx->stateStack.peek(&state);
+
+    LineParams lineParams;
+
+    // main line
+    lineParams.p1 = p1;
+    lineParams.p2 = p2;
+    lineParams.width = lineWidth;
+    lineParams.color = colorPremultiplyAlpha(state->strokeColor, state->alpha);
+    lineParams.scissor = state->scissor;
+    lineParams.mtx = state->mtx;
+    pushBatch(ctx, &g_vg->lineHandler, &lineParams, sizeof(lineParams));
+
+    vec2_t d = p2 - p1;
+    float totalLen = bx::vec2Length(d.f);
+    float t = bx::fmin(1.0f, arrowLength/totalLen);
+
+    vec2_t arrowStart;
+    bx::vec2Lerp(arrowStart.f, p2.f, p1.f, t);
+    d = d*(1.0f/totalLen);
+    vec2_t normal1 = vec2f(-d.y, d.x);
+    vec2_t normal2 = vec2f(d.y, -d.x);
+
+    // arrow line 1
+    lineParams.p1 = arrowStart + normal1*lineWidth*4.0f;
+    pushBatch(ctx, &g_vg->lineHandler, &lineParams, sizeof(lineParams));
+
+    // arrow line 2
+    lineParams.p1 = arrowStart + normal2*lineWidth*4.0f;
+    pushBatch(ctx, &g_vg->lineHandler, &lineParams, sizeof(lineParams));
+}
+
+void vgImageRect(VectorGfxContext* ctx, const rect_t& rect, const Texture* image)
 {
     if (!ctx->readyToDraw)
         return;
@@ -594,42 +666,42 @@ void termite::vgImageRect(VectorGfxContext* ctx, const rect_t& rect, const Textu
     pushBatch(ctx, &g_vg->rectHandler, &rectParams, sizeof(rectParams));
 }
 
-void termite::vgScissor(VectorGfxContext* ctx, const recti_t& rect)
+void vgScissor(VectorGfxContext* ctx, const recti_t& rect)
 {
     VgState* state;
     ctx->stateStack.peek(&state);
     state->scissor = rect;
 }
 
-void termite::vgAlpha(VectorGfxContext* ctx, float alpha)
+void vgAlpha(VectorGfxContext* ctx, float alpha)
 {
     VgState* state;
     ctx->stateStack.peek(&state);
     state->alpha = alpha;
 }
 
-void termite::vgTextColor(VectorGfxContext* ctx, color_t color)
+void vgTextColor(VectorGfxContext* ctx, color_t color)
 {
     VgState* state;
     ctx->stateStack.peek(&state);
     state->textColor = color;
 }
 
-void termite::vgStrokeColor(VectorGfxContext* ctx, color_t color)
+void vgStrokeColor(VectorGfxContext* ctx, color_t color)
 {
     VgState* state;
     ctx->stateStack.peek(&state);
     state->strokeColor = color;
 }
 
-void termite::vgFillColor(VectorGfxContext* ctx, color_t color)
+void vgFillColor(VectorGfxContext* ctx, color_t color)
 {
     VgState* state;
     ctx->stateStack.peek(&state);
     state->fillColor = color;
 }
 
-void termite::vgTranslate(VectorGfxContext* ctx, float x, float y)
+void vgTranslate(VectorGfxContext* ctx, float x, float y)
 {
     VgState* state;
     ctx->stateStack.peek(&state);
@@ -639,7 +711,7 @@ void termite::vgTranslate(VectorGfxContext* ctx, float x, float y)
     bx::mtx3x3Mul(state->mtx.f, cur.f, m.f);
 }
 
-void termite::vgScale(VectorGfxContext* ctx, float sx, float sy)
+void vgScale(VectorGfxContext* ctx, float sx, float sy)
 {
     VgState* state;
     ctx->stateStack.peek(&state);
@@ -649,7 +721,7 @@ void termite::vgScale(VectorGfxContext* ctx, float sx, float sy)
     bx::mtx3x3Mul(state->mtx.f, cur.f, m.f);
 }
 
-void termite::vgRotate(VectorGfxContext* ctx, float theta)
+void vgRotate(VectorGfxContext* ctx, float theta)
 {
     VgState* state;
     ctx->stateStack.peek(&state);
@@ -659,14 +731,14 @@ void termite::vgRotate(VectorGfxContext* ctx, float theta)
     bx::mtx3x3Mul(state->mtx.f, cur.f, m.f);
 }
 
-void termite::vgResetTransform(VectorGfxContext* ctx)
+void vgResetTransform(VectorGfxContext* ctx)
 {
     VgState* state;
     ctx->stateStack.peek(&state);
     state->mtx = mtx3x3Ident();
 }
 
-void termite::vgPushState(VectorGfxContext* ctx)
+void vgPushState(VectorGfxContext* ctx)
 {
     VgState* curState;
     ctx->stateStack.peek(&curState);
@@ -678,7 +750,7 @@ void termite::vgPushState(VectorGfxContext* ctx)
     }
 }
 
-void termite::vgPopState(VectorGfxContext* ctx)
+void vgPopState(VectorGfxContext* ctx)
 {
     if (ctx->stateStack.getHead()->down) {
         VgState* s;
@@ -687,7 +759,7 @@ void termite::vgPopState(VectorGfxContext* ctx)
     }
 }
 
-void termite::vgReset(VectorGfxContext* ctx)
+void vgReset(VectorGfxContext* ctx)
 {
     while (ctx->stateStack.getHead()->down) {
         VgState* s;
@@ -867,3 +939,74 @@ GfxState::Bits RectHandler::setStates(VectorGfxContext* ctx, GfxDriverApi* drive
     driver->setTexture(0, ctx->uTexture, texture ? texture->handle : g_vg->whiteTexture, TextureFlag::FromTexture);
     return GfxState::None;
 }
+
+LineHandler::LineHandler()
+{
+}
+
+uint32_t LineHandler::getHash(const void* params)
+{
+    return LINEHANDLER_ID;
+}
+
+void LineHandler::writePrimitives(VectorGfxContext* ctx, const void* params, vgVertexPosCoordColor* verts, int maxVerts,
+                                  uint16_t* indices, int firstVertIdx, int maxIndices, int* numVertsWritten, int* numIndicesWritten)
+{
+    const LineParams* lineParams = (const LineParams*)params;
+    color_t color = lineParams->color;
+    vec2_t p1 = lineParams->p1;
+    vec2_t p2 = lineParams->p2;
+    float width = lineParams->width;
+
+    int vertexIdx = 0;
+    int indexIdx = 0;
+
+    if ((vertexIdx + 4) <= maxVerts && (indexIdx + 6) <= maxIndices) {
+        vgVertexPosCoordColor& v0 = verts[vertexIdx];
+        vgVertexPosCoordColor& v1 = verts[vertexIdx + 1];
+        vgVertexPosCoordColor& v2 = verts[vertexIdx + 2];
+        vgVertexPosCoordColor& v3 = verts[vertexIdx + 3];
+
+        vec2_t d = p2 - p1;
+        bx::vec2Norm(d.f, d.f);
+        vec2_t normal1 = vec2f(-d.y, d.x);
+        vec2_t normal2 = vec2f(d.y, -d.x);
+
+        v0.x = p1.x + normal1.x*width;               v0.y = p1.y + normal1.y*width;
+        v0.tx = 0;                      v0.ty = 0;
+
+        v1.x = p2.x + normal1.x*width;               v1.y = p2.y + normal1.y*width;
+        v1.tx = 1.0f;                   v1.ty = 0;
+
+        v2.x = p1.x + normal2.x*width;               v2.y = p1.y + normal2.y*width;
+        v2.tx = 0;                      v2.ty = 1.0f;
+
+        v3.x = p2.x + normal2.x*width;               v3.y = p2.y + normal2.y*width;
+        v3.tx = 1.0f;                   v3.ty = 1.0f;
+
+        v0.color = v1.color = v2.color = v3.color = color.n;
+
+        // Make a quad from 4 verts
+        int startVertex = firstVertIdx + vertexIdx;
+        indices[indexIdx] = startVertex;
+        indices[indexIdx + 1] = startVertex + 1;
+        indices[indexIdx + 2] = startVertex + 2;
+        indices[indexIdx + 3] = startVertex + 2;
+        indices[indexIdx + 4] = startVertex + 1;
+        indices[indexIdx + 5] = startVertex + 3;
+
+        vertexIdx += 4;
+        indexIdx += 6;
+    }
+
+    *numVertsWritten = vertexIdx;
+    *numIndicesWritten = indexIdx;
+}
+
+GfxState::Bits LineHandler::setStates(VectorGfxContext* ctx, GfxDriverApi* driver, const void* params)
+{
+    driver->setTexture(0, ctx->uTexture, g_vg->whiteTexture, TextureFlag::FromTexture);
+    return GfxState::None;
+}
+
+} // namespace termite

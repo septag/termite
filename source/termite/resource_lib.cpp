@@ -60,6 +60,7 @@ namespace termite
         FileModifiedCallback modifiedCallback;
         void* fileModifiedUserParam;
         bx::AllocatorI* alloc;
+        bool ignoreUnloadResourceCalls;
 
     public:
         ResourceLib(bx::AllocatorI* _alloc) : 
@@ -74,6 +75,7 @@ namespace termite
             flags = ResourceLibInitFlag::None;
             modifiedCallback = nullptr;
             fileModifiedUserParam = nullptr;
+            ignoreUnloadResourceCalls = false;
         }
         
         virtual ~ResourceLib()
@@ -181,7 +183,7 @@ IoDriverApi* termite::getResourceLibIoDriver()
 }
 
 ResourceTypeHandle termite::registerResourceType(const char* name, ResourceCallbacksI* callbacks,
-                                                int userParamsSize /*= 0*/, uintptr_t failObj /*=0*/, 
+                                                 int userParamsSize /*= 0*/, uintptr_t failObj /*=0*/,
                                                  uintptr_t asyncProgressObj/* = 0*/)
 {
     ResourceLib* resLib = g_resLib;
@@ -190,6 +192,20 @@ ResourceTypeHandle termite::registerResourceType(const char* name, ResourceCallb
     if (userParamsSize > T_RESOURCE_MAX_USERPARAM_SIZE)
         return ResourceTypeHandle();
 
+    // Check if already have the type and modify it
+    for (int i = 0, c = resLib->resourceTypes.getCount(); i < c; i++) {
+        ResourceTypeHandle thandle = resLib->resourceTypes.handleAt(i);
+        ResourceTypeData* tdata = resLib->resourceTypes.getHandleData<ResourceTypeData>(0, thandle);
+        if (strcmp(tdata->name, name) == 0) {
+            tdata->callbacks = callbacks;
+            tdata->userParamsSize = userParamsSize;
+            tdata->failObj = failObj;
+            tdata->asyncProgressObj = asyncProgressObj;
+            return thandle;
+        }
+    }
+
+    // 
     uint16_t tHandle = resLib->resourceTypes.newHandle();
     assert(tHandle != UINT16_MAX);
     ResourceTypeData* tdata = resLib->resourceTypes.getHandleData<ResourceTypeData>(0, tHandle);
@@ -315,7 +331,9 @@ static ResourceHandle addResource(ResourceCallbacksI* callbacks, const char* uri
     ResourceHandle handle = overrideHandle;
     if (handle.isValid()) {
         Resource* rs = resLib->resources.getHandleData<Resource>(0, handle);
-        if (rs->handle.isValid())
+
+        // Unload previous resource object
+        if (rs->handle.isValid() && rs->loadState == ResourceLoadState::LoadOk)
             rs->callbacks->unloadObj(rs->obj, rs->objAlloc);
         
         rs->handle = handle;
@@ -424,8 +442,7 @@ static ResourceHandle loadResourceHashed(size_t nameHash, const char* uri, const
                 obj = tdata->failObj;
             }
 
-            handle = addResource(tdata->callbacks, uri, userParams, tdata->userParamsSize, obj, overrideHandle, nameHash,
-                                 objAlloc);
+            handle = addResource(tdata->callbacks, uri, userParams, tdata->userParamsSize, obj, overrideHandle, nameHash, objAlloc);
             setResourceLoadFlag(handle, loaded ? ResourceLoadState::LoadOk : ResourceLoadState::LoadFailed);
 
             // Trigger onReload callback
@@ -598,24 +615,26 @@ void termite::unloadResource(ResourceHandle handle)
     assert(resLib);
     assert(handle.isValid());
 
-    Resource* rs = resLib->resources.getHandleData<Resource>(0, handle);
-    rs->refcount--;
-    if (rs->refcount == 0) {
-        // Unregister from async loading
-        if (resLib->opMode == IoOperationMode::Async) {
-            int aIdx = resLib->asyncLoadsTable.find(bx::hashMurmur2A(rs->uri.cstr(), (uint32_t)rs->uri.getLength()));
-            if (aIdx != -1) {
-                resLib->asyncLoads.freeHandle(resLib->asyncLoadsTable.getValue(aIdx));
-                resLib->asyncLoadsTable.remove(aIdx);
+    if (!resLib->ignoreUnloadResourceCalls) {
+        Resource* rs = resLib->resources.getHandleData<Resource>(0, handle);
+        rs->refcount--;
+        if (rs->refcount == 0) {
+            // Unregister from async loading
+            if (resLib->opMode == IoOperationMode::Async) {
+                int aIdx = resLib->asyncLoadsTable.find(bx::hashMurmur2A(rs->uri.cstr(), (uint32_t)rs->uri.getLength()));
+                if (aIdx != -1) {
+                    resLib->asyncLoads.freeHandle(resLib->asyncLoadsTable.getValue(aIdx));
+                    resLib->asyncLoadsTable.remove(aIdx);
+                }
             }
-        }
 
-        // delete resource and unload resource object
-        int resTypeIdx = resLib->resourceTypesTable.find(rs->typeNameHash);
-        if (resTypeIdx != -1) {
-            const ResourceTypeData* tdata = 
-                resLib->resourceTypes.getHandleData<ResourceTypeData>(0, resLib->resourceTypesTable.getValue(resTypeIdx));
-            deleteResource(handle, tdata);
+            // delete resource and unload resource object
+            int resTypeIdx = resLib->resourceTypesTable.find(rs->typeNameHash);
+            if (resTypeIdx != -1) {
+                const ResourceTypeData* tdata =
+                    resLib->resourceTypes.getHandleData<ResourceTypeData>(0, resLib->resourceTypesTable.getValue(resTypeIdx));
+                deleteResource(handle, tdata);
+            }
         }
     }
 }
@@ -809,4 +828,56 @@ void termite::ResourceLib::onModified(const char* uri)
     // Run user callback
     if (this->modifiedCallback)
         this->modifiedCallback(uri, this->fileModifiedUserParam);
+}
+
+
+void termite::reloadResourceType(const char* name)
+{
+    ResourceLib* resLib = g_resLib;
+    int typeIdx = resLib->resourceTypesTable.find(tinystl::hash_string(name, strlen(name)));
+    if (typeIdx != -1) {
+         ResourceTypeData* rt = resLib->resourceTypes.getHandleData<ResourceTypeData>(0, resLib->resourceTypesTable[typeIdx]);
+         size_t hash = tinystl::hash_string(name, strlen(name));
+
+         for (int i = 0, c = resLib->resources.getCount(); i < c; i++) {
+             ResourceHandle handle = resLib->resources.handleAt(i);
+             Resource* r = resLib->resources.getHandleData<Resource>(0, handle);
+             if (r->typeNameHash == hash && !(r->uri.isEqual("[FAIL]") | r->uri.isEqual("[ASYNC]"))) {
+                 loadResourceHashed(hash, r->uri.cstr(), r->userParams, ResourceFlag::Reload, r->objAlloc);
+             }
+         }
+    }
+}
+
+void termite::unloadAllResources(const char* name)
+{
+    ResourceLib* resLib = g_resLib;
+    resLib->ignoreUnloadResourceCalls = true;       // This is for indirect calls to unloadResource
+
+    int typeIdx = resLib->resourceTypesTable.find(tinystl::hash_string(name, strlen(name)));
+    if (typeIdx != -1) {
+        ResourceTypeData* rt = resLib->resourceTypes.getHandleData<ResourceTypeData>(0, resLib->resourceTypesTable[typeIdx]);
+        size_t hash = tinystl::hash_string(name, strlen(name));
+
+        ResourceHandle xhandles[1000];
+        int numXHandles = 0;
+        for (int i = 0, c = resLib->resources.getCount(); i < c; i++) {
+            ResourceHandle handle = resLib->resources.handleAt(i);
+            Resource* r = resLib->resources.getHandleData<Resource>(0, handle);
+            if (r->typeNameHash == hash) {
+                if (r->loadState == ResourceLoadState::LoadOk) {
+                    rt->callbacks->unloadObj(r->obj, r->objAlloc);
+                    r->obj = rt->failObj;
+                    r->loadState = ResourceLoadState::LoadFailed;
+                } else if (r->uri.isEqual("[FAIL]") | r->uri.isEqual("[ASYNC]")) {
+                    xhandles[numXHandles++] = handle;
+                } 
+            }
+        }
+
+        for (int i = 0; i < numXHandles; i++)
+            deleteResource(xhandles[i], rt);
+    }
+
+    resLib->ignoreUnloadResourceCalls = false;
 }

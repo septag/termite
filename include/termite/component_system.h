@@ -49,7 +49,9 @@ namespace termite
 	TERMITE_API Entity createEntity(EntityManager* emgr);
 	TERMITE_API void destroyEntity(EntityManager* emgr, Entity ent);
 	TERMITE_API bool isEntityAlive(EntityManager* emgr, Entity ent);
+
     TERMITE_API void setEntityActive(Entity ent, bool active, uint32_t flags = 0);
+    TERMITE_API bool isEntityActive(Entity ent);
 
     // Component System
     result_t initComponentSystem(bx::AllocatorI* alloc);
