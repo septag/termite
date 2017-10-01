@@ -95,11 +95,20 @@ namespace bx
     inline Path Path::getFileExt() const
     {
         Path p;
-
-        const char* r = strrchr((const char*)this->text, '.');
-        const char* r2 = strchr((const char*)this->text, '/');
-        if (r > r2)
-            strcpy(p.text, r + 1);
+        int len = getLength();
+        if (len > 0) {
+            const char* start = strrchr((const char*)this->text, '/');
+            if (!start)
+                start = (const char*)this->text;
+            const char* end = &this->text[len-1];
+            for (const char* e = start; e < end; ++e) {
+                if (*e != '.')
+                    continue;
+                strcpy(p.text, e + 1);
+                break;
+            }
+        }        
+        
         return p;
     }
 

@@ -66,6 +66,7 @@
 #define IMGUI_VIEWID 255
 #define NANOVG_VIEWID 254
 #define LOG_STRING_SIZE 256
+#define RANDOM_NUMBER_POOL 10000
 
 #define T_ENC_SIGN 0x54454e43        // TENC
 #define T_ENC_VERSION T_MAKE_VERSION(1, 0)       
@@ -193,6 +194,11 @@ struct Core
 
     std::random_device randDevice;
     std::mt19937 randEngine;
+    int* randomPoolInt;
+    float* randomPoolFloat;
+    volatile int32_t randomIntOffset;
+    volatile int32_t randomFloatOffset;
+
     Remotery* rmt;
     bx::Array<ConsoleCommand> consoleCmds;
 
@@ -216,6 +222,9 @@ struct Core
         init = false;
         gfxReset = false;
         memset(&frameData, 0x00, sizeof(frameData));
+        randomFloatOffset = randomIntOffset = 0;
+        randomPoolFloat = nullptr;
+        randomPoolInt = nullptr;
     }
 };
 
@@ -308,7 +317,6 @@ JavaMethod termite::androidFindMethod(const char* methodName, const char* method
     return m;
 }
 #endif
-
 
 static void* remoteryMallocCallback(void* mm_context, rmtU32 size)
 {
@@ -424,6 +432,13 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
 
     if (initMemoryPool(g_alloc, conf.pageSize*1024, conf.maxPagesPerPool))
         return T_ERR_OUTOFMEM;
+
+    // Random pools
+    g_core->randomPoolInt = (int*)BX_ALLOC(g_alloc, sizeof(int)*RANDOM_NUMBER_POOL);
+    g_core->randomPoolFloat = (float*)BX_ALLOC(g_alloc, sizeof(float)*RANDOM_NUMBER_POOL);
+    if (!g_core->randomPoolInt || !g_core->randomPoolFloat)
+        return T_ERR_OUTOFMEM;
+    restartRandom();    // fill random values
 
     // Initialize plugins system and enumerate plugins
     if (initPluginSystem(conf.pluginPath, g_alloc)) {
@@ -815,6 +830,11 @@ void termite::shutdown(ShutdownCallback callback, void* userData)
     shutdownMemoryPool();
     BX_END_OK();
 
+    if (g_core->randomPoolFloat)
+        BX_FREE(g_alloc, g_core->randomPoolFloat);
+    if (g_core->randomPoolInt)
+        BX_FREE(g_alloc, g_core->randomPoolInt);
+
     shutdownErrorReport();
     BX_DELETE(g_alloc, g_core);
     g_core = nullptr;
@@ -879,7 +899,7 @@ void termite::doFrame()
     rmt_BeginCPUSample(Gfx_DrawFrame, 0);
     if (g_core->gfxDriver)
         g_core->gfxDriver->frame();
-    rmt_EndCPUSample(); // GfxFrame
+    rmt_EndCPUSample(); // Gfx_DrawFrame
 
     fd.frame++;
     fd.elapsedTime += dt;
@@ -1160,16 +1180,39 @@ void termite::cipherXOR(uint8_t* outputBuff, const uint8_t* inputBuff, size_t bu
     }
 }
 
+void termite::restartRandom()
+{
+    std::uniform_int_distribution<int> idist(0, INT_MAX);
+    int* randomInt = g_core->randomPoolInt;
+    for (int i = 0; i < RANDOM_NUMBER_POOL; i++) {
+        randomInt[i] = idist(g_core->randEngine);
+    }
+
+    std::uniform_real_distribution<float> fdist(0, 1.0f);
+    float* randomFloat = g_core->randomPoolFloat;
+    for (int i = 0; i < RANDOM_NUMBER_POOL; i++) {
+        randomFloat[i] = fdist(g_core->randEngine);
+    }
+
+    g_core->randomFloatOffset = g_core->randomIntOffset = 0;
+}
+
 float termite::getRandomFloatUniform(float a, float b)
 {
-    std::uniform_real_distribution<float> dist(a, b);
-    return dist(g_core->randEngine);
+    assert(a <= b);
+    int off = g_core->randomFloatOffset;
+    float r = (g_core->randomPoolFloat[off]*(b - a)) + a;
+    bx::atomicExchange<int32_t>(&g_core->randomFloatOffset, (off + 1) % RANDOM_NUMBER_POOL);
+    return r;
 }
 
 int termite::getRandomIntUniform(int a, int b)
 {
-    std::uniform_int_distribution<int> dist(a, b);
-    return dist(g_core->randEngine);
+    assert(a <= b);
+    int off = g_core->randomIntOffset;
+    int r = (g_core->randomPoolInt[off] % (b - a + 1)) + a;
+    bx::atomicExchange<int32_t>(&g_core->randomIntOffset, (off + 1) % RANDOM_NUMBER_POOL);
+    return r;
 }
 
 float termite::getRandomFloatNormal(float mean, float sigma)

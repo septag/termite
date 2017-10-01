@@ -52,4 +52,5 @@ namespace termite
     TERMITE_API bool blitRawPixels(uint8_t* dest, int destX, int destY, int destWidth, int destHeight, 
                                    const uint8_t* src, int srcX, int srcY, int srcWidth, int srcHeight,
                                    int pixelSize);
+
 } // namespace termite

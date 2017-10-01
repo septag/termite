@@ -72,6 +72,7 @@ namespace bx
 
         void clear();
         int getLeakCount() const;
+        bool owns(Ty* _ptr);
 
     private:
         struct Bucket
@@ -228,6 +229,24 @@ namespace bx
         }
 
         assert(false);  // pointer does not belong to this pool !
+    }
+
+    template <typename Ty>
+    bool bx::Pool<Ty>::owns(Ty* _ptr)
+    {
+        Bucket* b = m_firstBucket;
+        size_t buffer_sz = sizeof(Ty)*m_maxItemsPerBucket;
+        uint8_t* u8ptr = (uint8_t*)_ptr;
+
+        while (b) {
+            if (u8ptr >= b->buffer && u8ptr < (b->buffer + buffer_sz)) {
+                assert(b->iter != m_maxItemsPerBucket);
+                return true;
+            }
+
+            b = b->next;
+        }
+        return false;
     }
 
     template <typename Ty>

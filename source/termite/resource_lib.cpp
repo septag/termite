@@ -7,6 +7,7 @@
 #include "bxx/hash_table.h"
 #include "bxx/path.h"
 #include "bxx/handle_pool.h"
+#include "bxx/array.h"
 
 #include "../include_common/folder_png.h"
 
@@ -41,6 +42,12 @@ struct AsyncLoadRequest
     ResourceFlag::Bits flags;
 };
 
+struct ResourceExtensionOverride
+{
+    const char* ext;
+    const char* replacement;
+};
+
 namespace termite
 {
     class ResourceLib : public IoDriverEventsI
@@ -61,6 +68,7 @@ namespace termite
         void* fileModifiedUserParam;
         bx::AllocatorI* alloc;
         bool ignoreUnloadResourceCalls;
+        bx::Array<ResourceExtensionOverride> overrides;
 
     public:
         ResourceLib(bx::AllocatorI* _alloc) : 
@@ -139,6 +147,10 @@ result_t termite::initResourceLib(ResourceLibInitFlag::Bits flags, IoDriverApi* 
         return T_ERR_OUTOFMEM;
     }
 
+    if (!resLib->overrides.create(10, 10, alloc))
+        return T_ERR_OUTOFMEM;
+
+
     return 0;
 }
 
@@ -147,6 +159,8 @@ void termite::shutdownResourceLib()
     ResourceLib* resLib = g_resLib;
     if (!resLib)
         return;
+
+    resLib->overrides.destroy();
 
     // Got to clear the callbacks of the driver if DataStore is overloading it
     if (resLib->driver && resLib->driver->getCallbacks() == resLib) {
@@ -356,6 +370,54 @@ static void setResourceLoadFlag(ResourceHandle resHandle, ResourceLoadState::Enu
     res->loadState = flag;
 }
 
+static bx::Path getReplacementUri(const char* uri)
+{
+    ResourceLib* resLib = g_resLib;
+    bx::Path newUri(uri);
+    if (resLib->overrides.getCount() > 0) {
+        bx::Path ext = newUri.getFileExt();
+        ext.toLower();
+        int index = resLib->overrides.find([&ext](const ResourceExtensionOverride& value)->bool {
+            return ext.isEqual(value.ext);
+        });
+        if (index != -1) {
+            // Remove the extension and replace it with the new one
+            char* e = strrchr(newUri.getBuffer(), '.');
+            if (e)
+                *(e + 1) = 0;
+            newUri += resLib->overrides[index].replacement;
+        }
+    }
+    return newUri;
+}
+
+static bx::Path getOriginalUri(const char* uri)
+{
+    ResourceLib* resLib = g_resLib;
+    bx::Path newUri(uri);
+    if (resLib->overrides.getCount() > 0) {
+        bx::Path ext = newUri.getFileExt();
+        ext.toLower();
+        int index = resLib->overrides.find([&ext](const ResourceExtensionOverride& value)->bool {
+            return ext.isEqual(value.replacement);
+        });
+        if (index != -1) {
+            // Remove the extension and replace it with the new one
+            char* e = strrchr(newUri.getBuffer(), '.');
+            if (e) {
+                *e = 0;
+                e = strrchr(newUri.getBuffer(), '.');
+                if (e)
+                    *e = 0;
+            }
+
+            newUri += ".";
+            newUri += resLib->overrides[index].ext;
+        }
+    }
+    return newUri;
+}
+
 static ResourceHandle loadResourceHashed(size_t nameHash, const char* uri, const void* userParams, ResourceFlag::Bits flags,
                                          bx::AllocatorI* objAlloc)
 {
@@ -396,6 +458,8 @@ static ResourceHandle loadResourceHashed(size_t nameHash, const char* uri, const
         }
     }
 
+    bx::Path newUri = getReplacementUri(uri);
+
     // Load the resource for the first time
     if (!handle.isValid()) {
         if (resLib->opMode == IoOperationMode::Async) {
@@ -416,12 +480,12 @@ static ResourceHandle loadResourceHashed(size_t nameHash, const char* uri, const
             resLib->asyncLoadsTable.add(tinystl::hash_string(uri, strlen(uri)), reqHandle);
 
             // Load the file, result will be called in onReadComplete
-            resLib->driver->read(uri, IoPathType::Assets);
+            resLib->driver->read(newUri.cstr(), IoPathType::Assets);
         } else {
             // Load the file
-            MemoryBlock* mem = resLib->driver->read(uri, IoPathType::Assets);
+            MemoryBlock* mem = resLib->driver->read(newUri.cstr(), IoPathType::Assets);
             if (!mem) {
-                BX_WARN("Opening resource '%s' failed", uri);
+                BX_WARN("Opening resource '%s' failed", newUri.cstr());
                 BX_WARN(getErrorString());
                 if (overrideHandle.isValid())
                     deleteResource(overrideHandle, tdata);
@@ -429,7 +493,7 @@ static ResourceHandle loadResourceHashed(size_t nameHash, const char* uri, const
             }
 
             ResourceTypeParams params;
-            params.uri = uri;
+            params.uri = newUri.cstr();
             params.userParams = userParams;
             params.flags = flags;
             uintptr_t obj;
@@ -437,7 +501,7 @@ static ResourceHandle loadResourceHashed(size_t nameHash, const char* uri, const
             releaseMemoryBlock(mem);
 
             if (!loaded)    {
-                BX_WARN("Loading resource '%s' failed", uri);
+                BX_WARN("Loading resource '%s' failed", newUri.cstr());
                 BX_WARN(getErrorString());
                 obj = tdata->failObj;
             }
@@ -708,7 +772,8 @@ void termite::ResourceLib::onOpenError(const char* uri)
 {
     ResourceLib* resLib = g_resLib;
 
-    int r = this->asyncLoadsTable.find(tinystl::hash_string(uri, strlen(uri)));
+    bx::Path origUri = getOriginalUri(uri);
+    int r = this->asyncLoadsTable.find(tinystl::hash_string(origUri.cstr(), origUri.getLength()));
     if (r != -1) {
         uint16_t handle = this->asyncLoadsTable.getValue(r);
         AsyncLoadRequest* areq = this->asyncLoads.getHandleData<AsyncLoadRequest>(0, handle);
@@ -735,7 +800,8 @@ void termite::ResourceLib::onReadError(const char* uri)
 {
     ResourceLib* resLib = g_resLib;
 
-    int r = this->asyncLoadsTable.find(tinystl::hash_string(uri, strlen(uri)));
+    bx::Path origUri = getOriginalUri(uri);
+    int r = this->asyncLoadsTable.find(tinystl::hash_string(origUri.cstr(), origUri.getLength()));
     if (r != -1) {
         uint16_t handle = this->asyncLoadsTable.getValue(r);
         AsyncLoadRequest* areq = this->asyncLoads.getHandleData<AsyncLoadRequest>(0, handle);
@@ -761,7 +827,8 @@ void termite::ResourceLib::onReadError(const char* uri)
 void termite::ResourceLib::onReadComplete(const char* uri, MemoryBlock* mem)
 {
     ResourceLib* resLib = g_resLib;
-    int r = this->asyncLoadsTable.find(tinystl::hash_string(uri, strlen(uri)));
+    bx::Path origUri = getOriginalUri(uri);
+    int r = this->asyncLoadsTable.find(tinystl::hash_string(origUri.cstr(), origUri.getLength()));
     if (r != -1) {
         int handle = this->asyncLoadsTable[r];
         AsyncLoadRequest* areq = this->asyncLoads.getHandleData<AsyncLoadRequest>(0, handle);
@@ -810,11 +877,14 @@ void termite::ResourceLib::onReadComplete(const char* uri, MemoryBlock* mem)
 void termite::ResourceLib::onModified(const char* uri)
 {
     // Hot Loading
+    bx::Path origUri = getOriginalUri(uri);
+    int r = this->asyncLoadsTable.find(tinystl::hash_string(origUri.cstr(), origUri.getLength()));
+
     // strip "assets/" from the begining of uri
     size_t uriOffset = 0;
-    if (strstr(uri, "assets/") == uri)
+    if (strstr(origUri.getBuffer(), "assets/") == origUri.getBuffer())
         uriOffset = strlen("assets/");
-    int index = this->hotLoadsTable.find(tinystl::hash_string(uri + uriOffset, strlen(uri + uriOffset)));
+    int index = this->hotLoadsTable.find(tinystl::hash_string(origUri.cstr() + uriOffset, strlen(origUri.cstr() + uriOffset)));
     if (index != -1) {
         bx::MultiHashTable<uint16_t>::Node* node = this->hotLoadsTable.getNode(index);
         // Recurse resources and reload them with their params
@@ -827,7 +897,7 @@ void termite::ResourceLib::onModified(const char* uri)
 
     // Run user callback
     if (this->modifiedCallback)
-        this->modifiedCallback(uri, this->fileModifiedUserParam);
+        this->modifiedCallback(origUri.cstr(), this->fileModifiedUserParam);
 }
 
 
@@ -881,3 +951,26 @@ void termite::unloadAllResources(const char* name)
 
     resLib->ignoreUnloadResourceCalls = false;
 }
+
+void termite::overrideResourceExtension(const char* ext, const char* extReplacement)
+{
+    assert(ext);
+    ResourceLib* resLib = g_resLib;
+    int index = resLib->overrides.find([ext](const ResourceExtensionOverride& value)->bool {
+        return strcmp(value.ext, ext) == 0;
+    });
+
+    if (index != -1) {
+        if (extReplacement) {
+            resLib->overrides[index].replacement = extReplacement;
+        } else {
+            std::swap<ResourceExtensionOverride>(resLib->overrides[index], resLib->overrides[resLib->overrides.getCount()-1]);
+            resLib->overrides.pop();
+        }
+    } else {
+        ResourceExtensionOverride* teo = resLib->overrides.push();
+        teo->ext = ext;
+        teo->replacement = extReplacement;
+    }
+}
+

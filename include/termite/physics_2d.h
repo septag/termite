@@ -438,6 +438,7 @@ namespace termite
         // Ray Cast/Query
         void (*rayCast)(PhysScene2D* scene, const vec2_t& p1, const vec2_t& p2, PhysRayCastCallback2D callback, void* userData);
         void(*queryShapeCircle)(PhysScene2D* scene, float radius, const vec2_t pos, PhysQueryShapeCallback2D callback, void *userData);
+        void(*queryShapeBox)(PhysScene2D* scene, vec2_t pos, vec2_t halfSize, PhysQueryShapeCallback2D callback, void *userData);
 
         // Joints
 

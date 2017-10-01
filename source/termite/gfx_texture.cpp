@@ -9,7 +9,7 @@
 #include "gfx_driver.h"
 #include "gfx_texture.h"
 
-#define STB_IMAGE_IMPLEMENTATION
+//#define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
@@ -19,6 +19,8 @@
 #include "bxx/leakcheck_allocator.h"
 #include "bxx/proxy_allocator.h"
 #include "bxx/path.h"
+
+#include "lz4/lz4.h"
 
 using namespace termite;
 
@@ -120,6 +122,11 @@ result_t termite::initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc,
         return T_ERR_FAILED;
     }
 
+    if (!driver->isTextureValid(1, false, 1, TextureFormat::ETC2A, 0))
+        BX_TRACE("ETC2 is not supported");
+    else
+        BX_TRACE("ETC2 is supported");
+
     return 0;
 }
 
@@ -135,7 +142,7 @@ void termite::shutdownTextureLoader()
 {
     if (!g_texLoader)
         return;
-    
+
     if (g_texLoader->whiteTexture) {
         if (g_texLoader->whiteTexture->handle.isValid())
             g_texLoader->driver->destroyTexture(g_texLoader->whiteTexture->handle);
@@ -184,7 +191,6 @@ bool termite::blitRawPixels(uint8_t* dest, int destX, int destY, int destWidth, 
 
     return true;
 }
-
 
 static void stbCallbackFreeImage(void* ptr, void* userData)
 {
@@ -382,7 +388,27 @@ bool TextureLoaderAll::loadObj(const MemoryBlock* mem, const ResourceTypeParams&
     bx::Path path(params.uri);
     bx::Path ext = path.getFileExt();
     ext.toLower();
-    if (ext.isEqual("ktx") || ext.isEqual("dds") || ext.isEqual("pvr")) {
+    if (strstr(ext.getBuffer(), ".lz4")) {
+        // Uncompress and load again with real extension
+        uint32_t size = *((uint32_t*)mem->data);
+        assert(size > 0);
+        MemoryBlock* uncompressed = createMemoryBlock(size, getHeapAlloc());
+        if (!uncompressed)
+            return false;
+        LZ4_decompress_safe((const char*)(mem->data + sizeof(uint32_t)), (char*)uncompressed->data, mem->size, size);
+
+        ResourceTypeParams newParams;
+        memcpy(&newParams, &params, sizeof(ResourceTypeParams));
+        char path[256];
+        strcpy(path, params.uri);
+        char* dot = strrchr(path, '.');
+        if (dot)
+            *dot = 0;
+        newParams.uri = path;
+        bool r = loadObj(uncompressed, newParams, obj, alloc);                
+        releaseMemoryBlock(uncompressed);
+        return r;
+    } else if (ext.isEqual("ktx") || ext.isEqual("dds") || ext.isEqual("pvr")) {
         return loadCompressed(mem, params, obj, alloc);
     } else if (ext.isEqual("png") || ext.isEqual("tga") || ext.isEqual("jpg") || ext.isEqual("bmp") ||
                ext.isEqual("jpeg") || ext.isEqual("psd") || ext.isEqual("hdr") || ext.isEqual("gif"))

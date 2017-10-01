@@ -124,6 +124,7 @@ namespace termite
 	TERMITE_API void destroyComponent(EntityManager* emgr, Entity ent, ComponentHandle handle);
 
     TERMITE_API void runComponentGroup(ComponentUpdateStage::Enum stage, ComponentGroupHandle groupHandle, float dt);
+    TERMITE_API void endComponentGroupUpdates();
 
     /// Calls 'debug' callbacks on all components
     TERMITE_API void debugComponents(ImGuiApi_v0* imgui, void* userData);

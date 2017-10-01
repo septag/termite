@@ -207,6 +207,7 @@ namespace termite
                                                 const uint8_t* key = nullptr, const uint8_t* iv = nullptr);
     TERMITE_API void cipherXOR(uint8_t* outputBuff, const uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize);
 
+    TERMITE_API void restartRandom();
     TERMITE_API float getRandomFloatUniform(float a, float b);
     TERMITE_API int getRandomIntUniform(int a, int b);    
     TERMITE_API float getRandomFloatNormal(float mean, float sigma);

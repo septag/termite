@@ -384,6 +384,7 @@ static void destroyBodyBox2d(PhysBody2D* body)
     assert(body->b);
     
     body->ownerScene->w.DestroyBody(body->b);
+    body->b = nullptr;
     g_box2d.bodyPool.deleteInstance(body);
 }
 
@@ -835,6 +836,35 @@ static void box2dQueryShapeCircle(PhysScene2D* scene, float radius, const vec2_t
     scene->w.QueryAABB(&b2callback, aabb);
 }
 
+static void box2dQueryShapeBox(PhysScene2D* scene, const vec2_t pos, vec2_t halfSize, PhysQueryShapeCallback2D callback, void *userData)
+{
+    class QueryCircleCallback : public b2QueryCallback
+    {
+    private:
+        PhysQueryShapeCallback2D m_callback;
+        void* m_userData;
+
+    public:
+        QueryCircleCallback(PhysQueryShapeCallback2D _callback, void* _userData) :
+            m_callback(_callback),
+            m_userData(_userData)
+        {
+        }
+
+        bool ReportFixture(b2Fixture* fixture) override
+        {
+            return m_callback((PhysShape2D*)fixture->GetUserData(), m_userData);
+        }
+    };
+
+    QueryCircleCallback b2callback(callback, userData);
+    b2AABB aabb;
+    aabb.lowerBound = b2vec2(pos - halfSize);
+    aabb.upperBound = b2vec2(pos + halfSize);
+
+    scene->w.QueryAABB(&b2callback, aabb);
+}
+
 static PhysParticleEmitter2D* box2dCreateParticleEmitter(PhysScene2D* scene, const PhysParticleEmitterDef2D& def)
 {
     b2ParticleSystemDef b2def;
@@ -860,7 +890,6 @@ static PhysParticleEmitter2D* box2dCreateParticleEmitter(PhysScene2D* scene, con
     b2def.colorMixingStrength = 0.5f;
     b2def.destroyByAge = (def.flags & PhysEmitterFlags2D::DestroyByAge) ? true : false;
     b2def.lifetimeGranularity = 1.0f / 60.0f;
-    
 
     PhysParticleEmitter2D* emitter = g_box2d.emitterPool.newInstance<>();
     emitter->p = scene->w.CreateParticleSystem(&b2def);
@@ -1308,6 +1337,7 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 
     api.rayCast = box2dRayCast;
     api.queryShapeCircle = box2dQueryShapeCircle;
+    api.queryShapeBox = box2dQueryShapeBox;
     api.getMassCenter = [](PhysBody2D* body)->vec2_t {
         b2MassData massData;
         body->b->GetMassData(&massData);

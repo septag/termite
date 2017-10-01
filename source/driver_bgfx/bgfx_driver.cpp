@@ -3,6 +3,9 @@
 #include "termite/plugin_api.h"
 #include "termite/gfx_driver.h"
 
+#include "bxx/pool.h"
+#include "bx/mutex.h"
+
 #include "bgfx/bgfx.h"
 #include "bgfx/platform.h"
 
@@ -126,6 +129,13 @@ public:
     }
 };
 
+class BgfxProxyAllocator;
+
+struct BgfxSmallMemBlock
+{
+    uint8_t buff[32];
+};
+
 struct BgfxWrapper
 {
     BgfxCallbacks* callbacks;
@@ -134,6 +144,8 @@ struct BgfxWrapper
     GfxStats stats;
     HMDDesc hmd;
     GfxInternalData internal;
+    BgfxProxyAllocator* proxyAlloc;
+    bx::Pool<BgfxSmallMemBlock> smallPool;
 
     BgfxWrapper()
     {
@@ -143,10 +155,57 @@ struct BgfxWrapper
         memset(&stats, 0x00, sizeof(stats));
         memset(&hmd, 0x00, sizeof(hmd));
         memset(&internal, 0x00, sizeof(internal));
+        proxyAlloc = nullptr;
     }
 };
 
 static BgfxWrapper g_bgfx;
+
+// This allocator, only allocates small chunks (<32 bytes) from memory pool, which bgfx does it alot during frames
+// Bigger chunks are passed to default allocator
+class BgfxProxyAllocator : public bx::AllocatorI
+{
+    BX_CLASS(BgfxProxyAllocator
+             , NO_COPY
+             , NO_ASSIGNMENT
+    );
+
+public:
+    BgfxProxyAllocator(bx::AllocatorI* alloc, BgfxWrapper* bgfxWrapper)
+    {
+        m_alloc = alloc;
+        m_wrapper = bgfxWrapper;
+    }
+
+    void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) override
+    {
+        if (_size == 0) {
+            // free
+            if (m_wrapper->smallPool.owns((BgfxSmallMemBlock*)_ptr)) {
+                bx::MutexScope mtx(m_mutex);
+                m_wrapper->smallPool.deleteInstance((BgfxSmallMemBlock*)_ptr);
+                return nullptr;
+            }
+        } else if (_ptr == NULL) {
+            // malloc
+            if (_size <= sizeof(BgfxSmallMemBlock)) {
+                bx::MutexScope mtx(m_mutex);
+                BgfxSmallMemBlock* block = m_wrapper->smallPool.newInstance();
+                if (block)
+                    return block->buff;
+                else
+                    return nullptr;
+            }
+        } 
+
+        return m_alloc->realloc(_ptr, _size, _align, _file, _line);
+    }
+
+private:
+    bx::AllocatorI* m_alloc;
+    BgfxWrapper* m_wrapper;
+    bx::Mutex m_mutex;
+};
 
 static result_t initBgfx(uint16_t deviceId, GfxDriverEventsI* callbacks, bx::AllocatorI* alloc)
 {
@@ -157,13 +216,21 @@ static result_t initBgfx(uint16_t deviceId, GfxDriverEventsI* callbacks, bx::All
             return T_ERR_OUTOFMEM;
     }
 
-    
-    return bgfx::init(bgfx::RendererType::Count, 0, deviceId, g_bgfx.callbacks, alloc) ? 0 : T_ERR_FAILED;
+    g_bgfx.proxyAlloc = BX_NEW(alloc, BgfxProxyAllocator)(alloc, &g_bgfx);
+    g_bgfx.smallPool.create(512, alloc);
+
+    return bgfx::init(bgfx::RendererType::Count, 0, deviceId, g_bgfx.callbacks, g_bgfx.proxyAlloc) ? 0 : T_ERR_FAILED;
 }
 
 static void shutdownBgfx()
 {
     bgfx::shutdown();
+
+    g_bgfx.smallPool.destroy();
+
+    if (g_bgfx.proxyAlloc) {
+        BX_DELETE(g_bgfx.alloc, g_bgfx.proxyAlloc);
+    }
     if (g_bgfx.callbacks) {
         BX_DELETE(g_bgfx.alloc, g_bgfx.callbacks);
     }
@@ -604,6 +671,11 @@ static const GfxMemory* makeRef(const void* data, uint32_t size, gfxReleaseMemCa
     return (const GfxMemory*)bgfx::makeRef(data, size, releaseFn, userData);
 }
 
+static bool isTextureValid(uint16_t depth, bool cube, uint16_t numLayers, TextureFormat::Enum fmt, uint32_t flags)
+{
+    return bgfx::isTextureValid(depth, cube, numLayers, (bgfx::TextureFormat::Enum)fmt, flags);
+}
+
 static ShaderHandle createShader(const GfxMemory* mem)
 {
     ShaderHandle handle;
@@ -767,6 +839,7 @@ static void calcTextureSize(TextureInfo* info, uint16_t width, uint16_t height, 
 static TextureHandle createTexture(const GfxMemory* mem, TextureFlag::Bits flags, uint8_t skipMips, TextureInfo* info)
 {
     TextureHandle r;
+
     r.value = bgfx::createTexture((const bgfx::Memory*)mem, flags, skipMips, (bgfx::TextureInfo*)info).idx;
     return r;
 }
@@ -1071,6 +1144,7 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.createTextureCube = createTextureCube;
     api.updateTextureCube = updateTextureCube;
     api.readTexture = readTexture;
+    api.isTextureValid = isTextureValid;
     api.destroyTexture = destroyTexture;
     api.createFrameBuffer = createFrameBuffer;
     api.createFrameBufferRatio = createFrameBufferRatio;

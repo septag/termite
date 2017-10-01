@@ -82,6 +82,12 @@ struct ComponentType
     }
 };
 
+struct ComponentGroupPair
+{
+    ComponentGroupHandle cgroup;
+    ComponentHandle component;
+};
+
 struct ComponentGroup
 {
     struct Batch
@@ -106,11 +112,15 @@ struct ComponentSystem
     bx::Array<ComponentType> components;
     bx::HashTableInt nameTable;
     bx::HandlePool componentGroups;
+    bool lockComponentGroups;
+    bx::Array<ComponentGroupPair> deferredGroupAddCmds;
+    bx::Array<ComponentGroupPair> deferredGroupRemoveCmds;
 
     ComponentSystem(bx::AllocatorI* _alloc) : 
         alloc(_alloc),
         nameTable(bx::HashTableType::Mutable)
     {
+        lockComponentGroups = false;
     }
 };
 
@@ -169,11 +179,18 @@ Entity termite::createEntity(EntityManager* emgr)
 
 static void addToComponentGroup(ComponentGroupHandle handle, ComponentHandle component)
 {
-    ComponentGroup* group = g_csys->componentGroups.getHandleData<ComponentGroup>(0, handle);
-    ComponentHandle* pchandle = group->components.push();
-    if (pchandle) {
-        *pchandle = component;
-        group->sorted = false;
+    if (!g_csys->lockComponentGroups) {
+        ComponentGroup* group = g_csys->componentGroups.getHandleData<ComponentGroup>(0, handle);
+        ComponentHandle* pchandle = group->components.push();
+        if (pchandle) {
+            *pchandle = component;
+            group->sorted = false;
+        }
+    } else {
+        ComponentGroupPair* p = g_csys->deferredGroupAddCmds.push();
+        assert(p);
+        p->cgroup = handle;
+        p->component = component;
     }
 }
 
@@ -182,16 +199,22 @@ static void removeFromComponentGroup(ComponentGroupHandle handle, ComponentHandl
     assert(component.isValid());
     assert(handle.isValid());
 
-    ComponentGroup* group = g_csys->componentGroups.getHandleData<ComponentGroup>(0, handle);
-
-    int count = group->components.getCount();
-    // Find the component and Swap current with the last group
-    int index = group->components.find(component);
-    if (index != -1) {
-        ComponentHandle* buff = group->components.getBuffer();
-        std::swap<ComponentHandle>(buff[index], buff[count-1]);
-        group->sorted = false;
-        group->components.pop();
+    if (!g_csys->lockComponentGroups) {
+        ComponentGroup* group = g_csys->componentGroups.getHandleData<ComponentGroup>(0, handle);
+        int count = group->components.getCount();
+        // Find the component and Swap current with the last group
+        int index = group->components.find(component);
+        if (index != -1) {
+            ComponentHandle* buff = group->components.getBuffer();
+            std::swap<ComponentHandle>(buff[index], buff[count-1]);
+            group->sorted = false;
+            group->components.pop();
+        }
+    } else {
+        ComponentGroupPair* p = g_csys->deferredGroupRemoveCmds.push();
+        assert(p);
+        p->cgroup = handle;
+        p->component = component;
     }
 }
 
@@ -328,7 +351,9 @@ result_t termite::initComponentSystem(bx::AllocatorI* alloc)
     uint32_t cgSz = sizeof(ComponentGroup);
     if (!g_csys->components.create(32, 128, alloc) || 
         !g_csys->nameTable.create(128, alloc) ||
-        !g_csys->componentGroups.create(&cgSz, 1, 32, 32, alloc))
+        !g_csys->componentGroups.create(&cgSz, 1, 32, 32, alloc) ||
+        !g_csys->deferredGroupAddCmds.create(100, 200, alloc) ||
+        !g_csys->deferredGroupRemoveCmds.create(100, 200, alloc))
     {
         return T_ERR_OUTOFMEM;
     }
@@ -356,6 +381,8 @@ void termite::shutdownComponentSystem()
     g_csys->componentGroups.destroy();
     g_csys->components.destroy();
     g_csys->nameTable.destroy();
+    g_csys->deferredGroupAddCmds.destroy();
+    g_csys->deferredGroupRemoveCmds.destroy();
 
     BX_DELETE(g_csys->alloc, g_csys);
 }
@@ -390,6 +417,22 @@ void termite::destroyComponentGroup(ComponentGroupHandle handle)
         *ctype.dataPool.getHandleData<ComponentGroupHandle>(2, COMPONENT_INSTANCE_HANDLE(chandle)) = ComponentGroupHandle();
     }
 
+    // Delete all deferred component group pairs with this handle
+    for (int i = 0; i < g_csys->deferredGroupAddCmds.getCount(); i++) {
+        if (g_csys->deferredGroupAddCmds[i].cgroup != handle)
+            continue;
+        std::swap<ComponentGroupPair>(g_csys->deferredGroupAddCmds[i], 
+                                      g_csys->deferredGroupAddCmds[g_csys->deferredGroupAddCmds.getCount()-1]);
+        g_csys->deferredGroupAddCmds.pop();
+    }
+    for (int i = 0; i < g_csys->deferredGroupRemoveCmds.getCount(); i++) {
+        if (g_csys->deferredGroupRemoveCmds[i].cgroup != handle)
+            continue;
+        std::swap<ComponentGroupPair>(g_csys->deferredGroupRemoveCmds[i],
+                                      g_csys->deferredGroupRemoveCmds[g_csys->deferredGroupRemoveCmds.getCount()-1]);
+        g_csys->deferredGroupRemoveCmds.pop();
+    }
+    
     group->batches.destroy();
     group->components.destroy();
     g_csys->componentGroups.freeHandle(handle);
@@ -436,7 +479,7 @@ void termite::garbageCollectComponents(EntityManager* emgr)
         if ((ctype.flags & ComponentFlag::ImmediateDestroy) == 0) {
             int aliveInRow = 0;
             while (ctype.dataPool.getCount() && aliveInRow < 4) {
-                uint16_t r = ctype.dataPool.handleAt((uint16_t)getRandomIntUniform(0, (int)ctype.dataPool.getCount() - 1));
+                uint16_t r = ctype.dataPool.handleAt(getRandomIntUniform(0, (int)ctype.dataPool.getCount() - 1));
                 Entity ent = *ctype.dataPool.getHandleData<Entity>(0, r);
                 if (isEntityAlive(emgr, ent)) {
                     aliveInRow++;
@@ -603,11 +646,36 @@ void termite::runComponentGroup(ComponentUpdateStage::Enum stage, ComponentGroup
     sortAndBatchComponents(group);
 
     // Call their callbacks
+    g_csys->lockComponentGroups = true;
     for (int i = 0, c = group->batches.getCount(); i < c; i++) {
         ComponentGroup::Batch batch = group->batches[i];
+        if (batch.index >= group->components.getCount())
+            sortAndBatchComponents(group);
         const ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(group->components[batch.index])];
         if (ctype.callbacks.updateStageFn[stage])
             ctype.callbacks.updateStageFn[stage](group->components.itemPtr(batch.index), batch.count, dt);
+    }
+    g_csys->lockComponentGroups = false;
+}
+
+void termite::endComponentGroupUpdates()
+{
+    // Check for deferred add/removes and apply them
+
+    if (g_csys->deferredGroupAddCmds.getCount() > 0) {
+        for (int i = 0, c = g_csys->deferredGroupAddCmds.getCount(); i < c; i++) {
+            const ComponentGroupPair p = g_csys->deferredGroupAddCmds[i];
+            addToComponentGroup(p.cgroup, p.component);
+        }
+        g_csys->deferredGroupAddCmds.clear();
+    }
+     
+    if (g_csys->deferredGroupRemoveCmds.getCount() > 0) {
+        for (int i = 0, c = g_csys->deferredGroupRemoveCmds.getCount(); i < c; i++) {
+            const ComponentGroupPair p = g_csys->deferredGroupRemoveCmds[i];
+            removeFromComponentGroup(p.cgroup, p.component);
+        }
+        g_csys->deferredGroupRemoveCmds.clear();
     }
 }
 

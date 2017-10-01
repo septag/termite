@@ -124,7 +124,7 @@ endif()
 
 target_link_libraries(termite 
     PRIVATE ${FCONTEXT_LIB} imgui imgui_impl remotery utf8 ${PLUGIN_LIBS} ${PRIVATE_LIBS} tiny-AES128-C 
-    PUBLIC bx rapidjson AHEasing ${PUBLIC_LIBS} lz4)
+    PUBLIC bx rapidjson AHEasing lz4 miniz ${PUBLIC_LIBS})
 
 # 
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)

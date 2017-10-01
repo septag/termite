@@ -96,6 +96,10 @@ namespace termite
     TERMITE_API void reloadResourceType(const char* name);
     TERMITE_API void unloadAllResources(const char* name);
 
+    // Recommended: pass 'ext' and 'extReplacement' as lower-case
+    // Pass extReplacement = nullptr to remove the override
+    TERMITE_API void overrideResourceExtension(const char* ext, const char* extReplacement = nullptr);
+
     template <typename Ty>
     Ty* getResourcePtr(ResourceHandle handle)
     {
