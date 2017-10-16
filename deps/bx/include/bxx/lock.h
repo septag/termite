@@ -4,7 +4,8 @@
 /// Spin-Locks using atomic primitives
 /// Source: http://locklessinc.com/articles/locks/
 
-#include "../bx/cpu.h"
+#include "bx/cpu.h"
+#include "bx/os.h"
 
 namespace bx
 {
@@ -23,7 +24,7 @@ namespace bx
         {
             int32_t me = atomicFetchAndAdd<int32_t>(&m_data.s.users, 1);
             while (m_data.s.ticket != me)
-                yieldCpu();
+                bx::yield();
         }
 
         void unlock()
@@ -122,7 +123,7 @@ namespace bx
             int64_t me = atomicFetchAndAdd<int64_t>(&m_data.u, 0x100000000 /*1<<32*/);
             int16_t val = int16_t((me >> 32) & 0xffff);
             while (val != m_data.s.write)
-                yieldCpu();
+                yield();
         }
 
         void unlockWrite()
@@ -155,7 +156,7 @@ namespace bx
             int64_t me = atomicFetchAndAdd<int64_t>(&m_data.u, 0x100000000 /*1<<32*/);
             int16_t val = int16_t((me >> 32) & 0xffff);
             while (val != m_data.s.read)
-                yieldCpu();
+                yield();
             m_data.s.read++;
         }
 

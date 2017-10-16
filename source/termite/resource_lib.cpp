@@ -3,6 +3,7 @@
 #include "resource_lib.h"
 #include "io_driver.h"
 
+#include "bx/hash.h"
 #include "bxx/logger.h"
 #include "bxx/hash_table.h"
 #include "bxx/path.h"
@@ -223,7 +224,7 @@ ResourceTypeHandle termite::registerResourceType(const char* name, ResourceCallb
     uint16_t tHandle = resLib->resourceTypes.newHandle();
     assert(tHandle != UINT16_MAX);
     ResourceTypeData* tdata = resLib->resourceTypes.getHandleData<ResourceTypeData>(0, tHandle);
-    bx::strlcpy(tdata->name, name, sizeof(tdata->name));
+    bx::strCopy(tdata->name, sizeof(tdata->name), name);
     tdata->callbacks = callbacks;
     tdata->userParamsSize = userParamsSize;
     tdata->failObj = failObj;
@@ -275,7 +276,7 @@ static ResourceHandle newResource(ResourceCallbacksI* callbacks, const char* uri
         return ResourceHandle();
     }
     Resource* rs = resLib->resources.getHandleData<Resource>(0, rHandle);
-    memset(rs, 0x00, sizeof(Resource));
+    bx::memSet(rs, 0x00, sizeof(Resource));
 
     rs->handle = ResourceHandle(rHandle);
     rs->uri = uri;
@@ -288,7 +289,7 @@ static ResourceHandle newResource(ResourceCallbacksI* callbacks, const char* uri
     if (userParamsSize > 0) {
         assert(userParamsSize);
         memcpy(rs->userParams, userParams, userParamsSize);
-        rs->paramsHash = bx::hashMurmur2A(userParams, userParamsSize);
+        rs->paramsHash = bx::hash<bx::HashMurmur2A>(userParams, userParamsSize);
     }
 
     resLib->resourcesTable.add(hashResource(uri, userParams, userParamsSize, objAlloc), rHandle);
@@ -526,7 +527,7 @@ static ResourceHandle getResourceHandleInPlace(const ResourceTypeData* tdata, si
     void* userParams = nullptr;
     if (tdata->userParamsSize > 0) {
         userParams = alloca(tdata->userParamsSize);
-        memset(userParams, 0x00, tdata->userParamsSize);
+        bx::memSet(userParams, 0x00, tdata->userParamsSize);
     }
 
     // Find the possible already loaded handle by uri+params hash value
@@ -685,7 +686,7 @@ void termite::unloadResource(ResourceHandle handle)
         if (rs->refcount == 0) {
             // Unregister from async loading
             if (resLib->opMode == IoOperationMode::Async) {
-                int aIdx = resLib->asyncLoadsTable.find(bx::hashMurmur2A(rs->uri.cstr(), (uint32_t)rs->uri.getLength()));
+                int aIdx = resLib->asyncLoadsTable.find(bx::hash<bx::HashMurmur2A>(rs->uri.cstr(), (uint32_t)rs->uri.getLength()));
                 if (aIdx != -1) {
                     resLib->asyncLoads.freeHandle(resLib->asyncLoadsTable.getValue(aIdx));
                     resLib->asyncLoadsTable.remove(aIdx);

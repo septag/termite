@@ -1,5 +1,6 @@
 #include "termite/core.h"
 
+#define T_CORE_API
 #include "termite/plugin_api.h"
 #include "termite/gfx_driver.h"
 
@@ -12,9 +13,11 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cassert>
-//
 
+//
 using namespace termite;
+
+static CoreApi_v0* g_core = nullptr;
 
 #define BGFX_DECLARE_HANDLE(_Type, _Name, _Handle) bgfx::_Type _Name; _Name.idx = _Handle.value
 
@@ -43,7 +46,7 @@ public:
     ///
     /// @remarks
     ///   Not thread safe and it can be called from any thread.
-    void fatal(bgfx::Fatal::Enum _code, const char* _str)
+    void fatal(bgfx::Fatal::Enum _code, const char* _str) override
     {
         callbacks->onFatal((GfxFatalType::Enum)_code, _str);
     }
@@ -58,7 +61,7 @@ public:
     ///
     /// @remarks
     ///   Not thread safe and it can be called from any thread.
-    void traceVargs(const char* _filePath, uint16_t _line, const char* _format, va_list _argList)
+    void traceVargs(const char* _filePath, uint16_t _line, const char* _format, va_list _argList) override
     {
         callbacks->onTraceVargs(_filePath, _line, _format, _argList);
     }
@@ -68,7 +71,7 @@ public:
     ///
     /// @param[in] _id Cache id.
     /// @returns Number of bytes to read.
-    uint32_t cacheReadSize(uint64_t _id)
+    uint32_t cacheReadSize(uint64_t _id) override
     {
         return callbacks->onCacheReadSize(_id);
     }
@@ -78,7 +81,7 @@ public:
     /// @param[in] _id Cache id.
     /// @param[in] _data Buffer where to read data.
     /// @param[in] _size Size of data to read.
-    bool cacheRead(uint64_t _id, void* _data, uint32_t _size)
+    bool cacheRead(uint64_t _id, void* _data, uint32_t _size) override
     {
         return callbacks->onCacheRead(_id, _data, _size);
     }
@@ -88,7 +91,7 @@ public:
     /// @param[in] _id Cache id.
     /// @param[in] _data Data to write.
     /// @param[in] _size Size of data to write.
-    void cacheWrite(uint64_t _id, const void* _data, uint32_t _size)
+    void cacheWrite(uint64_t _id, const void* _data, uint32_t _size) override
     {
         callbacks->onCacheWrite(_id, _data, _size);
     }
@@ -102,19 +105,19 @@ public:
     /// @param[in] _data Image data.
     /// @param[in] _size Image size.
     /// @param[in] _yflip If true image origin is bottom left.
-    void screenShot(const char* _filePath, uint32_t _width, uint32_t _height, uint32_t _pitch, const void* _data, uint32_t _size, bool _yflip)
+    void screenShot(const char* _filePath, uint32_t _width, uint32_t _height, uint32_t _pitch, const void* _data, uint32_t _size, bool _yflip) override
     {
         callbacks->onScreenShot(_filePath, _width, _height, _pitch, _data, _size, _yflip);
     }
 
     /// Called when capture begins.
-    void captureBegin(uint32_t _width, uint32_t _height, uint32_t _pitch, bgfx::TextureFormat::Enum _format, bool _yflip)
+    void captureBegin(uint32_t _width, uint32_t _height, uint32_t _pitch, bgfx::TextureFormat::Enum _format, bool _yflip) override
     {
         callbacks->onCaptureBegin(_width, _height, _pitch, (TextureFormat::Enum)_format, _yflip);
     }
 
     /// Called when capture ends.
-    void captureEnd()
+    void captureEnd() override
     {
         callbacks->onCaptureEnd();
     }
@@ -123,9 +126,55 @@ public:
     ///
     /// @param[in] _data Image data.
     /// @param[in] _size Image size.
-    void captureFrame(const void* _data, uint32_t _size)
+    void captureFrame(const void* _data, uint32_t _size) override
     {
         callbacks->onCaptureFrame(_data, _size);
+    }
+
+    /// Profiler region begin.
+    ///
+    /// @param[in] _name Region name, contains dynamic string.
+    /// @param[in] _abgr Color of profiler region.
+    /// @param[in] _filePath File path where profilerBegin was called.
+    /// @param[in] _line Line where profilerBegin was called.
+    ///
+    /// @remarks
+    ///   Not thread safe and it can be called from any thread.
+    ///
+    /// @attention C99 equivalent is `bgfx_callback_vtbl.profiler_begin`.
+    ///
+    void profilerBegin(const char* _name, uint32_t _abgr, const char* _filePath, uint16_t _line) override
+    {
+        T_PROFILE_BEGIN_STR(g_core, _name, 0);
+    }
+
+    /// Profiler region begin with string literal name.
+    ///
+    /// @param[in] _name Region name, contains string literal.
+    /// @param[in] _abgr Color of profiler region.
+    /// @param[in] _filePath File path where profilerBeginLiteral was called.
+    /// @param[in] _line Line where profilerBeginLiteral was called.
+    ///
+    /// @remarks
+    ///   Not thread safe and it can be called from any thread.
+    ///
+    /// @attention C99 equivalent is `bgfx_callback_vtbl.profiler_begin_literal`.
+    ///
+    void profilerBeginLiteral(const char* _name, uint32_t _abgr, const char* _filePath, uint16_t _line) override
+    {
+        //T_PROFILE_BEGIN_STR(g_core, _name, 0);
+    }
+
+    /// Profiler region end.
+    ///
+    /// @remarks
+    ///   Not thread safe and it can be called from any thread.
+    ///
+    /// @attention C99 equivalent is `bgfx_callback_vtbl.profiler_end`.
+    ///
+    virtual void profilerEnd() override
+    {
+        T_PROFILE_END(g_core);
     }
 };
 
@@ -151,10 +200,10 @@ struct BgfxWrapper
     {
         callbacks = nullptr;
         alloc = nullptr;
-        memset(&caps, 0x00, sizeof(caps));
-        memset(&stats, 0x00, sizeof(stats));
-        memset(&hmd, 0x00, sizeof(hmd));
-        memset(&internal, 0x00, sizeof(internal));
+        bx::memSet(&caps, 0x00, sizeof(caps));
+        bx::memSet(&stats, 0x00, sizeof(stats));
+        bx::memSet(&hmd, 0x00, sizeof(hmd));
+        bx::memSet(&internal, 0x00, sizeof(internal));
         proxyAlloc = nullptr;
     }
 };
@@ -224,15 +273,16 @@ static result_t initBgfx(uint16_t deviceId, GfxDriverEventsI* callbacks, bx::All
 
 static void shutdownBgfx()
 {
+    bgfx::frame();
     bgfx::shutdown();
 
     g_bgfx.smallPool.destroy();
 
-    if (g_bgfx.proxyAlloc) {
-        BX_DELETE(g_bgfx.alloc, g_bgfx.proxyAlloc);
-    }
     if (g_bgfx.callbacks) {
         BX_DELETE(g_bgfx.alloc, g_bgfx.callbacks);
+    }
+    if (g_bgfx.proxyAlloc) {
+        BX_DELETE(g_bgfx.alloc, g_bgfx.proxyAlloc);
     }
 }
 
@@ -285,9 +335,11 @@ static const GfxCaps& getCaps()
 static const GfxStats& getStats()
 {
     const bgfx::Stats* stats = bgfx::getStats();
+    g_bgfx.stats.cpuTimeFrame = stats->cpuTimeFrame;
     g_bgfx.stats.cpuTimeBegin = stats->cpuTimeBegin;
     g_bgfx.stats.cpuTimeEnd = stats->cpuTimeEnd;
     g_bgfx.stats.cpuTimerFreq = stats->cpuTimerFreq;
+
     g_bgfx.stats.gpuTimeBegin = stats->gpuTimeBegin;
     g_bgfx.stats.gpuTimeEnd = stats->gpuTimeEnd;
     g_bgfx.stats.gpuTimerFreq = stats->gpuTimerFreq;
@@ -303,6 +355,9 @@ static const GfxStats& getStats()
     g_bgfx.stats.height = stats->height;
     g_bgfx.stats.textWidth = stats->textWidth;
     g_bgfx.stats.textHeight = stats->textHeight;
+
+    g_bgfx.stats.numViews = stats->numViews;
+    memcpy(g_bgfx.stats.viewStats, stats->viewStats, sizeof(ViewStats)*stats->numViews);
     return g_bgfx.stats;
 }
 
@@ -386,11 +441,6 @@ static void setPaletteColorRgbaf(uint8_t index, float r, float g, float b, float
     bgfx::setPaletteColor(index, r, g, b, a);
 }
 
-static void saveScreenshot(const char* filepath)
-{
-    bgfx::saveScreenShot(filepath);
-}
-
 static void setViewName(uint8_t id, const char* name)
 {
     bgfx::setViewName(id, name);
@@ -423,9 +473,9 @@ static void setViewClearPalette(uint8_t id, GfxClearFlag::Bits flags, float dept
     bgfx::setViewClear(id, flags, depth, stencil, color0, color1, color2, color3, color4, color5, color6, color7);
 }
 
-static void setViewSeq(uint8_t id, bool enabled)
+static void setViewMode(uint8_t id, ViewMode::Enum mode)
 {
-    bgfx::setViewSeq(id, enabled);
+    bgfx::setViewMode(id, (bgfx::ViewMode::Enum)mode);
 }
 
 static void setViewTransform(uint8_t id, const void* view, const void* projLeft, GfxViewFlag::Bits flags, 
@@ -512,32 +562,32 @@ static void setTransientIndexBuffer(const TransientIndexBuffer* tib)
     bgfx::setIndexBuffer((const bgfx::TransientIndexBuffer*)tib);
 }
 
-static void setVertexBuffer(VertexBufferHandle handle)
+static void setVertexBuffer(uint8_t stream, VertexBufferHandle handle)
 {
     BGFX_DECLARE_HANDLE(VertexBufferHandle, h, handle);
-    bgfx::setVertexBuffer(h);
+    bgfx::setVertexBuffer(stream, h);
 }
 
-static void setVertexBufferI(VertexBufferHandle handle, uint32_t vertexIndex, uint32_t numVertices)
+static void setVertexBufferI(uint8_t stream, VertexBufferHandle handle, uint32_t vertexIndex, uint32_t numVertices)
 {
     BGFX_DECLARE_HANDLE(VertexBufferHandle, h, handle);
-    bgfx::setVertexBuffer(h, vertexIndex, numVertices);
+    bgfx::setVertexBuffer(stream, h, vertexIndex, numVertices);
 }
 
-static void setDynamicVertexBuffer(DynamicVertexBufferHandle handle, uint32_t startVertex, uint32_t numVertices)
+static void setDynamicVertexBuffer(uint8_t stream, DynamicVertexBufferHandle handle, uint32_t startVertex, uint32_t numVertices)
 {
     BGFX_DECLARE_HANDLE(DynamicVertexBufferHandle, h, handle);
-    bgfx::setVertexBuffer(h, startVertex, numVertices);
+    bgfx::setVertexBuffer(stream, h, startVertex, numVertices);
 }
 
-static void setTransientVertexBuffer(const TransientVertexBuffer* tvb)
+static void setTransientVertexBuffer(uint8_t stream, const TransientVertexBuffer* tvb)
 {
-    bgfx::setVertexBuffer((const bgfx::TransientVertexBuffer*)tvb);
+    bgfx::setVertexBuffer(stream, (const bgfx::TransientVertexBuffer*)tvb);
 }
 
-static void setTransientVertexBufferI(const TransientVertexBuffer* tvb, uint32_t startVertex, uint32_t numVertices)
+static void setTransientVertexBufferI(uint8_t stream, const TransientVertexBuffer* tvb, uint32_t startVertex, uint32_t numVertices)
 {
-    bgfx::setVertexBuffer((const bgfx::TransientVertexBuffer*)tvb, startVertex, numVertices);
+    bgfx::setVertexBuffer(stream, (const bgfx::TransientVertexBuffer*)tvb, startVertex, numVertices);
 }
 
 static void setInstanceDataBuffer(const InstanceDataBuffer* idb, uint32_t num)
@@ -624,7 +674,7 @@ static void setComputeImage(uint8_t stage, UniformHandle sampler, TextureHandle 
     bgfx::setImage(stage, s, h, mip, (bgfx::Access::Enum)access, (bgfx::TextureFormat::Enum)fmt);
 }
 
-static uint32_t computeDispatch(uint8_t viewId, ProgramHandle handle, uint16_t numX, uint16_t numY, uint16_t numZ,
+static uint32_t computeDispatch(uint8_t viewId, ProgramHandle handle, uint32_t numX, uint32_t numY, uint32_t numZ,
                                 GfxSubmitFlag::Bits flags)
 {
     BGFX_DECLARE_HANDLE(ProgramHandle, h, handle);
@@ -692,13 +742,13 @@ static uint16_t getShaderUniforms(ShaderHandle handle, UniformHandle* uniforms, 
 static void destroyShader(ShaderHandle handle)
 {
     BGFX_DECLARE_HANDLE(ShaderHandle, h, handle);
-    bgfx::destroyShader(h);
+    bgfx::destroy(h);
 }
 
 static void destroyUniform(UniformHandle handle)
 {
     BGFX_DECLARE_HANDLE(UniformHandle, h, handle);
-    bgfx::destroyUniform(h);
+    bgfx::destroy(h);
 }
 
 static ProgramHandle createProgram(ShaderHandle vsh, ShaderHandle fsh, bool destroyShaders)
@@ -712,8 +762,9 @@ static ProgramHandle createProgram(ShaderHandle vsh, ShaderHandle fsh, bool dest
 
 static void destroyProgram(ProgramHandle handle)
 {
+    assert(handle.isValid());
     BGFX_DECLARE_HANDLE(ProgramHandle, h, handle);
-    bgfx::destroyProgram(h);
+    bgfx::destroy(h);
 }
 
 static UniformHandle createUniform(const char* name, UniformType::Enum type, uint16_t num)
@@ -761,13 +812,13 @@ static void updateDynamicVertexBuffer(DynamicVertexBufferHandle handle, uint32_t
 static void destroyVertexBuffer(VertexBufferHandle handle)
 {
     BGFX_DECLARE_HANDLE(VertexBufferHandle, h, handle);
-    bgfx::destroyVertexBuffer(h);
+    bgfx::destroy(h);
 }
 
 static void destroyDynamicVertexBuffer(DynamicVertexBufferHandle handle)
 {
     BGFX_DECLARE_HANDLE(DynamicVertexBufferHandle, h, handle);
-    bgfx::destroyDynamicVertexBuffer(h);
+    bgfx::destroy(h);
 }
 
 static uint32_t getAvailTransientVertexBuffer(uint32_t num, const VertexDecl& decl)
@@ -810,13 +861,13 @@ static void updateDynamicIndexBuffer(DynamicIndexBufferHandle handle, uint32_t s
 static void destroyIndexBuffer(IndexBufferHandle handle)
 {
     BGFX_DECLARE_HANDLE(IndexBufferHandle, h, handle);
-    bgfx::destroyIndexBuffer(h);
+    bgfx::destroy(h);
 }
 
 static void destroyDynamicIndexBuffer(DynamicIndexBufferHandle handle)
 {
     BGFX_DECLARE_HANDLE(DynamicIndexBufferHandle, h, handle);
-    bgfx::destroyDynamicIndexBuffer(h);
+    bgfx::destroy(h);
 }
 
 static uint32_t getAvailTransientIndexBuffer(uint32_t num)
@@ -834,14 +885,6 @@ static void calcTextureSize(TextureInfo* info, uint16_t width, uint16_t height, 
 {
     bgfx::calcTextureSize((bgfx::TextureInfo&)(*info), width, height, depth, cubemap, hasMips, numLayers, 
                           (bgfx::TextureFormat::Enum)fmt);
-}
-
-static TextureHandle createTexture(const GfxMemory* mem, TextureFlag::Bits flags, uint8_t skipMips, TextureInfo* info)
-{
-    TextureHandle r;
-
-    r.value = bgfx::createTexture((const bgfx::Memory*)mem, flags, skipMips, (bgfx::TextureInfo*)info).idx;
-    return r;
 }
 
 static TextureHandle createTexture2D(uint16_t width, uint16_t height, bool hasMips, uint16_t numLayers,
@@ -910,7 +953,7 @@ static void readTexture(TextureHandle handle, void* data, uint8_t mip)
 static void destroyTexture(TextureHandle handle)
 {
     BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
-    bgfx::destroyTexture(h);
+    bgfx::destroy(h);
 }
 
 static FrameBufferHandle createFrameBuffer(uint16_t width, uint16_t height, TextureFormat::Enum fmt, TextureFlag::Bits flags)
@@ -951,7 +994,7 @@ static FrameBufferHandle createFrameBufferNative(void* nwh, uint16_t width, uint
 static void destroyFrameBuffer(FrameBufferHandle handle)
 {
     BGFX_DECLARE_HANDLE(FrameBufferHandle, h, handle);
-    bgfx::destroyFrameBuffer(h);
+    bgfx::destroy(h);
 }
 
 static TextureHandle getFrameBufferTexture(FrameBufferHandle handle, uint8_t attachment)
@@ -967,9 +1010,9 @@ static uint32_t getAvailInstanceDataBuffer(uint32_t num, uint16_t stride)
     return bgfx::getAvailInstanceDataBuffer(num, stride);
 }
 
-static const InstanceDataBuffer* allocInstanceDataBuffer(uint32_t num, uint16_t stride)
+static void allocInstanceDataBuffer(InstanceDataBuffer* ibuff, uint32_t num, uint16_t stride)
 {
-    return (const InstanceDataBuffer*)bgfx::allocInstanceDataBuffer(num, stride);
+    bgfx::allocInstanceDataBuffer((bgfx::InstanceDataBuffer*)ibuff, num, stride);
 }
 
 static IndirectBufferHandle createIndirectBuffer(uint32_t num)
@@ -982,7 +1025,7 @@ static IndirectBufferHandle createIndirectBuffer(uint32_t num)
 static void destroyIndirectBuffer(IndirectBufferHandle handle)
 {
     BGFX_DECLARE_HANDLE(IndirectBufferHandle, h, handle);
-    bgfx::destroyIndirectBuffer(h);
+    bgfx::destroy(h);
 }
 
 static OcclusionQueryHandle createOccQuery()
@@ -1001,7 +1044,7 @@ static OcclusionQueryResult::Enum getResult(OcclusionQueryHandle handle)
 static void destroyOccQuery(OcclusionQueryHandle handle)
 {
     BGFX_DECLARE_HANDLE(OcclusionQueryHandle, h, handle);
-    bgfx::destroyOcclusionQuery(h);
+    bgfx::destroy(h);
 }
 
 static void dbgTextClear(uint8_t attr, bool small)
@@ -1039,7 +1082,7 @@ PluginDesc* getBgfxDriverDesc()
 void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 {
     static GfxDriverApi api;
-    memset(&api, 0x00, sizeof(api));
+    bx::memSet(&api, 0x00, sizeof(api));
     api.init = initBgfx;
     api.shutdown = shutdownBgfx;
     api.reset = resetBgfx;
@@ -1059,14 +1102,13 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.setPaletteColor = setPaletteColor;
     api.setPaletteColorRgba = setPaletteColorRgba;
     api.setPaletteColorRgbaf = setPaletteColorRgbaf;
-    api.saveScreenshot = saveScreenshot;
     api.setViewName = setViewName;
     api.setViewRect = setViewRect;
     api.setViewRectRatio = setViewRectRatio;
     api.setViewScissor = setViewScissor;
     api.setViewClear = setViewClear;
     api.setViewClearPalette = setViewClearPalette;
-    api.setViewSeq = setViewSeq;
+    api.setViewMode = setViewMode;
     api.setViewTransform = setViewTransform;
     api.setViewFrameBuffer = setViewFrameBuffer;
     api.resetView = resetView;
@@ -1135,7 +1177,6 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.destroyDynamicIndexBuffer = destroyDynamicIndexBuffer;
     api.destroyDynamicVertexBuffer = destroyDynamicVertexBuffer;
     api.calcTextureSize = calcTextureSize;
-    api.createTexture = createTexture;
     api.createTexture2D = createTexture2D;
     api.createTexture2DRatio = createTexture2DRatio;
     api.updateTexture2D = updateTexture2D;
@@ -1171,7 +1212,7 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     static_assert(VertexAttrib::TexCoord7  == bgfx::Attrib::TexCoord7, "VertexAttrib Mismatch");
     static_assert(VertexAttribType::Float == bgfx::AttribType::Float, "VertexAttribType mismatch");
     static_assert(TextureFormat::Unknown == bgfx::TextureFormat::Unknown, "TextureFormat mismatch");
-    static_assert(TextureFormat::R11G11B10F == bgfx::TextureFormat::R11G11B10F, "TextureFormat mismatch");
+    static_assert(TextureFormat::RG11B10F == bgfx::TextureFormat::RG11B10F, "TextureFormat mismatch");
     static_assert(TextureFormat::Count == bgfx::TextureFormat::Count, "TextureFormat mismatch");
     static_assert(UniformType::Count == bgfx::UniformType::Count, "UniformType mismatch");
     static_assert(BackbufferRatio::Count == bgfx::BackbufferRatio::Count, "BackbufferRatio mismatch");
@@ -1185,6 +1226,8 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     static_assert(sizeof(HMDDesc) == sizeof(bgfx::HMD), "HMD mismatch");
     static_assert(sizeof(VertexDecl) == sizeof(bgfx::VertexDecl), "VertexDecl mismatch");
     static_assert(sizeof(GfxMemory) == sizeof(bgfx::Memory), "Memory mismatch");
+
+    g_core = (CoreApi_v0*)getApi(ApiId::Core, 0);
 
     return &api;
 }

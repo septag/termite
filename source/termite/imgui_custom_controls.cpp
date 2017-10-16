@@ -4,7 +4,7 @@
 #include "imgui/imgui_internal.h"
 
 #include "bx/string.h"
-#include "bx/fpumath.h"
+#include "bx/math.h"
 
 namespace termite
 {

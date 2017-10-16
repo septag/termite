@@ -2,6 +2,7 @@
 
 #include "../bx/string.h"
 #include <cassert>
+#include <string.h>
 
 namespace bx
 {
@@ -78,7 +79,7 @@ namespace bx
     template <int _Size>
     String<_Size>::String(const char* text)
     {
-        bx::strlcpy(this->text, text, _Size);
+        bx::strCopy(this->text, _Size, text);
     }
 
     template <int _Size>
@@ -108,7 +109,7 @@ namespace bx
     template <int _Size>
     bool String<_Size>::isEqualNoCase(const char* text) const
     {
-        return bx::stricmp(this->text, text) == 0;
+        return bx::strCmpI(this->text, text) == 0;
     }
 
     template <int _Size>
@@ -121,7 +122,7 @@ namespace bx
     template <int _Size>
     String<_Size>& String<_Size>::operator=(const char* str)
     {
-        bx::strlcpy(this->text, str, sizeof(this->text));
+        bx::strCopy(this->text, sizeof(this->text), str);
         return *this;
     }
 
@@ -129,8 +130,8 @@ namespace bx
     String<_Size> String<_Size>::operator+(const char* str) const
     {
         String<_Size> r;
-        bx::strlcpy(r.text, this->text, _Size);
-        bx::strlcat(r.text, str, _Size);
+        bx::strCopy(r.text, this->text, _Size);
+        bx::strCat(r.text, _Size, str);
         return r;
     }
 
@@ -138,22 +139,22 @@ namespace bx
     String<_Size> String<_Size>::operator+(const String<_Size>& str) const
     {
         String<_Size> r;
-        bx::strlcpy(r.text, this->text, _Size);
-        bx::strlcat(r.text, str.cstr(), _Size);
+        bx::strCopy(r.text, _Size, this->text);
+        bx::strCat(r.text, _Size, str.cstr());
         return r;
     }
 
     template <int _Size>
     String<_Size>& String<_Size>::operator+=(const char* str)
     {
-        bx::strlcat(this->text, str, _Size);
+        bx::strCat(this->text, _Size, str);
         return *this;
     }
 
     template <int _Size>
     String<_Size>& String<_Size>::operator+=(const String<_Size>& str)
     {
-        bx::strlcat(this->text, str.cstr(), _Size);
+        bx::strCat(this->text, _Size, str.cstr());
         return *this;
     }
 

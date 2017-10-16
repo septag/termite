@@ -1,6 +1,6 @@
 #pragma once
 
-#include "bx/crtimpl.h"
+#include "bx/file.h"
 #include "bx/string.h"
 
 namespace bx 
@@ -12,7 +12,7 @@ namespace bx
     {
         assert(alloc);
 
-        bx::CrtFileReader reader;
+        bx::FileReader reader;
         bx::Error err;
         if (!reader.open(iniFilepath, &err))
             return false;
@@ -38,9 +38,9 @@ namespace bx
             const char* nextLine;
 
             if (lineSize != 0) {
-                bx::strlcpy(line, lineBegin, bx::uint32_min((uint32_t)lineSize+1, sizeof(line) - 1));
+                bx::strCopy(line, (int32_t)bx::uint32_min((uint32_t)lineSize+1, sizeof(line) - 1), lineBegin);
             } else {
-                bx::strlcpy(line, lineBegin, sizeof(line));
+                bx::strCopy(line, sizeof(line), lineBegin);
             }
 
             if (line[0] == '#') {
@@ -53,8 +53,8 @@ namespace bx
                 char value[256];
 
                 *equal = 0;
-                bx::strlcpy(key, line, sizeof(key));
-                bx::strlcpy(value, equal + 1, sizeof(value));
+                bx::strCopy(key, sizeof(key), line);
+                bx::strCopy(value, sizeof(value), equal + 1);
 
                 callback(bx::strws(key), bx::strws(value), userParam);
             }

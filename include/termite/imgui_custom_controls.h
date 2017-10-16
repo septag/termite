@@ -47,7 +47,7 @@ namespace termite
         ImGuiFishLayout()
         {
             padding = ImVec2(0, 0);
-            memset(layout, 0x00, sizeof(layout));
+            bx::memSet(layout, 0x00, sizeof(layout));
             mouseDown[0] = mouseDown[1] = false;
         }
     };
@@ -55,4 +55,40 @@ namespace termite
 
     /// Values: x=start, y=end
     bool imguiGaunt(const char* strId, ImVec2* values, int numValues, int* changeIdx, const ImVec2& size);
+
+    template <uint32_t _Max>
+    struct ImGuiGraphData
+    {
+        float data[_Max];
+        float presentData[_Max];
+        uint32_t num;
+
+        ImGuiGraphData() : num(0) 
+        {
+        }
+
+        void add(float value)
+        {
+            uint32_t index = num % _Max;
+            data[index] = value;
+            if (num > _Max) {
+                memcpy(presentData, data + index, sizeof(float)*(_Max - index));
+                if (index > 0)
+                    memcpy(presentData + _Max - index, data, sizeof(float)*index);
+            } else {
+                memcpy(presentData, data, sizeof(float)*index);
+            }
+            ++num;
+        }
+
+        int getCount() const
+        {
+            return (int)std::min<uint32_t>(num, _Max);
+        }
+
+        const float* getValues() const
+        {
+            return presentData;
+        }
+    };
 }

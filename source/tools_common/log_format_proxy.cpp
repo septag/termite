@@ -5,9 +5,8 @@
 
 #include "bxx/json.h"
 #include "bxx/logger.h"
-#include "bx/crtimpl.h"
 
-static bx::CrtAllocator g_alloc;
+static bx::DefaultAllocator g_alloc;
 
 void termite::LogFormatProxy::fatal(const char* fmt, ...)
 {

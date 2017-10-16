@@ -57,7 +57,7 @@ namespace bx
             Bucket* b = m_firstBucket;
             while (b) {
                 if (b->iter > 0)
-                    return new(b->ptrs[--b->iter]) Ty(params ...);
+                    return BX_PLACEMENT_NEW(b->ptrs[--b->iter], Ty)(params ...);
                 b = b->next;
             }
 
@@ -65,7 +65,7 @@ namespace bx
             if (!b)
                 return nullptr;
 
-            return new(b->ptrs[--b->iter]) Ty(params ...);
+            return BX_PLACEMENT_NEW(b->ptrs[--b->iter], Ty)(params ...);
         }
 
         void deleteInstance(Ty* _inst);
@@ -125,7 +125,7 @@ namespace bx
         uint8_t* buff = (uint8_t*)BX_ALLOC(m_alloc, total_sz);
         if (!buff)
             return false;
-        memset(buff, 0x00, total_sz);
+        bx::memSet(buff, 0x00, total_sz);
 
         m_buffer = (Ty*)buff;
         buff += sizeof(Ty)*m_maxItems;
@@ -288,7 +288,7 @@ namespace bx
         uint8_t* buff = (uint8_t*)BX_ALLOC(m_alloc, total_sz);
         if (!buff)
             return nullptr;
-        memset(buff, 0x00, total_sz);
+        bx::memSet(buff, 0x00, total_sz);
 
         Bucket* bucket = (Bucket*)buff;
         buff += sizeof(Bucket);

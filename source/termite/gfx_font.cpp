@@ -471,11 +471,11 @@ namespace termite
         auto readKeyValue = [](char* token, char* key, char* value, size_t maxChars) {
             char* equal = strchr(token, '=');
             if (equal) {
-                bx::strlcpy(key, token, std::min<size_t>(maxChars, size_t(equal-token)+1));
+                bx::strCopy(key, std::min<size_t>(maxChars, size_t(equal-token)+1), token);
                 if (*(equal + 1) != '"')
-                    bx::strlcpy(value, equal + 1, maxChars);
+                    bx::strCopy(value, maxChars, equal + 1);
                 else
-                    bx::strlcpy(value, equal + 2, maxChars);
+                    bx::strCopy(value, maxChars, equal + 2);
                 size_t vlen = strlen(value);
                 if (value[vlen-1] == '"')
                     value[vlen-1] = 0;
@@ -490,13 +490,13 @@ namespace termite
             char snum[16];
             char* token = strchr(value, ',');
             while (token) {
-                bx::strlcpy(snum, value, std::min<size_t>(sizeof(snum), size_t(token-value)+1));
+                bx::strCopy(snum, std::min<size_t>(sizeof(snum), size_t(token-value)+1), value);
                 if (index < maxNumbers)
                     numbers[index++] = (int16_t)bx::toInt(snum);
                 value = token + 1;
                 token = strchr(value, ',');
             }
-            bx::strlcpy(snum, value, sizeof(snum));
+            bx::strCopy(snum, sizeof(snum), value);
             if (index < maxNumbers)
                 numbers[index++] = (int16_t)bx::toInt(snum);
             return index;
@@ -508,7 +508,7 @@ namespace termite
             while (token) {
                 readKeyValue(token, key, value, 32);
                 if (strcmp(key, "face") == 0) {
-                    bx::strlcpy(name, value, 32);
+                    bx::strCopy(name, 32, value);
                 } else if (strcmp(key, "size") == 0) {
                     size = bx::toInt(value);
                 } else if (strcmp(key, "bold") == 0) {
@@ -634,7 +634,7 @@ namespace termite
         int kernIdx = 0;
         int charIdx = 0;
         while (eol) {
-            bx::strlcpy(line, strbuff, std::min<size_t>(sizeof(line), size_t(eol - strbuff)+1));
+            bx::strCopy(line, std::min<size_t>(sizeof(line), size_t(eol - strbuff)+1), strbuff);
             size_t lineLen = strlen(line);
             if (lineLen > 0) {
                 if (line[lineLen-1] == '\r')
@@ -653,7 +653,7 @@ namespace termite
                     assert(numGlyphs > 0);
                     glyphs = (FontGlyph*)BX_ALLOC(tmpAlloc, sizeof(FontGlyph)*numGlyphs);
                     assert(glyphs);
-                    memset(glyphs, 0x00, sizeof(FontGlyph)*numGlyphs);
+                    bx::memSet(glyphs, 0x00, sizeof(FontGlyph)*numGlyphs);
                 } else if (strcmp(token, "char") == 0) {
                     assert(charIdx < numGlyphs);
                     readChar(glyphs[charIdx++]);
@@ -662,7 +662,7 @@ namespace termite
                     if (numKernings > 0) {
                         kernings = (FontKerning*)BX_ALLOC(tmpAlloc, sizeof(FontKerning)*numKernings);
                         assert(kernings);
-                        memset(kernings, 0x00, sizeof(FontKerning)*numKernings);
+                        bx::memSet(kernings, 0x00, sizeof(FontKerning)*numKernings);
                     }
                 } else if (strcmp(token, "kerning") == 0) {
                     assert(kernIdx < numKernings);
@@ -808,7 +808,7 @@ namespace termite
             return nullptr;
         }
 
-        bx::strlcpy(font->name, fontName, sizeof(font->name));
+        bx::strCopy(font->name, sizeof(font->name), fontName);
         font->size = info.font_size;
         font->lineHeight = common.line_height;
         font->base = common.base;
@@ -821,7 +821,7 @@ namespace termite
         font->texHandles[0] = loadResource("texture", texFilepath.cstr(), &tparams, 0,
                                            alloc == g_fontSys->alloc ? nullptr : alloc);
         font->numPages = 1;
-        memset(font->glyphs, 0x00, sizeof(FontGlyph)*numGlyphs);
+        bx::memSet(font->glyphs, 0x00, sizeof(FontGlyph)*numGlyphs);
 
         uint16_t charWidth = 0;
         for (int i = 0; i < numGlyphs; i++) {
@@ -844,7 +844,7 @@ namespace termite
         font->charWidth = charWidth;
 
         if (numKerns > 0 && last_r > 0) {
-            memset(font->kerns, 0x00, sizeof(FontKerning)*numKerns);
+            bx::memSet(font->kerns, 0x00, sizeof(FontKerning)*numKerns);
 
             for (int i = 0; i < numKerns; i++) {
                 const fntKernPair_t& kern = kerns[i];
@@ -995,7 +995,7 @@ namespace termite
         if (mtxHash != batch->mtxHash) {
             mtx4x4_t inv;
             mtx4x4_t proj;
-            bx::mtxOrtho(proj.f, 0, screenSize.x, screenSize.y, 0, -1.0f, 1.0f);
+            bx::mtxOrtho(proj.f, 0, screenSize.x, screenSize.y, 0, -1.0f, 1.0f, 0, false);
             bx::mtxInverse(inv.f, viewProjMtx.f);
             bx::mtxMul(batch->transformMtx.f, proj.f, inv.f);
             batch->screenSize = screenSize;
@@ -1311,7 +1311,7 @@ namespace termite
             gDriver->setState(gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite, 0);
             gDriver->setTexture(0, g_fontSys->uTexture, getResourcePtr<Texture>(font->texHandles[0])->handle,
                                 TextureFlag::FromTexture);
-            gDriver->setTransientVertexBuffer(&tvb);
+            gDriver->setTransientVertexBuffer(0, &tvb);
             gDriver->setTransientIndexBuffer(&tib);
             gDriver->submit(viewId, prog, 0, false);
         }

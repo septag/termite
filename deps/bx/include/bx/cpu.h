@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2016 Branimir Karadzic. All rights reserved.
+ * Copyright 2010-2017 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bx#license-bsd-2-clause
  */
 
@@ -10,16 +10,11 @@
 #include "platform.h"
 
 #if BX_COMPILER_MSVC
-#	if BX_PLATFORM_XBOX360
-#		include <ppcintrinsics.h>
-#		include <xtl.h>
-#	else
-#		include <math.h> // math.h is included because VS bitches:
-						 // warning C4985: 'ceil': attributes not present on previous declaration.
-						 // must be included before intrin.h.
-#		include <intrin.h>
-#		include <windows.h>
-#	endif // !BX_PLATFORM_XBOX360
+#	include <math.h> // math.h is included because VS bitches:
+					 // warning C4985: 'ceil': attributes not present on previous declaration.
+					 // must be included before intrin.h.
+#	include <intrin.h>
+#	include <windows.h>
 #	if BX_PLATFORM_WINRT
 #		define _InterlockedExchangeAdd64 InterlockedExchangeAdd64
 #	endif // BX_PLATFORM_WINRT
@@ -75,21 +70,10 @@ namespace bx
 #endif // BX_COMPILER
 	}
 
-    inline void yieldCpu()
-    {
-#if BX_CPU_ARM
-        asm volatile("NOP");
-#else
-        _mm_pause();
-#endif
-    }
-
 	///
 	inline void memoryBarrier()
 	{
-#if BX_PLATFORM_XBOX360
-		__lwsync();
-#elif BX_PLATFORM_WINRT
+#if BX_PLATFORM_WINRT
 		MemoryBarrier();
 #elif BX_COMPILER_MSVC
 		_mm_mfence();
@@ -152,7 +136,20 @@ namespace bx
 	inline int64_t atomicFetchAndAdd<int64_t>(volatile int64_t* _ptr, int64_t _add)
 	{
 #if BX_COMPILER_MSVC
+#	if _WIN32_WINNT >= 0x600
 		return _InterlockedExchangeAdd64( (volatile int64_t*)_ptr, _add);
+#	else
+		int64_t oldVal;
+		int64_t newVal = *(int64_t volatile*)_ptr;
+		do
+		{
+			oldVal = newVal;
+			newVal = atomicCompareAndSwap(_ptr, oldVal, newVal + _add);
+
+		} while (oldVal != newVal);
+
+		return oldVal;
+#	endif
 #else
 		return __sync_fetch_and_add(_ptr, _add);
 #endif // BX_COMPILER_

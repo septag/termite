@@ -127,7 +127,6 @@ namespace termite
         void(*setPaletteColor)(uint8_t index, uint32_t rgba);
         void(*setPaletteColorRgba)(uint8_t index, float rgba[4]);
         void(*setPaletteColorRgbaf)(uint8_t index, float r, float g, float b, float a);
-        void(*saveScreenshot)(const char* filepath);
 
         // Views
         void(*setViewName)(uint8_t id, const char* name);
@@ -138,7 +137,7 @@ namespace termite
         void(*setViewClearPalette)(uint8_t id, GfxClearFlag::Bits flags, float depth, uint8_t stencil,
                                    uint8_t color0, uint8_t color1, uint8_t color2, uint8_t color3,
                                    uint8_t color4, uint8_t color5, uint8_t color6, uint8_t color7);
-        void (*setViewSeq)(uint8_t id, bool enabled);
+        void (*setViewMode)(uint8_t id, ViewMode::Enum mode);
         void(*setViewTransform)(uint8_t id, const void* view, const void* projLeft,
                                 GfxViewFlag::Bits flags/* = GfxViewFlag::Stereo*/, const void* projRight/* = nullptr*/);
         void(*setViewFrameBuffer)(uint8_t id, FrameBufferHandle handle);
@@ -164,11 +163,11 @@ namespace termite
         void(*setDynamicIndexBuffer)(DynamicIndexBufferHandle handle, uint32_t firstIndex, uint32_t numIndices);
         void(*setTransientIndexBufferI)(const TransientIndexBuffer* tib, uint32_t firstIndex, uint32_t numIndices);
         void(*setTransientIndexBuffer)(const TransientIndexBuffer* tib);
-        void(*setVertexBuffer)(VertexBufferHandle handle);
-        void(*setVertexBufferI)(VertexBufferHandle handle, uint32_t vertexIndex, uint32_t numVertices);
-        void(*setDynamicVertexBuffer)(DynamicVertexBufferHandle handle, uint32_t startVertex, uint32_t numVertices);
-        void(*setTransientVertexBuffer)(const TransientVertexBuffer* tvb);
-        void(*setTransientVertexBufferI)(const TransientVertexBuffer* tvb, uint32_t startVertex, uint32_t numVertices);
+        void(*setVertexBuffer)(uint8_t stream, VertexBufferHandle handle);
+        void(*setVertexBufferI)(uint8_t stream, VertexBufferHandle handle, uint32_t vertexIndex, uint32_t numVertices);
+        void(*setDynamicVertexBuffer)(uint8_t stream, DynamicVertexBufferHandle handle, uint32_t startVertex, uint32_t numVertices);
+        void(*setTransientVertexBuffer)(uint8_t stream, const TransientVertexBuffer* tvb);
+        void(*setTransientVertexBufferI)(uint8_t stream, const TransientVertexBuffer* tvb, uint32_t startVertex, uint32_t numVertices);
         void(*setInstanceDataBuffer)(const InstanceDataBuffer* idb, uint32_t num);
         void(*setInstanceDataBufferVb)(VertexBufferHandle handle, uint32_t startVertex, uint32_t num);
         void(*setInstanceDataBufferDynamicVb)(DynamicVertexBufferHandle handle, uint32_t startVertex, uint32_t num);
@@ -195,7 +194,7 @@ namespace termite
                                 GpuAccessFlag::Enum access, TextureFormat::Enum fmt);
 
         // Compute Dispatch
-        uint32_t(*computeDispatch)(uint8_t viewId, ProgramHandle handle, uint16_t numX, uint16_t numY, uint16_t numZ,
+        uint32_t(*computeDispatch)(uint8_t viewId, ProgramHandle handle, uint32_t numX, uint32_t numY, uint32_t numZ,
                                    GfxSubmitFlag::Bits flags/* = GfxSubmitFlag::Left*/);
         uint32_t(*computeDispatchIndirect)(uint8_t viewId, ProgramHandle handle, IndirectBufferHandle indirectHandle,
                                    uint16_t start, uint16_t num, GfxSubmitFlag::Bits flags/* = GfxSubmitFlag::Left*/);
@@ -252,7 +251,6 @@ namespace termite
         // Textures
         void(*calcTextureSize)(TextureInfo* info, uint16_t width, uint16_t height, uint16_t depth,
             bool cubemap, bool hasMips, uint16_t numLayers, TextureFormat::Enum fmt);
-        TextureHandle(*createTexture)(const GfxMemory* mem, TextureFlag::Bits flags, uint8_t skipMips, TextureInfo* info);
         TextureHandle(*createTexture2D)(uint16_t width, uint16_t height, bool hasMips, uint16_t numLayers,
             TextureFormat::Enum fmt, TextureFlag::Bits flags/* = TextureFlag::None*/, const GfxMemory* mem/* = nullptr*/);
         TextureHandle(*createTexture2DRatio)(BackbufferRatio::Enum ratio, bool hasMips, uint16_t numLayers, TextureFormat::Enum fmt,
@@ -284,7 +282,7 @@ namespace termite
 
         // Instance Buffer
         uint32_t(*getAvailInstanceDataBuffer)(uint32_t num, uint16_t stride);
-        const InstanceDataBuffer* (*allocInstanceDataBuffer)(uint32_t num, uint16_t stride);
+        void (*allocInstanceDataBuffer)(InstanceDataBuffer* ibuff, uint32_t num, uint16_t stride);
 
         // Indirect Buffer
         IndirectBufferHandle(*createIndirectBuffer)(uint32_t num);

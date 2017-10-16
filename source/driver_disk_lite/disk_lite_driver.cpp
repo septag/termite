@@ -2,113 +2,158 @@
 #include "termite/io_driver.h"
 
 #include "bx/platform.h"
-#include "bx/crtimpl.h"
 #include "bx/cpu.h"
+#include "bx/file.h"
 #include "bxx/path.h"
 #include "bxx/pool.h"
+#include "bxx/linked_list.h"
 #include "bxx/queue.h"
-#include "bx/thread.h"
 #include "bx/mutex.h"
-#include "bx/sem.h"
 
 #define T_CORE_API
 #include "termite/plugin_api.h"
 
+#if USE_EFSW
+#include "efsw/efsw.hpp"
+#endif
+
+#include "lz4/lz4.h"
+
+#define MAX_DISK_JOBS 4
+
 using namespace termite;
 
-static CoreApi_v0* g_core = nullptr;
+#if USE_EFSW
+class FileWatchListener : public efsw::FileWatchListener
+{
+public:
+    void handleFileAction(efsw::WatchID watchid, const std::string& dir, const std::string& filename,
+                          efsw::Action action,
+                          std::string oldFilename = "") override;
+
+    void setRootDir(const bx::Path& rootDir);
+private:
+    bx::Path m_rootDir;
+};
+
+struct EfswResult
+{
+    efsw::Action action;
+    bx::Path filepath;
+    bx::Queue<EfswResult*>::Node qnode;
+    EfswResult() : qnode(this)
+    {
+    }
+};
+#endif
 
 struct BlockingAssetDriver
 {
     bx::AllocatorI* alloc;
     bx::Path rootDir;
+    IoFlags::Bits flags;
 
     BlockingAssetDriver()
     {
         alloc = nullptr;
+        flags = 0;
     }
 };
 
-struct AsyncRequest
+struct DiskJobMode
 {
-    enum Type
-    {
+    enum Enum {
         Read,
         Write
     };
-
-    Type type;
-    bx::Path uri;
-    MemoryBlock* mem;
-    IoPathType::Enum pathType;
-    bx::Queue<AsyncRequest*>::Node qnode;
-
-    AsyncRequest() :
-        mem(nullptr),
-        qnode(this)
-    {
-    }
-
 };
 
-struct AsyncResponse
+struct DiskJobResult
 {
-    enum Type
-    {
-        RequestOpenFailed,
-        RequestReadFailed,
-        RequestReadOk,
-        RequestWriteFailed,
-        RequestWriteOk
+    enum Enum {
+        OpenFailed,
+        ReadFailed,
+        ReadOk,
+        WriteFailed,
+        WriteOk
     };
+};
 
-    Type type;
+struct DiskJob
+{
+    // Request
+    DiskJobMode::Enum mode;
     bx::Path uri;
-    MemoryBlock* mem;
-    size_t bytesWritten;
-    bx::Queue<AsyncResponse*>::Node qnode;
+    IoPathType::Enum pathType;
 
-    AsyncResponse() :
-        mem(nullptr),
-        bytesWritten(0),
-        qnode(this)
+    // Result
+    DiskJobResult::Enum result;
+    MemoryBlock* mem;      // Read memory (read mode)
+    size_t bytesWritten;       // written bytes (write mode)
+
+    JobHandle handle;          // JobHandle
+
+    bx::List<DiskJob*>::Node lnode; 
+
+    DiskJob() : lnode(this)
     {
+        mem = nullptr;
+        handle = nullptr;
+        bytesWritten = 0;
     }
 };
 
 struct AsyncAssetDriver
 {
     bx::AllocatorI* alloc;
+    bx::Pool<DiskJob> jobPool;
+    bx::List<DiskJob*> jobList;
+    bx::List<DiskJob*> pendingJobList;
     IoDriverEventsI* callbacks;
-    bx::Thread loadThread;
-    bx::Path rootDir;
+    int numDiskJobs;
+    int maxDiskJobsProcessed;
 
-    bx::Mutex reqQueueMtx;
-    bx::Mutex resQueueMtx;
-    bx::Queue<AsyncRequest*> reqQueue;
-    bx::Queue<AsyncResponse*> resQueue;
-
-    volatile int32_t stop;
-
-    bx::Semaphore reqSem;
-    bx::Pool<AsyncRequest> reqPool;
-    bx::Pool<AsyncResponse> resPool;
+#if USE_EFSW
+    FileWatchListener watchListener;
+    efsw::FileWatcher* fileWatcher;
+    efsw::WatchID rootWatch;
+    bx::Mutex reqMutex;
+    bx::Queue<EfswResult*> efswQueue;
+#endif
 
     AsyncAssetDriver()
     {
-        alloc = nullptr;
         callbacks = nullptr;
-        stop = 0;
+        numDiskJobs = 0; 
+        maxDiskJobsProcessed = 0;
+#if USE_EFSW
+        fileWatcher = nullptr;
+        rootWatch = 0;
+#endif
     }
 };
 
 static BlockingAssetDriver g_blocking;
 static AsyncAssetDriver g_async;
-static int g_assetsBundleId = -1;
+static CoreApi_v0* g_core = nullptr;
 
 #if BX_PLATFORM_IOS
+static int g_assetsBundleId = -1;
 int iosAddBundle(const char* bundleName);
 bx::Path iosResolveBundlePath(int bundleId, const char* filepath);
+#elif BX_PLATFORM_ANDROID
+#include <android/asset_manager.h>
+#include <android/asset_manager_jni.h>
+#include <jni.h>
+
+static AAssetManager* g_assetMgr = nullptr;
+
+extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteInitAssetManager(JNIEnv* env, jclass cls, jobject jassetManager)
+{
+    BX_UNUSED(cls);
+    g_assetMgr = AAssetManager_fromJava(env, jassetManager);
+}
+
 #endif
 
 static bx::Path resolvePath(const char* uri, const bx::Path& rootDir, IoPathType::Enum pathType)
@@ -116,11 +161,13 @@ static bx::Path resolvePath(const char* uri, const bx::Path& rootDir, IoPathType
     bx::Path filepath;
     switch (pathType) {
     case IoPathType::Assets:
-#if !BX_PLATFORM_IOS
+#if BX_PLATFORM_IOS
+        filepath = iosResolveBundlePath(g_assetsBundleId, uri);
+#elif BX_PLATFORM_ANDROID
+        assert(false);      // Resolving from assetManager is not supported
+#else
         filepath = rootDir;
         filepath.join("assets").join(uri);
-#else
-        filepath = iosResolveBundlePath(g_assetsBundleId, uri);
 #endif
         break;
     case IoPathType::Relative:
@@ -135,11 +182,20 @@ static bx::Path resolvePath(const char* uri, const bx::Path& rootDir, IoPathType
 }
 
 // BlockingIO
-static int blockInit(bx::AllocatorI* alloc, const char* uri, const void* params, IoDriverEventsI* callbacks)
+static int blockInit(bx::AllocatorI* alloc, const char* uri, const void* params, IoDriverEventsI* callbacks, IoFlags::Bits flags)
 {
     g_blocking.alloc = alloc;
+    g_blocking.flags = flags;
     g_blocking.rootDir = uri;
     g_blocking.rootDir.normalizeSelf();
+
+#if BX_PLATFORM_ANDROID
+    if (!g_assetMgr) {
+        T_ERROR_API(g_core, "JNI AssetManager is not initialized. Call "
+                    "com.termite.utils.PlatformUtils.termiteInitAssetManager before initializing the engine");
+        return T_ERR_FAILED;
+    }
+#endif
 
     return 0;
 }
@@ -157,93 +213,183 @@ static IoDriverEventsI* blockGetCallbacks()
     return nullptr;
 }
 
-static MemoryBlock* blockReadRaw(const char* uri, IoPathType::Enum pathType, AsyncResponse::Type* pRes)
+static MemoryBlock* uncompressBlob(MemoryBlock* mem, bx::AllocatorI* alloc, const char* filepath)
 {
-    MemoryBlock* mem = nullptr;
-
-    bx::Path filepath = resolvePath(uri, g_blocking.rootDir, pathType);
-
-    bx::CrtFileReader file;
-    bx::Error err;
-    if (!file.open(filepath.cstr(), &err)) {
-        *pRes = AsyncResponse::RequestOpenFailed;
-        return nullptr;
+    assert(mem);
+    // check the last extension
+    const char* ext = strrchr(filepath, '.');
+    if (ext && bx::strCmpI(ext + 1, "lz4") == 0 && mem->size > sizeof(uint32_t)) {
+        uint32_t size = *((uint32_t*)mem->data);
+        assert(size > 0);
+        MemoryBlock* uncompressed = g_core->createMemoryBlock(size, alloc);
+        if (uncompressed) {
+            LZ4_decompress_safe((const char*)(mem->data + sizeof(uint32_t)), (char*)uncompressed->data, mem->size, size);
+            g_core->releaseMemoryBlock(mem);
+            mem = uncompressed;
+        } else {
+            g_core->releaseMemoryBlock(mem);
+            mem = nullptr;
+        }
     }
 
-    // Get file size
-    int64_t size = file.seek(0, bx::Whence::End);
-    file.seek(0, bx::Whence::Begin);
-
-    // Read Contents
-    if (size) {
-        mem = g_core->createMemoryBlock((uint32_t)size, g_blocking.alloc);
-        if (mem)
-            file.read(mem->data, mem->size, &err);
-    }
-
-    file.close();
-
-    *pRes = mem ? AsyncResponse::RequestReadOk : AsyncResponse::RequestReadFailed;
     return mem;
 }
 
-static size_t blockWriteRaw(const char* uri, const MemoryBlock* mem, IoPathType::Enum pathType, AsyncResponse::Type* pRes)
+static void blockingReadJob(int jobIdx, void* userParam)
 {
-    size_t size = 0;
-    if (pathType != IoPathType::Assets) {
-        bx::Path filepath = resolvePath(uri, g_blocking.rootDir, pathType);
+    DiskJob* job = (DiskJob*)userParam;
 
-        bx::CrtFileWriter file;
-        bx::Error err;
-        if (!file.open(filepath.cstr(), false, &err)) {
-            *pRes = AsyncResponse::RequestOpenFailed;
-            return 0;
+#if BX_PLATFORM_ANDROID
+    // Asset Loading has a different path on android platform
+    if (job->pathType == IoPathType::Assets) {
+        AAsset* asset = AAssetManager_open(g_assetMgr, job->uri.cstr(), AASSET_MODE_UNKNOWN);
+        if (!asset) {
+            job->result = DiskJobResult::OpenFailed;
+            return;
         }
 
-        // Write memory
-        size = file.write(mem->data, mem->size, &err);
-        file.close();
-    }
+        off_t size = AAsset_getLength(asset);
+        MemoryBlock* mem = nullptr;
+        int r = -1;
+        if (size) {
+            mem = g_core->createMemoryBlock(size, g_blocking.alloc);
+            if (mem)
+                r = AAsset_read(asset, mem->data, size);
+        }
+        AAsset_close(asset);
 
-    *pRes = size != 0 ? AsyncResponse::RequestWriteOk : AsyncResponse::RequestWriteFailed;
-    return size;
+        if (mem && (g_blocking.flags & IoFlags::ExtractLZ4)) {
+            mem = uncompressBlob(mem, g_blocking.alloc, job->uri.cstr());
+        }
+
+        if (mem && r > 0) {
+            job->result = DiskJobResult::ReadOk;
+            job->mem = mem;
+        } else if (!mem) {
+            job->result = DiskJobResult::OpenFailed;
+        } else if (r <= 0) {
+            job->result = DiskJobResult::ReadFailed;
+            g_core->releaseMemoryBlock(mem);
+        }
+
+        return;
+    }
+#endif
+
+    // Normal reading from DiskFs
+    bx::Path filepath = resolvePath(job->uri.cstr(), g_blocking.rootDir, job->pathType);
+    bx::FileReader file;
+    bx::Error err;
+
+    if (file.open(filepath.cstr(), &err)) {
+        // Get file size
+        int64_t size = file.seek(0, bx::Whence::End);
+        file.seek(0, bx::Whence::Begin);
+        MemoryBlock* mem = nullptr;
+        int r = 0;
+
+        // Read Contents
+        if (size > 0) {
+            mem = g_core->createMemoryBlock((uint32_t)size, g_blocking.alloc);
+            if (mem)
+                r = file.read(mem->data, mem->size, &err);
+        }
+        file.close();
+
+        // LZ4 decompress if flag is set
+        if (mem && (g_blocking.flags & IoFlags::ExtractLZ4)) {
+            mem = uncompressBlob(mem, g_blocking.alloc, job->uri.cstr());
+        }
+
+        if (mem && r > 0) {
+            job->result = DiskJobResult::ReadOk;
+            job->mem = mem;
+        } else if (!mem) {
+            job->result = DiskJobResult::ReadFailed;
+        } else if (r <= 0) {
+            job->result = DiskJobResult::ReadFailed;
+            g_core->releaseMemoryBlock(mem);
+        }
+    } else {
+        job->result = DiskJobResult::OpenFailed;
+    }
+}
+
+static void blockingWriteJob(int jobIdx, void* userParam)
+{
+    DiskJob* job = (DiskJob*)userParam;
+
+#if BX_PLATFORM_ANDROID || BX_PLATFORM_IOS
+    if (job->pathType == IoPathType::Assets) {
+        job->result = DiskJobResult::OpenFailed;
+        return;
+    }
+#endif
+
+    assert(job->mem);
+    size_t size = 0;
+    bx::Path filepath = resolvePath(job->uri.cstr(), g_blocking.rootDir, job->pathType);
+
+    bx::FileWriter file;
+    bx::Error err;
+    if (file.open(filepath.cstr(), false, &err)) {
+        size = file.write(job->mem->data, job->mem->size, &err);
+        file.close();
+
+        if (size > 0) {
+            job->result = DiskJobResult::WriteOk;
+            job->bytesWritten = size;
+        } else {
+            job->result = DiskJobResult::WriteFailed;
+        }
+    } else {
+        job->result = DiskJobResult::OpenFailed;
+    }
 }
 
 static MemoryBlock* blockRead(const char* uri, IoPathType::Enum pathType)
 {
-    AsyncResponse::Type res;
-    MemoryBlock* mem = blockReadRaw(uri, pathType, &res);
-    switch (res) {
-    case AsyncResponse::RequestReadOk:
+    DiskJob job;
+    job.mode = DiskJobMode::Read;
+    job.uri = uri;
+    job.pathType = pathType;
+    blockingReadJob(0, &job);
+
+    switch (job.result) {
+    case DiskJobResult::ReadOk:
         break;
-    case AsyncResponse::RequestOpenFailed:
-        T_ERROR_API(g_core, "Unable to open file '%s' for reading", uri);
+    case DiskJobResult::OpenFailed:
+        T_ERROR_API(g_core, "DiskDriver: Unable to open file '%s' for reading", uri);
         break;
-    case AsyncResponse::RequestReadFailed:
-        T_ERROR_API(g_core, "Unable read file '%s'", uri);
+    case DiskJobResult::ReadFailed:
+        T_ERROR_API(g_core, "DiskDriver: Unable to read file '%s'", uri);
         break;
     }
-
-    return mem;
+    return job.mem;
 }
 
 static size_t blockWrite(const char* uri, const MemoryBlock* mem, IoPathType::Enum pathType)
 {
-    AsyncResponse::Type res;
-    size_t size = blockWriteRaw(uri, mem, pathType, &res);
+    DiskJob job;
+    job.mode = DiskJobMode::Write;
+    job.uri = uri;
+    job.pathType = pathType;
+    job.mem = const_cast<MemoryBlock*>(mem);
 
-    switch (res) {
-    case AsyncResponse::RequestWriteOk:
+    blockingWriteJob(0, &job);
+
+    switch (job.result) {
+    case DiskJobResult::WriteOk:
         break;
-    case AsyncResponse::RequestOpenFailed:
+    case DiskJobResult::OpenFailed:
         T_ERROR_API(g_core, "Unable to open file '%s' for writing", uri);
         break;
-    case AsyncResponse::RequestWriteFailed:
+    case DiskJobResult::WriteFailed:
         T_ERROR_API(g_core, "Unable write file '%s'", uri);
         break;
     }
 
-    return size;
+    return job.bytesWritten;
 }
 
 static void blockRunAsyncLoop()
@@ -261,81 +407,46 @@ static const char* blockGetUri()
 }
 
 // AsyncIO
-static int32_t asyncThread(void* userData)
+static int asyncInit(bx::AllocatorI* alloc, const char* uri, const void* params, IoDriverEventsI* callbacks, IoFlags::Bits flags)
 {
-    AsyncAssetDriver* driver = (AsyncAssetDriver*)userData;
-
-    while (!driver->stop) {
-        // Wait for incoming requests
-        driver->reqSem.wait();
-
-        AsyncRequest req;
-        // Pull one request and execute it
-        {
-            bx::MutexScope mtx(driver->reqQueueMtx);
-            AsyncRequest* pReq;
-            if (!driver->reqQueue.pop(&pReq))
-                continue;
-            memcpy(&req, pReq, sizeof(AsyncRequest));
-            driver->reqPool.deleteInstance(pReq);
-        }
-
-        AsyncResponse::Type resType;
-        if (req.type == AsyncRequest::Read) {
-            MemoryBlock* mem = blockReadRaw(req.uri.cstr(), req.pathType, &resType);
-
-            bx::MutexScope mtx(driver->resQueueMtx);
-            AsyncResponse* res = driver->resPool.newInstance<>();
-            res->type = resType;
-            res->uri = req.uri;
-            res->mem = mem;
-            driver->resQueue.push(&res->qnode);
-        } else if (req.type == AsyncRequest::Write) {
-            size_t size = blockWriteRaw(req.uri.cstr(), req.mem, req.pathType, &resType);
-
-            bx::MutexScope mtx(driver->resQueueMtx);
-            AsyncResponse* res = driver->resPool.newInstance<>();
-            res->type = resType;
-            res->bytesWritten = size;
-            driver->resQueue.push(&res->qnode);
-        }
-    }
-
-    return 0;
-}
-
-static int asyncInit(bx::AllocatorI* alloc, const char* uri, const void* params, IoDriverEventsI* callbacks)
-{
-    assert(!g_async.alloc);
-
-    g_async.alloc = alloc;
-    g_async.callbacks = callbacks;
-
     // Initialize pools and their queues
-    if (!g_async.reqPool.create(32, alloc))
+    g_async.alloc = alloc;
+    if (!g_async.jobPool.create(64, alloc))
         return T_ERR_OUTOFMEM;
 
-    if (!g_async.resPool.create(32, alloc))
-        return T_ERR_OUTOFMEM;
-
-    // Start the load thread
-    g_async.loadThread.init(asyncThread, &g_async, 128*1024, "AsyncLoadThread");
+#if USE_EFSW
+    g_async.fileWatcher = BX_NEW(alloc, efsw::FileWatcher);
+    if (!g_async.fileWatcher)
+        return T_ERR_FAILED;
+    // Watch assets directory only
+    bx::Path watchDir = g_blocking.rootDir;
+    watchDir.join("assets");
+    g_async.rootWatch = g_async.fileWatcher->addWatch(watchDir.cstr(), &g_async.watchListener, true);
+    g_async.watchListener.setRootDir(watchDir);
+    g_async.fileWatcher->watch();
+#endif
     return 0;
 }
 
 static void asyncShutdown()
 {
-    if (!g_async.alloc)
-        return;
+    g_async.jobPool.destroy();
 
-    bx::AllocatorI* alloc = g_async.alloc;
-    bx::atomicExchange<int32_t>(&g_async.stop, 1);
+#if USE_EFSW
+    if (g_async.fileWatcher) {
+        if (g_async.rootWatch) {
+            g_async.fileWatcher->removeWatch(g_async.rootWatch);
+            g_async.rootWatch = 0;
+        }
 
-    g_async.reqSem.post(100);
-    g_async.loadThread.shutdown();
-    
-    g_async.resPool.destroy();
-    g_async.reqPool.destroy();
+        EfswResult* result;
+        while (g_async.efswQueue.pop(&result)) {
+            BX_DELETE(g_async.alloc, result);
+        }
+
+        BX_DELETE(g_async.alloc, g_async.fileWatcher);
+    }
+#endif
 }
 
 static void asyncSetCallbacks(IoDriverEventsI* callbacks)
@@ -350,67 +461,126 @@ static IoDriverEventsI* asyncGetCallbacks()
 
 static MemoryBlock* asyncRead(const char* uri, IoPathType::Enum pathType)
 {
-    bx::MutexScope mtx(g_async.reqQueueMtx);
+    DiskJob* dj = g_async.jobPool.newInstance<>();
+    dj->mode = DiskJobMode::Read;
+    dj->pathType = pathType;
+    dj->uri = uri;
 
-    AsyncRequest* req = g_async.reqPool.newInstance<>();
-    req->type = AsyncRequest::Read;
-    req->uri = uri;
-    req->pathType = pathType;
-
-    g_async.reqQueue.push(&req->qnode);
-    g_async.reqSem.post();
-
+    if (g_async.numDiskJobs < MAX_DISK_JOBS) {
+        JobDesc job(blockingReadJob, dj);
+        dj->handle = g_core->dispatchSmallJobs(&job, 1);
+        if (dj->handle) {
+            ++g_async.numDiskJobs;
+            g_async.maxDiskJobsProcessed = std::max(g_async.numDiskJobs, g_async.maxDiskJobsProcessed);
+            g_async.jobList.add(&dj->lnode);
+        } else {
+            // Add to pending to process later
+            g_async.pendingJobList.add(&dj->lnode);
+        }
+    } else {
+        g_async.pendingJobList.add(&dj->lnode);
+    }
     return nullptr;
 }
 
 static size_t asyncWrite(const char* uri, const MemoryBlock* mem, IoPathType::Enum pathType)
 {
-    bx::MutexScope mtx(g_async.reqQueueMtx);
+    DiskJob* dj = g_async.jobPool.newInstance<>();
+    dj->mode = DiskJobMode::Write;
+    dj->pathType = pathType;
+    dj->uri = uri;
+    dj->mem = const_cast<MemoryBlock*>(mem);
 
-    AsyncRequest* req = g_async.reqPool.newInstance<>();
-    req->type = AsyncRequest::Write;
-    req->uri = uri;
-    req->pathType = pathType;
-    req->mem = g_core->refMemoryBlock(const_cast<MemoryBlock*>(mem));
-
-    g_async.reqQueue.push(&req->qnode);
-    g_async.reqSem.post();
-
+    if (g_async.numDiskJobs < MAX_DISK_JOBS) {
+        JobDesc job(blockingWriteJob, dj);
+        dj->handle = g_core->dispatchSmallJobs(&job, 1);
+        if (dj->handle) {
+            ++g_async.numDiskJobs;
+            g_async.maxDiskJobsProcessed = std::max(g_async.numDiskJobs, g_async.maxDiskJobsProcessed);
+            g_async.jobList.add(&dj->lnode);
+        } else {
+            // Add to pending to process later
+            g_async.pendingJobList.add(&dj->lnode);
+        }
+    } else {
+        g_async.pendingJobList.add(&dj->lnode);
+    }
     return 0;
 }
 
+// runs in main thread
 static void asyncRunAsyncLoop()
 {
     if (!g_async.callbacks)
         return;
 
-    AsyncResponse* res;
-    g_async.resQueueMtx.lock();
-    while (g_async.resQueue.pop(&res)) {
-        g_async.resQueueMtx.unlock();
+    // Process main disk jobs
+    bx::List<DiskJob*>::Node* node = g_async.jobList.getFirst();
+    while (node) {
+        bx::List<DiskJob*>::Node* next = node->next;
+        DiskJob* dj = node->data;
+        if (g_core->isJobDone(dj->handle)) {
+            switch (dj->result) {
+            case DiskJobResult::ReadOk:
+                g_async.callbacks->onReadComplete(dj->uri.cstr(), dj->mem);
+                break;
+            case DiskJobResult::OpenFailed:
+                g_async.callbacks->onOpenError(dj->uri.cstr());
+                break;
+            case DiskJobResult::ReadFailed:
+                g_async.callbacks->onReadError(dj->uri.cstr());
+                break;
+            case DiskJobResult::WriteOk:
+                g_async.callbacks->onWriteComplete(dj->uri.cstr(), dj->bytesWritten);
+                break;
+            case DiskJobResult::WriteFailed:
+                g_async.callbacks->onWriteError(dj->uri.cstr());
+                break;
+            }
 
-        switch (res->type) {
-        case AsyncResponse::RequestReadOk:
-            g_async.callbacks->onReadComplete(res->uri.cstr(), res->mem);
-            break;
-        case AsyncResponse::RequestOpenFailed:
-            g_async.callbacks->onOpenError(res->uri.cstr());
-            break;
-        case AsyncResponse::RequestReadFailed:
-            g_async.callbacks->onReadError(res->uri.cstr());
-            break;
-        case AsyncResponse::RequestWriteOk:
-            g_async.callbacks->onWriteComplete(res->uri.cstr(), res->bytesWritten);
-            break;
-        case AsyncResponse::RequestWriteFailed:
-            g_async.callbacks->onWriteError(res->uri.cstr());
-            break;
+            // Remove the job
+            g_core->deleteJob(dj->handle);
+            g_async.jobList.remove(node);
+            g_async.jobPool.deleteInstance(dj);
+            --g_async.numDiskJobs;
         }
 
-        g_async.resQueueMtx.lock();
-        g_async.resPool.deleteInstance(res);
+        node = next;
     }
-    g_async.resQueueMtx.unlock();
+
+    // Process pending jobs
+    node = g_async.pendingJobList.getFirst();
+    while (node && g_async.numDiskJobs < MAX_DISK_JOBS) {
+        bx::List<DiskJob*>::Node* next = node->next;
+        g_async.pendingJobList.remove(node);
+
+        DiskJob* dj = node->data;
+        if (dj->mode == DiskJobMode::Read) {
+            asyncRead(dj->uri.cstr(), dj->pathType);
+        } else if (dj->mode == DiskJobMode::Write) {
+            asyncWrite(dj->uri.cstr(), dj->mem, dj->pathType);
+        }
+
+        node = next;
+    }
+
+#if USE_EFSW
+    // Process Hot-Loads
+    EfswResult* result;
+    while (g_async.efswQueue.pop(&result)) {
+        switch (result->action) {
+        case efsw::Action::Modified:
+            assert(g_async.callbacks);
+            g_async.callbacks->onModified(result->filepath.cstr());
+            break;
+        default:
+            assert(0);  // not implemented
+            break;
+        }
+        BX_DELETE(g_async.alloc, result);
+    }
+#endif
+
 }
 
 static IoOperationMode::Enum asyncGetOpMode()
@@ -420,15 +590,73 @@ static IoOperationMode::Enum asyncGetOpMode()
 
 static const char* asyncGetUri()
 {
-    return g_async.rootDir.cstr();
+    return g_blocking.rootDir.cstr();
 }
+
+#if USE_EFSW
+void FileWatchListener::handleFileAction(efsw::WatchID watchid, const std::string& dir, const std::string& filename, efsw::Action action, std::string oldFilename /*= ""*/)
+{
+    auto getRelativePath = [this](bx::Path& filepath)->const char* {
+        if (BX_ENABLED(BX_PLATFORM_WINDOWS))
+            filepath.toUnix();
+        if (BX_ENABLED(BX_PLATFORM_WINDOWS) || BX_ENABLED(BX_PLATFORM_OSX))
+            filepath.toLower();
+
+        char* subpath = strstr(filepath.getBuffer(), this->m_rootDir.cstr());
+        int sz = m_rootDir.getLength();
+        if (subpath[sz] == '/')
+            sz++;
+        return subpath ? subpath + sz : filepath.cstr();
+    };
+
+    if (watchid == g_async.rootWatch) {
+        switch (action) {
+        case efsw::Action::Moved:
+            // TODO: Probably we'll want to implement move for resources that are renamed
+        case efsw::Action::Modified:
+        {
+            bx::Path filepath(dir.c_str());
+            filepath.join(filename.c_str());
+            bx::FileInfo info;
+            bx::stat(filepath.cstr(), info);
+            if (info.m_type == bx::FileInfo::Regular && info.m_size > 0) {
+                EfswResult* result = BX_NEW(g_async.alloc, EfswResult);
+                result->filepath = getRelativePath(filepath);
+                result->action = efsw::Action::Modified;
+
+                bx::MutexScope mtx(g_async.reqMutex);
+                g_async.efswQueue.push(&result->qnode);
+            }
+            break;
+        }
+        case efsw::Action::Add:
+        case efsw::Action::Delete:
+            // No implementation for these cases
+            // TODO: Probably we'll want to implement Delete for resources
+            break;
+
+        default:
+            assert(0);
+        }
+    }
+}
+
+void FileWatchListener::setRootDir(const bx::Path& rootDir)
+{
+    m_rootDir = rootDir;
+    m_rootDir.toUnix();
+    if (BX_ENABLED(BX_PLATFORM_WINDOWS) || BX_ENABLED(BX_PLATFORM_OSX))
+        m_rootDir.toLower();
+}
+
+#endif
 
 //
 PluginDesc* getDiskLiteDriverDesc()
 {
     static PluginDesc desc;
     strcpy(desc.name, "DiskIO_Lite");
-    strcpy(desc.description, "DiskIO-Lite driver (Blocking and Async) - with no Hot-Loading and Libuv support");
+    strcpy(desc.description, "DiskIO-Lite driver (Blocking and Async)");
     desc.type = PluginType::IoDriver;
     desc.version = T_MAKE_VERSION(1, 0);
     return &desc;

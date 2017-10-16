@@ -1,7 +1,7 @@
 #include "bxx/path.h"
 #include "bxx/pool.h"
 #include "bx/platform.h"
-#include "bx/crtimpl.h"
+#include "bx/file.h"
 
 #include "termite/core.h"
 #include "termite/io_driver.h"
@@ -31,7 +31,7 @@ struct DiskFileRequest
     DiskFileRequest()
     {
         mem = nullptr;
-        memset(&buff, 0x00, sizeof(buff));
+        bx::memSet(&buff, 0x00, sizeof(buff));
 
         uv_fs_req_cleanup(&openReq);
         uv_fs_req_cleanup(&rwReq);
@@ -61,8 +61,8 @@ struct AsyncDiskDriver
     {
         callbacks = nullptr;
         alloc = nullptr;
-        memset(&dirChange, 0x00, sizeof(dirChange));
-        memset(&loop, 0x00, sizeof(loop));
+        bx::memSet(&dirChange, 0x00, sizeof(dirChange));
+        bx::memSet(&loop, 0x00, sizeof(loop));
     }
 };
 
@@ -383,7 +383,7 @@ static MemoryBlock* blockRead(const char* uri, IoPathType::Enum pathType)
 {
     bx::Path filepath = resolvePath(uri, g_blocking.rootDir, pathType);
 
-    bx::CrtFileReader file;
+    bx::FileReader file;
     bx::Error err;
     if (!file.open(filepath.cstr(), &err)) {
         T_ERROR_API(g_core, "Unable to open file '%s' for reading", uri);
@@ -410,7 +410,7 @@ static size_t blockWrite(const char* uri, const MemoryBlock* mem, IoPathType::En
 {
     bx::Path filepath = resolvePath(uri, g_blocking.rootDir, pathType);
 
-    bx::CrtFileWriter file;
+    bx::FileWriter file;
     bx::Error err;
     if (!file.open(filepath.cstr(), false, &err)) {
         T_ERROR_API(g_core, "Unable to open file '%s' for writing", filepath.cstr());
@@ -460,8 +460,8 @@ void* initDiskDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
         &asyncApi
     };
 
-    memset(&asyncApi, 0x00, sizeof(asyncApi));
-    memset(&blockApi, 0x00, sizeof(blockApi));
+    bx::memSet(&asyncApi, 0x00, sizeof(asyncApi));
+    bx::memSet(&blockApi, 0x00, sizeof(blockApi));
 
     asyncApi.init = asyncInit;
     asyncApi.shutdown = asyncShutdown;

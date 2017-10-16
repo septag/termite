@@ -36,12 +36,13 @@ namespace termite
 
         Texture()
         {
-            memset(&info, 0x00, sizeof(info));
+            bx::memSet(&info, 0x00, sizeof(info));
             ratio = 0;
         }
     };
 
-    result_t initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc, int texturePoolSize = 64);
+    result_t initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc, int texturePoolSize = 64,
+                               bool enableTextureDecodeCache = true);
     void shutdownTextureLoader();
 
     void registerTextureToResourceLib();
@@ -52,5 +53,4 @@ namespace termite
     TERMITE_API bool blitRawPixels(uint8_t* dest, int destX, int destY, int destWidth, int destHeight, 
                                    const uint8_t* src, int srcX, int srcY, int srcWidth, int srcHeight,
                                    int pixelSize);
-
 } // namespace termite

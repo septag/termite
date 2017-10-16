@@ -96,7 +96,7 @@ struct ThreadData
         stackIdx = 0;
         main = false;
         threadId = 0;
-        memset(stacks, 0x00, sizeof(stacks));
+        bx::memSet(stacks, 0x00, sizeof(stacks));
     }
 };
 
@@ -132,7 +132,7 @@ struct JobDispatcher
         numThreads = 0;
         stop = 0;
         dummyCounter = 0;
-        memset(&mainStack, 0x00, sizeof(mainStack));
+        bx::memSet(&mainStack, 0x00, sizeof(mainStack));
     }
 };
 
@@ -161,7 +161,7 @@ bool FiberPool::create(uint16_t maxFibers, uint32_t stackSize, bx::AllocatorI* a
     uint8_t* buff = (uint8_t*)BX_ALLOC(alloc, totalSize);
     if (!buff)
         return false;
-    memset(buff, 0x00, totalSize);
+    bx::memSet(buff, 0x00, totalSize);
 
     m_fibers = (Fiber*)buff;
     buff += sizeof(Fiber)*maxFibers;
@@ -204,7 +204,7 @@ static ThreadData* createThreadData(bx::AllocatorI* alloc, uint32_t threadId, bo
         return nullptr;
     data->main = main;
     data->threadId = threadId;
-    memset(data->stacks, 0x00, sizeof(fcontext_stack_t)*MAX_WAIT_STACKS);
+    bx::memSet(data->stacks, 0x00, sizeof(fcontext_stack_t)*MAX_WAIT_STACKS);
 
     for (int i = 0; i < MAX_WAIT_STACKS; i++) {
         data->stacks[i] = create_fcontext_stack(WAIT_STACK_SIZE);
@@ -372,17 +372,26 @@ static JobHandle dispatch(const JobDesc* jobs, uint16_t numJobs, FiberPool* pool
         }
     }
 
-    *counter = count;
-    if (data->running)
-        data->running->waitCounter = counter;
+    if (count > 0) {
+        *counter = count;
+        assert(data);       // Must be called within main or job_dispatcher threads only
+        if (data->running)
+            data->running->waitCounter = counter;
 
-    g_dispatcher->jobLock.lock();
-    for (uint32_t i = 0; i < count; i++) 
-        g_dispatcher->waitList[fibers[i]->priority].addToEnd(&fibers[i]->lnode);
-    g_dispatcher->jobLock.unlock();
+        g_dispatcher->jobLock.lock();
+        for (uint32_t i = 0; i < count; i++)
+            g_dispatcher->waitList[fibers[i]->priority].addToEnd(&fibers[i]->lnode);
+        g_dispatcher->jobLock.unlock();
 
-    // post to semaphore so worker threads can continue and fetch them
-    g_dispatcher->semaphore.post(count);
+        // post to semaphore so worker threads can continue and fetch them
+        g_dispatcher->semaphore.post(count);
+    } else {
+        // No job created ...
+        bx::LockScope mutex(g_dispatcher->counterLock);
+        g_dispatcher->counterPool.deleteInstance((CounterContainer*)counter);
+        counter = nullptr;
+    }
+
     return counter;
 }
 
@@ -396,7 +405,7 @@ JobHandle termite::dispatchBigJobs(const JobDesc* jobs, uint16_t numJobs) T_THRE
     return dispatch(jobs, numJobs, &g_dispatcher->bigFibers);
 }
 
-void termite::waitJobs(JobHandle handle) T_THREAD_SAFE
+void termite::waitAndDeleteJob(JobHandle handle) T_THREAD_SAFE
 {
     ThreadData* data = (ThreadData*)g_dispatcher->threadData.get();
 
@@ -435,6 +444,18 @@ void termite::waitJobs(JobHandle handle) T_THREAD_SAFE
     g_dispatcher->counterLock.unlock();
 }
 
+bool termite::isJobDone(JobHandle handle) T_THREAD_SAFE
+{
+    return *handle == 0;
+}
+
+void termite::deleteJob(JobHandle handle) T_THREAD_SAFE
+{
+    g_dispatcher->counterLock.lock();
+    g_dispatcher->counterPool.deleteInstance((CounterContainer*)handle);
+    g_dispatcher->counterLock.unlock();
+}
+
 static int32_t threadFunc(void* userData)
 {
     // Initialize thread data
@@ -454,7 +475,7 @@ static int32_t threadFunc(void* userData)
 result_t termite::initJobDispatcher(bx::AllocatorI* alloc,
                           uint16_t maxSmallFibers, uint32_t smallFiberStackSize,
                           uint16_t maxBigFibers, uint32_t bigFiberStackSize,
-                          bool lockThreadsToCores, uint8_t numWorkerThreads)
+                          bool lockThreadsToCores, uint8_t numThreads)
 {
     if (g_dispatcher) {
         assert(false);
@@ -482,33 +503,30 @@ result_t termite::initJobDispatcher(bx::AllocatorI* alloc,
     smallFiberStackSize = smallFiberStackSize ? smallFiberStackSize : DEFAULT_SMALL_STACKSIZE;
     bigFiberStackSize = bigFiberStackSize ? bigFiberStackSize : DEFAULT_BIG_STACKSIZE;
 
-    if (!g_dispatcher->counterPool.create(maxSmallFibers + maxBigFibers, alloc)) {
+    if (!g_dispatcher->counterPool.create(maxSmallFibers + maxBigFibers, alloc) ||
+        !g_dispatcher->bigFibers.create(maxBigFibers, bigFiberStackSize, alloc) ||
+        !g_dispatcher->smallFibers.create(maxSmallFibers, smallFiberStackSize, alloc)) 
+    {
         return T_ERR_OUTOFMEM;
     }
 
-    if (!g_dispatcher->bigFibers.create(maxBigFibers, bigFiberStackSize, alloc)) {
-        return T_ERR_FAILED;
-    }
-
-    if (!g_dispatcher->smallFibers.create(maxSmallFibers, smallFiberStackSize, alloc)) {
-        return T_ERR_FAILED;
-    }
-
     // Create threads
-    if (numWorkerThreads == UINT8_MAX) {
-        uint32_t numCores = std::thread::hardware_concurrency();
-        numWorkerThreads = (uint8_t)bx::uint32_min(numCores ? (numCores - 1) : 0, UINT8_MAX);
+    uint16_t numCores = numThreads;
+    if (numThreads == UINT8_MAX) {
+        numCores = std::min<uint16_t>(getHardwareStats().numCores, UINT8_MAX);
+        numCores = numCores ? (numCores - 1) : 0;   // NumThreads is always one less than number of cores
     }
+    numThreads = (uint8_t)std::min<uint16_t>(numCores, numThreads);
 
-    if (numWorkerThreads > 0) {
-        g_dispatcher->threads = (bx::Thread**)BX_ALLOC(alloc, sizeof(bx::Thread*)*numWorkerThreads);
+    if (numThreads > 0) {
+        g_dispatcher->threads = (bx::Thread**)BX_ALLOC(alloc, sizeof(bx::Thread*)*numThreads);
         assert(g_dispatcher->threads);
         
-        g_dispatcher->numThreads = numWorkerThreads;
-        for (uint8_t i = 0; i < numWorkerThreads; i++) {
+        g_dispatcher->numThreads = numThreads;
+        for (uint8_t i = 0; i < numThreads; i++) {
             g_dispatcher->threads[i] = BX_NEW(alloc, bx::Thread);
             char name[32];
-            bx::snprintf(name, sizeof(name), "JobThread #%d", i + 1);
+            bx::snprintf(name, sizeof(name), "TJobThread #%d", i + 1);
             g_dispatcher->threads[i]->init(threadFunc, nullptr, 8 * 1024, name);
         }
     }

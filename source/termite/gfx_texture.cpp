@@ -3,14 +3,24 @@
 #include "bxx/pool.h"
 #include "bxx/array.h"
 #include "bxx/logger.h"
-#include "bx/fpumath.h"
+#include "bx/math.h"
 #include "bx/uint32_t.h"
+#include "bx/error.h"
+#include "bx/file.h"
+#include "bx/hash.h"
+#include "bx/mutex.h"
 
 #include "gfx_driver.h"
 #include "gfx_texture.h"
+#include "job_dispatcher.h"
+
+#include "bimg/decode.h"
 
 //#define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb/stb_image_write.h"
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb/stb_image_resize.h"
@@ -20,7 +30,7 @@
 #include "bxx/proxy_allocator.h"
 #include "bxx/path.h"
 
-#include "lz4/lz4.h"
+#define TEXTURE_CACHE_FILENAME "ttcache.list"
 
 using namespace termite;
 
@@ -34,6 +44,21 @@ public:
     void onReload(ResourceHandle handle, bx::AllocatorI* alloc) override;
 };
 
+struct TextureCacheItem
+{
+    uint32_t nameHash;
+    uint32_t dataHash;  // CRC32
+};
+
+struct SaveTextureCacheJob
+{
+    bx::Path uri;
+    void* pixelData;
+    int width;
+    int height;
+    int numChannels;    // number of channgels
+};
+
 struct TextureLoader
 {
     bx::Pool<Texture> texturePool;
@@ -44,7 +69,11 @@ struct TextureLoader
     Texture* asyncBlankTexture;
     Texture* failTexture;
     GfxDriverApi* driver;
-
+    bx::Array<TextureCacheItem> decodeCacheItems;
+    bool enableTextureDecodeCache;
+    bool isETC2Supported;
+    JobHandle saveCacheJobHandle;
+    
     TextureLoader(bx::AllocatorI* _alloc)
     {
         alloc = _alloc;
@@ -52,12 +81,168 @@ struct TextureLoader
         asyncBlankTexture = nullptr;
         failTexture = nullptr;
         driver = nullptr;
+        enableTextureDecodeCache = false;
+        isETC2Supported = false;
+        saveCacheJobHandle = nullptr;
     }
 };
 
 static TextureLoader* g_texLoader = nullptr;
 
-result_t termite::initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc, int texturePoolSize)
+static void stbCallbackFreeImage(void* ptr, void* userData)
+{
+    stbi_image_free(ptr);
+}
+
+static void loadTextureCacheList(const char* filepath, bx::Array<TextureCacheItem>* items)
+{
+    FILE* file = fopen(filepath, "rt");
+    if (file) {
+        char line[256];
+
+        char filename[128];
+        char filehash[128];
+        while (fgets(line, sizeof(line), file)) {
+            char* sep = strchr(line, ';');
+            if (sep) {
+                bx::strCopy(filename, sizeof(filename), line, (int)size_t(sep - line));
+                bx::strCopy(filehash, sizeof(filehash), sep + 1);
+                filehash[strlen(filehash)-1] = 0;   // strip the last character ('\n')
+
+                /*
+                // strip the extension and keep the hash number only
+                char* dot = strchr(filename, '.');
+                if (dot)
+                    *dot = 0;
+                    */
+
+                TextureCacheItem* item = items->push();
+                item->nameHash = uint32_t(bx::toUint(filename));
+                item->dataHash = uint32_t(bx::toUint(filehash));
+            }
+        }
+
+        fclose(file);
+    }
+}
+
+static void saveTextureCacheList(const char* filepath, const bx::Array<TextureCacheItem>& items)
+{
+    FILE* file = fopen(filepath, "wt");
+    if (file) {
+        for (int i = 0; i < items.getCount(); i++) {
+            TextureCacheItem item = items[i];
+            fprintf(file, "%u;%u\n", item.nameHash, item.dataHash);
+        }
+        fclose(file);
+    }
+}
+
+// Returns true if file is changed + update it in the cache db
+// Returns false if file is not changed
+static bool checkTextureCacheChanged(const char* filepath, uint32_t dataHash)
+{
+    // Hash the filepath and check for it in the list
+    uint32_t nameHash = bx::hash<bx::HashCrc32>(filepath);
+    
+    for (int i = 0, c = g_texLoader->decodeCacheItems.getCount(); i < c; i++) {
+        if (g_texLoader->decodeCacheItems[i].nameHash != nameHash)
+            continue;
+        return g_texLoader->decodeCacheItems[i].dataHash != dataHash;
+    }
+
+    return true;
+}
+
+static void updateTextureCacheItem(uint32_t nameHash, uint32_t dataHash)
+{
+    for (int i = 0, c = g_texLoader->decodeCacheItems.getCount(); i < c; i++) {
+        if (g_texLoader->decodeCacheItems[i].nameHash != nameHash)
+            continue;
+        g_texLoader->decodeCacheItems[i].dataHash = dataHash;
+        return;
+    }
+
+    TextureCacheItem* item = g_texLoader->decodeCacheItems.push();
+    item->nameHash = nameHash;
+    item->dataHash = dataHash;
+}
+
+static void removeTextureCacheItem(const char* filepath)
+{
+    uint32_t nameHash = bx::hash<bx::HashCrc32>(filepath);
+    for (int i = 0, c = g_texLoader->decodeCacheItems.getCount(); i < c; i++) {
+        if (g_texLoader->decodeCacheItems[i].nameHash != nameHash)
+            continue;
+
+        std::swap<TextureCacheItem>(g_texLoader->decodeCacheItems[i], 
+                                    g_texLoader->decodeCacheItems[g_texLoader->decodeCacheItems.getCount()-1]);
+        g_texLoader->decodeCacheItems.pop();
+        return;
+    }
+}
+
+static void saveCacheTextureJob(int jobIdx, void* userParam)
+{
+    SaveTextureCacheJob* params = (SaveTextureCacheJob*)userParam;
+
+    // Save the file
+    const char* cacheDir = getCacheDir();
+
+    // save file as hashed name
+    // Save file as PNG
+    uint32_t nameHash = bx::hash<bx::HashCrc32>(params->uri.cstr());
+    char dbfilename[256];
+    bx::snprintf(dbfilename, sizeof(dbfilename), "%u.png", nameHash);
+    bx::Path dbfilepath(cacheDir);
+    dbfilepath.join(dbfilename);
+
+    stbi_write_png(dbfilepath.cstr(), params->width, params->height, 4, params->pixelData, params->width*4);
+    
+    BX_FREE(getHeapAlloc(), params);
+}
+
+static TextureHandle loadTextureFromCache(const ResourceTypeParams& params, GfxDriverApi* driver)
+{
+    const char* cacheDir = getCacheDir();
+    bx::FileReader file;
+    bx::Error err;
+    char cacheTextureName[128];
+    uint32_t nameHash = bx::hash<bx::HashCrc32>(params.uri);
+    bx::snprintf(cacheTextureName, sizeof(cacheTextureName), "%u.png", nameHash);
+    bx::Path cacheTexturePath(cacheDir);
+    cacheTexturePath.join(cacheTextureName);
+    bx::AllocatorI* alloc = getHeapAlloc();
+    if (file.open(cacheTexturePath.cstr(), &err)) {
+        uint32_t size = (uint32_t)file.seek(0, bx::Whence::End);
+        if (size == 0)
+            return TextureHandle();
+        void* data = BX_ALLOC(alloc, size);
+        if (!data)
+            return TextureHandle();
+
+        file.seek(0, bx::Whence::Begin);
+        file.read(data, size, &err);
+        file.close();
+
+        int width, height, comp;
+        uint8_t* pixels = stbi_load_from_memory((const stbi_uc*)data, size, &width, &height, &comp, 0);
+        if (!pixels) {
+            BX_FREE(alloc, data);
+            return TextureHandle();
+        }
+        BX_FREE(alloc, data);
+
+        return driver->createTexture2D(width, height, false, 1, 
+                                       TextureFormat::RGBA8, params.flags,
+                                       driver->makeRef(pixels, width*height*comp, stbCallbackFreeImage, nullptr));        
+    }
+
+    return TextureHandle();
+}
+
+result_t termite::initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc, int texturePoolSize,
+                                    bool enableTextureDecodeCache)
 {
     assert(driver);
     if (g_texLoader) {
@@ -122,10 +307,24 @@ result_t termite::initTextureLoader(GfxDriverApi* driver, bx::AllocatorI* alloc,
         return T_ERR_FAILED;
     }
 
-    if (!driver->isTextureValid(1, false, 1, TextureFormat::ETC2A, 0))
-        BX_TRACE("ETC2 is not supported");
-    else
-        BX_TRACE("ETC2 is supported");
+
+    g_texLoader->isETC2Supported = driver->isTextureValid(1, false, 1, TextureFormat::ETC2A, 0) &&
+                                   driver->isTextureValid(1, false, 1, TextureFormat::ETC2, 0);
+    if (BX_ENABLED(BX_PLATFORM_ANDROID) || BX_ENABLED(BX_PLATFORM_IOS)) {
+        if (!g_texLoader->isETC2Supported) {
+            BX_WARN("ETC2 formated is not supported in this device. Engine will decode and cache ETC2 textures internally, may cause longer load times");
+        }
+    }
+
+    g_texLoader->enableTextureDecodeCache = enableTextureDecodeCache;
+    if (enableTextureDecodeCache) {
+        if (!g_texLoader->decodeCacheItems.create(200, 200, alloc))
+            return T_ERR_OUTOFMEM;
+        // Load cache file
+        bx::Path cacheFilepath(getCacheDir());
+        cacheFilepath.join(TEXTURE_CACHE_FILENAME);
+        loadTextureCacheList(cacheFilepath.cstr(), &g_texLoader->decodeCacheItems);
+    }
 
     return 0;
 }
@@ -142,6 +341,15 @@ void termite::shutdownTextureLoader()
 {
     if (!g_texLoader)
         return;
+
+    if (g_texLoader->enableTextureDecodeCache) {
+        // Save cache file
+        bx::Path cacheFilepath(getCacheDir());
+        cacheFilepath.join(TEXTURE_CACHE_FILENAME);
+        saveTextureCacheList(cacheFilepath.cstr(), g_texLoader->decodeCacheItems);
+
+        g_texLoader->decodeCacheItems.destroy();
+    }
 
     if (g_texLoader->whiteTexture) {
         if (g_texLoader->whiteTexture->handle.isValid())
@@ -190,11 +398,6 @@ bool termite::blitRawPixels(uint8_t* dest, int destX, int destY, int destWidth, 
     }
 
     return true;
-}
-
-static void stbCallbackFreeImage(void* ptr, void* userData)
-{
-    stbi_image_free(ptr);
 }
 
 static bool loadUncompressed(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
@@ -358,6 +561,75 @@ static bool loadUncompressed(const MemoryBlock* mem, const ResourceTypeParams& p
     return true;
 }
 
+// This (unpack) code is taken from: https://github.com/KhronosGroup/KTX/blob/master/lib/etcunpack.cxx
+// fwd declare functions from etcpack
+extern void decompressBlockAlphaC(uint8_t* data, uint8_t* img,
+                                  int width, int height, int startx, int starty, int channels);
+extern void decompressBlockETC2c(unsigned int block_part1, unsigned int block_part2, uint8_t* img,
+                                 int width, int height, int startx, int starty, int channels);
+extern void setupAlphaTable();
+
+inline void readBigEndian4byteWord(uint32_t* pBlock, const uint8_t* s)
+{
+    *pBlock = (s[0] << 24) | (s[1] << 16) | (s[2] << 8) | s[3];
+}
+
+static void* decodeETC2(bx::AllocatorI* alloc, const void* etc2Blocks, TextureFormat::Enum etc2Fmt, 
+                        uint16_t width, uint16_t height, uint32_t* outSize)
+{
+    uint16_t w = ((width + 3)/4)*4;
+    uint16_t h = ((height + 3)/4)*4;
+
+    const int bpp = 4;  // bytes per pixel
+    uint32_t block1, block2;
+    uint8_t* inData = (uint8_t*)etc2Blocks;
+    uint8_t* outData = (uint8_t*)BX_ALLOC(alloc, w*h*bpp);
+    if (!outData)
+        return nullptr;
+
+    if (etc2Fmt == TextureFormat::ETC2A) {
+        setupAlphaTable();
+        for (int y = 0; y < h/4; y++) {
+            for (int x = 0; x < w/4; x++) {
+                // EAC block + ETC2 RGB block
+                decompressBlockAlphaC(inData, outData+3, w, h, 4*x, 4*y, 4);
+                inData += 8;
+                readBigEndian4byteWord(&block1, inData);
+                inData += 4;
+                readBigEndian4byteWord(&block2, inData);
+                inData += 4;
+                decompressBlockETC2c(block1, block2, outData, w, h, 4*x, 4*y, 4);
+            }
+        }
+    } else {
+        assert(0);  // unsupported format
+        return nullptr;
+    }
+
+    // Write out actual pixels, if width != actualWidth or height != actualHeight
+    if (w != width || h != height) {
+        int destRow = 4 * w;
+        int actualRow = 4 * width;
+
+        uint8_t* actualData = (uint8_t*)BX_ALLOC(alloc, 4 * width * height);
+        if (!actualData) {
+            BX_FREE(alloc, outData);
+            return nullptr;
+        }
+        for (uint32_t yy = 0; yy < height; yy++) {
+            for (uint32_t xx = 0; xx < width; xx++) {
+                *((uint32_t*)(actualData + yy*actualRow + xx*4)) = *((uint32_t*)(outData + yy*destRow + xx*4));
+            }
+        }
+
+        BX_FREE(alloc, outData);
+        outData = actualData;
+    }
+
+    *outSize = w*h*bpp;
+    return outData;
+}
+
 static bool loadCompressed(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
 {
     const LoadTextureParams* texParams = (const LoadTextureParams*)params.userParams;
@@ -371,12 +643,107 @@ static bool loadCompressed(const MemoryBlock* mem, const ResourceTypeParams& par
         return false;
 
     GfxDriverApi* driver = g_texLoader->driver;
-    texture->handle = driver->createTexture(driver->copy(mem->data, mem->size), texParams->flags, texParams->skipMips,
-                                            &texture->info);
-    if (!texture->handle.isValid())
+    bimg::ImageContainer imgInfo;
+    bx::Error err;
+    if (!bimg::imageParse(imgInfo, mem->data, mem->size, &err)) {
         return false;
-    texture->ratio = float(texture->info.width) / float(texture->info.height);
+    }
 
+    // TODO: verify format compatibility, convert if needed
+    bool formatIsETC2 = (imgInfo.m_format == bimg::TextureFormat::ETC2) ||
+                        (imgInfo.m_format == bimg::TextureFormat::ETC2A) ||
+                        (imgInfo.m_format == bimg::TextureFormat::ETC2A1);
+    bool isFormatSupported = true;
+    if (formatIsETC2 && !g_texLoader->isETC2Supported)
+        isFormatSupported = false;
+
+    // 
+    bimg::ImageContainer* img = bimg::imageParse(getHeapAlloc(), mem->data, mem->size);
+    if (!img || !img->m_data)
+        return false;
+    
+    texture->info.width = imgInfo.m_width;
+    texture->info.height = imgInfo.m_height;
+    texture->info.format = (TextureFormat::Enum)imgInfo.m_format;
+    texture->info.numMips = imgInfo.m_numMips;
+    texture->info.storageSize = img->m_size;
+    texture->info.depth = img->m_depth;
+    texture->info.cubeMap = img->m_cubeMap;
+    texture->info.bitsPerPixel = bimg::getBitsPerPixel(imgInfo.m_format);
+    texture->ratio = float(imgInfo.m_width) / float(imgInfo.m_height);
+
+    if (isFormatSupported) {
+        // TODO: support Cube/3D textures
+        uint32_t size = img->m_size;
+        assert(img->m_depth == 1 && !img->m_cubeMap);
+        texture->handle = driver->createTexture2D(img->m_width, img->m_height, img->m_numMips>1, img->m_numLayers,
+            (TextureFormat::Enum)img->m_format, texParams->flags, driver->makeRef(img->m_data, img->m_size, [](void* ptr, void* userData) {
+            bimg::ImageContainer* img = (bimg::ImageContainer*)userData;
+            bimg::imageFree(img);
+        }, img));
+    } else {
+        bool decode = true;
+        uint32_t dataHash = 0;
+        if (g_texLoader->enableTextureDecodeCache) {
+            dataHash = bx::hash<bx::HashCrc32>(mem->data, mem->size);
+            decode = checkTextureCacheChanged(params.uri, dataHash);
+        }
+
+        if (decode) {
+            // Decode the ETC2 image data to RGBA8
+            uint32_t decodedSize;
+            void* decoded = nullptr;
+            if (formatIsETC2) {
+                decoded = decodeETC2(getHeapAlloc(), img->m_data, (TextureFormat::Enum)img->m_format,
+                                     img->m_width, img->m_height, &decodedSize);
+            } else {
+                assert(0);  // not supported
+            }
+
+            if (decoded) {
+                texture->handle = driver->createTexture2D(img->m_width, img->m_height, img->m_numMips>1, img->m_numLayers,
+                                                          TextureFormat::RGBA8, texParams->flags, 
+                                                          driver->makeRef(decoded, decodedSize, [](void* ptr, void* userData) {
+                    BX_FREE(getHeapAlloc(), ptr);
+                }, nullptr));
+
+                
+                if (g_texLoader->enableTextureDecodeCache) {
+                    SaveTextureCacheJob* cacheJob = (SaveTextureCacheJob*)BX_ALLOC(getHeapAlloc(), 
+                                                                                   sizeof(SaveTextureCacheJob) + decodedSize);
+                    cacheJob->uri = params.uri;
+                    cacheJob->pixelData = cacheJob + 1;
+                    cacheJob->width = img->m_width;
+                    cacheJob->height = img->m_height;
+                    cacheJob->numChannels = 4;
+                    memcpy(cacheJob->pixelData, decoded, decodedSize);
+
+                    JobDesc j(saveCacheTextureJob, cacheJob, JobPriority::Low);
+                    if (g_texLoader->saveCacheJobHandle)
+                        waitAndDeleteJob(g_texLoader->saveCacheJobHandle);
+                    g_texLoader->saveCacheJobHandle = dispatchBigJobs(&j, 1);
+                    if (g_texLoader->saveCacheJobHandle)
+                        updateTextureCacheItem(bx::hash<bx::HashCrc32>(params.uri), dataHash);
+                }
+            }
+        } else {
+            // Try to open the decoded file from cache
+            texture->handle = loadTextureFromCache(params, driver);
+            if (!texture->handle.isValid()) {
+                // Some error occured on opening cached file, remove it from cache db
+                removeTextureCacheItem(params.uri);
+            }
+        }
+
+        bimg::imageFree(img);
+    }
+    if (!texture->handle.isValid()) {
+        if (alloc)
+            BX_DELETE(alloc, texture);
+        else
+            g_texLoader->texturePool.deleteInstance(texture);
+        return false;
+    }
     *obj = uintptr_t(texture);
     return true;
 }
@@ -388,27 +755,12 @@ bool TextureLoaderAll::loadObj(const MemoryBlock* mem, const ResourceTypeParams&
     bx::Path path(params.uri);
     bx::Path ext = path.getFileExt();
     ext.toLower();
-    if (strstr(ext.getBuffer(), ".lz4")) {
-        // Uncompress and load again with real extension
-        uint32_t size = *((uint32_t*)mem->data);
-        assert(size > 0);
-        MemoryBlock* uncompressed = createMemoryBlock(size, getHeapAlloc());
-        if (!uncompressed)
-            return false;
-        LZ4_decompress_safe((const char*)(mem->data + sizeof(uint32_t)), (char*)uncompressed->data, mem->size, size);
+    // strip LZ4 from extension
+    char* lz4Ext = strstr(ext.getBuffer(), ".lz4");
+    if (lz4Ext)
+        *lz4Ext = 0;
 
-        ResourceTypeParams newParams;
-        memcpy(&newParams, &params, sizeof(ResourceTypeParams));
-        char path[256];
-        strcpy(path, params.uri);
-        char* dot = strrchr(path, '.');
-        if (dot)
-            *dot = 0;
-        newParams.uri = path;
-        bool r = loadObj(uncompressed, newParams, obj, alloc);                
-        releaseMemoryBlock(uncompressed);
-        return r;
-    } else if (ext.isEqual("ktx") || ext.isEqual("dds") || ext.isEqual("pvr")) {
+    if (ext.isEqual("ktx") || ext.isEqual("dds") || ext.isEqual("pvr")) {
         return loadCompressed(mem, params, obj, alloc);
     } else if (ext.isEqual("png") || ext.isEqual("tga") || ext.isEqual("jpg") || ext.isEqual("bmp") ||
                ext.isEqual("jpeg") || ext.isEqual("psd") || ext.isEqual("hdr") || ext.isEqual("gif"))

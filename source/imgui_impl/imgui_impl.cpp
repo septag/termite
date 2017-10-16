@@ -3,7 +3,7 @@
 #endif
 #include "termite/core.h"
 
-#include "bx/fpumath.h"
+#include "bx/math.h"
 #include "bx/uint32_t.h"
 
 #include "termite/gfx_driver.h"
@@ -77,12 +77,12 @@ static void imguiDrawLists(ImDrawData* data)
     float width = ImGui::GetIO().DisplaySize.x;
     float height = ImGui::GetIO().DisplaySize.y;
     uint8_t viewId = g_Im->viewId;
-    bx::mtxOrtho(proj, 0.0f, width, height, 0.0f, -1.0f, 1.0f);
+    bx::mtxOrtho(proj, 0.0f, width, height, 0.0f, -1.0f, 1.0f, 0, false);
 
     GfxState::Bits state = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite;
     driver->touch(viewId);
     driver->setViewRectRatio(viewId, 0, 0, BackbufferRatio::Equal);
-    driver->setViewSeq(viewId, true);
+    driver->setViewMode(viewId, ViewMode::Sequential);
     driver->setViewTransform(viewId, nullptr, proj, GfxViewFlag::Stereo, nullptr);
 
     for (int n = 0; n < data->CmdListsCount; n++) {
@@ -137,7 +137,7 @@ static void imguiDrawLists(ImDrawData* data)
                     driver->setTexture(0, g_Im->uniformTexture, *handle, TextureFlag::FromTexture);
 
                 driver->setTransientIndexBufferI(&tib, indexOffset, cmd.ElemCount);
-                driver->setTransientVertexBufferI(&tvb, 0, numVertices);
+                driver->setTransientVertexBufferI(0, &tvb, 0, numVertices);
                 driver->setState(state, 0);
 
                 driver->submit(viewId, g_Im->progHandle, 0, false);

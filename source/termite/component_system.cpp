@@ -76,7 +76,7 @@ struct ComponentType
         entTable(bx::HashTableType::Mutable)
     {
         strcpy(name, "");
-        memset(&callbacks, 0x00, sizeof(callbacks));
+        bx::memSet(&callbacks, 0x00, sizeof(callbacks));
         flags = ComponentFlag::None;
         dataSize = 0;
     }
@@ -451,7 +451,7 @@ ComponentTypeHandle termite::registerComponentType(const char* name, const Compo
 
     ComponentType* ctype = new(buff) ComponentType();
 
-    bx::strlcpy(ctype->name, name, sizeof(ctype->name));
+    bx::strCopy(ctype->name, sizeof(ctype->name), name);
     if (callbacks)
         memcpy(&ctype->callbacks, callbacks, sizeof(ComponentCallbacks));
     ctype->flags = flags;

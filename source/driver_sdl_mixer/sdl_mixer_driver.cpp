@@ -455,7 +455,7 @@ void* initSdlMixerDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     g_mixer.alloc = alloc;
     
     static SoundDriverApi soundApi;
-    memset(&soundApi, 0x00, sizeof(soundApi));
+    bx::memSet(&soundApi, 0x00, sizeof(soundApi));
 
     soundApi.init = mixerInit;
     soundApi.shutdown = mixerShutdown;

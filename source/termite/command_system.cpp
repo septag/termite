@@ -196,7 +196,7 @@ CommandTypeHandle termite::registerCommand(const char* name, ExecuteCommandFn ex
 
     CommandType* ctype = new(ptr) CommandType();
 
-    bx::strlcpy(ctype->name, name, sizeof(ctype->name));
+    bx::strCopy(ctype->name, sizeof(ctype->name), name);
     assert(executeFn);
     ctype->executeFn = executeFn;
     ctype->undoFn = undoFn;

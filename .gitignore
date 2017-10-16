@@ -40,6 +40,7 @@ docs/warnings.txt
 imgui.ini
 install
 out
+*.log
 
 # Downloaded
 deps/assimp

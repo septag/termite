@@ -7,7 +7,7 @@
 #include "bxx/queue.h"
 #include "bx/thread.h"
 #include "bx/mutex.h"
-#include "bx/sem.h"
+#include "bx/semaphore.h"
 #include "tinystl/hash.h"
 
 namespace termite {

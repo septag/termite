@@ -151,13 +151,13 @@ void termite::loadResource(ProgressiveLoader* loader,
         return;
     }
 
-    bx::strlcpy(req->name, name, sizeof(req->name));
+    bx::strCopy(req->name, sizeof(req->name), name);
     req->uri = uri;
     int paramSize = getResourceParamSize(name);
     if (paramSize && userParams) {
         memcpy(req->userParams, userParams, paramSize);
     } else {
-        memset(req->userParams, 0x00, sizeof(req->userParams));
+        bx::memSet(req->userParams, 0x00, sizeof(req->userParams));
     }
     req->flags = flags;
     req->pHandle = pHandle;

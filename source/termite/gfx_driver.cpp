@@ -52,8 +52,8 @@ VertexDecl* termite::vdeclBegin(VertexDecl* vdecl, RendererType::Enum _type /*= 
 {
     vdecl->hash = (uint32_t)_type;
     vdecl->stride = 0;
-    memset(vdecl->offset, 0x00, sizeof(vdecl->offset));
-    memset(vdecl->attribs, 0x00, sizeof(vdecl->attribs));
+    bx::memSet(vdecl->offset, 0x00, sizeof(vdecl->offset));
+    bx::memSet(vdecl->attribs, 0x00, sizeof(vdecl->attribs));
     return vdecl;
 }
 

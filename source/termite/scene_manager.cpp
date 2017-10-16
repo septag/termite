@@ -6,8 +6,9 @@
 #include "bxx/pool.h"
 #include "bxx/logger.h"
 #include "bx/string.h"
-#include "bx/fpumath.h"
+#include "bx/math.h"
 #include "bx/cpu.h"
+#include "bx/os.h"
 #include "tinystl/hash.h"
 #include "bxx/linked_list.h"
 
@@ -50,6 +51,7 @@ namespace termite
             LoadResource,
             Create,
             Ready,
+            InLimbo,
             Destroy,
             UnloadResource
         };
@@ -392,6 +394,9 @@ static void updateScene(SceneManager* mgr, Scene* scene, float dt, bool loadIfDe
         break;
     }
 
+    case Scene::InLimbo:
+        break;      // This is where problably onExit is called and waiting to destroyObjects
+
     // Destroy proceeds to unloadResource
     case Scene::Destroy:
     {
@@ -432,7 +437,7 @@ static void preloadScene(SceneManager* mgr, Scene* scene)
             getAsyncIoDriver()->runAsyncLoop();
         mgr->loader.step(1.0f);
         updateScene(mgr, scene, 1.0f, true);
-        bx::yieldCpu();
+        bx::yield();
     }
 }
 
@@ -457,7 +462,7 @@ Scene* termite::createScene(SceneManager* mgr, const char* name, SceneCallbacksI
     Scene* scene = mgr->scenePool.newInstance<>();
     if (!scene)
         return nullptr;
-    bx::strlcpy(scene->name, name, sizeof(scene->name));
+    bx::strCopy(scene->name, sizeof(scene->name), name);
     scene->order = order;
     scene->callbacks = callbacks;
     scene->tag = tag;
@@ -526,7 +531,7 @@ void termite::destroyScene(SceneManager* mgr, Scene* scene)
         while (scene->state != Scene::Dead) {
             mgr->loader.step(1.0f);
             updateScene(mgr, scene, 1.0f);
-            bx::yieldCpu();
+            bx::yield();
         }
     }
 
@@ -671,7 +676,7 @@ Scene* termite::findScene(SceneManager* mgr, const char* name, FindSceneMode::En
     switch (mode) {
     case FindSceneMode::Active:
         for (int i = 0; i < mgr->numActiveScenes; i++) {
-            if (bx::stricmp(mgr->activeScenes[i]->name, name) == 0)
+            if (bx::strCmpI(mgr->activeScenes[i]->name, name) == 0)
                 return mgr->activeScenes[i];
         }
         break;
@@ -682,7 +687,7 @@ Scene* termite::findScene(SceneManager* mgr, const char* name, FindSceneMode::En
     {
         bx::List<Scene*>::Node* node = mgr->sceneList.getFirst();
         while (node) {
-            if (bx::stricmp(node->data->name, name) == 0)
+            if (bx::strCmpI(node->data->name, name) == 0)
                 return node->data;
             node = node->next;
         }
@@ -745,11 +750,21 @@ static void updateLink(SceneManager* mgr, SceneLink* link, float dt, const vec2i
                 link->effectBeginA = false;
                 link->sceneA->drawOnEffectFb = false;
 
+                // Playing effect for A is finished, we are entering Loading screen
+                // SceneA should exit now and prepare for cleanup
+                link->sceneA->callbacks->onExit(link->sceneA, link->sceneB);
+                if (!(link->sceneB->flags & SceneFlag::Overlay))
+                    link->sceneA->state = Scene::InLimbo;
+
                 link->state = SceneLink::InLoad;
                 updateLink(mgr, link, dt, renderSize);
             }
         } else {
             link->state = SceneLink::InLoad;
+            link->sceneA->callbacks->onExit(link->sceneA, link->sceneB);
+            if (!(link->sceneB->flags & SceneFlag::Overlay))
+                link->sceneA->state = Scene::InLimbo;
+
             updateLink(mgr, link, dt, renderSize);
         }
         break;
@@ -769,13 +784,12 @@ static void updateLink(SceneManager* mgr, SceneLink* link, float dt, const vec2i
             if (!(link->sceneB->flags & SceneFlag::Overlay)) {
                 // Issue destroy for non-cached scenes
                 if (removeActiveScene(mgr, link->sceneA)) {
-                    link->sceneA->callbacks->onExit(link->sceneA, link->sceneB);
                     if (!(link->sceneA->flags & SceneFlag::CacheAlways))
                         link->sceneA->state = Scene::Destroy;
                 }
 
                 if (link->sceneA->state != Scene::Ready)
-                    updateScene(mgr, link->sceneA, dt); // update until Dead
+                    updateScene(mgr, link->sceneA, dt); // update until Dead/Maybe InLimbo
             }
 
             // sceneB is ready, proceed to next step

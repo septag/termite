@@ -190,7 +190,7 @@ static NVGpathCache* nvg__allocPathCache(void)
 {
 	NVGpathCache* c = (NVGpathCache*)malloc(sizeof(NVGpathCache));
 	if (c == NULL) goto error;
-	memset(c, 0, sizeof(NVGpathCache));
+	bx::memSet(c, 0, sizeof(NVGpathCache));
 
 	c->points = (NVGpoint*)malloc(sizeof(NVGpoint)*NVG_INIT_POINTS_SIZE);
 	if (!c->points) goto error;
@@ -227,7 +227,7 @@ NVGcontext* nvgCreateInternal(NVGparams* params)
 	NVGcontext* ctx = (NVGcontext*)malloc(sizeof(NVGcontext));
 	int i;
 	if (ctx == NULL) goto error;
-	memset(ctx, 0, sizeof(NVGcontext));
+	bx::memSet(ctx, 0, sizeof(NVGcontext));
 
 	ctx->params = *params;
 	for (i = 0; i < NVG_MAX_FONTIMAGES; i++)
@@ -249,7 +249,7 @@ NVGcontext* nvgCreateInternal(NVGparams* params)
 	if (ctx->params.renderCreate(ctx->params.userPtr) == 0) goto error;
 
 	// Init font rendering
-	memset(&fontParams, 0, sizeof(fontParams));
+	bx::memSet(&fontParams, 0, sizeof(fontParams));
 	fontParams.width = NVG_INIT_FONTIMAGE_SIZE;
 	fontParams.height = NVG_INIT_FONTIMAGE_SIZE;
 	fontParams.flags = FONS_ZERO_TOPLEFT;
@@ -556,7 +556,7 @@ float nvgRadToDeg(float rad)
 
 static void nvg__setPaintColor(NVGpaint* p, NVGcolor color)
 {
-	memset(p, 0, sizeof(*p));
+	bx::memSet(p, 0, sizeof(*p));
 	nvgTransformIdentity(p->xform);
 	p->radius = 0.0f;
 	p->feather = 1.0f;
@@ -585,7 +585,7 @@ void nvgRestore(NVGcontext* ctx)
 void nvgReset(NVGcontext* ctx)
 {
 	NVGstate* state = nvg__getState(ctx);
-	memset(state, 0, sizeof(*state));
+	bx::memSet(state, 0, sizeof(*state));
 
 	nvg__setPaintColor(&state->fill, nvgRGBA(255,255,255,255));
 	nvg__setPaintColor(&state->stroke, nvgRGBA(0,0,0,255));
@@ -783,7 +783,7 @@ NVGpaint nvgLinearGradient(NVGcontext* ctx,
 	float dx, dy, d;
 	const float large = 1e5;
 	NVG_NOTUSED(ctx);
-	memset(&p, 0, sizeof(p));
+	bx::memSet(&p, 0, sizeof(p));
 
 	// Calculate transform aligned to the line
 	dx = ex - sx;
@@ -822,7 +822,7 @@ NVGpaint nvgRadialGradient(NVGcontext* ctx,
 	float r = (inr+outr)*0.5f;
 	float f = (outr-inr);
 	NVG_NOTUSED(ctx);
-	memset(&p, 0, sizeof(p));
+	bx::memSet(&p, 0, sizeof(p));
 
 	nvgTransformIdentity(p.xform);
 	p.xform[4] = cx;
@@ -847,7 +847,7 @@ NVGpaint nvgBoxGradient(NVGcontext* ctx,
 {
 	NVGpaint p;
 	NVG_NOTUSED(ctx);
-	memset(&p, 0, sizeof(p));
+	bx::memSet(&p, 0, sizeof(p));
 
 	nvgTransformIdentity(p.xform);
 	p.xform[4] = x+w*0.5f;
@@ -873,7 +873,7 @@ NVGpaint nvgImagePattern(NVGcontext* ctx,
 {
 	NVGpaint p;
 	NVG_NOTUSED(ctx);
-	memset(&p, 0, sizeof(p));
+	bx::memSet(&p, 0, sizeof(p));
 
 	nvgTransformRotate(p.xform, angle);
 	p.xform[4] = cx;
@@ -952,7 +952,7 @@ void nvgIntersectScissor(NVGcontext* ctx, float x, float y, float w, float h)
 void nvgResetScissor(NVGcontext* ctx)
 {
 	NVGstate* state = nvg__getState(ctx);
-	memset(state->scissor.xform, 0, sizeof(state->scissor.xform));
+	bx::memSet(state->scissor.xform, 0, sizeof(state->scissor.xform));
 	state->scissor.extent[0] = -1.0f;
 	state->scissor.extent[1] = -1.0f;
 }
@@ -1061,7 +1061,7 @@ static void nvg__addPath(NVGcontext* ctx)
 		ctx->cache->cpaths = cpaths;
 	}
 	path = &ctx->cache->paths[ctx->cache->npaths];
-	memset(path, 0, sizeof(*path));
+	bx::memSet(path, 0, sizeof(*path));
 	path->first = ctx->cache->npoints;
 	path->winding = NVG_CCW;
 
@@ -1099,7 +1099,7 @@ static void nvg__addPoint(NVGcontext* ctx, float x, float y, int flags)
 	}
 
 	pt = &ctx->cache->points[ctx->cache->npoints];
-	memset(pt, 0, sizeof(*pt));
+	bx::memSet(pt, 0, sizeof(*pt));
 	pt->x = x;
 	pt->y = y;
 	pt->flags = (unsigned char)flags;

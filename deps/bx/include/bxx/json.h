@@ -143,7 +143,7 @@ namespace bx
                 // realloc
                 JsonNode* node = (JsonNode*)_ptr;
                 node->~JsonNode();
-                return new(node) JsonNode();
+                return BX_PLACEMENT_NEW(node, JsonNode);
             }
         }
 

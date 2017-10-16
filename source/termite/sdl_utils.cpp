@@ -41,7 +41,7 @@ struct SdlState
         mouseWheel = 0;
         mouseButtons[0] = mouseButtons[1] = mouseButtons[2] = false;
         modKeys = 0;
-        memset(keysDown, 0x00, sizeof(keysDown));
+        bx::memSet(keysDown, 0x00, sizeof(keysDown));
         accel[0] = accel[1] = accel[2] = 0;
     }
 };

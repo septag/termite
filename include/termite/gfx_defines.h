@@ -80,7 +80,9 @@ namespace termite
             PTC14A, // PVRTC1 RGBA 4BPP
             PTC22, // PVRTC2 RGBA 2BPP
             PTC24, // PVRTC2 RGBA 4BPP
+
             Unknown,
+
             R1,
             A8,
             R8,
@@ -129,8 +131,10 @@ namespace termite
             RGBA4,
             RGB5A1,
             RGB10A2,
-            R11G11B10F,
+            RG11B10F,
+
             UnknownDepth,
+
             D16,
             D24,
             D24S8,
@@ -288,28 +292,43 @@ namespace termite
         GPUDesc gpu[4];
     };
 
+    struct ViewStats
+    {
+        char     name[256];      //!< View name.
+        uint8_t  view;           //!< View id.
+        uint64_t cpuTimeElapsed; //!< CPU (submit) time elapsed.
+        uint64_t gpuTimeElapsed; //!< GPU time elapsed.
+    };
+
     struct GfxStats
     {
-        uint64_t cpuTimeBegin;  //!< CPU frame begin time.
-        uint64_t cpuTimeEnd;    //!< CPU frame end time.
-        uint64_t cpuTimerFreq;  //!< CPU timer frequency.
+        int64_t cpuTimeFrame;    //!< CPU time between two `bgfx::frame` calls.
+        int64_t cpuTimeBegin;    //!< Render thread CPU submit begin time.
+        int64_t cpuTimeEnd;      //!< Render thread CPU submit end time.
+        int64_t cpuTimerFreq;    //!< CPU timer frequency.
 
-        uint64_t gpuTimeBegin;  //!< GPU frame begin time.
-        uint64_t gpuTimeEnd;    //!< GPU frame end time.
-        uint64_t gpuTimerFreq;  //!< GPU timer frequency.
+        int64_t gpuTimeBegin;    //!< GPU frame begin time.
+        int64_t gpuTimeEnd;      //!< GPU frame end time.
+        int64_t gpuTimerFreq;    //!< GPU timer frequency.
 
-        int64_t waitRender;     //!< Time spent waiting for render backend thread to finish issuing
-                                //!  draw commands to underlying graphics API.
-        int64_t waitSubmit;     //!< Time spent waiting for submit thread to advance to next frame.
+        int64_t waitRender;       //!< Time spent waiting for render backend thread to finish issuing
+                                  //!  draw commands to underlying graphics API.
+        int64_t waitSubmit;       //!< Time spent waiting for submit thread to advance to next frame.
 
-        uint32_t numDraw;       //!< Number of draw calls submitted.
-        uint32_t numCompute;    //!< Number of compute calls submitted.
-        uint32_t maxGpuLatency; //!< GPU driver latency.
+        uint32_t numDraw;         //!< Number of draw calls submitted.
+        uint32_t numCompute;      //!< Number of compute calls submitted.
+        uint32_t maxGpuLatency;   //!< GPU driver latency.
 
-        uint16_t width;         //!< Backbuffer width in pixels.
-        uint16_t height;        //!< Backbuffer height in pixels.
-        uint16_t textWidth;     //!< Debug text width in characters.
-        uint16_t textHeight;    //!< Debug text height in characters.
+        int64_t gpuMemoryMax;     //!< Maximum available GPU memory.
+        int64_t gpuMemoryUsed;    //!< Available GPU memory.
+
+        uint16_t width;           //!< Backbuffer width in pixels.
+        uint16_t height;          //!< Backbuffer height in pixels.
+        uint16_t textWidth;       //!< Debug text width in characters.
+        uint16_t textHeight;      //!< Debug text height in characters.
+
+        uint16_t  numViews;       //!< Number of view stats.
+        ViewStats viewStats[256]; //!< View stats.
     };
 
     struct HMDDesc
@@ -351,6 +370,7 @@ namespace termite
         void* context;  // GL context, d3d device
         void* backBuffer;   // GL backbuffer or d3d render target view
         void* backBufferDS; // Backbuffer depth/stencil
+        void* session;      //!< ovrSession, for Oculus SDK
 
         GfxPlatformData()
         {
@@ -359,6 +379,7 @@ namespace termite
             context = nullptr;
             backBuffer = nullptr;
             backBufferDS = nullptr;
+            session = nullptr;
         }
     };
 
@@ -612,22 +633,24 @@ namespace termite
     {
         enum Enum
         {
-            Position,  // a_position
-            Normal,    // a_normal
-            Tangent,   // a_tangent
-            Bitangent, // a_bitangent
-            Color0,    // a_color0
-            Color1,    // a_color1
-            Indices,   // a_indices
-            Weight,    // a_weight
-            TexCoord0, // a_texcoord0
-            TexCoord1, // a_texcoord1
-            TexCoord2, // a_texcoord2
-            TexCoord3, // a_texcoord3
-            TexCoord4, // a_texcoord4
-            TexCoord5, // a_texcoord5
-            TexCoord6, // a_texcoord6
-            TexCoord7, // a_texcoord7
+            Position,  //!< a_position
+            Normal,    //!< a_normal
+            Tangent,   //!< a_tangent
+            Bitangent, //!< a_bitangent
+            Color0,    //!< a_color0
+            Color1,    //!< a_color1
+            Color2,    //!< a_color2
+            Color3,    //!< a_color3
+            Indices,   //!< a_indices
+            Weight,    //!< a_weight
+            TexCoord0, //!< a_texcoord0
+            TexCoord1, //!< a_texcoord1
+            TexCoord2, //!< a_texcoord2
+            TexCoord3, //!< a_texcoord3
+            TexCoord4, //!< a_texcoord4
+            TexCoord5, //!< a_texcoord5
+            TexCoord6, //!< a_texcoord6
+            TexCoord7, //!< a_texcoord7
 
             Count
         };
@@ -678,6 +701,20 @@ namespace termite
             Invisible,
             Visible,
             NoResult,
+
+            Count
+        };
+    };
+
+    struct ViewMode
+    {
+        /// View modes:
+        enum Enum
+        {
+            Default,         //!< Default sort order.
+            Sequential,      //!< Sort in the same order in which submit calls were called.
+            DepthAscending,  //!< Sort draw call depth in ascending order.
+            DepthDescending, //!< Sort draw call depth in descending order.
 
             Count
         };

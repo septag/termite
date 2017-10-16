@@ -1179,7 +1179,7 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     for (int i = 0, c = batches.getCount(); i < c; i++) {
         const Batch batch = batches[i];
         driver->setState(baseState, 0);
-        driver->setTransientVertexBufferI(&tvb, 0, batch.count*4);
+        driver->setTransientVertexBufferI(0, &tvb, 0, batch.count*4);
         driver->setTransientIndexBufferI(&tib, batch.index*6, batch.count*6);
         Sprite* sprite = sortedSprites[batch.index].sprite;
         ResourceHandle texHandle = sprite->getCurFrame().texHandle;
@@ -1223,4 +1223,18 @@ ResourceHandle termite::getSpriteSheetTexture(ResourceHandle spritesheet)
 {
     SpriteSheet* ss = getResourcePtr<SpriteSheet>(spritesheet);
     return ss->texHandle;
+}
+
+vec2_t termite::getSpriteSheetFrameSize(ResourceHandle spritesheet, const char* name)
+{
+    SpriteSheet* ss = getResourcePtr<SpriteSheet>(spritesheet);
+    size_t filenameHash = tinystl::hash_string(name, strlen(name));
+    for (int i = 0, c = ss->numFrames; i < c; i++) {
+        if (ss->frames[i].filenameHash != filenameHash)
+            continue;
+
+        return ss->frames[i].sourceSize;
+    }
+    return vec2f(0, 0);
+
 }

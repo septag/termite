@@ -58,6 +58,7 @@ add_definitions(-DBLUR_KERNEL_SIZE=${BLUR_KERNEL_SIZE})
 set(BLUR_SHADER_SOURCES "shaders/blur.vsc" "shaders/blur.fsc")
 source_group(shaders FILES ${BLUR_SHADER_SOURCES})
 bgfx_add_shaders("${BLUR_SHADER_SOURCES}" "KERNEL_SIZE=${BLUR_KERNEL_SIZE}" "../shaders" "shaders_h" TRUE IGNORE BLUR_SHADER_FILES)
+source_group(shaders\\compiled FILES ${BLUR_SHADER_FILES})
 
 add_library(termite ${BUILD_LIBRARY_TYPE} 
             ${SOURCE_FILES} 
@@ -98,16 +99,13 @@ if (CMAKE_COMPILER_IS_GNUCC)
     endif()
 endif()
 
+#if (ANDROID)
+#    set(PRIVATE_LIBS ${PRIVATE_LIBS} stdc++)
+#endif()
+
 # statically linked plugin libraries
 if (BUILD_STATIC)
-    if (ANDROID)
-        set(DISK_DRIVER android_assets_driver)
-    elseif (USE_DISK_LITE_DRIVER)
-        set(DISK_DRIVER disk_lite_driver)
-    else()
-        set(DISK_DRIVER disk_driver)
-    endif()
-    set(PLUGIN_LIBS bgfx_driver box2d_driver ${DISK_DRIVER})
+    set(PLUGIN_LIBS bgfx_driver box2d_driver disk_lite_driver)
 
     if (USE_SDL2_MIXER)
         set(PLUGIN_LIBS ${PLUGIN_LIBS} sdl_mixer_driver)
@@ -123,12 +121,14 @@ else()
 endif()
 
 target_link_libraries(termite 
-    PRIVATE ${FCONTEXT_LIB} imgui imgui_impl remotery utf8 ${PLUGIN_LIBS} ${PRIVATE_LIBS} tiny-AES128-C 
-    PUBLIC bx rapidjson AHEasing lz4 miniz ${PUBLIC_LIBS})
+    PRIVATE ${FCONTEXT_LIB} imgui imgui_impl remotery utf8 ${PLUGIN_LIBS} 
+            ${PRIVATE_LIBS} tiny-AES128-C ${BIMG_LIBRARY} ${BIMG_DECODE_LIBRARY}
+            etcpack 
+    PUBLIC bx rapidjson AHEasing lz4 ${PUBLIC_LIBS})
 
 # 
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)
-target_include_directories(termite PUBLIC ${TERMITE_INCLUDE_DIR} ${DEP_ROOT_DIR} ${FCONTEXT_INCLUDE_DIR})
+target_include_directories(termite PUBLIC ${TERMITE_INCLUDE_DIR} ${DEP_ROOT_DIR} ${FCONTEXT_INCLUDE_DIR} ${BIMG_INCLUDE_DIR})
 if (USE_SDL2)
     target_include_directories(termite PUBLIC ${SDL2_INCLUDE_DIR})
     target_link_libraries(termite PUBLIC ${SDL2_LIBRARY})

@@ -411,6 +411,10 @@ namespace termite
         void (*setAngularVelocity)(PhysBody2D* body, float vel);
         vec2_t (*getLinearVelocity)(PhysBody2D* body);
         float (*getAngularVelocity)(PhysBody2D* body);
+        void (*setLinearDamping)(PhysBody2D* body, float damping);
+        float (*getLinearDamping)(PhysBody2D* body);
+        void (*setAngularDamping)(PhysBody2D* body, float damping);
+        float (*getAngularDamping)(PhysBody2D* body);
         void (*applyForce)(PhysBody2D* body, const vec2_t& force, const vec2_t& worldPt, bool wake/* = true*/);
         void (*applyForceToCenter)(PhysBody2D* body, const vec2_t& force, bool wake/* = true*/);
         void (*applyTorque)(PhysBody2D* body, float torque, bool wake/* = true*/);

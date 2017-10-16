@@ -1233,7 +1233,7 @@ PluginDesc* getBox2dDriverDesc()
 void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 {
     static PhysDriver2DApi api;
-    memset(&api, 0x00, sizeof(api));
+    bx::memSet(&api, 0x00, sizeof(api));
 
     g_coreApi = (CoreApi_v0*)getApi(ApiId::Core, 0);
     g_gfxApi = (GfxApi_v0*)getApi(ApiId::Gfx, 0);
@@ -1269,6 +1269,11 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.setAngularVelocity = [](PhysBody2D* body, float omega) { body->b->SetAngularVelocity(-omega); };
     api.getLinearVelocity = [](PhysBody2D* body)->vec2_t { return tvec2(body->b->GetLinearVelocity()); };
     api.getAngularVelocity = [](PhysBody2D* body)->float { return -body->b->GetAngularVelocity(); };
+    api.setLinearDamping = [](PhysBody2D* body, float damping) { body->b->SetLinearDamping(damping); };
+    api.getLinearDamping = [](PhysBody2D* body)->float { return body->b->GetLinearDamping(); };
+    api.setAngularDamping = [](PhysBody2D* body, float damping) { body->b->SetAngularDamping(damping); };
+    api.getAngularDamping = [](PhysBody2D* body)->float { return body->b->GetAngularDamping(); };
+
     api.isAwake = [](PhysBody2D* body)->bool { return body->b->IsAwake(); };
     api.setAwake = [](PhysBody2D* body, bool awake) { body->b->SetAwake(awake); };
     api.isActive = [](PhysBody2D* body)->bool { return body->b->IsActive(); };

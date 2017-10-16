@@ -41,9 +41,9 @@ void *stb_leakcheck_malloc(size_t sz, const char *file, int line)
            r = strrchr(file, '\\');
 
        if (r)
-           bx::strlcpy(mi->file, r + 1, sizeof(mi->file));
+           bx::strCopy(mi->file, sizeof(mi->file), r + 1);
        else
-           bx::strlcpy(mi->file, file, sizeof(mi->file));
+           bx::strCopy(mi->file, sizeof(mi->file), file);
    } else {
        mi->file[0] = 0;
    }
@@ -151,12 +151,12 @@ namespace bx
         {
         }
 
-        virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) BX_OVERRIDE
+        virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) override
         {
             if (_size == 0) {
                 // free
                 if (_ptr != NULL) {
-                    if (BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT >= _align) {
+                    if (8 >= _align) {
                         stb_leakcheck_free(_ptr);
                         return nullptr;
                     }
@@ -165,12 +165,12 @@ namespace bx
                 return NULL;
             } else if (_ptr == NULL) {
                 // malloc
-                if (BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT >= _align)
+                if (8 >= _align)
                     return stb_leakcheck_malloc(_size, _file, _line);
                 return bx::alignedAlloc(this, _size, _align, _file, _line);
             }  else {
                 // realloc
-                if (BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT >= _align)
+                if (8 >= _align)
                     return stb_leakcheck_realloc(_ptr, _size, _file, _line);
                 return bx::alignedRealloc(this, _ptr, _size, _align, _file, _line);
             }

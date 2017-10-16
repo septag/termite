@@ -58,11 +58,22 @@ namespace termite
         };
     };
 
+    struct IoFlags
+    {
+        enum Enum
+        {
+            ExtractLZ4 = 0x1     /// auto extract files with .lz4 extension when reading files
+        };
+
+        typedef uint8_t Bits;
+    };
+
     // Backend interface for 
     struct IoDriverApi
     {
     public:
-        result_t(*init)(bx::AllocatorI* alloc, const char* uri, const void* params, IoDriverEventsI* callbacks/* = nullptr*/);
+        result_t(*init)(bx::AllocatorI* alloc, const char* uri, const void* params, IoDriverEventsI* callbacks/* = nullptr*/,
+                        IoFlags::Bits flags/* = 0*/);
         void(*shutdown)();
 
         void(*setCallbacks)(IoDriverEventsI* callbacks);

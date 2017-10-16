@@ -3,8 +3,8 @@
 
 #include "bx/allocator.h"
 #include "bx/commandline.h"
-#include "bx/crtimpl.h"
-#include "bx/fpumath.h"
+#include "bx/file.h"
+#include "bx/math.h"
 #include "bx/string.h"
 #include "bx/uint32_t.h"
 #include "bxx/array.h"
@@ -28,7 +28,7 @@
 
 using namespace termite;
 
-static bx::CrtAllocator g_alloc;
+static bx::DefaultAllocator g_alloc;
 static LogFormatProxy* g_logger = nullptr;
 
 struct Args
@@ -113,7 +113,7 @@ static AnimData* importAnim(const Args& args)
     AnimData::Channel* channels = (AnimData::Channel*)BX_ALLOC(&g_alloc, sizeof(AnimData::Channel)*numChannels);
     if (!channels)
         return nullptr;
-    memset(channels, 0x00, sizeof(AnimData::Channel)*numChannels);
+    bx::memSet(channels, 0x00, sizeof(AnimData::Channel)*numChannels);
 
     int channelOffset = 0;
     for (uint32_t i = 0; i < scene->mNumAnimations; i++) {
@@ -122,7 +122,7 @@ static AnimData* importAnim(const Args& args)
             const aiNodeAnim* achannel = aanim->mChannels[k];
             AnimData::Channel* channel = &channels[k + channelOffset];
 
-            bx::strlcpy(channel->c.bindto, achannel->mNodeName.data, sizeof(channel->c.bindto));
+            bx::strCopy(channel->c.bindto, sizeof(channel->c.bindto), achannel->mNodeName.data);
             channel->poss = (float*)BX_ALLOC(&g_alloc, sizeof(float) * 4 * numFrames);
             channel->rots = (float*)BX_ALLOC(&g_alloc, sizeof(float) * 4 * numFrames);
             if (!channel->poss || !channel->rots)
@@ -181,7 +181,7 @@ static bool exportAnimFile(const char* animFilepath, const AnimData& anim)
     header.numChannels = anim.numChannels;
     header.metaOffset = -1;
 
-    bx::CrtFileWriter file;
+    bx::FileWriter file;
     bx::Error err;
     if (!file.open(animFilepath, false, &err)) {
         g_logger->fatal("Could not open file '%s' for writing", animFilepath);
@@ -222,9 +222,9 @@ int main(int argc, char** argv)
     args.verbose = cmd.hasArg('v', "verbose");
    
     const char* zaxis = cmd.findOption('z', "zaxis", "");
-    if (bx::stricmp(zaxis, "UP") == 0)
+    if (bx::strCmpI(zaxis, "UP") == 0)
         args.zaxis = ZAxis::Up;
-    else if (bx::stricmp(zaxis, "GL") == 0)
+    else if (bx::strCmpI(zaxis, "GL") == 0)
         args.zaxis = ZAxis::GL;
     else
         args.zaxis = ZAxis::Unknown;

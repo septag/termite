@@ -88,7 +88,7 @@ namespace termite
             setActive(nullptr),
             debug(nullptr)
         {
-            memset(updateStageFn, 0x00, sizeof(UpdateStageFunc)*ComponentUpdateStage::Count);
+            bx::memSet(updateStageFn, 0x00, sizeof(UpdateStageFunc)*ComponentUpdateStage::Count);
         }
     };
 

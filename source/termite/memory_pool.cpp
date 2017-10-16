@@ -2,6 +2,7 @@
 
 #include "memory_pool.h"
 
+#include "bx/cpu.h"
 #include "bx/mutex.h"
 #include "bxx/linked_list.h"
 #include "bxx/pool.h"

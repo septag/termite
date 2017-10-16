@@ -41,7 +41,7 @@ namespace bx
             return m_size;
         }
 
-        virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) BX_OVERRIDE
+        virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) override
         {
             if (_size == 0) {
                 // free

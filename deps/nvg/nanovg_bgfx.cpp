@@ -23,12 +23,12 @@
 #define NVG_ANTIALIAS 1
 
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include "nanovg.h"
 
 #include <bx/bx.h>
 #include <bx/allocator.h>
-#include <bx/crtimpl.h>
 
 #include "../../include/termite/gfx_driver.h"
 
@@ -185,7 +185,7 @@ namespace
 				int old = gl->ctextures;
 				gl->ctextures = (gl->ctextures == 0) ? 2 : gl->ctextures*2;
 				gl->textures = (struct GLNVGtexture*)BX_REALLOC(gl->m_allocator, gl->textures, sizeof(struct GLNVGtexture)*gl->ctextures);
-				memset(&gl->textures[old], 0xff, (gl->ctextures-old)*sizeof(struct GLNVGtexture) );
+				bx::memSet(&gl->textures[old], 0xff, (gl->ctextures-old)*sizeof(struct GLNVGtexture) );
 
 				if (gl->textures == NULL)
 				{
@@ -195,7 +195,7 @@ namespace
 			tex = &gl->textures[gl->ntextures++];
 		}
 
-		memset(tex, 0, sizeof(*tex) );
+		bx::memSet(tex, 0, sizeof(*tex) );
 
 		return tex;
 	}
@@ -225,7 +225,7 @@ namespace
 				{
 					gl->driver->destroyTexture(gl->textures[ii].id);
 				}
-				memset(&gl->textures[ii], 0, sizeof(gl->textures[ii]) );
+				bx::memSet(&gl->textures[ii], 0, sizeof(gl->textures[ii]) );
 				gl->textures[ii].id.reset();
 				return 1;
 			}
@@ -251,7 +251,7 @@ namespace
 						);
 		const termite::GfxMemory* mem = gl->driver->alloc(4*4*4);
 		uint32_t* bgra8 = (uint32_t*)mem->data;
-		memset(bgra8, 0, 4*4*4);
+		bx::memSet(bgra8, 0, 4*4*4);
 		gl->texMissing = gl->driver->createTexture2D(4, 4, false, 1, termite::TextureFormat::BGRA8, termite::TextureFlag::None, mem);
 
 		gl->u_scissorMat      = gl->driver->createUniform("u_scissorMat",      termite::UniformType::Mat3, 1);
@@ -424,7 +424,7 @@ namespace
 		struct GLNVGtexture* tex = NULL;
 		float invxform[6] = {};
 
-		memset(frag, 0, sizeof(*frag) );
+		bx::memSet(frag, 0, sizeof(*frag) );
 
 		frag->innerCol = paint->innerColor;
 		frag->outerCol = paint->outerColor;
@@ -434,7 +434,7 @@ namespace
 
 		if (scissor->extent[0] < 0.5f || scissor->extent[1] < 0.5f)
 		{
-			memset(frag->scissorMat, 0, sizeof(frag->scissorMat) );
+			bx::memSet(frag->scissorMat, 0, sizeof(frag->scissorMat) );
 			frag->scissorExt[0] = 1.0f;
 			frag->scissorExt[1] = 1.0f;
 			frag->scissorScale[0] = 1.0f;
@@ -578,7 +578,7 @@ namespace
 					| termite::GfxStencilState::OpDepthFailKeep
 					| termite::GfxStencilState::OpDepthPassDecr
 					);
-				gl->driver->setTransientVertexBuffer(&gl->tvb);
+				gl->driver->setTransientVertexBuffer(0, &gl->tvb);
 				gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
 				fan(gl, paths[i].fillOffset, paths[i].fillCount);
 				gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
@@ -601,7 +601,7 @@ namespace
 					| termite::GfxStencilState::OpDepthFailKeep
 					| termite::GfxStencilState::OpDepthPassKeep
 					, termite::GfxStencilState::None);
-				gl->driver->setTransientVertexBufferI(&gl->tvb, paths[i].strokeOffset, paths[i].strokeCount);
+				gl->driver->setTransientVertexBufferI(0, &gl->tvb, paths[i].strokeOffset, paths[i].strokeCount);
 				gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
 				gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
 			}
@@ -609,7 +609,7 @@ namespace
 
 		// Draw fill
 		gl->driver->setState(gl->state, 0);
-		gl->driver->setTransientVertexBufferI(&gl->tvb, call->vertexOffset, call->vertexCount);
+		gl->driver->setTransientVertexBufferI(0, &gl->tvb, call->vertexOffset, call->vertexCount);
 		gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
 		gl->driver->setStencil(
 				termite::GfxStencilState::TestNotEqual
@@ -634,7 +634,7 @@ namespace
 		{
 			if (paths[i].fillCount == 0) continue;
 			gl->driver->setState(gl->state, 0);
-			gl->driver->setTransientVertexBuffer(&gl->tvb);
+			gl->driver->setTransientVertexBuffer(0, &gl->tvb);
 			gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
 			fan(gl, paths[i].fillOffset, paths[i].fillCount);
 			gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
@@ -646,7 +646,7 @@ namespace
 			for (i = 0; i < npaths; i++)
 			{
 				gl->driver->setState(gl->state | termite::GfxState::PrimitiveTriStrip, 0);
-				gl->driver->setTransientVertexBufferI(&gl->tvb, paths[i].strokeOffset, paths[i].strokeCount);
+				gl->driver->setTransientVertexBufferI(0, &gl->tvb, paths[i].strokeOffset, paths[i].strokeCount);
 				gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
 				gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
 			}
@@ -664,7 +664,7 @@ namespace
 		for (i = 0; i < npaths; i++)
 		{
 			gl->driver->setState(gl->state | termite::GfxState::PrimitiveTriStrip, 0);
-			gl->driver->setTransientVertexBufferI(&gl->tvb, paths[i].strokeOffset, paths[i].strokeCount);
+			gl->driver->setTransientVertexBufferI(0, &gl->tvb, paths[i].strokeOffset, paths[i].strokeCount);
 			gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
 			gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
 		}
@@ -677,7 +677,7 @@ namespace
 			nvgRenderSetUniforms(gl, call->uniformOffset, call->image);
 
 			gl->driver->setState(gl->state, 0);
-			gl->driver->setTransientVertexBufferI(&gl->tvb, call->vertexOffset, call->vertexCount);
+			gl->driver->setTransientVertexBufferI(0, &gl->tvb, call->vertexOffset, call->vertexCount);
 			gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
 			gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
 		}
@@ -770,7 +770,7 @@ namespace
 			gl->calls = (struct GLNVGcall*)BX_REALLOC(gl->m_allocator, gl->calls, sizeof(struct GLNVGcall) * gl->ccalls);
 		}
 		ret = &gl->calls[gl->ncalls++];
-		memset(ret, 0, sizeof(struct GLNVGcall) );
+		bx::memSet(ret, 0, sizeof(struct GLNVGcall) );
 		return ret;
 	}
 
@@ -856,7 +856,7 @@ namespace
 		{
 			struct GLNVGpath* copy = &gl->paths[call->pathOffset + i];
 			const struct NVGpath* path = &paths[i];
-			memset(copy, 0, sizeof(struct GLNVGpath) );
+			bx::memSet(copy, 0, sizeof(struct GLNVGpath) );
 			if (path->nfill > 0)
 			{
 				copy->fillOffset = offset;
@@ -892,7 +892,7 @@ namespace
 			call->uniformOffset = glnvg__allocFragUniforms(gl, 2);
 			// Simple shader for stencil
 			frag = nvg__fragUniformPtr(gl, call->uniformOffset);
-			memset(frag, 0, sizeof(*frag) );
+			bx::memSet(frag, 0, sizeof(*frag) );
 			frag->type = NSVG_SHADER_SIMPLE;
 			// Fill shader
 			glnvg__convertPaint(gl, nvg__fragUniformPtr(gl, call->uniformOffset + gl->fragSize), paint, scissor, fringe, fringe);
@@ -926,7 +926,7 @@ namespace
 		{
 			struct GLNVGpath* copy = &gl->paths[call->pathOffset + i];
 			const struct NVGpath* path = &paths[i];
-			memset(copy, 0, sizeof(struct GLNVGpath) );
+			bx::memSet(copy, 0, sizeof(struct GLNVGpath) );
 			if (path->nstroke)
 			{
 				copy->strokeOffset = offset;
@@ -1014,7 +1014,7 @@ NVGcontext* nvgCreate(int edgeaa, unsigned char _viewId, termite::GfxDriverApi* 
 	if (NULL == _allocator)
 	{
 #if BX_CONFIG_ALLOCATOR_CRT
-		static bx::CrtAllocator allocator;
+		static bx::DefaultAllocator allocator;
 		_allocator = &allocator;
 #else
 		BX_CHECK(false, "No allocator has been passed to nvgCreate(). Either specify a bx::AllocatorI instance or enable BX_CONFIG_ALLOCATOR_CRT directive.");
@@ -1026,11 +1026,11 @@ NVGcontext* nvgCreate(int edgeaa, unsigned char _viewId, termite::GfxDriverApi* 
 	struct NVGcontext* ctx = NULL;
 	struct GLNVGcontext* gl = (struct GLNVGcontext*)BX_ALLOC(_allocator, sizeof(struct GLNVGcontext) );
 	if (gl == NULL) goto error;
-	memset(gl, 0, sizeof(struct GLNVGcontext) );
+	bx::memSet(gl, 0, sizeof(struct GLNVGcontext) );
 	gl->driver = driver;
 	gl->gfxApi = gfxApi;
 
-	memset(&params, 0, sizeof(params) );
+	bx::memSet(&params, 0, sizeof(params) );
 	params.renderCreate         = nvgRenderCreate;
 	params.renderCreateTexture  = nvgRenderCreateTexture;
 	params.renderDeleteTexture  = nvgRenderDeleteTexture;

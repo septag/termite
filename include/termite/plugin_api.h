@@ -91,6 +91,7 @@ namespace termite
 #include "core.h"
 #include "bxx/logger.h"
 #include "resource_lib.h"
+#include "job_dispatcher.h"
 
 namespace termite {
     struct CoreApi_v0
@@ -124,6 +125,14 @@ namespace termite {
         ResourceTypeHandle(*registerResourceType)(const char* name, ResourceCallbacksI* callbacks,
                                                   int userParamsSize /*= 0*/, uintptr_t failObj /*= 0*/,
                                                   uintptr_t asyncProgressObj /*= 0*/);
+
+        // Job API
+        JobHandle (*dispatchSmallJobs)(const JobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE;
+        JobHandle (*dispatchBigJobs)(const JobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE;
+
+        void (*waitAndDeleteJob)(JobHandle handle) T_THREAD_SAFE;
+        bool (*isJobDone)(JobHandle handle) T_THREAD_SAFE;
+        void (*deleteJob)(JobHandle handle) T_THREAD_SAFE;
     };
 }
 #endif

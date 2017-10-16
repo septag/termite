@@ -87,8 +87,12 @@ namespace bx
 
         // Name only
         char* r = strrchr(p.text, '.');
-        if (r)
+        if (r && r > ri) {
             *r = 0;
+            r = strrchr(p.text, '.');
+            if (r && r > ri)
+                *r = 0;
+        }
         return p;
     }
 
@@ -98,6 +102,8 @@ namespace bx
         int len = getLength();
         if (len > 0) {
             const char* start = strrchr((const char*)this->text, '/');
+            if (!start)
+                start = strrchr((const char*)this->text, '\\');
             if (!start)
                 start = (const char*)this->text;
             const char* end = &this->text[len-1];
@@ -202,11 +208,12 @@ namespace bx
 
         if (this->text[0] != 0) {
             if (path[0] != 0)   {
-                bx::strlcat(this->text, sep, sizeof(this->text));
-                bx::strlcat(this->text, path, sizeof(this->text));
+                if (this->text[strlen(this->text)-1] != sep[0])
+                    bx::strCat(this->text, sizeof(this->text), sep);
+                bx::strCat(this->text, sizeof(this->text), path[0] != sep[0] ? path : path + 1);
             }
         }   else    {
-            bx::strlcpy(this->text, path, sizeof(this->text));
+            bx::strCopy(this->text, sizeof(this->text), path);
         }
 
         return *this;
@@ -217,11 +224,11 @@ namespace bx
         const char* sep = "/";
         if (this->text[0] != 0) {
             if (path[0] != 0) {
-                bx::strlcat(this->text, sep, sizeof(this->text));
-                bx::strlcat(this->text, path, sizeof(this->text));
+                bx::strCat(this->text, sizeof(this->text), sep);
+                bx::strCat(this->text, sizeof(this->text), path);
             }
         } else {
-            bx::strlcpy(this->text, path, sizeof(this->text));
+            bx::strCopy(this->text, sizeof(this->text), path);
         }
 
         return *this;

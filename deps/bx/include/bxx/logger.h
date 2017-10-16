@@ -191,7 +191,7 @@ namespace bx
             numWarnings = 0;
             numMessages = 0;
             colorOverride = LogColor::None;
-            memset(excludeList, 0x00, sizeof(excludeList));
+            bx::memSet(excludeList, 0x00, sizeof(excludeList));
             tag[0] = 0;
 
 #if BX_PLATFORM_WINDOWS
@@ -288,7 +288,7 @@ namespace bx
 
     void setLogTag(const char* tag)
     {
-        bx::strlcpy(g_logger.tag, tag, sizeof(g_logger.tag));
+        bx::strCopy(g_logger.tag, sizeof(g_logger.tag), tag);
     }
 
 #if BX_PLATFORM_ANDROID

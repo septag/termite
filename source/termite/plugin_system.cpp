@@ -31,19 +31,9 @@ struct PluginSystem
 static PluginSystem* g_pluginSys = nullptr;
 
 #ifdef termite_STATIC_LIB
-#if BX_PLATFORM_ANDROID
-void* initAndroidAssetDriver(bx::AllocatorI* alloc, GetApiFunc getApi);
-PluginDesc* getAndroidAssetDriverDesc();
-void shutdownAndroidAssetDriver();
-#elif BX_PLATFORM_IOS
 void* initDiskLiteDriver(bx::AllocatorI* alloc, GetApiFunc getApi);
 PluginDesc* getDiskLiteDriverDesc();
 void shutdownDiskLiteDriver();
-#else
-PluginDesc* getDiskDriverDesc();
-void* initDiskDriver(bx::AllocatorI* alloc, GetApiFunc getApi);
-void shutdownDiskDriver();
-#endif
 
 PluginDesc* getBgfxDriverDesc();
 void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi);
@@ -62,29 +52,18 @@ static void loadStaticPlugins()
     // IoDriver
     static PluginApi_v0 ioApi;
     Plugin* p = g_pluginSys->plugins.push();
-    memset(p, 0x00, sizeof(*p));
-#if BX_PLATFORM_ANDROID
-    memcpy(&p->desc, getAndroidAssetDriverDesc(), sizeof(p->desc));
-    ioApi.getDesc = getAndroidAssetDriverDesc;
-    ioApi.init = initAndroidAssetDriver;
-    ioApi.shutdown = shutdownAndroidAssetDriver;
-#elif BX_PLATFORM_IOS
+    bx::memSet(p, 0x00, sizeof(*p));
     memcpy(&p->desc, getDiskLiteDriverDesc(), sizeof(p->desc));
     ioApi.getDesc = getDiskLiteDriverDesc;
     ioApi.init = initDiskLiteDriver;
     ioApi.shutdown = shutdownDiskLiteDriver;
-#else
-    memcpy(&p->desc, getDiskDriverDesc(), sizeof(p->desc));
-    ioApi.getDesc = getDiskDriverDesc;
-    ioApi.init = initDiskDriver;
-    ioApi.shutdown = shutdownDiskDriver;
-#endif
+
     p->api = &ioApi;
 
     // BgfxDriver
     static PluginApi_v0 bgfxApi;
     p = g_pluginSys->plugins.push();
-    memset(p, 0x00, sizeof(*p));
+    bx::memSet(p, 0x00, sizeof(*p));
     memcpy(&p->desc, getBgfxDriverDesc(), sizeof(p->desc));
     bgfxApi.getDesc = getBgfxDriverDesc;
     bgfxApi.init = initBgfxDriver;
@@ -94,7 +73,7 @@ static void loadStaticPlugins()
     // Box2D driver
     static PluginApi_v0 box2dApi;
     p = g_pluginSys->plugins.push();
-    memset(p, 0x00, sizeof(*p));
+    bx::memSet(p, 0x00, sizeof(*p));
     memcpy(&p->desc, getBox2dDriverDesc(), sizeof(p->desc));
     box2dApi.getDesc = getBox2dDriverDesc;
     box2dApi.init = initBox2dDriver;
@@ -104,7 +83,7 @@ static void loadStaticPlugins()
     // Sound driver
     static PluginApi_v0 soundApi;
     p = g_pluginSys->plugins.push();
-    memset(p, 0x00, sizeof(*p));
+    bx::memSet(p, 0x00, sizeof(*p));
     memcpy(&p->desc, getSdlMixerDriverDesc(), sizeof(p->desc));
     soundApi.init = initSdlMixerDriver;
     soundApi.shutdown = shutdownSdlMixerDriver;
@@ -193,7 +172,7 @@ result_t termite::initPluginSystem(const char* pluginPath, bx::AllocatorI* alloc
             if (T_OK(validatePlugin(filepath, &desc))) {
                 // Save in plugin library
                 Plugin* p = g_pluginSys->plugins.push();
-                memset(p, 0x00, sizeof(*p));
+                bx::memSet(p, 0x00, sizeof(*p));
                 memcpy(&p->desc, &desc, sizeof(desc));
                 p->filepath = filepath;
             }
@@ -264,7 +243,7 @@ int termite::findPluginByName(const char* name, uint32_t version, PluginHandle* 
     int index = 0;
     for (int i = 0, c = g_pluginSys->plugins.getCount(); i < c && index < maxHandles; i++) {
         const Plugin& p = g_pluginSys->plugins[i];
-        if (bx::stricmp(name, p.desc.name) == 0 && (type == PluginType::Unknown || type == p.desc.type)) {
+        if (bx::strCmpI(name, p.desc.name) == 0 && (type == PluginType::Unknown || type == p.desc.type)) {
             handles[index++] = PluginHandle(uint16_t(i));
         }
     }

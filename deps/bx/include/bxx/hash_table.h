@@ -44,6 +44,12 @@ namespace bx
             return getValue(index);
         }
 
+        inline Ty& operator[](int index)
+        {
+            assert(index>=0);
+            return m_values[index];
+        }
+
         static size_t GetImmutableSizeBytes(int capacity);
 
     private:
@@ -225,7 +231,7 @@ namespace bx
 
         size_t totalSz = (sizeof(Ky) + sizeof(Ty))*capacity;
         uint8_t* buff = (uint8_t*)BX_ALLOC(alloc, totalSz);
-        memset(buff, 0x00, totalSz);
+        bx::memSet(buff, 0x00, totalSz);
         if (!buff)
             return false;
 
@@ -246,7 +252,7 @@ namespace bx
         m_numItems = 0;
         m_alloc = nullptr;
 
-        memset(buff, 0x00, (sizeof(Ty) + sizeof(Ky))*capacity);
+        bx::memSet(buff, 0x00, (sizeof(Ty) + sizeof(Ky))*capacity);
         uint8_t* bbuff = (uint8_t*)buff;
 
         m_keys = (Ky*)bbuff;     bbuff += sizeof(Ky)*capacity;
@@ -278,7 +284,7 @@ namespace bx
 
             size_t totalSz = (sizeof(Ky) + sizeof(Ty))*new_cnt;
             uint8_t* buff = (uint8_t*)BX_ALLOC(m_alloc, totalSz);
-            memset(buff, 0x00, totalSz);
+            bx::memSet(buff, 0x00, totalSz);
             if (!buff)
                 return false;
             Ky* keys = (Ky*)buff;       
@@ -333,7 +339,7 @@ namespace bx
     template <typename Ty, typename Ky>
     void HashTable<Ty, Ky>::clear()
     {
-        memset(m_keys, 0x00, sizeof(Ky)*m_numTotal);
+        bx::memSet(m_keys, 0x00, sizeof(Ky)*m_numTotal);
         m_numItems = 0;
     }
 
@@ -419,8 +425,8 @@ namespace bx
         m_keys = (Ky*)BX_ALLOC(alloc, sizeof(Ky)*capacity);
         if (!m_nodes || !m_keys)
             return false;
-        memset(m_nodes, 0x00, sizeof(Node*)*capacity);
-        memset(m_keys, 0x00, sizeof(Ky)*capacity);
+        bx::memSet(m_nodes, 0x00, sizeof(Node*)*capacity);
+        bx::memSet(m_keys, 0x00, sizeof(Ky)*capacity);
 
         m_numItems = 0;
         m_numTotal = capacity;
@@ -458,8 +464,8 @@ namespace bx
             Ky* keys = (Ky*)BX_ALLOC(m_alloc, sizeof(Ky)*new_cnt);
             if (!keys || !nodes)
                 return -1;
-            memset(nodes, 0x00, sizeof(Node*)*new_cnt);
-            memset(keys, 0x00, sizeof(Ky)*new_cnt);
+            bx::memSet(nodes, 0x00, sizeof(Node*)*new_cnt);
+            bx::memSet(keys, 0x00, sizeof(Ky)*new_cnt);
 
             reorder(keys, nodes, new_cnt);
 

@@ -3,9 +3,9 @@
 
 #include "bx/allocator.h"
 #include "bx/commandline.h"
-#include "bx/crtimpl.h"
-#include "bx/fpumath.h"
+#include "bx/math.h"
 #include "bx/string.h"
+#include "bx/file.h"
 #include "bxx/array.h"
 #include "bxx/path.h"
 
@@ -27,7 +27,7 @@
 
 using namespace termite;
 
-static bx::CrtAllocator g_alloc;
+static bx::DefaultAllocator g_alloc;
 static LogFormatProxy* g_logger = nullptr;
 
 struct Args
@@ -140,7 +140,7 @@ struct ModelData
 
 static aiNode* findNodeRecursive(aiNode* anode, const char* name)
 {
-    if (bx::stricmp(anode->mName.C_Str(), name) == 0)
+    if (bx::strCmpI(anode->mName.C_Str(), name) == 0)
         return anode;
     for (uint32_t i = 0; i < anode->mNumChildren; i++) {
         aiNode* achild = findNodeRecursive(anode->mChildren[i], name);
@@ -227,7 +227,7 @@ static void setupGeoJoints(const aiScene* scene, const bx::Array<aiNode*>& bones
 
     for (int i = 0; i < bones.getCount(); i++) {
         aiNode* bone = bones[i];
-        bx::strlcpy(joints[i].name, bone->mName.C_Str(), sizeof(joints[i].name));
+        bx::strCopy(joints[i].name, sizeof(joints[i].name), bone->mName.C_Str());
 
         // If joint name is found within SkinBones (aiBone), retreive offset matrix
         // Else use identity matrix
@@ -268,7 +268,7 @@ static int importGeo(const aiScene* scene, ModelData* model, unsigned int* amesh
                      const Args& conf, const mtx4x4_t& rootMtx)
 {
     ModelData::Geometry* geo = model->geos.push();
-    memset(geo, 0x00, sizeof(ModelData::Geometry));
+    bx::memSet(geo, 0x00, sizeof(ModelData::Geometry));
 
     bx::Array<aiNode*> bones;
     bx::Array<aiBone*> skinBones;
@@ -388,7 +388,7 @@ static int importGeo(const aiScene* scene, ModelData* model, unsigned int* amesh
     uint8_t* vertIwIndices = nullptr;   // Counters for skin indices (per vertex)
     if (findAttrib(attribs, numAttribs, t3dVertexAttrib::Indices) != -1) {
         vertIwIndices = (uint8_t*)alloca(sizeof(uint8_t)*numVerts);
-        memset(vertIwIndices, 0x00, sizeof(uint8_t)*numVerts);
+        bx::memSet(vertIwIndices, 0x00, sizeof(uint8_t)*numVerts);
 
         // Setup joints
         geo->g.skel.numJoints = bones.getCount();
@@ -536,7 +536,7 @@ static int importGeo(const aiScene* scene, ModelData* model, unsigned int* amesh
 static int importMaterial(const aiScene* scene, ModelData* model, aiMaterial* amtl)
 {
     ModelData::Material* mtl = model->mtls.push();
-    memset(mtl, 0x00, sizeof(ModelData::Material));
+    bx::memSet(mtl, 0x00, sizeof(ModelData::Material));
 
     auto setColor = [](const aiColor4D &c, float *fv) {fv[0] = c.r; fv[1] = c.g; fv[2] = c.b; };
     auto setColor1 = [](float c, float *fv) {fv[0] = c; fv[1] = c; fv[2] = c; };
@@ -585,39 +585,39 @@ static int importMaterial(const aiScene* scene, ModelData* model, aiMaterial* am
     aiString filepath;
 
     if (amtl->Get(AI_MATKEY_TEXTURE_DIFFUSE(0), filepath) == AI_SUCCESS) {
-        bx::strlcpy(textures[tcount].filepath, filepath.C_Str(), sizeof(textures[tcount].filepath));
+        bx::strCopy(textures[tcount].filepath, sizeof(textures[tcount].filepath), filepath.C_Str());
         textures[tcount++].usage = t3dTextureUsage::Diffuse;
     }
     if (amtl->Get(AI_MATKEY_TEXTURE_SHININESS(0), filepath) == AI_SUCCESS) {
-        bx::strlcpy(textures[tcount].filepath, filepath.C_Str(), sizeof(textures[tcount].filepath));
+        bx::strCopy(textures[tcount].filepath, sizeof(textures[tcount].filepath), filepath.C_Str());
         textures[tcount++].usage = t3dTextureUsage::Gloss;
     }
     if (amtl->Get(AI_MATKEY_TEXTURE_NORMALS(0), filepath) == AI_SUCCESS) {
-        bx::strlcpy(textures[tcount].filepath, filepath.C_Str(), sizeof(textures[tcount].filepath));
+        bx::strCopy(textures[tcount].filepath, sizeof(textures[tcount].filepath), filepath.C_Str());
         textures[tcount++].usage = t3dTextureUsage::Normal;
     }
     if (amtl->Get(AI_MATKEY_TEXTURE_OPACITY(0), filepath) == AI_SUCCESS) {
-        bx::strlcpy(textures[tcount].filepath, filepath.C_Str(), sizeof(textures[tcount].filepath));
+        bx::strCopy(textures[tcount].filepath, sizeof(textures[tcount].filepath), filepath.C_Str());
         textures[tcount++].usage = t3dTextureUsage::Alpha;
     }
     if (amtl->Get(AI_MATKEY_TEXTURE_LIGHTMAP(0), filepath) == AI_SUCCESS) {
-        bx::strlcpy(textures[tcount].filepath, filepath.C_Str(), sizeof(textures[tcount].filepath));
+        bx::strCopy(textures[tcount].filepath, sizeof(textures[tcount].filepath), filepath.C_Str());
         textures[tcount++].usage = t3dTextureUsage::Light;
     }
     if (amtl->Get(AI_MATKEY_TEXTURE_REFLECTION(0), filepath) == AI_SUCCESS) {
-        bx::strlcpy(textures[tcount].filepath, filepath.C_Str(), sizeof(textures[tcount].filepath));
+        bx::strCopy(textures[tcount].filepath, sizeof(textures[tcount].filepath), filepath.C_Str());
         textures[tcount++].usage = t3dTextureUsage::Reflection;
     }
     if (amtl->Get(AI_MATKEY_TEXTURE_EMISSIVE(0), filepath) == AI_SUCCESS) {
-        bx::strlcpy(textures[tcount].filepath, filepath.C_Str(), sizeof(textures[tcount].filepath));
+        bx::strCopy(textures[tcount].filepath, sizeof(textures[tcount].filepath), filepath.C_Str());
         textures[tcount++].usage = t3dTextureUsage::Emissive;
     }
     if (amtl->Get(AI_MATKEY_TEXTURE_AMBIENT(0), filepath) == AI_SUCCESS) {
-        bx::strlcpy(textures[tcount].filepath, filepath.C_Str(), sizeof(textures[tcount].filepath));
+        bx::strCopy(textures[tcount].filepath, sizeof(textures[tcount].filepath), filepath.C_Str());
         textures[tcount++].usage = t3dTextureUsage::AO;
     }
     if (amtl->Get(AI_MATKEY_TEXTURE_SPECULAR(0), filepath) == AI_SUCCESS) {
-        bx::strlcpy(textures[tcount].filepath, filepath.C_Str(), sizeof(textures[tcount].filepath));
+        bx::strCopy(textures[tcount].filepath, sizeof(textures[tcount].filepath), filepath.C_Str());
         textures[tcount++].usage = t3dTextureUsage::Specular;
     }
 
@@ -635,12 +635,12 @@ static int importMesh(const aiScene* scene, ModelData* model, unsigned int* ames
                       const mtx4x4_t& rootMtx)
 {
     ModelData::Mesh* mesh = model->meshes.push();
-    memset(mesh, 0x00, sizeof(ModelData::Mesh));
+    bx::memSet(mesh, 0x00, sizeof(ModelData::Mesh));
 
     mesh->m.numSubmeshes = (int)numMeshes;
     mesh->submeshes = (t3dSubmesh*)BX_ALLOC(&g_alloc, sizeof(t3dSubmesh)*numMeshes);
     assert(mesh->submeshes);
-    memset(mesh->submeshes, 0x00, sizeof(t3dSubmesh)*numMeshes);
+    bx::memSet(mesh->submeshes, 0x00, sizeof(t3dSubmesh)*numMeshes);
 
     // Geomerty (with some data of submeshes)
     int geo = importGeo(scene, model, ameshIds, numMeshes, mainNode, mesh->submeshes, conf, rootMtx);
@@ -729,9 +729,9 @@ static int importNodeRecursive(const aiScene* scene, aiNode* anode, ModelData* m
                                mtx4x4_t& rootMtx)
 {
     ModelData::Node* node = model->nodes.push();
-    memset(node, 0x00, sizeof(ModelData::Node));
+    bx::memSet(node, 0x00, sizeof(ModelData::Node));
 
-    bx::strlcpy(node->n.name, anode->mName.C_Str(), sizeof(node->n.name));
+    bx::strCopy(node->n.name, sizeof(node->n.name), anode->mName.C_Str());
     node->n.parent = parent;
 
     // Calculate local transform mat of the node
@@ -805,7 +805,7 @@ static bool exportT3d(const char* t3dFilepath, const ModelData& model)
     hdr.numGeos = model.geos.getCount();
     hdr.numMeshes = model.meshes.getCount();
 
-    bx::CrtFileWriter file;
+    bx::FileWriter file;
     bx::Error err;
     if (!file.open(t3dFilepath, false, &err)) {
         g_logger->fatal("Could not open file '%s' for writing", t3dFilepath);
@@ -925,7 +925,7 @@ static bool exportMeta(const char* metaJsonFilepath, const ModelData& model)
         char* jmeta = bx::makeJson(jroot, &g_alloc, false);
         if (!jmeta)
             return false;
-        bx::CrtFileWriter file;
+        bx::FileWriter file;
         bx::Error err;
         if (!file.open(metaJsonFilepath, false, &err))
             return false;
@@ -1038,9 +1038,9 @@ int main(int argc, char** argv)
     sscanf(scaleStr, "%f", &conf.scale);
 
     const char* zaxis = cmd.findOption('z', "zaxis", "");
-    if (bx::stricmp(zaxis, "UP") == 0)
+    if (bx::strCmpI(zaxis, "UP") == 0)
         conf.zaxis = ZAxis::Up;
-    else if (bx::stricmp(zaxis, "GL") == 0)
+    else if (bx::strCmpI(zaxis, "GL") == 0)
         conf.zaxis = ZAxis::GL;
     else
         conf.zaxis = ZAxis::Unknown;
@@ -1048,7 +1048,7 @@ int main(int argc, char** argv)
     conf.outputMtl = cmd.findOption('M', "metafile", "");
     conf.inFilepath = cmd.findOption('i', "input", "");
     conf.outFilepath = cmd.findOption('o', "output", "");
-    bx::strlcpy(conf.modelName, cmd.findOption('n', "name", ""), sizeof(conf.modelName));
+    bx::strCopy(conf.modelName, sizeof(conf.modelName), cmd.findOption('n', "name", ""));
     bool jsonLog = cmd.hasArg('j', "jsonlog");
 
     bool help = cmd.hasArg('h', "help");

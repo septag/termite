@@ -748,7 +748,7 @@ coro_create (coro_context *ctx, coro_func coro, void *arg, void *sptr, size_t ss
   #endif
 
   ctx->sp -= NUM_SAVED;
-  memset (ctx->sp, 0, sizeof (*ctx->sp) * NUM_SAVED);
+  bx::memSet (ctx->sp, 0, sizeof (*ctx->sp) * NUM_SAVED);
 
 # elif CORO_UCONTEXT
 

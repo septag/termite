@@ -16,10 +16,10 @@
 
 using namespace termite;
 
-static void* getImGuiApi0()
+static void* getImGuiApi(uint32_t version)
 {
 	static ImGuiApi_v0 api;
-	memset(&api, 0x00, sizeof(api));
+	bx::memSet(&api, 0x00, sizeof(api));
 
 	api.begin = static_cast<bool(*)(const char*, bool*, ImGuiWindowFlags)>(ImGui::Begin);
 	api.beginWithSize = static_cast<bool(*)(const char*, bool*, const ImVec2&, float, ImGuiWindowFlags)>(ImGui::Begin);
@@ -263,7 +263,7 @@ static void* getImGuiApi0()
 static void* getComponentApi(uint32_t version)
 {
 	static ComponentApi_v0 api;
-	memset(&api, 0x00, sizeof(api));
+	bx::memSet(&api, 0x00, sizeof(api));
 
 	switch (version) {
 	case 0:
@@ -289,7 +289,7 @@ static void* getComponentApi(uint32_t version)
 static void* getCameraApi(uint32_t version)
 {
     static CameraApi_v0 api;
-    memset(&api, 0x00, sizeof(api));
+    bx::memSet(&api, 0x00, sizeof(api));
 
     switch (version) {
     case 0:
@@ -317,60 +317,83 @@ static void* getCameraApi(uint32_t version)
     }
 }
 
+static void* getCoreApi(uint32_t version)
+{
+    static CoreApi_v0 core0;
+    bx::memSet(&core0, 0x00, sizeof(core0));
+
+    core0.copyMemoryBlock = copyMemoryBlock;
+    core0.createMemoryBlock = createMemoryBlock;
+    core0.readTextFile = readTextFile;
+    core0.refMemoryBlock = refMemoryBlock;
+    core0.refMemoryBlockPtr = refMemoryBlockPtr;
+    core0.releaseMemoryBlock = releaseMemoryBlock;
+    core0.getElapsedTime = getElapsedTime;
+    core0.reportError = reportError;
+    core0.reportErrorf = reportErrorf;
+    core0.logBeginProgress = bx::logBeginProgress;
+    core0.logEndProgress = bx::logEndProgress;
+    core0.logPrint = bx::logPrint;
+    core0.logPrintf = bx::logPrintf;
+    core0.getConfig = getConfig;
+    core0.getEngineVersion = getEngineVersion;
+    core0.getTempAlloc = getTempAlloc;
+    core0.getGfxDriver = getGfxDriver;
+    core0.getAsyncIoDriver = getAsyncIoDriver;
+    core0.getBlockingIoDriver = getBlockingIoDriver;
+    core0.getPhys2dDriver = getPhys2dDriver;
+    core0.registerResourceType = registerResourceType;
+#if RMT_ENABLED
+    core0.beginCPUSample = _rmt_BeginCPUSample;
+    core0.endCPUSample = _rmt_EndCPUSample;
+#endif
+    core0.dispatchBigJobs = dispatchBigJobs;
+    core0.dispatchSmallJobs = dispatchSmallJobs;
+    core0.waitAndDeleteJob = waitAndDeleteJob;
+    core0.isJobDone = isJobDone;
+    core0.deleteJob = deleteJob;
+
+    return &core0;
+}
+
+static void* getGfxApi(uint32_t version)
+{
+    static GfxApi_v0 gfx0;
+    gfx0.calcGaussKernel = calcGaussKernel;
+    gfx0.drawFullscreenQuad = drawFullscreenQuad;
+    gfx0.loadShaderProgram = loadShaderProgram;
+    gfx0.vdeclAdd = vdeclAdd;
+    gfx0.vdeclBegin = vdeclBegin;
+    gfx0.vdeclEnd = vdeclEnd;
+    gfx0.vdeclDecode = vdeclDecode;
+    gfx0.vdeclGetSize = vdeclGetSize;
+    gfx0.vdeclHas = vdeclHas;
+    gfx0.vdeclSkip = vdeclSkip;
+
+    return &gfx0;
+}
+
 void* termite::getEngineApi(uint16_t apiId, uint32_t version)
 {
-    if (apiId == ApiId::Core && version == 0) {
-        static CoreApi_v0 core0;
-        memset(&core0, 0x00, sizeof(core0));
+    switch (apiId) {
+    case ApiId::Core:
+        return getCoreApi(version);
 
-        core0.copyMemoryBlock = copyMemoryBlock;
-        core0.createMemoryBlock = createMemoryBlock;
-        core0.readTextFile = readTextFile;
-        core0.refMemoryBlock = refMemoryBlock;
-        core0.refMemoryBlockPtr = refMemoryBlockPtr;
-        core0.releaseMemoryBlock = releaseMemoryBlock;
-        core0.getElapsedTime = getElapsedTime;
-        core0.reportError = reportError;
-        core0.reportErrorf = reportErrorf;
-        core0.logBeginProgress = bx::logBeginProgress;
-        core0.logEndProgress = bx::logEndProgress;
-        core0.logPrint = bx::logPrint;
-        core0.logPrintf = bx::logPrintf;
-        core0.getConfig = getConfig;
-        core0.getEngineVersion = getEngineVersion;
-        core0.getTempAlloc = getTempAlloc;
-        core0.getGfxDriver = getGfxDriver;
-        core0.getAsyncIoDriver = getAsyncIoDriver;
-        core0.getBlockingIoDriver = getBlockingIoDriver;
-        core0.getPhys2dDriver = getPhys2dDriver;
-        core0.registerResourceType = registerResourceType;
-#if RMT_ENABLED
-        core0.beginCPUSample = _rmt_BeginCPUSample;
-        core0.endCPUSample = _rmt_EndCPUSample;
-#endif
-        return &core0;
-    } else if (apiId == ApiId::Gfx && version == 0) {
-        static GfxApi_v0 gfx0;
-        gfx0.calcGaussKernel = calcGaussKernel;
-        gfx0.drawFullscreenQuad = drawFullscreenQuad;
-        gfx0.loadShaderProgram = loadShaderProgram;
-        gfx0.vdeclAdd = vdeclAdd;
-        gfx0.vdeclBegin = vdeclBegin;
-        gfx0.vdeclEnd = vdeclEnd;
-        gfx0.vdeclDecode = vdeclDecode;
-        gfx0.vdeclGetSize = vdeclGetSize;
-        gfx0.vdeclHas = vdeclHas;
-        gfx0.vdeclSkip = vdeclSkip;
+    case ApiId::Gfx:
+        return getGfxApi(version);
 
-        return &gfx0;
-	} else if (apiId == ApiId::ImGui && version == 0) {
-		return getImGuiApi0();
-    } else if (apiId == ApiId::Camera) {
+    case ApiId::ImGui:
+        return getImGuiApi(version);
+
+    case ApiId::Camera:
         return getCameraApi(version);
-    } else if (apiId == ApiId::Component) {
-        return getComponentApi(version);
-    }
 
-    return nullptr;
+    case ApiId::Component:
+        return getComponentApi(version);
+
+    default:
+        assert(0);
+        return nullptr;
+    }
 }
 

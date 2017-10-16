@@ -5,7 +5,7 @@ using namespace termite;
 
 void termite::camInit(Camera* cam, float fov /*= 60.0f*/, float fnear /*= 0.1f*/, float ffar /*= 100.0f*/)
 {
-    memset(cam, 0x00, sizeof(Camera));
+    bx::memSet(cam, 0x00, sizeof(Camera));
     
     cam->right = vec3f(1.0f, 0, 0);
     cam->up = vec3f(0, 1.0f, 0);
@@ -54,10 +54,10 @@ void termite::camCalcFrustumCorners(const Camera* cam, vec3_t result[8], float a
     vec3_t yaxis = cam->up;
     vec3_t zaxis = cam->forward;
 
-    float nearPlaneHeight = tanf(fov * 0.5f) * fnear;
+    float nearPlaneHeight = bx::ftan(fov * 0.5f) * fnear;
     float nearPlaneWidth = nearPlaneHeight * aspectRatio;
 
-    float farPlaneHeight = tanf(fov * 0.5f) * ffar;
+    float farPlaneHeight = bx::ftan(fov * 0.5f) * ffar;
     float farPlaneWidth = farPlaneHeight * aspectRatio;
 
     // Far/Near planes
@@ -186,7 +186,7 @@ mtx4x4_t termite::camViewMtx(const Camera* cam)
 
 mtx4x4_t termite::camProjMtx(const Camera* cam, float aspectRatio)
 {
-    float xscale = 1.0f / tanf(bx::toRad(cam->fov)*0.5f);
+    float xscale = 1.0f / bx::ftan(bx::toRad(cam->fov)*0.5f);
     float yscale = aspectRatio*xscale;
     float zf = cam->ffar;
     float zn = cam->fnear;
@@ -252,7 +252,7 @@ mtx4x4_t termite::cam2dProjMtx(const Camera2D& cam)
 {
     mtx4x4_t projMtx;
     vec2_t halfSize = calcCam2dHalfSize(cam);
-    bx::mtxOrtho(projMtx.f, -halfSize.x, halfSize.x, -halfSize.y, halfSize.y, 0, 1.0f);
+    bx::mtxOrtho(projMtx.f, -halfSize.x, halfSize.x, -halfSize.y, halfSize.y, 0, 1.0f, 0, false);
     return projMtx;
 }
 

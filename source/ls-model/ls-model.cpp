@@ -14,11 +14,10 @@
 #include "bxx/logger.h"
 
 #include "../tools_common/log_format_proxy.h"
-#include "bx/crtimpl.h"
 
 #define LSMODEL_VERSION "0.1"
 
-static bx::CrtAllocator g_alloc;
+static bx::DefaultAllocator g_alloc;
 using namespace termite;
 
 static void showHelp()

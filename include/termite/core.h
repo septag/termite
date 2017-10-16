@@ -112,7 +112,7 @@ namespace termite
             gfxHeight = 0;
             gfxDeviceId = 0;
             gfxDriverFlags = 0;
-            memset(keymap, 0x00, sizeof(keymap));
+            bx::memSet(keymap, 0x00, sizeof(keymap));
 
             audioFreq = AudioFreq::Freq22Khz;
             audioChannels = AudioChannels::Mono;
@@ -133,6 +133,12 @@ namespace termite
     {
         uint8_t* data;
         uint32_t size;
+    };
+
+    struct HardwareStats
+    {
+        uint16_t numCores;
+        size_t processMemUsed;
     };
 
     typedef void(*UpdateCallback)(float dt);
@@ -238,6 +244,8 @@ namespace termite
 
     // Remote Console
     TERMITE_API void registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback);
+
+    TERMITE_API const HardwareStats& getHardwareStats();
 
 #if BX_PLATFORM_ANDROID
     struct JavaMethod

@@ -34,7 +34,7 @@ struct ModelImpl
 
     ModelImpl()
     {
-        memset(&m, 0x00, sizeof(m));
+        bx::memSet(&m, 0x00, sizeof(m));
         vertexBuffers = nullptr;
         indexBuffers = nullptr;
     }

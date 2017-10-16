@@ -27,7 +27,7 @@ struct ErrorReport
         alloc = _alloc;
         numReports = 0;
         fullString = nullptr;
-        memset(reports, 0x00, sizeof(ErrorItem*)*T_ERROR_MAX_STACK_SIZE);
+        bx::memSet(reports, 0x00, sizeof(ErrorItem*)*T_ERROR_MAX_STACK_SIZE);
     }
 };
 

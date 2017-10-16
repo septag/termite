@@ -3,11 +3,11 @@
 #include "bx/readerwriter.h"
 #include "bx/os.h"
 #include "bx/cpu.h"
+#include "bx/file.h"
 #include "bxx/path.h"
 #include "bxx/inifile.h"
 #include "bxx/pool.h"
 #include "bxx/lock.h"
-#include "bx/crtimpl.h"
 #include "bxx/array.h"
 #include "bxx/string.h"
 
@@ -57,10 +57,11 @@
 #include <dirent.h>
 #include <random>
 #include <chrono>
+#include <thread>
 
 #include "remotery/Remotery.h"
 #include "lz4/lz4.h"
-#include "tiny-AES128-c/aes.h"
+#include "tiny-AES128-C/aes.h"
 
 #define MEM_POOL_BUCKET_SIZE 256
 #define IMGUI_VIEWID 255
@@ -176,6 +177,7 @@ struct ConsoleCommand
 
 struct Core
 {
+    HardwareStats hwStats;
     UpdateCallback updateFn;
     Config conf;
     RendererApi* renderer;
@@ -209,6 +211,7 @@ struct Core
         tempAlloc(T_MID_TEMP),
         randEngine(randDevice())
     {
+        memset(&hwStats, 0x00, sizeof(hwStats));
         gfxDriver = nullptr;
         phys2dDriver = nullptr;
         sndDriver = nullptr;
@@ -221,7 +224,7 @@ struct Core
         rmt = nullptr;
         init = false;
         gfxReset = false;
-        memset(&frameData, 0x00, sizeof(frameData));
+        bx::memSet(&frameData, 0x00, sizeof(frameData));
         randomFloatOffset = randomIntOffset = 0;
         randomPoolFloat = nullptr;
         randomPoolInt = nullptr;
@@ -231,7 +234,7 @@ struct Core
 #ifdef _DEBUG
 static bx::LeakCheckAllocator g_allocStub;
 #else
-static bx::CrtAllocator g_allocStub;
+static bx::DefaultAllocator g_allocStub;
 #endif
 static bx::AllocatorI* g_alloc = &g_allocStub;
 
@@ -258,11 +261,11 @@ extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteInitEngi
     g_activityObj = env->NewGlobalRef(obj);
     
     const char* str = env->GetStringUTFChars(dataDir, nullptr);
-    bx::strlcpy(g_dataDir.getBuffer(), str, sizeof(g_dataDir));
+    bx::strCopy(g_dataDir.getBuffer(), sizeof(g_dataDir), str);
     env->ReleaseStringUTFChars(dataDir, str);
 
     str = env->GetStringUTFChars(cacheDir, nullptr);
-    bx::strlcpy(g_cacheDir.getBuffer(), str, sizeof(g_cacheDir));
+    bx::strCopy(g_cacheDir.getBuffer(), sizeof(g_cacheDir), str);
     env->ReleaseStringUTFChars(cacheDir, str);
 }
 
@@ -279,7 +282,7 @@ JavaMethod termite::androidFindMethod(const char* methodName, const char* method
     assert(g_javaVM);
 
     JavaMethod m;
-    memset(&m, 0x00, sizeof(m));
+    bx::memSet(&m, 0x00, sizeof(m));
 
     if (type == JavaMethodType::Method) {
         g_javaVM->AttachCurrentThread(&m.env, nullptr);
@@ -340,7 +343,7 @@ static void remoteryInputHandlerCallback(const char* text, void* context)
     const int maxArgs = 16;
     bx::String64 args[maxArgs];
     char cmdText[2048];
-    bx::strlcpy(cmdText, text, sizeof(cmdText));
+    bx::strCopy(cmdText, sizeof(cmdText), text);
     char* token = strtok(cmdText, " ");
     int numArgs = 0;
     while (token && numArgs < maxArgs) {
@@ -368,15 +371,15 @@ static void callbackConf(const char* key, const char* value, void* userParam)
 {
     Config* conf = (Config*)userParam;
 
-    if (bx::stricmp(key, "Plugin_Path") == 0)
-        bx::strlcpy(conf->pluginPath, value, sizeof(conf->pluginPath));
-    else if (bx::stricmp(key, "gfx_DeviceId") == 0)
+    if (bx::strCmpI(key, "Plugin_Path") == 0)
+        bx::strCopy(conf->pluginPath, sizeof(conf->pluginPath), value);
+    else if (bx::strCmpI(key, "gfx_DeviceId") == 0)
         sscanf(value, "%hu", &conf->gfxDeviceId);
-    else if (bx::stricmp(key, "gfx_Width") == 0)
+    else if (bx::strCmpI(key, "gfx_Width") == 0)
         sscanf(value, "%hu", &conf->gfxWidth);
-    else if (bx::stricmp(key, "gfx_Height") == 0)
+    else if (bx::strCmpI(key, "gfx_Height") == 0)
         sscanf(value, "%hu", &conf->gfxHeight);
-    else if (bx::stricmp(key, "gfx_VSync") == 0)
+    else if (bx::strCmpI(key, "gfx_VSync") == 0)
         conf->gfxDriverFlags |= bx::toBool(value) ? uint32_t(GfxResetFlag::VSync) : 0;
 }
 
@@ -412,11 +415,15 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
 
     memcpy(&g_core->conf, &conf, sizeof(g_core->conf));
 
+    // Hardware stats
+    g_core->hwStats.numCores = std::thread::hardware_concurrency();
+    g_core->hwStats.processMemUsed = bx::getProcessMemoryUsed();
+
     g_core->updateFn = updateFn;
 
     // Set Data and Cache Dir paths
 #if !BX_PLATFORM_ANDROID
-    bx::strlcpy(g_dataDir.getBuffer(), conf.dataUri, sizeof(g_dataDir));
+    bx::strCopy(g_dataDir.getBuffer(), sizeof(g_dataDir), conf.dataUri);
     g_dataDir.normalizeSelf();
     g_cacheDir = bx::getTempDir();        
 #endif
@@ -450,14 +457,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     PluginHandle pluginHandle;
 
     // IO
-#if BX_PLATFORM_ANDROID
-    const char* ioDriverName = "AssetIO";
-#elif BX_PLATFORM_IOS
-    const char* ioDriverName = "DiskIO_Lite";
-#else
-    const char* ioDriverName = "DiskIO";
-#endif
-    r = findPluginByName(conf.ioName[0] ? conf.ioName : ioDriverName , 0, &pluginHandle, 1, PluginType::IoDriver);
+    r = findPluginByName(conf.ioName[0] ? conf.ioName : "DiskIO_Lite" , 0, &pluginHandle, 1, PluginType::IoDriver);
     if (r > 0) {
         g_core->ioDriver = (IoDriverDual*)initPlugin(pluginHandle, g_alloc);
         if (!g_core->ioDriver) {
@@ -479,8 +479,8 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
 
         const PluginDesc& desc = getPluginDesc(pluginHandle);
         BX_BEGINP("Initializing IO Driver: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version), T_VERSION_MINOR(desc.version));
-        if (T_FAILED(g_core->ioDriver->blocking->init(g_alloc, uri, nullptr, nullptr)) ||
-            T_FAILED(g_core->ioDriver->async->init(g_alloc, uri, nullptr, nullptr))) 
+        if (T_FAILED(g_core->ioDriver->blocking->init(g_alloc, uri, nullptr, nullptr, IoFlags::ExtractLZ4)) ||
+            T_FAILED(g_core->ioDriver->async->init(g_alloc, uri, nullptr, nullptr, IoFlags::ExtractLZ4)))
         {
             BX_END_FATAL();
             T_ERROR("Engine init failed: Initializing IoDriver failed");
@@ -1038,7 +1038,7 @@ void termite::releaseMemoryBlock(termite::MemoryBlock* mem)
 
 MemoryBlock* termite::readTextFile(const char* absFilepath)
 {
-    bx::CrtFileReader file;
+    bx::FileReader file;
     bx::Error err;
     if (!file.open(absFilepath, &err))
         return nullptr;
@@ -1060,7 +1060,7 @@ MemoryBlock* termite::readTextFile(const char* absFilepath)
 
 MemoryBlock* termite::readBinaryFile(const char* absFilepath)
 {
-    bx::CrtFileReader file;
+    bx::FileReader file;
     bx::Error err;
     if (!file.open(absFilepath, &err))
         return nullptr;
@@ -1085,7 +1085,7 @@ MemoryBlock* termite::readBinaryFile(const char* absFilepath)
 
 bool termite::saveBinaryFile(const char* absFilepath, const MemoryBlock* mem)
 {
-    bx::CrtFileWriter file;
+    bx::FileWriter file;
     bx::Error err;
     if (mem->size == 0 || !file.open(absFilepath, false, &err)) {
         return false;
@@ -1118,7 +1118,7 @@ MemoryBlock* termite::encodeMemoryAES128(const MemoryBlock* mem, bx::AllocatorI*
     int compressSize = LZ4_compress_default((const char*)mem->data, (char*)compressedBuff, mem->size, maxSize);
     int alignedCompressSize = BX_ALIGN_16(compressSize);
     assert(alignedCompressSize <= maxSize);
-    memset((uint8_t*)compressedBuff + compressSize, 0x00, alignedCompressSize - compressSize);
+    bx::memSet((uint8_t*)compressedBuff + compressSize, 0x00, alignedCompressSize - compressSize);
 
     // AES Encode
     MemoryBlock* encMem = createMemoryBlock(alignedCompressSize + sizeof(header), alloc);
@@ -1455,10 +1455,18 @@ void termite::registerConsoleCommand(const char* name, std::function<void(int, c
 #endif
 }
 
+const HardwareStats& termite::getHardwareStats()
+{
+    // update memory used
+    g_core->hwStats.processMemUsed = bx::getProcessMemoryUsed();
+
+    return g_core->hwStats;
+}
+
 void GfxDriverEvents::onFatal(GfxFatalType::Enum type, const char* str)
 {
     char strTrimed[LOG_STRING_SIZE];
-    bx::strlcpy(strTrimed, str, sizeof(strTrimed));
+    bx::strCopy(strTrimed, sizeof(strTrimed), str);
     strTrimed[strlen(strTrimed) - 1] = 0;
 
     if (g_core->numGfxLogCache < 1000) {

@@ -26,8 +26,8 @@ namespace bx
             m_alloc = nullptr;
             m_indices = nullptr;
             m_revIndices = nullptr;
-            memset(m_buffers, 0x00, sizeof(uint8_t*)*BX_INDEXED_POOL_MAX_BUFFERS);
-            memset(m_itemSizes, 0x00, sizeof(uint32_t)*BX_INDEXED_POOL_MAX_BUFFERS);
+            bx::memSet(m_buffers, 0x00, sizeof(uint8_t*)*BX_INDEXED_POOL_MAX_BUFFERS);
+            bx::memSet(m_itemSizes, 0x00, sizeof(uint32_t)*BX_INDEXED_POOL_MAX_BUFFERS);
             m_maxItems = 0;
             m_partition = 0;
             m_numBuffers = 0;
@@ -81,8 +81,8 @@ namespace bx
             m_indices = m_revIndices = nullptr;
             m_alloc = nullptr;
             m_maxItems = m_partition = 0;
-            memset(m_buffers, 0x00, sizeof(uint8_t*)*BX_INDEXED_POOL_MAX_BUFFERS);
-            memset(m_itemSizes, 0x00, sizeof(uint32_t)*BX_INDEXED_POOL_MAX_BUFFERS);
+            bx::memSet(m_buffers, 0x00, sizeof(uint8_t*)*BX_INDEXED_POOL_MAX_BUFFERS);
+            bx::memSet(m_itemSizes, 0x00, sizeof(uint32_t)*BX_INDEXED_POOL_MAX_BUFFERS);
         }
 
         ~HandlePool()

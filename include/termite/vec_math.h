@@ -2,7 +2,7 @@
 
 #include "bx/bx.h"
 #include "bx/platform.h"
-#include "bx/fpumath.h"
+#include "bxx/math.h"
 #include <float.h>
 #include <cassert>
 #include <utility>
@@ -599,8 +599,8 @@ namespace termite
         float wHalf = (rc.xmax - rc.xmin)*0.5f;
         float hHalf = (rc.ymax - rc.ymin)*0.5f;
 
-        float dx = bx::fabsolute((rc.xmin + wHalf) - center.x);
-        float dy = bx::fabsolute((rc.ymin + hHalf) - center.y);
+        float dx = bx::fabs((rc.xmin + wHalf) - center.x);
+        float dy = bx::fabs((rc.ymin + hHalf) - center.y);
         if (dx > (radius + wHalf) || dy > (radius + hHalf))
             return false;
 
@@ -753,7 +753,7 @@ namespace termite
 
     inline void mtxProjPlane(mtx4x4_t* r, const vec3_t planeNorm)
     {
-        memset(r, 0x00, sizeof(mtx4x4_t));
+        bx::memSet(r, 0x00, sizeof(mtx4x4_t));
 
         r->m11 = 1.0f - planeNorm.x*planeNorm.x;
         r->m22 = 1.0f - planeNorm.y*planeNorm.y;

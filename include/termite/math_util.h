@@ -37,7 +37,7 @@ namespace termite
 
             this->width = _width;
             this->height = _height;
-            memset(this->mtx, 0x00, sizeof(Ty)*width*height);
+            bx::memSet(this->mtx, 0x00, sizeof(Ty)*width*height);
 
             return true;
         }
@@ -86,7 +86,7 @@ namespace termite
     inline float fwrapRange(float x, float vmin, float vmax)
     {
         vmax -= vmin;
-        x = fmod(x, vmax);
+        x = bx::fmod(x, vmax);
         return x + vmin;
     }
 
@@ -102,7 +102,7 @@ namespace termite
 
     inline float falign(float value, float size)
     {
-        return value - bx::fabsolute(bx::fmod(value, size));
+        return value - bx::fabs(bx::fmod(value, size));
     }
 
     // Line fgain, but goes up to 1.0 and then back to 0

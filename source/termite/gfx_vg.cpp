@@ -6,6 +6,7 @@
 #include "gfx_font.h"
 #include "gfx_texture.h"
 
+#include "bx/hash.h"
 #include "bxx/pool.h"
 #include "bxx/stack.h"
 #include "bxx/logger.h"
@@ -297,7 +298,7 @@ static void drawBatches(VectorGfxContext* ctx)
     driver->setViewRect(viewId, vp.xmin, vp.ymin, vp.xmax - vp.xmin, vp.ymax - vp.ymin);
 
     driver->setViewTransform(viewId, ctx->viewMtx.f, ctx->projMtx.f, GfxViewFlag::Stereo, nullptr);
-    driver->setViewSeq(viewId, true);
+    driver->setViewMode(viewId, ViewMode::Sequential);
 
     // Allocate and fill vertices
     TransientVertexBuffer tvb;
@@ -330,7 +331,7 @@ static void drawBatches(VectorGfxContext* ctx)
                            batch.scissorRect.xmax - batch.scissorRect.xmin,
                            batch.scissorRect.ymax - batch.scissorRect.ymin);
         driver->setTransientIndexBufferI(&tib, batch.firstIdx, batch.numIndices);
-        driver->setTransientVertexBufferI(&tvb, 0, batch.numVerts);       
+        driver->setTransientVertexBufferI(0, &tvb, 0, batch.numVerts);       
         driver->submit(viewId, ctx->program, 0, false); 
     }
 }
@@ -491,7 +492,7 @@ void vgBegin(VectorGfxContext* ctx, uint8_t viewId, const recti_t& viewport,
     else
         bx::mtxOrtho(ctx->projMtx.f, 0,
                      float(viewport.xmax - viewport.xmin), 
-                     float(viewport.ymax - viewport.ymin), 0, -1.0f, 1.0f);
+                     float(viewport.ymax - viewport.ymin), 0, -1.0f, 1.0f, 0 , false);
 }
 
 void vgEnd(VectorGfxContext* ctx)
@@ -522,7 +523,7 @@ void vgText(VectorGfxContext* ctx, float x, float y, const char* text)
     ctx->stateStack.peek(&state);
 
     TextParams textParams;
-    bx::strlcpy(textParams.text, text, sizeof(textParams.text));
+    bx::strCopy(textParams.text, sizeof(textParams.text), text);
     textParams.mtx = state->mtx;
     textParams.scissor = state->scissor;
     textParams.color = colorPremultiplyAlpha(state->textColor, state->alpha);

@@ -27,7 +27,7 @@ namespace termite
 
     MaterialDecl::MaterialDecl()
     {
-        memset(m_vars, 0x00, sizeof(m_vars));
+        bx::memSet(m_vars, 0x00, sizeof(m_vars));
         m_count = 0;
     }
 
@@ -43,7 +43,7 @@ namespace termite
 
         if (m_count < MAX_MATERIAL_VARS) {
             Var& v = m_vars[m_count++];
-            bx::strlcpy(v.name, name, sizeof(name));
+            bx::strCopy(v.name, sizeof(name), name);
             v.type = type;
             v.num = num;
         }

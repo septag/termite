@@ -181,7 +181,7 @@ static Shape createSolidAABB()
         pts[i] = aabbGetCorner(box, i);
 
     eddVertexPosCoordColor* verts = (eddVertexPosCoordColor*)alloca(sizeof(eddVertexPosCoordColor) * numVerts);
-    memset(verts, 0x00, sizeof(eddVertexPosCoordColor)*numVerts);
+    bx::memSet(verts, 0x00, sizeof(eddVertexPosCoordColor)*numVerts);
 
     // Z-
     verts[0].setPos(pts[0]); verts[1].setPos(pts[2]); verts[2].setPos(pts[3]);
@@ -221,7 +221,7 @@ static Shape createAABB()
         pts[i] = aabbGetCorner(box, i);
 
     eddVertexPosCoordColor* verts = (eddVertexPosCoordColor*)alloca(sizeof(eddVertexPosCoordColor) * numVerts);
-    memset(verts, 0x00, sizeof(eddVertexPosCoordColor)*numVerts);
+    bx::memSet(verts, 0x00, sizeof(eddVertexPosCoordColor)*numVerts);
 
     // Bottom edges
     verts[0].setPos(pts[0]);    verts[1].setPos(pts[1]);
@@ -258,9 +258,9 @@ static Shape createBoundingSphere(int numSegs)
     int size = numVerts * sizeof(eddVertexPosCoordColor);
     eddVertexPosCoordColor* verts = (eddVertexPosCoordColor*)alloca(size);
     assert(verts);
-    memset(verts, 0x00, size);
+    bx::memSet(verts, 0x00, size);
 
-    const float dt = bx::pi * 2.0f / float(numSegs);
+    const float dt = bx::kPi2 / float(numSegs);
     float theta = 0.0f;
     int idx = 0;
 
@@ -306,11 +306,11 @@ static Shape createSphere(int numSegsX, int numSegsY)
     float r;
 
     // Phi: vertical angle 
-    float delta_phi = bx::pi / (float)numIter;
-    float phi = -bx::piHalf + delta_phi;
+    float delta_phi = bx::kPi / (float)numIter;
+    float phi = -bx::kPiHalf + delta_phi;
 
     // Theta: horizontal angle 
-    float delta_theta = (bx::pi*2.0f) / (float)numSegsX;
+    float delta_theta = (bx::kPi*2.0f) / (float)numSegsX;
     float theta = 0.0f;
     float y;
 
@@ -319,7 +319,7 @@ static Shape createSphere(int numSegsX, int numSegsY)
     eddVertexPosCoordColor *verts = (eddVertexPosCoordColor*)alloca(size);
     if (verts == nullptr)
         return Shape();
-    memset(verts, 0x00, size);
+    bx::memSet(verts, 0x00, size);
 
     for (int i = 0; i < numIter; i++) {
         /* calculate z and slice radius */
@@ -693,7 +693,7 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spaci
 
     mtx4x4_t ident = mtx4x4Ident();
 
-    driver->setTransientVertexBuffer(&tvb);
+    driver->setTransientVertexBuffer(0, &tvb);
     driver->setTransform(ident.f, 1);
     driver->setState(GfxState::RGBWrite | GfxState::DepthTestLess | GfxState::PrimitiveLines, 0);
     driver->setUniform(g_dbg->uColor, state->color.f, 1);
@@ -794,7 +794,7 @@ void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spa
 
     mtx4x4_t ident = mtx4x4Ident();
 
-    driver->setTransientVertexBuffer(&tvb);
+    driver->setTransientVertexBuffer(0, &tvb);
     driver->setTransform(ident.f, 1);
     driver->setState(GfxState::RGBWrite | GfxState::PrimitiveLines | gfxStateBlendAlpha(), 0);
     driver->setUniform(g_dbg->uColor, state->color.f, 1);
@@ -820,7 +820,7 @@ void termite::ddBoundingBox(DebugDrawContext* ctx, const aabb_t bb, bool showInf
     ctx->stateStack.peek(&state);
 
     GfxDriverApi* driver = g_dbg->driver;
-    driver->setVertexBuffer(shape.vb);
+    driver->setVertexBuffer(0, shape.vb);
     driver->setTransform(mtx.f, 1);
     driver->setUniform(g_dbg->uColor, state->color.f, 1);
     driver->setState(GfxState::RGBWrite | GfxState::DepthTestLess | GfxState::PrimitiveLines, 0);
@@ -860,7 +860,7 @@ void termite::ddBoundingSphere(DebugDrawContext* ctx, const sphere_t sphere, boo
 
     GfxDriverApi* driver = g_dbg->driver;
     Shape shape = g_dbg->bsphereShape;
-    driver->setVertexBuffer(shape.vb);
+    driver->setVertexBuffer(0, shape.vb);
     driver->setTransform(mtx.f, 1);
     driver->setUniform(g_dbg->uColor, state->color.f, 1);
     driver->setState(GfxState::RGBWrite | GfxState::DepthTestLess | GfxState::PrimitiveLines, 0);

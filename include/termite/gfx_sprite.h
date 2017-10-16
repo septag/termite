@@ -196,4 +196,5 @@ namespace termite
     void registerSpriteSheetToResourceLib();
     TERMITE_API rect_t getSpriteSheetTextureFrame(ResourceHandle spritesheet, const char* name);
     TERMITE_API ResourceHandle getSpriteSheetTexture(ResourceHandle spritesheet);
+    TERMITE_API vec2_t getSpriteSheetFrameSize(ResourceHandle spritesheet, const char* name);
 } // namespace termite

@@ -94,10 +94,10 @@ float termite::normalDist(float x, float mean, float stdDev)
 {
     float variance = stdDev*stdDev;
     float var2x = 2.0f*variance;
-    float f = 1.0f / bx::fsqrt(var2x*bx::pi);
+    float f = 1.0f / bx::fsqrt(var2x*bx::kPi);
     float p = x - mean;
     float ep = -(p*p) / var2x;
 
-    return f*expf(ep);
+    return f*bx::fexp2(ep);
 }
 

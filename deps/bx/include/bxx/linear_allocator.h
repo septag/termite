@@ -29,10 +29,10 @@ namespace bx
             m_ptr = (uint8_t*)_ptr;
         }
 
-        void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) BX_OVERRIDE
+        void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) override
         {
             if (_size) {
-                _align = _align < BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT ? BX_CONFIG_ALLOCATOR_NATURAL_ALIGNMENT : _align;
+                _align = _align < 8 ? 8 : _align;
                 struct Header
                 {
                     uint32_t size;

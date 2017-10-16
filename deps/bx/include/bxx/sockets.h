@@ -163,7 +163,7 @@ static const char *inet_ntop(int af, const void *src, char *dst, socklen_t size)
     struct sockaddr_storage ss;
     unsigned long s = size;
 
-    memset(&ss, 0x00, sizeof(ss));
+    bx::memSet(&ss, 0x00, sizeof(ss));
     ss.ss_family = af;
 
     switch (af) {
@@ -190,7 +190,7 @@ namespace bx
     SocketAddr::SocketAddr(uint32_t ip4, int port)
     {
         this->type = SocketAddrType::IPv4;
-        memset(this->addr.v6.ip, 0x00, sizeof(this->addr.v6.ip));
+        bx::memSet(this->addr.v6.ip, 0x00, sizeof(this->addr.v6.ip));
         this->addr.v4.ip = ip4;
         this->port = port;
     }
@@ -359,7 +359,7 @@ namespace bx
 
         // Listen
         sockaddr_in addr;
-        memset(&addr, 0x00, sizeof(addr));
+        bx::memSet(&addr, 0x00, sizeof(addr));
 
         addr.sin_family = AF_INET;
         addr.sin_port = htons(port);
@@ -404,7 +404,7 @@ namespace bx
 
             // Connect
             sockaddr_in sa;
-            memset(&sa, 0x00, sizeof(sa));
+            bx::memSet(&sa, 0x00, sizeof(sa));
             sa.sin_family = AF_INET;
             sa.sin_port = htons(addr.port);
             sa.sin_addr.s_addr = htonl(addr.addr.v4.ip);
@@ -424,7 +424,7 @@ namespace bx
 
             // Connect
             sockaddr_in6 sa;
-            memset(&sa, 0x00, sizeof(sa));
+            bx::memSet(&sa, 0x00, sizeof(sa));
             sa.sin6_family = AF_INET6;
             sa.sin6_port = htons(addr.port);
             memcpy(INET6_ADDR(sa.sin6_addr), addr.addr.v6.ip, sizeof(addr.addr.v6.ip));
@@ -508,7 +508,7 @@ namespace bx
 
         // Bind
         sockaddr_in addr;
-        memset(&addr, 0x00, sizeof(addr));
+        bx::memSet(&addr, 0x00, sizeof(addr));
         addr.sin_family = AF_INET;
         addr.sin_port = htons(port);
         addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -530,7 +530,7 @@ namespace bx
             return -1;
 
         sockaddr_storage addr;
-        memset(&addr, 0x00, sizeof(sockaddr_storage));
+        bx::memSet(&addr, 0x00, sizeof(sockaddr_storage));
         socklen_t addrlen = sizeof(addr);
 
         int r = (int)::recvfrom(m_sock, (char*)data, size, 0, (sockaddr*)&addr, &addrlen);
@@ -565,7 +565,7 @@ namespace bx
 
         // Prepare remote address for Berkley socket
         sockaddr_storage addr;
-        memset(&addr, 0x00, sizeof(addr));
+        bx::memSet(&addr, 0x00, sizeof(addr));
         socklen_t addr_len;
         if (m_remoteAddr.type == SocketAddrType::IPv4) {
             addr.ss_family = AF_INET;
@@ -612,7 +612,7 @@ namespace bx
             // Prepare remote address for Berkley socket
             sockaddr_storage addr;
             socklen_t addr_len;
-            memset(&addr, 0x00, sizeof(addr));
+            bx::memSet(&addr, 0x00, sizeof(addr));
             if (m_remoteAddr.type == SocketAddrType::IPv4) {
                 addr.ss_family = AF_INET;
                 ((sockaddr_in*)&addr)->sin_addr.s_addr = htonl(m_remoteAddr.addr.v4.ip);
