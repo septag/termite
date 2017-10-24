@@ -21,8 +21,8 @@ namespace termite
     {
         enum Enum
         {
-            DestroyResource = 0x1,
-            None = 0
+            None = 0,
+            DestroyResource = 0x1
         };
 
         typedef uint8_t Bits;
@@ -32,8 +32,8 @@ namespace termite
     {
         enum Enum
         {
-            FlipX = 0x1,
-            FlipY = 0x2,
+            FlipX = 0x4,
+            FlipY = 0x8,
         };
 
         typedef uint8_t Bits;
@@ -153,9 +153,15 @@ namespace termite
     TERMITE_API void convertSpritePhysicsVerts(vec2_t* ptsOut, const vec2_t* ptsIn, int numPts, Sprite* sprite);
 
     // Dynamically draw sprites
+    TERMITE_API void drawSpritesOld(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,
+                                 ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr,
+                                 void* stateUserData = nullptr, const color_t* colors = nullptr);
+
     TERMITE_API void drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,
                                  ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr,
                                  void* stateUserData = nullptr, const color_t* colors = nullptr);
+
+
     inline void drawSprite(uint8_t viewId, Sprite* sprite, const mtx3x3_t& mat,
                            ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr,
                            void* stateUserData = nullptr)
@@ -194,7 +200,9 @@ namespace termite
     };
 
     void registerSpriteSheetToResourceLib();
+    TERMITE_API rect_t getSpriteSheetTextureFrame(ResourceHandle spritesheet, int index);
     TERMITE_API rect_t getSpriteSheetTextureFrame(ResourceHandle spritesheet, const char* name);
     TERMITE_API ResourceHandle getSpriteSheetTexture(ResourceHandle spritesheet);
     TERMITE_API vec2_t getSpriteSheetFrameSize(ResourceHandle spritesheet, const char* name);
+    TERMITE_API vec2_t getSpriteSheetFrameSize(ResourceHandle spritesheet, int index);
 } // namespace termite

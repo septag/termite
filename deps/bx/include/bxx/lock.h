@@ -106,6 +106,8 @@ namespace bx
     };
 
     // Read-Write Lock
+    /// Use this when multiple threads only reading some data
+    /// multiple threads can access the data without any locking needed for them
     class RwLock
     {
         BX_CLASS(RwLock,

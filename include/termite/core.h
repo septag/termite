@@ -7,6 +7,7 @@
 #include <functional>
 
 #include "bx/allocator.h"
+#include "bxx/path.h"
 #include "tinystl/hash.h"
 
 // Windows
@@ -23,7 +24,7 @@
 // For self-documenting code
 #define T_THREAD_SAFE
 
-#define T_MID_TEMP 0x1fece76b992f595e 
+#define T_MID_TEMP 0x666ce76b992f595e 
 
 #if BX_PLATFORM_ANDROID
 #include <jni.h>
@@ -53,15 +54,15 @@ namespace termite
     struct Config
     {
         // Plugins
-        char pluginPath[256];
-        char dataUri[256];
+        bx::Path pluginPath;
+        bx::Path dataUri;
 
-        char ioName[32];
-        char rendererName[32];
-        char gfxName[32];
-        char uiIniFilename[32];
-        char phys2dName[32];    // Physics2D Driver name
-        char soundName[32];     // Sound driver name
+        bx::String32 ioName;
+        bx::String32 rendererName;
+        bx::String32 gfxName;
+        bx::String32 uiIniFilename;
+        bx::String32 phys2dName;    // Physics2D Driver name
+        bx::String32 soundName;     // Sound driver name
 
         // 
         uint16_t refScreenWidth;
@@ -96,14 +97,12 @@ namespace termite
 
         Config()
         {
-            strcpy(pluginPath, "");
-            strcpy(rendererName, "");
-            strcpy(ioName, "");
-            strcpy(dataUri, "");
-            strcpy(gfxName, "Bgfx");
-            strcpy(uiIniFilename, "");
-            strcpy(phys2dName, "Box2D");
-            strcpy(soundName, "SDL_mixer");
+            // Default drivers
+            gfxName = "Bgfx";
+            soundName = "SDL_mixer";
+            phys2dName = "Box2D";
+            ioName = "DiskIO_Lite";
+            uiIniFilename = "termite_imgui.ini";
 
             refScreenWidth = 0;
             refScreenHeight = 0;
@@ -127,6 +126,7 @@ namespace termite
             maxPagesPerPool = 0;
             cmdHistorySize = 32;
         }
+
     };
 
     struct MemoryBlock
@@ -246,6 +246,9 @@ namespace termite
     TERMITE_API void registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback);
 
     TERMITE_API const HardwareStats& getHardwareStats();
+
+    // TEMP
+    TERMITE_API void setPointerCheck(void* ptr);
 
 #if BX_PLATFORM_ANDROID
     struct JavaMethod

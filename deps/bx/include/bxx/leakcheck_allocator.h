@@ -24,15 +24,15 @@ struct malloc_info
 
 static stb_leakcheck_malloc_info *mi_head;
 
-#define STB_LEAKCHECK_MULTITHREAD
 #ifdef STB_LEAKCHECK_MULTITHREAD
-#  include "bx/mutex.h"
-static bx::Mutex mi_mutex;
+#  include "bxx/lock.h"
+static bx::Lock mi_lock;
 #endif
 
 void *stb_leakcheck_malloc(size_t sz, const char *file, int line)
 {
    stb_leakcheck_malloc_info *mi = (stb_leakcheck_malloc_info *) malloc(sz + sizeof(stb_leakcheck_malloc_info));
+
    if (mi == NULL) return mi;
    // get filename
    if (file) {
@@ -50,7 +50,7 @@ void *stb_leakcheck_malloc(size_t sz, const char *file, int line)
    mi->line = line;
 
 #ifdef STB_LEAKCHECK_MULTITHREAD
-   bx::MutexScope mtx(mi_mutex);
+   bx::LockScope mtx(mi_lock);
 #endif
    mi->next = mi_head;
    if (mi_head)
@@ -70,7 +70,7 @@ void stb_leakcheck_free(void *ptr)
       #ifndef STB_LEAKCHECK_SHOWALL
 
 #ifdef STB_LEAKCHECK_MULTITHREAD
-      bx::MutexScope mtx(mi_mutex);
+      bx::LockScope mtx(mi_lock);
 #endif
 
       if (mi->prev == NULL) {

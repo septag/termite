@@ -248,6 +248,9 @@ namespace termite
         uint32_t(*getAvailTransientIndexBuffer)(uint32_t num);
         void(*allocTransientIndexBuffer)(TransientIndexBuffer* tib, uint32_t num);
 
+        bool(*allocTransientBuffers)(TransientVertexBuffer* tvb, const VertexDecl& decl, uint32_t numVerts, 
+                                     TransientIndexBuffer* tib, uint16_t numIndices);
+
         // Textures
         void(*calcTextureSize)(TextureInfo* info, uint16_t width, uint16_t height, uint16_t depth,
             bool cubemap, bool hasMips, uint16_t numLayers, TextureFormat::Enum fmt);

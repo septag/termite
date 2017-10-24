@@ -9,8 +9,22 @@ namespace bx
         BX_CLASS(LinearAllocator
                  , NO_COPY
                  , NO_ASSIGNMENT
-                 );
+        );
+
+    private:
+        struct Header
+        {
+            uint32_t size;
+            uint8_t padding;
+        };
+
     public:
+        LinearAllocator()
+        {
+            m_offset = m_size = 0;
+            m_ptr = nullptr;
+        }
+
         LinearAllocator(void* _ptr, size_t _size)
         {
             m_offset = 0;
@@ -33,12 +47,6 @@ namespace bx
         {
             if (_size) {
                 _align = _align < 8 ? 8 : _align;
-                struct Header
-                {
-                    uint32_t size;
-                    uint8_t padding;
-                };
-
                 size_t total = _size + sizeof(Header) + _align;
 
                 // Allocate memory (with header)
@@ -56,7 +64,7 @@ namespace bx
                 if (_ptr) {
                     Header* prevHeader = (Header*)_ptr - 1;
                     size_t prevsize = prevHeader->size;
-                    memcpy(aligned, _ptr, _size > prevsize ? prevsize : _size);
+                    bx::memCopy(aligned, _ptr, _size > prevsize ? prevsize : _size);
                 }
 
                 return aligned;
@@ -67,6 +75,22 @@ namespace bx
         void reset()
         {
             m_offset = 0;
+        }
+
+        /// Used to calculate the extra allocation size for each alloc call
+        static size_t getExtraAllocSize(int numAllocs, size_t align = 8)
+        {
+            return (sizeof(Header) + align)*numAllocs;
+        }
+
+        inline size_t getOffset() const
+        {
+            return m_offset;
+        }
+    
+        inline size_t getSize() const
+        {
+            return m_offset;
         }
 
     private:

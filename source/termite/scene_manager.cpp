@@ -770,11 +770,6 @@ static void updateLink(SceneManager* mgr, SceneLink* link, float dt, const vec2i
         break;
 
     case SceneLink::InLoad:
-        /*if (link->effectA) {
-            mgr->finalFb = mgr->effectFb;
-            mgr->finalTex = mgr->effectTex;
-        }*/
-
         // add 'loading' scene to active scenes
         if (link->loadScene)
             addActiveScene(mgr, link->loadScene);

@@ -104,6 +104,15 @@ namespace rapidjson
             n[i] = jvalue[i].GetInt();
     }
 
+    template <typename _T>
+    inline void getUInt16Array(const _T& jvalue, uint16_t* n, int num)
+    {
+        assert(jvalue.IsArray());
+        num = std::min<int>(jvalue.Size(), num);
+        for (int i = 0; i < num; i++)
+            n[i] = (uint16_t)jvalue[i].GetInt();
+    }
+
     template <typename _T, typename _AllocT>
     _T createFloatArray(const float* f, int num, _AllocT& alloc)
     {

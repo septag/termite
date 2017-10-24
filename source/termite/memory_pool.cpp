@@ -1,13 +1,18 @@
 #include "pch.h"
 
 #include "memory_pool.h"
+#include <inttypes.h>
 
 #include "bx/cpu.h"
-#include "bx/mutex.h"
+#include "bxx/lock.h"
 #include "bxx/linked_list.h"
 #include "bxx/pool.h"
 #include "bxx/logger.h"
 #include "bxx/linear_allocator.h"
+#include "bx/string.h"
+
+#define T_IMGUI_API
+#include "plugin_api.h"
 
 using namespace termite;
 
@@ -60,7 +65,7 @@ struct MemoryPool
     size_t pageSize;
     bx::List<PageBucket*> bucketList;
     bx::List<MemoryPage*> pageList;
-    bx::Mutex mutex;
+    bx::RwLock lock;
 
     MemoryPool()
     {
@@ -160,11 +165,11 @@ static bx::AllocatorI* newPage(PageBucket* bucket, uint64_t tag)
     return &page->linAlloc;
 }
 
-bx::AllocatorI* termite::allocPage(uint64_t tag) T_THREAD_SAFE
+bx::AllocatorI* termite::allocMemPage(uint64_t tag) T_THREAD_SAFE
 {
     assert(g_mempool);
 
-    bx::MutexScope mutex(g_mempool->mutex);
+    bx::WriteLockScope lock(g_mempool->lock);
 
     PageBucket::LNode* node = g_mempool->bucketList.getFirst();
     while (node) {
@@ -184,11 +189,11 @@ bx::AllocatorI* termite::allocPage(uint64_t tag) T_THREAD_SAFE
     return ::newPage(bucket, tag);
 }
 
-void termite::freeTag(uint64_t tag) T_THREAD_SAFE
+void termite::freeMemTag(uint64_t tag) T_THREAD_SAFE
 {
     assert(g_mempool);
 
-    bx::MutexScope mutex(g_mempool->mutex);
+    bx::ReadLockScope lock(g_mempool->lock);
 
     // Search all pages for the tag
     MemoryPage::LNode* node = g_mempool->pageList.getFirst();
@@ -211,19 +216,31 @@ void termite::freeTag(uint64_t tag) T_THREAD_SAFE
     }
 }
 
-size_t termite::getNumPages() T_THREAD_SAFE
+size_t termite::getNumMemPages() T_THREAD_SAFE
 {
     return g_mempool->numPages;
 }
 
-size_t termite::getAllocSize() T_THREAD_SAFE
+size_t termite::getMemPoolAllocSize() T_THREAD_SAFE
 {
-    return g_mempool->numPages*g_mempool->pageSize;
+    bx::ReadLockScope lock(g_mempool->lock);
+
+    size_t pageSize = g_mempool->pageSize;
+    size_t sz = 0;
+    MemoryPage::LNode* node = g_mempool->pageList.getFirst();
+    while (node) {
+        MemoryPage* page = node->data;
+        sz += page->linAlloc.getOffset();
+        node = node->next;
+    }
+
+    return sz;
 }
 
-size_t termite::getTagSize(uint64_t tag) T_THREAD_SAFE
+
+size_t termite::getMemTagAllocSize(uint64_t tag) T_THREAD_SAFE
 {
-    bx::MutexScope mutex(g_mempool->mutex);
+    bx::ReadLockScope lock(g_mempool->lock);
     
     size_t pageSize = g_mempool->pageSize;
     size_t sz = 0;
@@ -231,11 +248,70 @@ size_t termite::getTagSize(uint64_t tag) T_THREAD_SAFE
     while (node) {
         MemoryPage* page = node->data;
         if (page->tag == tag)
-            sz += pageSize;
+            sz += page->linAlloc.getOffset();
         node = node->next;
     }
 
     return sz;
+}
+
+int termite::getMemTags(uint64_t* tags, int maxTags, size_t* pageSizes) T_THREAD_SAFE
+{
+    bx::ReadLockScope lock(g_mempool->lock);
+    
+    int count = 0;
+    MemoryPage::LNode* node = g_mempool->pageList.getFirst();
+    while (node && count < maxTags) {
+        MemoryPage* page = node->data;
+        if (pageSizes)
+            pageSizes[count] = page->linAlloc.getOffset();
+        tags[count++] = page->tag;
+        node = node->next;
+    }
+
+    return count;
+}
+
+void termite::debugMemoryPool(ImGuiApi_v0* imgui)
+{
+    imgui->setNextWindowSize(ImVec2(350.0f, 200.0f), ImGuiSetCond_FirstUseEver);
+    if (imgui->begin("Memory Pool", nullptr, 0)) {
+        uint64_t tags[512];
+        size_t pageSizes[512];
+        int numTags = getMemTags(tags, BX_COUNTOF(tags), pageSizes);
+
+        static ImGuiGraphData<128> memGraph;
+
+        char name[64];
+        static char selName[64];
+        static int selected = -1;
+        imgui->columns(2, "MemoryPageList", false);
+        for (int i = 0; i < numTags; i++) {
+            bx::snprintf(name, sizeof(name), "0x%" PRIx64, tags[i]);
+
+            if (imgui->selectable(name, i == selected, ImGuiSelectableFlags_DontClosePopups, ImVec2(0, 0))) {
+                memGraph.reset();
+                selected = i;
+                bx::strCopy(selName, sizeof(selName), name);
+            }
+
+            imgui->nextColumn();
+            imgui->setColumnOffset(1, 200.0f);
+
+            imgui->text("%" PRIu32 "KB", pageSizes[i]/1024);
+
+            if (i == selected)
+                memGraph.add(float(pageSizes[i]/1024));
+            imgui->nextColumn();
+        }
+
+        imgui->columns(1, nullptr, false);
+        if (selected != -1) {
+            imgui->plotHistogram(selName, memGraph.getValues(), memGraph.getCount(), 0, nullptr, 0,
+                                 float(g_mempool->pageSize/1024), ImVec2(0, 100.0f), 4);
+        }
+    }
+    imgui->end();
 }
 
 void* termite::PageAllocator::realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line)
@@ -243,14 +319,14 @@ void* termite::PageAllocator::realloc(void* _ptr, size_t _size, size_t _align, c
     if (_size <= g_mempool->pageSize) {
         if (_size > 0) {
             if (!m_linAlloc) {
-                m_linAlloc = allocPage(m_tag);
+                m_linAlloc = allocMemPage(m_tag);
                 if (!m_linAlloc)
                     return nullptr;
             }
 
             void* p = m_linAlloc->realloc(_ptr, _size, _align, _file, _line);
             if (!p) {
-                m_linAlloc = allocPage(m_tag);
+                m_linAlloc = allocMemPage(m_tag);
                 if (m_linAlloc)
                     p = m_linAlloc->realloc(_ptr, _size, _align, _file, _line);
             }

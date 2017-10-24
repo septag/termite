@@ -314,20 +314,21 @@ static RendererType::Enum getRendererType()
 static const GfxCaps& getCaps()
 {
     const bgfx::Caps* caps = bgfx::getCaps();
+    g_bgfx.caps.type = (RendererType::Enum)caps->rendererType;
     g_bgfx.caps.deviceId = caps->deviceId;
     g_bgfx.caps.supported = caps->supported;
-    g_bgfx.caps.maxDrawCalls = caps->limits.maxDrawCalls;
-    g_bgfx.caps.maxFBAttachments = caps->limits.maxFBAttachments;
-    g_bgfx.caps.maxTextureSize = caps->limits.maxTextureSize;
-    g_bgfx.caps.maxViews = caps->limits.maxViews;
-    g_bgfx.caps.numGPUs = caps->numGPUs;
-    g_bgfx.caps.type = (RendererType::Enum)caps->rendererType;
     g_bgfx.caps.vendorId = caps->vendorId;
+    g_bgfx.caps.homogeneousDepth = caps->homogeneousDepth;
+    g_bgfx.caps.originBottomLeft = caps->originBottomLeft;
+    g_bgfx.caps.numGPUs = caps->numGPUs;
         
     for (int i = 0; i < 4; i++) {
         g_bgfx.caps.gpu[i].deviceId = caps->gpu[i].deviceId;
         g_bgfx.caps.gpu[i].vendorId = caps->gpu[i].vendorId;
     }
+
+    static_assert(TextureFormat::Count == bgfx::TextureFormat::Count, "TextureFormat is not synced with Bgfx");
+    memcpy(g_bgfx.caps.formats, caps->formats, sizeof(TextureFormat::Enum)*TextureFormat::Count);
 
     return g_bgfx.caps;
 }
@@ -831,6 +832,13 @@ static void allocTransientVertexBuffer(TransientVertexBuffer* tvb, uint32_t num,
     bgfx::allocTransientVertexBuffer((bgfx::TransientVertexBuffer*)tvb, num, (const bgfx::VertexDecl&)decl);
 }
 
+static bool allocTransientBuffers(TransientVertexBuffer* tvb, const VertexDecl& decl, uint32_t numVerts,
+                                  TransientIndexBuffer* tib, uint16_t numIndices)
+{
+    return bgfx::allocTransientBuffers((bgfx::TransientVertexBuffer*)tvb, (const bgfx::VertexDecl&)decl, numVerts,
+                                       (bgfx::TransientIndexBuffer*)tib, numIndices);
+}
+
 static IndexBufferHandle createIndexBuffer(const GfxMemory* mem, GpuBufferFlag::Bits flags)
 {
     IndexBufferHandle handle;
@@ -1168,6 +1176,7 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.getAvailTransientIndexBuffer = getAvailTransientIndexBuffer;
     api.allocTransientVertexBuffer = allocTransientVertexBuffer;
     api.allocTransientIndexBuffer = allocTransientIndexBuffer;
+    api.allocTransientBuffers = allocTransientBuffers;
     api.createIndexBuffer = createIndexBuffer;
     api.createDynamicIndexBuffer = createDynamicIndexBuffer;
     api.createDynamicVertexBufferMem = createDynamicVertexBufferMem;

@@ -96,6 +96,7 @@ namespace bx
             // Grow buffer if needed
             if (m_partition == m_maxItems) {
                 uint16_t prevMax = m_maxItems;
+                assert(m_growSize);
                 m_maxItems += m_growSize;
                 size_t totalSize = 2 * sizeof(uint16_t)*m_maxItems;
                 for (int i = 0; i < m_numBuffers; i++)

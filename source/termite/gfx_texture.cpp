@@ -400,6 +400,16 @@ bool termite::blitRawPixels(uint8_t* dest, int destX, int destY, int destWidth, 
     return true;
 }
 
+void termite::saveTextureCache()
+{
+    if (g_texLoader->enableTextureDecodeCache) {
+        // Save cache file
+        bx::Path cacheFilepath(getCacheDir());
+        cacheFilepath.join(TEXTURE_CACHE_FILENAME);
+        saveTextureCacheList(cacheFilepath.cstr(), g_texLoader->decodeCacheItems);
+    }
+}
+
 static bool loadUncompressed(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
 {
     assert(g_texLoader);

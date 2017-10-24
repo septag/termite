@@ -69,7 +69,7 @@
 #define LOG_STRING_SIZE 256
 #define RANDOM_NUMBER_POOL 10000
 
-#define T_ENC_SIGN 0x54454e43        // TENC
+#define T_ENC_SIGN 0x54454e43        // "TENC"
 #define T_ENC_VERSION T_MAKE_VERSION(1, 0)       
 
 #include "bxx/rapidjson_allocator.h"
@@ -245,6 +245,8 @@ static Core* g_core = nullptr;
 // Define rapidjson static allocator 
 bx::AllocatorI* rapidjson::BxAllocatorStatic::Alloc = g_alloc;
 
+static void* mi_ptr_check = nullptr;
+
 #if BX_PLATFORM_ANDROID
 static JavaVM* g_javaVM = nullptr;
 static jclass g_activityClass = 0;
@@ -371,8 +373,8 @@ static void callbackConf(const char* key, const char* value, void* userParam)
 {
     Config* conf = (Config*)userParam;
 
-    if (bx::strCmpI(key, "Plugin_Path") == 0)
-        bx::strCopy(conf->pluginPath, sizeof(conf->pluginPath), value);
+    if (bx::strCmpI(key, "PluginPath") == 0)
+        conf->pluginPath = value;
     else if (bx::strCmpI(key, "gfx_DeviceId") == 0)
         sscanf(value, "%hu", &conf->gfxDeviceId);
     else if (bx::strCmpI(key, "gfx_Width") == 0)
@@ -423,7 +425,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
 
     // Set Data and Cache Dir paths
 #if !BX_PLATFORM_ANDROID
-    bx::strCopy(g_dataDir.getBuffer(), sizeof(g_dataDir), conf.dataUri);
+    g_dataDir = conf.dataUri;
     g_dataDir.normalizeSelf();
     g_cacheDir = bx::getTempDir();        
 #endif
@@ -448,7 +450,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     restartRandom();    // fill random values
 
     // Initialize plugins system and enumerate plugins
-    if (initPluginSystem(conf.pluginPath, g_alloc)) {
+    if (initPluginSystem(conf.pluginPath.cstr(), g_alloc)) {
         T_ERROR("Engine init failed: PluginSystem failed");
         return T_ERR_FAILED;
     }
@@ -457,7 +459,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     PluginHandle pluginHandle;
 
     // IO
-    r = findPluginByName(conf.ioName[0] ? conf.ioName : "DiskIO_Lite" , 0, &pluginHandle, 1, PluginType::IoDriver);
+    r = findPluginByName(!conf.ioName.isEmpty() ? conf.ioName.cstr() : "DiskIO_Lite" , 0, &pluginHandle, 1, PluginType::IoDriver);
     if (r > 0) {
         g_core->ioDriver = (IoDriverDual*)initPlugin(pluginHandle, g_alloc);
         if (!g_core->ioDriver) {
@@ -470,8 +472,8 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
         // If not, use the current directory as the root path
         char curPath[256];
         const char* uri;
-        if (conf.dataUri[0]) {
-            uri = conf.dataUri;
+        if (!conf.dataUri.isEmpty()) {
+            uri = conf.dataUri.cstr();
         } else {
             bx::pwd(curPath, sizeof(curPath));
             uri = curPath;
@@ -503,8 +505,8 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     BX_END_OK();
 
     // Renderer
-    if (conf.rendererName[0] != 0) {
-        r = findPluginByName(conf.rendererName, 0, &pluginHandle, 1, PluginType::Renderer);
+    if (!conf.rendererName.isEmpty()) {
+        r = findPluginByName(conf.rendererName.cstr(), 0, &pluginHandle, 1, PluginType::Renderer);
         if (r > 0) {
             g_core->renderer = (RendererApi*)initPlugin(pluginHandle, g_alloc);
             const PluginDesc& desc = getPluginDesc(pluginHandle);
@@ -518,14 +520,14 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     }
 
     // Graphics Device
-    if (conf.gfxName[0] != 0)    {
-        r = findPluginByName(conf.gfxName, 0, &pluginHandle, 1, PluginType::GraphicsDriver);
+    if (!conf.gfxName.isEmpty())    {
+        r = findPluginByName(conf.gfxName.cstr(), 0, &pluginHandle, 1, PluginType::GraphicsDriver);
         if (r > 0) {
             g_core->gfxDriver = (GfxDriverApi*)initPlugin(pluginHandle, g_alloc);
         }
 
         if (!g_core->gfxDriver) {
-            T_ERROR("Core init failed: Could not detect Graphics driver: %s", conf.gfxName);
+            T_ERROR("Core init failed: Could not detect Graphics driver: %s", conf.gfxName.cstr());
             return T_ERR_FAILED;
         }
 
@@ -584,7 +586,7 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
 
         // ImGui initialize
         if (T_FAILED(initImGui(IMGUI_VIEWID, g_core->gfxDriver, g_alloc, conf.keymap,
-                               conf.uiIniFilename, platform ? platform->nwh : nullptr))) {
+                               conf.uiIniFilename.cstr(), platform ? platform->nwh : nullptr))) {
             T_ERROR("Initializing ImGui failed");
             return T_ERR_FAILED;
         }
@@ -597,14 +599,14 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     }
 
     // Physics2D Driver
-    if (conf.phys2dName[0] != 0) {
-        r = findPluginByName(conf.phys2dName, 0, &pluginHandle, 1, PluginType::Physics2dDriver);
+    if (!conf.phys2dName.isEmpty()) {
+        r = findPluginByName(conf.phys2dName.cstr(), 0, &pluginHandle, 1, PluginType::Physics2dDriver);
         if (r > 0) {
             g_core->phys2dDriver = (PhysDriver2DApi*)initPlugin(pluginHandle, g_alloc);
         }
 
         if (!g_core->phys2dDriver) {
-            T_ERROR("Core init failed: Could not detect Physics driver: %s", conf.phys2dName);
+            T_ERROR("Core init failed: Could not detect Physics driver: %s", conf.phys2dName.cstr());
             return T_ERR_FAILED;
         }
 
@@ -622,14 +624,14 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     }
 
     // Sound device
-    if (conf.soundName[0] != 0) {
-        r = findPluginByName(conf.soundName, 0, &pluginHandle, 1, PluginType::SoundDriver);
+    if (!conf.soundName.isEmpty()) {
+        r = findPluginByName(conf.soundName.cstr(), 0, &pluginHandle, 1, PluginType::SoundDriver);
         if (r > 0) {
             g_core->sndDriver = (SoundDriverApi*)initPlugin(pluginHandle, g_alloc);
         }
 
         if (!g_core->sndDriver) {
-            T_ERROR("Core init failed: Could not detect Sound driver: %s", conf.soundName);
+            T_ERROR("Core init failed: Could not detect Sound driver: %s", conf.soundName.cstr());
             return T_ERR_FAILED;
         }
 
@@ -981,10 +983,12 @@ termite::MemoryBlock* termite::createMemoryBlock(uint32_t size, bx::AllocatorI* 
     if (!alloc)
         alloc = g_alloc;
     mem->m.data = (uint8_t*)BX_ALLOC(alloc, size);
+
     if (!mem->m.data)
         return nullptr;
     mem->m.size = size;
     mem->alloc = alloc;
+
     return (termite::MemoryBlock*)mem;
 }
 
@@ -995,6 +999,7 @@ termite::MemoryBlock* termite::refMemoryBlockPtr(const void* data, uint32_t size
     g_core->memPoolLock.unlock();
     mem->m.data = (uint8_t*)const_cast<void*>(data);
     mem->m.size = size;
+
     return (MemoryBlock*)mem;
 }
 
@@ -1011,6 +1016,7 @@ termite::MemoryBlock* termite::copyMemoryBlock(const void* data, uint32_t size, 
     memcpy(mem->m.data, data, size);
     mem->m.size = size; 
     mem->alloc = alloc;
+
     return (MemoryBlock*)mem;
 }
 
@@ -1360,13 +1366,13 @@ bool termite::resetGraphics(const GfxPlatformData* platform)
     PluginHandle pluginHandle;
     const Config& conf = g_core->conf;
 
-    r = findPluginByName(conf.gfxName, 0, &pluginHandle, 1, PluginType::GraphicsDriver);
+    r = findPluginByName(conf.gfxName.cstr(), 0, &pluginHandle, 1, PluginType::GraphicsDriver);
     if (r > 0) {
         g_core->gfxDriver = (GfxDriverApi*)initPlugin(pluginHandle, g_alloc);
     }
 
     if (!g_core->gfxDriver) {
-        T_ERROR("Core init failed: Could not detect Graphics driver: %s", conf.gfxName);
+        T_ERROR("Core init failed: Could not detect Graphics driver: %s", conf.gfxName.cstr());
         return false;
     }
 
@@ -1424,7 +1430,7 @@ bool termite::resetGraphics(const GfxPlatformData* platform)
 
     // ImGui initialize
     if (T_FAILED(initImGui(IMGUI_VIEWID, g_core->gfxDriver, g_alloc, conf.keymap,
-                           conf.uiIniFilename, platform ? platform->nwh : nullptr))) {
+                           conf.uiIniFilename.cstr(), platform ? platform->nwh : nullptr))) {
         T_ERROR("Initializing ImGui failed");
         return false;
     }
@@ -1463,6 +1469,11 @@ const HardwareStats& termite::getHardwareStats()
     return g_core->hwStats;
 }
 
+void termite::setPointerCheck(void* ptr)
+{
+    mi_ptr_check = ptr;
+}
+
 void GfxDriverEvents::onFatal(GfxFatalType::Enum type, const char* str)
 {
     char strTrimed[LOG_STRING_SIZE];
@@ -1492,3 +1503,4 @@ void GfxDriverEvents::onTraceVargs(const char* filepath, int line, const char* f
     }
 
 }
+

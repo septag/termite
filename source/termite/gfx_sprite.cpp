@@ -9,6 +9,7 @@
 #include "bxx/linked_list.h"
 #include "bxx/pool.h"
 #include "bxx/logger.h"
+#include "bxx/linear_allocator.h"
 
 #include "rapidjson/error/en.h"
 #include "rapidjson/document.h"
@@ -69,14 +70,47 @@ public:
     void onReload(ResourceHandle handle, bx::AllocatorI* alloc) override;
 };
 
+struct SpriteMesh
+{
+    vec2_t* verts;
+    vec2_t* uvs;
+    uint16_t* tris;
+    int numVerts;
+    int numTris;
+
+    SpriteMesh() :
+        verts(nullptr),
+        uvs(nullptr),
+        tris(nullptr),
+        numVerts(0),
+        numTris(0)
+    {
+    }
+};
+
+struct SpriteDrawBatch
+{
+    ResourceHandle texHandle;
+    uint16_t startIdx;
+    uint16_t numIndices;
+    uint32_t numVerts;
+};
+
+struct SortedSprite
+{
+    int index;
+    Sprite* sprite;
+    uint64_t key;
+};
+
 struct SpriteFrame
 {
     ResourceHandle texHandle;   // Handle to spritesheet/texture resource
     ResourceHandle ssHandle;    // For spritesheets we have spritesheet handle
-    uint8_t flags;
 
     size_t nameHash;
     size_t tagHash;
+    int meshId;
 
     rect_t frame;       // top-left, right-bottom
     vec2_t pivot;       // In textures it should be provided, in spritesheets, this value comes from the file
@@ -89,9 +123,12 @@ struct SpriteFrame
     SpriteFrameCallback frameCallback;
     void* frameCallbackUserData;
 
+    uint8_t flags;
+
     SpriteFrame() :
         nameHash(0),
         tagHash(0),
+        meshId(-1),
         frameCallback(nullptr),
         frameCallbackUserData(nullptr)
     {
@@ -168,13 +205,18 @@ struct SpriteSheetFrame
 
 struct SpriteSheet
 {
-    ResourceHandle texHandle;
-    int numFrames;
+    void* buff;
     SpriteSheetFrame* frames;
+    SpriteMesh* meshes;         // If meshes is not nullptr, we have a mesh for each frame
+    int numFrames;
+    ResourceHandle texHandle;
+    uint8_t padding[2];
 
     SpriteSheet() :
+        buff(nullptr),
         numFrames(0),
-        frames(nullptr)
+        frames(nullptr),
+        meshes(nullptr)
     {
     }
 };
@@ -202,24 +244,56 @@ struct SpriteSystem
 
 static SpriteSystem* g_spriteSys = nullptr;
 
-static const SpriteSheetFrame* findSpritesheetFrame(const SpriteSheet* sheet, size_t nameHash)
+static const SpriteSheetFrame* findSpritesheetFrame(const SpriteSheet* sheet, size_t nameHash, int* index)
 {
-    SpriteSheetFrame* sheetFrame = nullptr;
     for (int i = 0, c = sheet->numFrames; i < c; i++) {
         if (sheet->frames[i].filenameHash != nameHash)
             continue;
-        sheetFrame = &sheet->frames[i];
-        break;
+        *index = i;
+        return &sheet->frames[i];
     }
 
-    return sheetFrame;
+    return nullptr;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SpriteSheetLoader
+template <typename _T>
+vec2_t* loadSpriteVerts(const _T& jnode, int* numVerts, bx::AllocatorI* alloc)
+{
+    int count = jnode.Size();
+    vec2_t* verts = nullptr;
+    vec2i_t ivert;
+    if (count > 0) {
+        verts = (vec2_t*)BX_ALLOC(alloc, sizeof(vec2_t)*count);
+        for (int i = 0; i < count; i++) {
+            getIntArray<_T>(jnode[i], ivert.n, 2);
+            verts[i] = vec2f(float(ivert.x), float(ivert.y));
+        }
+    }
+    *numVerts = count;
+    return verts;
+}
+
+template <typename _T>
+uint16_t* loadSpriteTris(const _T& jnode, int* numTries, bx::AllocatorI* alloc)
+{
+    int count = jnode.Size();
+    uint16_t* tris = nullptr;
+    if (count > 0) {
+        tris = (uint16_t*)BX_ALLOC(alloc, sizeof(uint16_t)*count*3);
+        for (int i = 0; i < count; i++) {
+            getUInt16Array<_T>(jnode[i], tris + 3*i, 3);
+        }
+    }
+    *numTries = count;
+    return tris;
+}
+
 bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, 
                                 bx::AllocatorI* alloc)
 {
+
     const LoadSpriteSheetParams* ssParams = (const LoadSpriteSheetParams*)params.userParams;
 
     bx::AllocatorI* tmpAlloc = getTempAlloc();
@@ -253,16 +327,37 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
     if (numFrames == 0)
         return false;
 
-    // Create sprite sheet
-    size_t totalSz = sizeof(SpriteSheet) + numFrames*sizeof(SpriteSheetFrame);
-    uint8_t* buff = (uint8_t*)BX_ALLOC(alloc ? alloc : g_spriteSys->alloc, totalSz);
-    if (!buff) {
-        T_ERROR("Out of Memory");
-        return false;
+    // evaluate total vertices, triangles and uvs
+    int numTotalVerts = 0, numTotalTris = 0, numTotalUvs = 0;
+    for (int i = 0; i < numFrames; i++) {
+        const BxValue& jframe = jframes[i];
+        if (jframe.HasMember("vertices")) {
+            numTotalVerts += jframe["vertices"].Size();
+            if (jframe.HasMember("verticesUV"))
+                numTotalUvs += jframe["verticesUV"].Size();
+            if (jframe.HasMember("triangles"))
+                numTotalTris += jframe["triangles"].Size();
+        } else {
+            numTotalVerts += 4;
+            numTotalUvs += 4;
+            numTotalTris += 6;
+        }        
     }
-    SpriteSheet* ss = new(buff) SpriteSheet();  buff += sizeof(SpriteSheet);
-    ss->frames = (SpriteSheetFrame*)buff;
+
+    // Create sprite sheet
+    int totalAllocs = 3 + numFrames*3;
+    size_t totalSz = sizeof(SpriteSheet) + numFrames*sizeof(SpriteSheetFrame) +
+        numTotalVerts*sizeof(vec2_t) + numTotalTris*sizeof(uint16_t)*3 + numTotalUvs*sizeof(vec2_t) + 
+        numFrames*sizeof(SpriteMesh) + bx::LinearAllocator::getExtraAllocSize(totalAllocs);
+    uint8_t* buff = (uint8_t*)BX_ALLOC(alloc ? alloc : g_spriteSys->alloc, totalSz);
+    if (!buff)
+        return false;
+    bx::LinearAllocator lalloc(buff, totalSz);
+    SpriteSheet* ss = BX_NEW(&lalloc, SpriteSheet);
+    ss->buff = buff;
+    ss->frames = (SpriteSheetFrame*)BX_ALLOC(&lalloc, numFrames*sizeof(SpriteSheetFrame));
     ss->numFrames = numFrames;
+    ss->meshes = (SpriteMesh*)BX_ALLOC(&lalloc, numFrames*sizeof(SpriteMesh));
 
     // image width/height
     const BxValue& jsize = jmeta["size"];
@@ -328,12 +423,66 @@ bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams
         float pivoty = jpivotY.IsFloat() ?  jpivotY.GetFloat() : float(jpivotY.GetInt());
         frame.pivot = vec2f(pivotx - 0.5f, -pivoty + 0.5f);     // convert to our coordinates
 
-        vec2_t srcOffset = vec2f((srcx + srcw*0.5f)/frame.sourceSize.x - 0.5f, -(srcy + srch*0.5f)/frame.sourceSize.y + 0.5f);
-        frame.posOffset = srcOffset;
+        // PosOffset is the center of the sprite in -0.5~0.5 coords
+        frame.posOffset = vec2f( (srcx + srcw*0.5f)/frame.sourceSize.x - 0.5f, 
+                                -(srcy + srch*0.5f)/frame.sourceSize.y + 0.5f);
+
+        // Mesh
+        if (jframe.HasMember("vertices")) {
+            SpriteMesh& mesh = ss->meshes[i];
+            const BxValue& jverts = jframe["vertices"];
+            mesh.verts = loadSpriteVerts(jverts, &mesh.numVerts, &lalloc);
+            
+            // Convert vertices to (-0.5-0.5) of the sprite frame
+            for (int i = 0; i < mesh.numVerts; i++) {
+                vec2_t pixelPos = mesh.verts[i];
+                mesh.verts[i] = vec2f(pixelPos.x/frame.sourceSize.x - 0.5f, -pixelPos.y/frame.sourceSize.y + 0.5f);
+            }
+
+            if (jframe.HasMember("verticesUV")) {
+                mesh.uvs = loadSpriteVerts(jframe["verticesUV"], &mesh.numVerts, &lalloc);
+                // Convert UVs
+                float invWidth = 1.0f/imgWidth;
+                float invHeight = 1.0f/imgHeight;
+                for (int j = 0; j < mesh.numVerts; j++) {
+                    mesh.uvs[j].x *= invWidth;
+                    mesh.uvs[j].y *= invHeight;
+                }
+            }
+
+            if (jframe.HasMember("triangles"))
+                mesh.tris = loadSpriteTris(jframe["triangles"], &mesh.numTris, &lalloc);
+        } else {
+            rect_t texcoords = frame.frame;
+            vec2_t topLeft = vec2f(srcx/frame.sourceSize.x - 0.5f,
+                                   -srcy/frame.sourceSize.y + 0.5f);
+            vec2_t rightBottom = vec2f((srcx + srcw)/frame.sourceSize.x - 0.5f,
+                                       -(srcy + srch)/frame.sourceSize.y + 0.5f);
+            SpriteMesh& mesh = ss->meshes[i];
+            mesh.numVerts = 4;
+            mesh.verts = (vec2_t*)BX_ALLOC(&lalloc, sizeof(vec2_t)*mesh.numVerts);
+            mesh.uvs = (vec2_t*)BX_ALLOC(&lalloc, sizeof(vec2_t)*mesh.numVerts);
+            mesh.numTris = 2;
+            mesh.tris = (uint16_t*)BX_ALLOC(&lalloc, sizeof(uint16_t)*mesh.numTris*3);
+
+            mesh.verts[0] = topLeft;
+            mesh.uvs[0] = texcoords.vmin;
+
+            mesh.verts[1] = vec2f(rightBottom.x, topLeft.y);
+            mesh.uvs[1] = vec2f(texcoords.xmax, texcoords.ymin);
+
+            mesh.verts[2] = vec2f(topLeft.x, rightBottom.y);
+            mesh.uvs[2] = vec2f(texcoords.xmin, texcoords.ymax);
+
+            mesh.verts[3] = rightBottom;
+            mesh.uvs[3] = texcoords.vmax;
+
+            mesh.tris[0] = 0;       mesh.tris[1] = 1;       mesh.tris[2] = 2;
+            mesh.tris[3] = 2;       mesh.tris[4] = 1;       mesh.tris[5] = 3;
+        }
     }
 
     *obj = uintptr_t(ss);
-
     return true;
 }
 
@@ -348,7 +497,7 @@ void SpriteSheetLoader::unloadObj(uintptr_t obj, bx::AllocatorI* alloc)
         sheet->texHandle.reset();
     }
     
-    BX_FREE(alloc ? alloc : g_spriteSys->alloc, sheet);
+    BX_FREE(alloc ? alloc : g_spriteSys->alloc, sheet->buff);
 }
 
 void SpriteSheetLoader::onReload(ResourceHandle handle, bx::AllocatorI* alloc)
@@ -364,8 +513,10 @@ void SpriteSheetLoader::onReload(ResourceHandle handle, bx::AllocatorI* alloc)
             // find the frame in spritesheet and update data
             SpriteFrame& frame = sprite->frames[i];
             SpriteSheet* sheet = getResourcePtr<SpriteSheet>(handle);
-            const SpriteSheetFrame* sheetFrame = findSpritesheetFrame(sheet, frame.nameHash);
+            int index;
+            const SpriteSheetFrame* sheetFrame = findSpritesheetFrame(sheet, frame.nameHash, &index);
             if (sheetFrame) {
+                frame.meshId = index;
                 frame.texHandle = sheet->texHandle;
                 frame.pivot = sheetFrame->pivot;
                 frame.frame = sheetFrame->frame;
@@ -375,6 +526,7 @@ void SpriteSheetLoader::onReload(ResourceHandle handle, bx::AllocatorI* alloc)
                 frame.rotOffset = sheetFrame->rotOffset;
                 frame.pixelRatio = sheetFrame->pixelRatio;
             } else {
+                frame.meshId = -1;
                 frame.texHandle = getResourceFailHandle("texture");
                 Texture* tex = getResourcePtr<Texture>(frame.texHandle);
                 frame.pivot = vec2f(0, 0);
@@ -394,15 +546,19 @@ void SpriteSheetLoader::onReload(ResourceHandle handle, bx::AllocatorI* alloc)
 static SpriteSheet* createDummySpriteSheet(ResourceHandle texHandle, bx::AllocatorI* alloc)
 {
     // Create sprite sheet
-    size_t totalSz = sizeof(SpriteSheet) + sizeof(SpriteSheetFrame);
+    size_t totalSz = sizeof(SpriteSheet) + sizeof(SpriteSheetFrame) + sizeof(SpriteMesh) + bx::LinearAllocator::getExtraAllocSize(3);
     uint8_t* buff = (uint8_t*)BX_ALLOC(alloc, totalSz);
     if (!buff) {
         T_ERROR("Out of Memory");
         return nullptr;
     }
-    SpriteSheet* ss = new(buff) SpriteSheet();  buff += sizeof(SpriteSheet);
-    ss->frames = (SpriteSheetFrame*)buff;
+
+    bx::LinearAllocator lalloc(buff, totalSz);
+    SpriteSheet* ss = BX_NEW(&lalloc, SpriteSheet); 
+    ss->buff = buff;
+    ss->frames = (SpriteSheetFrame*)BX_ALLOC(&lalloc, sizeof(SpriteSheetFrame));
     ss->numFrames = 1;
+    ss->meshes = (SpriteMesh*)BX_ALLOC(&lalloc, sizeof(SpriteMesh));
 
     ss->texHandle = getResourceFailHandle("texture");
     assert(ss->texHandle.isValid());
@@ -418,7 +574,32 @@ static SpriteSheet* createDummySpriteSheet(ResourceHandle texHandle, bx::Allocat
     ss->frames[0].sizeOffset = vec2f(1.0f, 1.0f);
     ss->frames[0].sourceSize = vec2f(imgWidth, imgHeight);
     ss->frames[0].rotOffset = 0;
-    
+
+    static uint16_t tris[] = {
+        0, 1, 2,
+        2, 1, 3
+    };
+
+    static vec2_t verts[] = {
+        vec2f(-0.5f, 0.5f),
+        vec2f(0.5f, 0.5f),
+        vec2f(-0.5f, -0.5f),
+        vec2f(0.5f, -0.5f)   
+    };
+
+    static vec2_t uvs[] = {
+        vec2f(0, 0),
+        vec2f(1.0f, 0),
+        vec2f(0, 1.0f),
+        vec2f(1.0f, 1.0f)
+    };
+
+    ss->meshes[0].numTris = 2;
+    ss->meshes[0].numVerts = 4;
+    ss->meshes[0].tris = tris;
+    ss->meshes[0].verts = verts;
+    ss->meshes[0].uvs = uvs;
+
     return ss;
 }
 
@@ -473,7 +654,7 @@ Sprite* termite::createSprite(bx::AllocatorI* alloc, const vec2_t halfSize)
     if (!sprite)
         return nullptr;
     sprite->id = ++id;
-    if (!sprite->frames.create(4, 16, alloc))
+    if (!sprite->frames.create(4, 32, alloc))
         return nullptr;
     sprite->halfSize = halfSize;
     // Add to sprite list
@@ -576,7 +757,7 @@ void termite::addSpriteFrameTexture(Sprite* sprite,
     if (texHandle.isValid()) {
         assert(getResourceLoadState(texHandle) != ResourceLoadState::LoadInProgress);
  
-        SpriteFrame* frame = new(sprite->frames.push()) SpriteFrame();
+        SpriteFrame* frame = BX_PLACEMENT_NEW(sprite->frames.push(), SpriteFrame);
         if (frame) {
             frame->texHandle = texHandle;
             frame->flags = flags;
@@ -603,14 +784,15 @@ void termite::addSpriteFrameSpritesheet(Sprite* sprite,
     if (ssHandle.isValid()) {
         assert(getResourceLoadState(ssHandle) != ResourceLoadState::LoadInProgress);
         
-        SpriteFrame* frame = new(sprite->frames.push()) SpriteFrame();
+        SpriteFrame* frame = BX_PLACEMENT_NEW(sprite->frames.push(), SpriteFrame);
         if (frame) {
             frame->ssHandle = ssHandle;
             SpriteSheet* sheet = getResourcePtr<SpriteSheet>(ssHandle);
 
             // find frame name in spritesheet, if found fill the frame data
             size_t nameHash = tinystl::hash_string(name, strlen(name));
-            const SpriteSheetFrame* sheetFrame = findSpritesheetFrame(sheet, nameHash);
+            int index;
+            const SpriteSheetFrame* sheetFrame = findSpritesheetFrame(sheet, nameHash, &index);
 
             frame->nameHash = nameHash;
             frame->flags = flags;
@@ -618,6 +800,7 @@ void termite::addSpriteFrameSpritesheet(Sprite* sprite,
 
             // If not found fill dummy data
             if (sheetFrame) {
+                frame->meshId = index;
                 frame->texHandle = sheet->texHandle;
                 frame->pivot = sheetFrame->pivot;
                 frame->frame = sheetFrame->frame;
@@ -629,6 +812,7 @@ void termite::addSpriteFrameSpritesheet(Sprite* sprite,
             } else {
                 frame->texHandle = getResourceFailHandle("texture");
                 Texture* tex = getResourcePtr<Texture>(frame->texHandle);
+                frame->flags = flags;
                 frame->pivot = vec2f(0, 0);
                 frame->frame = rectf(0, 0, 1.0f, 1.0f);
                 frame->sourceSize = vec2f(float(tex->info.width), float(tex->info.height));
@@ -647,11 +831,11 @@ void termite::addSpriteFrameAll(Sprite* sprite, ResourceHandle ssHandle, SpriteF
         assert(getResourceLoadState(ssHandle) != ResourceLoadState::LoadInProgress);
 
         SpriteSheet* sheet = getResourcePtr<SpriteSheet>(ssHandle);
-        SpriteFrame* frames = sprite->frames.pushMany(sheet->numFrames);
         for (int i = 0, c = sheet->numFrames; i < c; i++) {
             const SpriteSheetFrame& sheetFrame = sheet->frames[i];
-            SpriteFrame* frame = new(&frames[i]) SpriteFrame();
+            SpriteFrame* frame = BX_PLACEMENT_NEW(sprite->frames.push(), SpriteFrame);
 
+            frame->meshId = i;
             frame->texHandle = sheet->texHandle;
             frame->ssHandle = ssHandle;
             frame->nameHash = sheetFrame.filenameHash;
@@ -1019,6 +1203,206 @@ void termite::convertSpritePhysicsVerts(vec2_t* ptsOut, const vec2_t* ptsIn, int
 }
 
 void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,
+                           ProgramHandle progOverride /*= ProgramHandle()*/, SetSpriteStateCallback stateCallback /*= nullptr*/,
+                           void* stateUserData, const color_t* colors)
+{
+    if (numSprites <= 0)
+        return;
+    assert(sprites);
+
+    GfxDriverApi* gDriver = g_spriteSys->driver;
+
+    // Evaluate final vertices and indexes
+    int numVerts = 0, numIndices = 0;
+    for (int si = 0; si < numSprites; si++) {
+        Sprite* sprite = sprites[si];
+        const SpriteFrame& frame = sprite->frames[sprite->curFrameIdx];
+
+        if (frame.ssHandle.isValid()) {
+            assert(frame.meshId != -1);
+            SpriteSheet* sheet = getResourcePtr<SpriteSheet>(frame.ssHandle);
+            const SpriteMesh& mesh = sheet->meshes[frame.meshId];
+            numVerts += mesh.numVerts;
+            numIndices += mesh.numTris*3;
+        } else {
+            numVerts += 4;
+            numIndices += 6;
+        }
+    }
+
+    TransientVertexBuffer tvb;
+    TransientIndexBuffer tib;
+
+    if (!gDriver->allocTransientBuffers(&tvb, SpriteVertex::Decl, numVerts, &tib, numIndices))
+        return;
+    SpriteVertex* verts = (SpriteVertex*)tvb.data;
+    uint16_t* indices = (uint16_t*)tib.data;
+    bx::AllocatorI* tmpAlloc = getTempAlloc();
+
+    // Sort sprites by order->texture->id and batch them
+    SortedSprite* sortedSprites = (SortedSprite*)BX_ALLOC(tmpAlloc, sizeof(SortedSprite)*numSprites);
+
+    for (int i = 0; i < numSprites; i++) {
+        const SpriteFrame& frame = sprites[i]->getCurFrame();
+        sortedSprites[i].index = i;
+        sortedSprites[i].sprite = sprites[i];
+        sortedSprites[i].key = MAKE_SPRITE_KEY(sprites[i]->order, frame.texHandle.value, sprites[i]->id);
+    }
+
+    if (numSprites > 1) {
+        std::sort(sortedSprites, sortedSprites + numSprites, [](const SortedSprite& a, const SortedSprite&b)->bool {
+            return a.key < b.key;
+        });
+    }
+
+    // Fill draw data (geometry)
+    mtx3x3_t preMat, finalMat;
+    int indexIdx = 0;
+    int vertexIdx = 0;
+
+    // Batching
+    bx::Array<SpriteDrawBatch> batches;
+    batches.create(32, 64, tmpAlloc);
+    uint32_t prevKey = UINT32_MAX;
+    SpriteDrawBatch* curBatch = nullptr;
+
+    for (int si = 0; si < numSprites; si++) {
+        const SortedSprite ss = sortedSprites[si];
+        Sprite* sprite = sprites[ss.index];
+        const SpriteFrame& frame = sprite->frames[sprite->curFrameIdx];
+
+        vec2_t halfSize = sprite->halfSize;
+        float pixelRatio = frame.pixelRatio;
+        SpriteFlag::Bits flipX = sprite->flip | frame.flags;
+        SpriteFlag::Bits flipY = sprite->flip | frame.flags;
+        float scalex, scaley;
+        if (halfSize.y <= 0) {
+            scalex = halfSize.x*2.0f;
+            scaley = scalex / pixelRatio;
+        } else if (halfSize.x <= 0) {
+            scaley = halfSize.y*2.0f;
+            scalex = scaley*pixelRatio;
+        } else {
+            scalex = halfSize.x*2.0f;
+            scaley = halfSize.y*2.0f;
+        }
+
+        vec2_t pos = sprite->posOffset - frame.pivot;
+        vec2_t scale = vec2f(scalex, scaley) * sprite->sizeMultiplier;
+
+        if (flipX & SpriteFlip::FlipX)
+            scale.x = -scale.x;
+        if (flipY & SpriteFlip::FlipY)
+            scale.y = -scale.y;
+
+        // Transform (offset x sprite's own matrix)
+        // PreMat = TranslateMat * ScaleMat
+        preMat.m11 = scale.x;       preMat.m12 = 0;             preMat.m13 = 0;
+        preMat.m21 = 0;             preMat.m22 = scale.y;       preMat.m23 = 0;
+        preMat.m31 = scale.x*pos.x; preMat.m32 = scale.y*pos.y; preMat.m33 = 1.0f;
+        bx::mtx3x3Mul(finalMat.f, preMat.f, mats[ss.index].f);
+
+        vec3_t transform1 = vec3f(finalMat.m11, finalMat.m12, finalMat.m21);
+        vec3_t transform2 = vec3f(finalMat.m22, finalMat.m31, finalMat.m32);
+        uint32_t color;
+        if (!colors)    color = ss.sprite->tint.n;
+        else            color = colors[ss.index].n;
+
+        // Batch
+        uint32_t batchKey = SPRITE_KEY_GET_BATCH(ss.key);
+        if (batchKey != prevKey) {
+            curBatch = batches.push();
+            curBatch->texHandle = frame.texHandle;
+            curBatch->numVerts = 0;
+            curBatch->numIndices = 0;
+            curBatch->startIdx = indexIdx;
+            prevKey = batchKey;
+        }
+        
+        // Fill geometry data
+        if (frame.ssHandle.isValid()) {
+            SpriteSheet* sheet = getResourcePtr<SpriteSheet>(frame.ssHandle);
+            assert(frame.meshId != -1);
+            const SpriteMesh& mesh = sheet->meshes[frame.meshId];
+
+            for (int i = 0, c = mesh.numVerts; i < c; i++) {
+                int k = i + vertexIdx;
+                verts[k].pos = mesh.verts[i];
+                verts[k].transform1 = transform1;
+                verts[k].transform2 = transform2;
+                verts[k].coords = mesh.uvs[i];
+                verts[k].color = color;
+            }
+
+            for (int i = 0, c = mesh.numTris; i < c; i++) {
+                int k = i*3;
+                indices[k + indexIdx] = mesh.tris[k] + vertexIdx;
+                indices[k + indexIdx + 1] = mesh.tris[k + 1] + vertexIdx;
+                indices[k + indexIdx + 2] = mesh.tris[k + 2] + vertexIdx;
+            }
+
+            int numIndices = mesh.numTris*3;
+            indexIdx += numIndices;
+            vertexIdx += mesh.numVerts;
+            curBatch->numVerts += mesh.numVerts;
+            curBatch->numIndices += uint16_t(numIndices);
+        } else {
+            // Make a normalized quad
+            SpriteVertex& v0 = verts[vertexIdx];
+            SpriteVertex& v1 = verts[vertexIdx + 1];
+            SpriteVertex& v2 = verts[vertexIdx + 2];
+            SpriteVertex& v3 = verts[vertexIdx + 3];
+            v0.pos = vec2f(-0.5f, 0.5f);
+            v0.coords = vec2f(0, 0);
+
+            v1.pos = vec2f(0.5f, 0.5f);
+            v1.coords = vec2f(1.0f, 0);
+
+            v2.pos = vec2f(-0.5f, -0.5f);
+            v2.coords = vec2f(0, 1.0f);
+
+            v3.pos = vec2f(0.5f, -0.5f);
+            v3.coords = vec2f(1.0f, 1.0f);
+
+            v0.transform1 = v1.transform1 = v2.transform1 = v3.transform1 = transform1;
+            v0.transform2 = v1.transform2 = v2.transform2 = v3.transform2 = transform2;
+            v0.color = v1.color = v2.color = v3.color = color;
+
+            indices[indexIdx] = vertexIdx;
+            indices[indexIdx + 1] = vertexIdx + 1;
+            indices[indexIdx + 2] = vertexIdx + 2;
+            indices[indexIdx + 3] = vertexIdx + 2;
+            indices[indexIdx + 4] = vertexIdx + 1;
+            indices[indexIdx + 5] = vertexIdx + 3;
+
+            vertexIdx += 4;
+            indexIdx += 6;
+            curBatch->numVerts += 4;
+            curBatch->numIndices += 6;
+        }
+    }
+
+    // Draw
+    GfxState::Bits state = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite;
+    ProgramHandle prog = !progOverride.isValid() ? g_spriteSys->spriteProg : progOverride;
+    for (int i = 0, c = batches.getCount(); i < c; i++) {
+        const SpriteDrawBatch batch = batches[i];
+        gDriver->setState(state, 0);
+        gDriver->setTransientVertexBufferI(0, &tvb, 0, batch.numVerts);
+        gDriver->setTransientIndexBufferI(&tib, batch.startIdx, batch.numIndices);
+        if (batch.texHandle.isValid())
+            gDriver->setTexture(0, g_spriteSys->u_texture, getResourcePtr<Texture>(batch.texHandle)->handle, TextureFlag::FromTexture);
+
+        if (stateCallback) {
+            stateCallback(gDriver, stateUserData);
+        }
+        gDriver->submit(viewId, prog, 0, false);
+    }
+
+    batches.destroy();
+}
+
+void termite::drawSpritesOld(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,
                           ProgramHandle progOverride /*= ProgramHandle()*/, SetSpriteStateCallback stateCallback /*= nullptr*/,
                           void* stateUserData, const color_t* colors)
 {
@@ -1046,13 +1430,6 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     driver->allocTransientIndexBuffer(&tib, numIndices);
 
     // Sort sprites by texture and batch them
-    struct SortedSprite
-    {
-        int index;
-        Sprite* sprite;
-        uint64_t key;
-    };
-
     SortedSprite* sortedSprites = (SortedSprite*)BX_ALLOC(tmpAlloc, sizeof(SortedSprite)*numSprites);
     for (int i = 0; i < numSprites; i++) {
         const SpriteFrame& frame = sprites[i]->getCurFrame();
@@ -1060,9 +1437,12 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
         sortedSprites[i].sprite = sprites[i];
         sortedSprites[i].key = MAKE_SPRITE_KEY(sprites[i]->order, frame.texHandle.value, sprites[i]->id);
     }
-    std::sort(sortedSprites, sortedSprites + numSprites, [](const SortedSprite& a, const SortedSprite&b)->bool {
-        return a.key < b.key;
-    });
+
+    if (numSprites > 1) {
+        std::sort(sortedSprites, sortedSprites + numSprites, [](const SortedSprite& a, const SortedSprite&b)->bool {
+            return a.key < b.key;
+        });
+    }
 
     // Fill sprite quads
     SpriteVertex* verts = (SpriteVertex*)tvb.data;
@@ -1125,10 +1505,10 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
         v0.transform1 = v1.transform1 = v2.transform1 = v3.transform1 = transform1;
         v0.transform2 = v1.transform2 = v2.transform2 = v3.transform2 = transform2;
 
-        if (!colors)
-            v0.color = v1.color = v2.color = v3.color = ss.sprite->tint.n;
-        else 
-            v0.color = v1.color = v2.color = v3.color = colors[ss.index].n;
+        uint32_t color;
+        if (!colors)    color = ss.sprite->tint.n;
+        else            color = colors[ss.index].n;
+        v0.color = v1.color = v2.color = v3.color = color;
 
         if (flipX & SpriteFlip::FlipX) {
             std::swap<float>(v0.coords.x, v1.coords.x);
@@ -1206,6 +1586,13 @@ void termite::registerSpriteSheetToResourceLib()
     assert(handle.isValid());
 }
 
+rect_t termite::getSpriteSheetTextureFrame(ResourceHandle spritesheet, int index)
+{
+    SpriteSheet* ss = getResourcePtr<SpriteSheet>(spritesheet);
+    assert(index < ss->numFrames);
+    return ss->frames[index].frame;
+}
+
 rect_t termite::getSpriteSheetTextureFrame(ResourceHandle spritesheet, const char* name)
 {
     SpriteSheet* ss = getResourcePtr<SpriteSheet>(spritesheet);
@@ -1223,6 +1610,13 @@ ResourceHandle termite::getSpriteSheetTexture(ResourceHandle spritesheet)
 {
     SpriteSheet* ss = getResourcePtr<SpriteSheet>(spritesheet);
     return ss->texHandle;
+}
+
+vec2_t termite::getSpriteSheetFrameSize(ResourceHandle spritesheet, int index)
+{
+    SpriteSheet* ss = getResourcePtr<SpriteSheet>(spritesheet);
+    assert(index < ss->numFrames);
+    return ss->frames[index].sourceSize;
 }
 
 vec2_t termite::getSpriteSheetFrameSize(ResourceHandle spritesheet, const char* name)

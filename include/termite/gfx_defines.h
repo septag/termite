@@ -217,30 +217,58 @@ namespace termite
     {
         enum Enum
         {
-            TextureCompareLequal = 0x0000000000000001,
-            TextureCompareAll = 0x0000000000000003,
-            Texture3D = 0x0000000000000004,
-            VertexAttribHalf = 0x0000000000000008,
-            VertexAttribUint8 = 0x0000000000000010,
-            Instancing = 0x0000000000000020,
-            Multithreaded = 0x0000000000000040,
-            FragmentDepth = 0x0000000000000080,
-            BlendIndependent = 0x0000000000000100,
-            Compute = 0x0000000000000200,
-            FragmentOrdering = 0x0000000000000400,
-            SwapChain = 0x0000000000000800,
-            HMD = 0x0000000000001000,
-            Index32 = 0x0000000000002000,
-            DrawIndirect = 0x0000000000004000,
-            HiDPi = 0x0000000000008000,
-            TextureBlit = 0x0000000000010000,
-            TextureReadBack = 0x0000000000020000,
-            OcclusionQuery = 0x0000000000040000,
-
-            TextureFormatNone
+            AlphaToCoverage = 0x0000000000000001,
+            BlendeIndependent = 0x0000000000000002,
+            Compute = 0x0000000000000004,
+            ConservativeRaster = 0x0000000000000008,
+            DrawIndirect = 0x0000000000000010,
+            FragmentDepth = 0x0000000000000020,
+            FragmentOrdering = 0x0000000000000040,
+            GraphicsDebugger = 0x0000000000000080,
+            HiDPI = 0x0000000000000100,
+            HMD = 0x0000000000000200,
+            Index32 = 0x0000000000000400,
+            Instancing = 0x0000000000000800,
+            OcclusionQuery = 0x0000000000001000,
+            MultiThreaded = 0x0000000000002000,
+            SwapChain = 0x0000000000004000,
+            Texture2DArray = 0x0000000000008000,
+            Texture3D = 0x0000000000010000,
+            TextureBlit = 0x0000000000020000,
+            TextureCompareAll = 0x00000000000c0000,
+            TextureCompareLequal = 0x0000000000080000,
+            TextureCubeArray = 0x0000000000100000,
+            TextureReadBack = 0x0000000000200000,
+            VertexAttribHalf = 0x0000000000400000,
+            VertexAttribUint10 = 0x0000000000800000
         };
 
         typedef uint64_t Bits;
+    };
+
+    struct TextureSupportFlag
+    {
+        enum Enum
+        {
+            None = 0,
+            Texture2D = 0x0001,
+            Texture2D_SRGB = 0x0002,
+            Texture2D_Emulated = 0x0004,
+            Texture3D = 0x0008,
+            Texture3D_SRGB = 0x0010,
+            Texture3D_Emulated = 0x0020,
+            TextureCube = 0x0040,
+            TextureCube_SRGB = 0x0080,
+            TextureCube_Emulated = 0x0100,
+            TextureVertex = 0x0200,
+            TextureImage = 0x0400,
+            TextureFramebuffer = 0x0800,
+            TextureFramebuffer_MSAA = 0x1000,
+            TextureMSAA = 0x2000,
+            TextureMSAA_MIP_AutoGen = 0x4000
+        };
+
+        typedef uint16_t Bits;
     };
 
     struct GpuTransform
@@ -281,15 +309,40 @@ namespace termite
     {
         RendererType::Enum type;
         GpuCapsFlag::Bits supported;
-        uint32_t maxDrawCalls;
-        uint16_t maxTextureSize;
-        uint16_t maxViews;
-        uint8_t maxFBAttachments;
-        uint8_t numGPUs;
+
         uint16_t vendorId;
         uint16_t deviceId;
-        uint16_t formats[TextureFormat::Count];
+        bool homogeneousDepth;
+        bool originBottomLeft;
+        uint8_t numGPUs;
+
         GPUDesc gpu[4];
+
+        struct Limits
+        {
+            uint32_t maxDrawCalls;            //!< Maximum draw calls.
+            uint32_t maxBlits;                //!< Maximum number of blit calls.
+            uint32_t maxTextureSize;          //!< Maximum texture size.
+            uint32_t maxViews;                //!< Maximum views.
+            uint32_t maxFrameBuffers;         //!< Maximum number of frame buffer handles.
+            uint32_t maxFBAttachments;        //!< Maximum frame buffer attachments.
+            uint32_t maxPrograms;             //!< Maximum number of program handles.
+            uint32_t maxShaders;              //!< Maximum number of shader handles.
+            uint32_t maxTextures;             //!< Maximum number of texture handles.
+            uint32_t maxTextureSamplers;      //!< Maximum number of texture samplers.
+            uint32_t maxVertexDecls;          //!< Maximum number of vertex format declarations.
+            uint32_t maxVertexStreams;        //!< Maximum number of vertex streams.
+            uint32_t maxIndexBuffers;         //!< Maximum number of index buffer handles.
+            uint32_t maxVertexBuffers;        //!< Maximum number of vertex buffer handles.
+            uint32_t maxDynamicIndexBuffers;  //!< Maximum number of dynamic index buffer handles.
+            uint32_t maxDynamicVertexBuffers; //!< Maximum number of dynamic vertex buffer handles.
+            uint32_t maxUniforms;             //!< Maximum number of uniform handles.
+            uint32_t maxOcclusionQueries;     //!< Maximum number of occlusion query handles.
+        };
+
+        Limits limits;
+
+        TextureSupportFlag::Bits formats[TextureFormat::Count];
     };
 
     struct ViewStats

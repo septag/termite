@@ -90,5 +90,10 @@ namespace termite
         {
             return presentData;
         }
+
+        void reset()
+        {
+            num = 0;
+        }
     };
 }

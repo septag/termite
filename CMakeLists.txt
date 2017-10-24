@@ -157,6 +157,7 @@ endif()
 
 ################################################################################
 # Compilation flags
+add_definitions(-D__STDC_FORMAT_MACROS)
 if(MSVC)
     add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
     add_definitions(-D_HAS_EXCEPTIONS=0)
