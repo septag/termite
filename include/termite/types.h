@@ -46,12 +46,12 @@ namespace termite
     template <typename Tx, typename _Meaning, Tx _Invalid = 0>
     struct PhantomType
     {
-        PhantomType()
+        inline PhantomType()
         {
             value = _Invalid;
         }
 
-        PhantomType(Tx _value) : value(_value)
+        inline PhantomType(Tx _value) : value(_value)
         {
         }
 

@@ -649,8 +649,11 @@ void termite::runComponentGroup(ComponentUpdateStage::Enum stage, ComponentGroup
     g_csys->lockComponentGroups = true;
     for (int i = 0, c = group->batches.getCount(); i < c; i++) {
         ComponentGroup::Batch batch = group->batches[i];
-        if (batch.index >= group->components.getCount())
+        bool sorted = false;
+        if (batch.index >= group->components.getCount()) {
             sortAndBatchComponents(group);
+            sorted = true;
+        }
         const ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(group->components[batch.index])];
         if (ctype.callbacks.updateStageFn[stage])
             ctype.callbacks.updateStageFn[stage](group->components.itemPtr(batch.index), batch.count, dt);

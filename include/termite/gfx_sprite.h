@@ -39,6 +39,15 @@ namespace termite
         typedef uint8_t Bits;
     };
 
+    struct SpriteRenderMode
+    {
+        enum Enum
+        {
+            Normal = 0,
+            Wireframe
+        };
+    };
+
     // Callback for setting custom states when drawing sprites
     typedef void(*SetSpriteStateCallback)(GfxDriverApi* driver, void* userData);
     // Callback for animation frames
@@ -50,6 +59,9 @@ namespace termite
 
     bool initSpriteSystemGraphics(GfxDriverApi* driver);
     void shutdownSpriteSystemGraphics();
+
+    TERMITE_API void setSpriteRenderMode(SpriteRenderMode::Enum mode);
+    TERMITE_API SpriteRenderMode::Enum getSpriteRenderMode();
 
     TERMITE_API Sprite* createSprite(bx::AllocatorI* alloc, const vec2_t halfSize);
     TERMITE_API void destroySprite(Sprite* sprite);
@@ -151,11 +163,6 @@ namespace termite
                                             ResourceHandle* textureHandle);
 
     TERMITE_API void convertSpritePhysicsVerts(vec2_t* ptsOut, const vec2_t* ptsIn, int numPts, Sprite* sprite);
-
-    // Dynamically draw sprites
-    TERMITE_API void drawSpritesOld(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,
-                                 ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr,
-                                 void* stateUserData = nullptr, const color_t* colors = nullptr);
 
     TERMITE_API void drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats,
                                  ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr,

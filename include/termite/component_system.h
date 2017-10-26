@@ -4,9 +4,6 @@
 #include "bx/bx.h"
 #include "bx/allocator.h"
 
-#define T_COMPONENT_DATA(_C, _Ent) getComponentData<_C>(getComponent(_C::Handle, _Ent));
-#define T_COMPONENT_DATA_H(_C, _Handle) getComponentData<_C>(getComponent(_C::Handle, getComponentEntity(_Handle)));
-
 namespace termite
 {
     static const uint32_t kEntityIndexBits = 16;

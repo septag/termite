@@ -436,6 +436,8 @@ void termite::waitAndDeleteJob(JobHandle handle) T_THREAD_SAFE
         // Switch to job-pusher To see if we can process any remaining jobs
         jump_fcontext(jobPusherCtx, data);
         popWaitStack(data);
+
+        bx::yield();
     }
 
     // Delete the counter
