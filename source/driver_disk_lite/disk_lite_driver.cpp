@@ -85,6 +85,7 @@ struct DiskJob
     DiskJobMode::Enum mode;
     bx::Path uri;
     IoPathType::Enum pathType;
+    IoReadFlags::Bits flags;
 
     // Result
     DiskJobResult::Enum result;
@@ -98,6 +99,7 @@ struct DiskJob
     DiskJob() : lnode(this)
     {
         mem = nullptr;
+        flags = 0;
         handle = nullptr;
         bytesWritten = 0;
     }
@@ -258,7 +260,7 @@ static void blockingReadJob(int jobIdx, void* userParam)
         }
         AAsset_close(asset);
 
-        if (mem && (g_blocking.flags & IoFlags::ExtractLZ4)) {
+        if (mem && (g_blocking.flags & IoFlags::ExtractLZ4) && !(job->flags & IoReadFlags::RawRead)) {
             mem = uncompressBlob(mem, g_blocking.alloc, job->uri.cstr());
         }
 
@@ -297,7 +299,7 @@ static void blockingReadJob(int jobIdx, void* userParam)
         file.close();
 
         // LZ4 decompress if flag is set
-        if (mem && (g_blocking.flags & IoFlags::ExtractLZ4)) {
+        if (mem && (g_blocking.flags & IoFlags::ExtractLZ4) && !(job->flags & IoReadFlags::RawRead)) {
             mem = uncompressBlob(mem, g_blocking.alloc, job->uri.cstr());
         }
 
@@ -347,11 +349,12 @@ static void blockingWriteJob(int jobIdx, void* userParam)
     }
 }
 
-static MemoryBlock* blockRead(const char* uri, IoPathType::Enum pathType)
+static MemoryBlock* blockRead(const char* uri, IoPathType::Enum pathType, IoReadFlags::Bits flags)
 {
     DiskJob job;
     job.mode = DiskJobMode::Read;
     job.uri = uri;
+    job.flags = flags;
     job.pathType = pathType;
     blockingReadJob(0, &job);
 
@@ -459,12 +462,13 @@ static IoDriverEventsI* asyncGetCallbacks()
     return g_async.callbacks;
 }
 
-static MemoryBlock* asyncRead(const char* uri, IoPathType::Enum pathType)
+static MemoryBlock* asyncRead(const char* uri, IoPathType::Enum pathType, IoReadFlags::Bits flags)
 {
     DiskJob* dj = g_async.jobPool.newInstance<>();
     dj->mode = DiskJobMode::Read;
     dj->pathType = pathType;
     dj->uri = uri;
+    dj->flags = flags;
 
     if (g_async.numDiskJobs < MAX_DISK_JOBS) {
         JobDesc job(blockingReadJob, dj);
@@ -556,7 +560,7 @@ static void asyncRunAsyncLoop()
 
         DiskJob* dj = node->data;
         if (dj->mode == DiskJobMode::Read) {
-            asyncRead(dj->uri.cstr(), dj->pathType);
+            asyncRead(dj->uri.cstr(), dj->pathType, 0);
         } else if (dj->mode == DiskJobMode::Write) {
             asyncWrite(dj->uri.cstr(), dj->mem, dj->pathType);
         }

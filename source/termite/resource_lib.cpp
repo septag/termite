@@ -481,10 +481,10 @@ static ResourceHandle loadResourceHashed(size_t nameHash, const char* uri, const
             resLib->asyncLoadsTable.add(tinystl::hash_string(uri, strlen(uri)), reqHandle);
 
             // Load the file, result will be called in onReadComplete
-            resLib->driver->read(newUri.cstr(), IoPathType::Assets);
+            resLib->driver->read(newUri.cstr(), IoPathType::Assets, 0);
         } else {
             // Load the file
-            MemoryBlock* mem = resLib->driver->read(newUri.cstr(), IoPathType::Assets);
+            MemoryBlock* mem = resLib->driver->read(newUri.cstr(), IoPathType::Assets, 0);
             if (!mem) {
                 BX_WARN("Opening resource '%s' failed", newUri.cstr());
                 BX_WARN(getErrorString());

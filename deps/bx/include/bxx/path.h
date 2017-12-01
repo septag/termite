@@ -48,7 +48,6 @@ namespace bx
         Path& normalizeSelf();
         Path& join(const char* path);
         Path& joinUnix(const char* path);
-        PathType getType();        
     };
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -232,32 +231,6 @@ namespace bx
         }
 
         return *this;
-    }
-
-    inline bx::PathType Path::getType()
-    {
-#if BX_PLATFORM_WINDOWS
-        DWORD atts = GetFileAttributes(text);
-        if (atts & FILE_ATTRIBUTE_DIRECTORY)
-            return PathType::Directory;
-        else if (atts == INVALID_FILE_ATTRIBUTES)
-            return PathType::Invalid;
-        else
-            return PathType::File;
-#else
-        struct stat s;
-        if (stat(text, &s) == 0) {
-            if (s.st_mode & S_IFDIR)
-                return PathType::Directory;
-            else if ((s.st_mode & (S_IFREG | S_IFLNK)))
-                return PathType::File;
-            else
-                return PathType::Invalid;
-
-        } else {
-            return PathType::Invalid;
-        }
-#endif
     }
 
 #if BX_PLATFORM_WINDOWS

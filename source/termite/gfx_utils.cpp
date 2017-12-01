@@ -58,6 +58,7 @@ namespace termite
         UniformHandle uTexture;
         UniformHandle uVignetteParams;
         UniformHandle uSepiaParams;
+        UniformHandle uVignetteColor;
 
         uint16_t width;
         uint16_t height;
@@ -66,12 +67,14 @@ namespace termite
         float vignetteIntensity;
         float sepiaIntensity;   // 0 ~ 1
         vec4_t sepiaColor; 
+        vec4_t vignetteColor;
         
         PostProcessVignetteSepia(bx::AllocatorI* _alloc) : alloc(_alloc)
         {
             width = height = 0;
             radius = 0;
             softness = 0.45f;   
+            vignetteColor = vec4f(0, 0, 0, 0);
         }
     };
 
@@ -208,13 +211,13 @@ namespace termite
                                     const char* fsFilepath)
     {
         GfxDriverApi* driver = gfxDriver;
-        MemoryBlock* vso = ioDriver->read(vsFilepath, IoPathType::Assets);
+        MemoryBlock* vso = ioDriver->read(vsFilepath, IoPathType::Assets, 0);
         if (!vso) {
             T_ERROR("Opening file '%s' failed", vsFilepath);
             return ProgramHandle();
         }
 
-        MemoryBlock* fso = ioDriver->read(fsFilepath, IoPathType::Assets);
+        MemoryBlock* fso = ioDriver->read(fsFilepath, IoPathType::Assets, 0);
         if (!fso) {
             T_ERROR("Opening file '%s' failed", fsFilepath);
             return ProgramHandle();
@@ -378,7 +381,7 @@ namespace termite
     PostProcessVignetteSepia* createVignetteSepiaPostProcess(bx::AllocatorI* alloc, uint16_t width, uint16_t height, 
                                                              float radius, float softness, 
                                                              float vignetteIntensity, float sepiaIntensity, 
-                                                             color_t sepiaColor)
+                                                             color_t sepiaColor, color_t vignetteColor)
     {
         GfxDriverApi* driver = g_gutils->driver;
 
@@ -388,6 +391,7 @@ namespace termite
         vignette->radius = radius;
         vignette->softness = bx::fclamp(softness, 0, 0.5f);
         vignette->sepiaColor = colorToVec4(sepiaColor);
+        vignette->vignetteColor = colorToVec4(vignetteColor);
         vignette->vignetteIntensity = vignetteIntensity;
         vignette->sepiaIntensity = sepiaIntensity;
 
@@ -399,6 +403,7 @@ namespace termite
         vignette->uTexture = driver->createUniform("u_texture", UniformType::Int1, 1);
         vignette->uVignetteParams = driver->createUniform("u_vignetteParams", UniformType::Vec4, 1);
         vignette->uSepiaParams = driver->createUniform("u_sepiaParams", UniformType::Vec4, 1);
+        vignette->uVignetteColor = driver->createUniform("u_vignetteColor", UniformType::Vec4, 1);
 
         return vignette;
     }
@@ -419,6 +424,28 @@ namespace termite
         driver->setTexture(0, vignette->uTexture, sourceTexture, TextureFlag::FromTexture);
         driver->setUniform(vignette->uVignetteParams, vigParams.f, 1);
         driver->setUniform(vignette->uSepiaParams, sepiaParams.f, 1);
+        driver->setUniform(vignette->uVignetteColor, vignette->vignetteColor.f, 1);
+
+        drawFullscreenQuad(viewId, vignette->prog);
+        return driver->getFrameBufferTexture(targetFb, 0);
+    }
+
+    TextureHandle drawVignettePostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId, FrameBufferHandle targetFb, 
+                                                  TextureHandle sourceTexture, float softness, float radius, float intensity,
+                                                  vec4_t vignetteColor)
+    {
+        GfxDriverApi* driver = g_gutils->driver;
+
+        vec4_t vigParams = vec4f(radius, softness, intensity, 0);
+        vec4_t sepiaParams = vec4f(1.0f, 1.0f, 1.0f, 0);
+
+        driver->setViewRect(viewId, 0, 0, vignette->width, vignette->height);
+        driver->setViewFrameBuffer(viewId, targetFb);
+        driver->setState(GfxState::RGBWrite, 0);
+        driver->setTexture(0, vignette->uTexture, sourceTexture, TextureFlag::FromTexture);
+        driver->setUniform(vignette->uVignetteParams, vigParams.f, 1);
+        driver->setUniform(vignette->uSepiaParams, sepiaParams.f, 1);
+        driver->setUniform(vignette->uVignetteColor, vignetteColor.f, 1);
         drawFullscreenQuad(viewId, vignette->prog);
         return driver->getFrameBufferTexture(targetFb, 0);
     }
@@ -434,6 +461,8 @@ namespace termite
             driver->destroyUniform(vignette->uVignetteParams);
         if (vignette->uSepiaParams.isValid())
             driver->destroyUniform(vignette->uSepiaParams);
+        if (vignette->uVignetteColor.isValid())
+            driver->destroyUniform(vignette->uVignetteColor);
         if (vignette->prog.isValid())
             driver->destroyProgram(vignette->prog);
         BX_DELETE(vignette->alloc, vignette);

@@ -324,7 +324,7 @@ static void destroySceneBox2d(PhysScene2D* scene)
 
 static void stepSceneBox2d(PhysScene2D* scene, float dt)
 {
-    scene->w.Step(dt, 8, 3, 2);
+    scene->w.Step(dt, 9, 4, 2);
 }
 
 static void debugSceneBox2d(PhysScene2D* scene, const recti_t viewport, const Camera2D& cam,

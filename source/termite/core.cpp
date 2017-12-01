@@ -1102,7 +1102,7 @@ bool termite::saveBinaryFile(const char* absFilepath, const MemoryBlock* mem)
     return wb == mem->size ? true : false;
 }
 
-MemoryBlock* termite::encodeMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
+MemoryBlock* termite::encryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
 {
     assert(mem);
     if (key == nullptr)
@@ -1141,7 +1141,7 @@ MemoryBlock* termite::encodeMemoryAES128(const MemoryBlock* mem, bx::AllocatorI*
     return encMem;
 }
 
-MemoryBlock* termite::decodeMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
+MemoryBlock* termite::decryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
 {
     assert(mem);
     if (key == nullptr)

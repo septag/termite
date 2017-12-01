@@ -1940,7 +1940,7 @@ static rmtError rmtHashTable_Resize(rmtHashTable* table)
             rmtHashTable_Insert(table, slot->key, slot->key);
     }
 
-    free(old_slots);
+    rmtFree(old_slots);
 
     return RMT_ERROR_NONE;
 }

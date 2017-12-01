@@ -15,6 +15,8 @@
 
 #include "../tools_common/log_format_proxy.h"
 
+#include "bx/file.h"
+
 #define LSMODEL_VERSION "0.1"
 
 static bx::DefaultAllocator g_alloc;
@@ -45,7 +47,8 @@ int main(int argc, char **argv)
     LogFormatProxy logger(jsonlog ? LogProxyOptions::Json : LogProxyOptions::Text);
     bx::enableLogToFileHandle(stdout);    
 
-    if (inFilepath.isEmpty() || inFilepath.getType() != bx::PathType::File) {
+    bx::FileInfo finfo;
+    if (!bx::stat(inFilepath.cstr(), finfo) || finfo.m_type != bx::FileInfo::Regular) {
         logger.fatal("Invalid input file '%s'", inFilepath.cstr());
         return -1;
     }

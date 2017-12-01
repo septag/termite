@@ -134,6 +134,7 @@ namespace termite
     TERMITE_API void setSpriteHalfSize(Sprite* sprite, const vec2_t& halfSize);
     TERMITE_API vec2_t getSpriteHalfSize(Sprite* sprite);
     TERMITE_API void setSpriteSizeMultiplier(Sprite* sprite, const vec2_t& sizeMultiplier);
+    TERMITE_API vec2_t getSpriteSizeMultiplier(Sprite* sprite);
     TERMITE_API void gotoSpriteFrameIndex(Sprite* sprite, int frameIdx);
     TERMITE_API void gotoSpriteFrameName(Sprite* sprite, const char* name);
     TERMITE_API void gotoSpriteFrameTag(Sprite* sprite, const char* frameTag);
@@ -178,14 +179,15 @@ namespace termite
     }
 
     // SpriteCache contains static sprite rendering data
-    // When filled 'fillSpriteCache', the rendering data is saved in GPU buffer for consistant use
-    // Call 'updateSpriteCache' if current sprites inside the cache needs to be updated (like animation frames)
-    TERMITE_API SpriteCache* createSpriteCache(uint16_t maxSprites);
-    TERMITE_API void destroySpriteCache(SpriteCache* scache);
-    TERMITE_API void fillSpriteCache(SpriteCache* scache, Sprite** sprites, uint16_t numSprites,
-                                     const mtx3x3_t* mats,
-                                     ProgramHandle progOverride = ProgramHandle(), SetSpriteStateCallback stateCallback = nullptr);
-    TERMITE_API void updateSpriteCache(SpriteCache* scache);
+    // Send the same drawing data same as drawSprites
+    TERMITE_API SpriteCache* createSpriteCache(bx::AllocatorI* alloc, Sprite** sprites, uint16_t numSprites, 
+                                               const mtx3x3_t* mats, const color_t* colors = nullptr);
+    TERMITE_API void drawSpriteCache(uint8_t viewId, SpriteCache* spriteCache,
+                                     ProgramHandle progOverride = ProgramHandle(),
+                                     SetSpriteStateCallback stateCallback = nullptr,
+                                     void* stateUserData = nullptr);
+    TERMITE_API void destroySpriteCache(SpriteCache* spriteCache);
+    TERMITE_API termite::rect_t getSpriteCacheBounds(SpriteCache* spriteCache);
 
     // Registers "spritesheet" resource type and Loads SpriteSheet object
     struct LoadSpriteSheetParams

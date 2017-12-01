@@ -207,9 +207,9 @@ namespace termite
     TERMITE_API MemoryBlock* readBinaryFile(const char* absFilepath);
     TERMITE_API bool saveBinaryFile(const char* absFilepath, const MemoryBlock* mem);
 
-    TERMITE_API MemoryBlock* encodeMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc = nullptr, 
+    TERMITE_API MemoryBlock* encryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc = nullptr, 
                                                 const uint8_t* key = nullptr, const uint8_t* iv = nullptr);
-    TERMITE_API MemoryBlock* decodeMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc = nullptr, 
+    TERMITE_API MemoryBlock* decryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc = nullptr, 
                                                 const uint8_t* key = nullptr, const uint8_t* iv = nullptr);
     TERMITE_API void cipherXOR(uint8_t* outputBuff, const uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize);
 

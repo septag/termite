@@ -627,7 +627,7 @@ SceneLinkHandle termite::linkScene(SceneManager* mgr, Scene* sceneA, Scene* scen
     SceneLinkHandle handle = SceneLinkHandle(mgr->linkPool.newHandle());
     if (!handle.isValid())
         return handle;
-    SceneLink* link = new(mgr->linkPool.getHandleData(0, handle)) SceneLink();
+    SceneLink* link = BX_PLACEMENT_NEW(mgr->linkPool.getHandleData(0, handle), SceneLink);
     link->sceneA = sceneA;
     link->sceneB = sceneB;
     link->effectA = def.effectNameA ? findEffect(mgr, def.effectNameA) : nullptr;
@@ -648,6 +648,14 @@ SceneLinkHandle termite::linkScene(SceneManager* mgr, Scene* sceneA, Scene* scen
 
 void termite::removeSceneLink(SceneManager* mgr, SceneLinkHandle handle)
 {
+    for (int i = 0, c = mgr->numActiveLinks; i < c; i++) {
+        if (handle != mgr->activeLinks[i])
+            continue;
+
+        assert(0);  // Link that should be deleted should not be active
+        return;
+    }
+
     mgr->linkPool.freeHandle(handle);
 }
 

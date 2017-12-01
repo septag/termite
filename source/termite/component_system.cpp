@@ -9,6 +9,8 @@
 #include "bxx/hash_table.h"
 #include "bxx/logger.h"
 
+#include "remotery/Remotery.h"
+
 #define MIN_FREE_INDICES 1024
 
 static const uint32_t kComponentHandleBits = 16;
@@ -642,6 +644,33 @@ static void sortAndBatchComponents(ComponentGroup* group)
 void termite::runComponentGroup(ComponentUpdateStage::Enum stage, ComponentGroupHandle groupHandle, float dt)
 {
     assert(groupHandle.isValid());
+
+#if RMT_ENABLED
+    const char* stageName = "";
+    switch (stage) {
+    case ComponentUpdateStage::InputUpdate:
+        stageName = "Input";
+        break;
+
+    case ComponentUpdateStage::PreUpdate:
+        stageName = "PreUpdate";
+        break;
+
+    case ComponentUpdateStage::Update:
+        stageName = "Update";
+        break;
+
+    case ComponentUpdateStage::PostUpdate:
+        stageName = "PostUpdate";
+        break;
+
+    case ComponentUpdateStage::FixedUpdate:
+        stageName = "FixedUpdate";
+        break;
+    }
+    char name[64];
+#endif
+
     ComponentGroup* group = g_csys->componentGroups.getHandleData<ComponentGroup>(0, groupHandle);
     sortAndBatchComponents(group);
 
@@ -649,14 +678,17 @@ void termite::runComponentGroup(ComponentUpdateStage::Enum stage, ComponentGroup
     g_csys->lockComponentGroups = true;
     for (int i = 0, c = group->batches.getCount(); i < c; i++) {
         ComponentGroup::Batch batch = group->batches[i];
-        bool sorted = false;
-        if (batch.index >= group->components.getCount()) {
-            sortAndBatchComponents(group);
-            sorted = true;
-        }
         const ComponentType& ctype = g_csys->components[COMPONENT_TYPE_INDEX(group->components[batch.index])];
-        if (ctype.callbacks.updateStageFn[stage])
+        if (ctype.callbacks.updateStageFn[stage]) {
+#if RMT_ENABLED
+            bx::snprintf(name, sizeof(name), "%s: %s (%d)", stageName, ctype.name, batch.count);
+            rmt_BeginCPUSampleDynamic(name, 0);
+#endif
             ctype.callbacks.updateStageFn[stage](group->components.itemPtr(batch.index), batch.count, dt);
+#if RMT_ENABLED
+            rmt_EndCPUSample();
+#endif
+        }
     }
     g_csys->lockComponentGroups = false;
 }

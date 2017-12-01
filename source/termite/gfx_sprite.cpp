@@ -37,7 +37,7 @@ static const uint8_t kSpriteKeyTextureShift = kSpriteKeyIdBits;
 
 #define MAKE_SPRITE_KEY(_Order, _Texture, _Id) \
     (uint64_t(_Order & kSpriteKeyOrderMask) << kSpriteKeyOrderShift) | (uint64_t(_Texture & kSpriteKeyTextureMask) << kSpriteKeyTextureShift) | uint64_t(_Id & kSpriteKeyIdMask)
-#define SPRITE_KEY_GET_BATCH(_Key) uint32_t((_Key >> kSpriteKeyIdBits) & kSpriteKeyIdMask)
+#define SPRITE_KEY_GET_BATCH(_Key) uint32_t((_Key >> kSpriteKeyIdBits) & kSpriteKeyIdMask) & kSpriteKeyTextureMask
 
 struct SpriteVertex
 {
@@ -137,6 +137,40 @@ struct SpriteFrame
 
 namespace termite
 {
+    struct SpriteCache
+    {
+        typedef bx::List<SpriteCache*>::Node LNode;
+
+        bx::AllocatorI* alloc;
+        VertexBufferHandle vb;
+        IndexBufferHandle ib;
+
+        // backup buffers to restore the gpu buffers
+        void* verts;
+        int vbSize;     // bytes
+        void* indices;
+        int ibSize;     // bytes
+
+        SpriteDrawBatch* batches;       // Draw batches 
+        int numBatches;
+
+        rect_t bounds;
+
+        LNode lnode;
+
+        SpriteCache(bx::AllocatorI* _alloc) :
+            alloc(_alloc),
+            verts(nullptr),
+            vbSize(0),
+            indices(nullptr),
+            ibSize(0),
+            batches(nullptr),
+            numBatches(0),
+            lnode(this)
+        {
+        }
+    };
+
     struct Sprite
     {
         typedef bx::List<Sprite*>::Node LNode;
@@ -232,6 +266,7 @@ struct SpriteSystem
     SpriteSheet* failSheet;
     SpriteSheet* asyncSheet;
     bx::List<Sprite*> spriteList;       // keep a list of sprites for proper shutdown and sheet reloading
+    bx::List<SpriteCache*> spriteCacheList;
     SpriteRenderMode::Enum renderMode;
 
     SpriteSystem(bx::AllocatorI* _alloc) : 
@@ -690,14 +725,7 @@ void termite::shutdownSpriteSystem()
         return;
 
     bx::AllocatorI* alloc = g_spriteSys->alloc;
-    GfxDriverApi* driver = g_spriteSys->driver;
-
-    if (g_spriteSys->spriteProg.isValid())
-        driver->destroyProgram(g_spriteSys->spriteProg);
-    if (g_spriteSys->spriteAddProg.isValid())
-        driver->destroyProgram(g_spriteSys->spriteAddProg);
-    if (g_spriteSys->u_texture.isValid())
-        driver->destroyUniform(g_spriteSys->u_texture);
+    shutdownSpriteSystemGraphics();
 
     // Move through the remaining sprites and unload their resources
     Sprite::LNode* node = g_spriteSys->spriteList.getFirst();
@@ -736,6 +764,19 @@ bool termite::initSpriteSystemGraphics(GfxDriverApi* driver)
 
     g_spriteSys->u_texture = driver->createUniform("u_texture", UniformType::Int1, 1);
 
+    // Recreate all sprite cache buffers
+    SpriteCache::LNode* node = g_spriteSys->spriteCacheList.getFirst();
+    while (node) {
+        SpriteCache* sc = node->data;
+
+        assert(sc->verts);
+        assert(sc->indices);
+        sc->vb = driver->createVertexBuffer(driver->makeRef(sc->verts, sc->vbSize, nullptr, nullptr), SpriteVertex::Decl, 0);
+        sc->ib = driver->createIndexBuffer(driver->makeRef(sc->indices, sc->ibSize, nullptr, nullptr), 0);
+
+        node = node->next;
+    }
+
     return true;
 }
 
@@ -749,6 +790,19 @@ void termite::shutdownSpriteSystemGraphics()
         driver->destroyProgram(g_spriteSys->spriteAddProg);
     if (g_spriteSys->u_texture.isValid())
         driver->destroyUniform(g_spriteSys->u_texture);
+
+    // Destroy all sprite cache buffers
+    SpriteCache::LNode* node = g_spriteSys->spriteCacheList.getFirst();
+    while (node) {
+        SpriteCache* sc = node->data;
+        if (sc->vb.isValid())
+            driver->destroyVertexBuffer(sc->vb);
+        if (sc->ib.isValid())
+            driver->destroyIndexBuffer(sc->ib);
+        sc->vb = VertexBufferHandle();
+        sc->ib = IndexBufferHandle();
+        node = node->next;
+    }
 }
 
 void termite::setSpriteRenderMode(SpriteRenderMode::Enum mode)
@@ -1005,6 +1059,11 @@ vec2_t termite::getSpriteHalfSize(Sprite* sprite)
 void termite::setSpriteSizeMultiplier(Sprite* sprite, const vec2_t& sizeMultiplier)
 {
     sprite->sizeMultiplier = sizeMultiplier;
+}
+
+vec2_t termite::getSpriteSizeMultiplier(Sprite* sprite)
+{
+    return sprite->sizeMultiplier;
 }
 
 void termite::gotoSpriteFrameIndex(Sprite* sprite, int frameIdx)
@@ -1618,6 +1677,277 @@ void termite::drawSprites(uint8_t viewId, Sprite** sprites, uint16_t numSprites,
     }
 
     batches.destroy();
+}
+
+SpriteCache* termite::createSpriteCache(bx::AllocatorI* alloc, Sprite** sprites, uint16_t numSprites, const mtx3x3_t* mats, 
+                                        const color_t* colors /*= nullptr*/)
+{
+    if (numSprites <= 0)
+        return nullptr;
+    assert(sprites);
+
+    // Evaluate final vertices and indexes
+    int numVerts = 0, numIndices = 0;
+    for (int si = 0; si < numSprites; si++) {
+        Sprite* sprite = sprites[si];
+        const SpriteFrame& frame = sprite->frames[sprite->curFrameIdx];
+
+        if (frame.ssHandle.isValid()) {
+            assert(frame.meshId != -1);
+            SpriteSheet* sheet = getResourcePtr<SpriteSheet>(frame.ssHandle);
+            const SpriteMesh& mesh = sheet->meshes[frame.meshId];
+            numVerts += mesh.numVerts;
+            numIndices += mesh.numTris*3;
+        } else {
+            numVerts += 4;
+            numIndices += 6;
+        }
+    }
+
+    // Create vertex and index buffers
+    SpriteCache* sc = BX_NEW(alloc, SpriteCache)(alloc);
+    sc->vbSize = sizeof(SpriteVertex)*numVerts;
+    sc->verts = BX_ALLOC(alloc, sc->vbSize);
+    sc->ibSize = sizeof(uint16_t)*numIndices;
+    sc->indices = BX_ALLOC(alloc, sc->ibSize);
+
+    SpriteVertex* verts = (SpriteVertex*)sc->verts;
+    uint16_t* indices = (uint16_t*)sc->indices;
+
+    bx::AllocatorI* tmpAlloc = getTempAlloc();
+
+    // Calculate bounds
+    sc->bounds = rectEmpty();
+    for (int i = 0; i < numSprites; i++) {
+        rect_t spriteBounds = getSpriteDrawRect(sprites[i]);
+        vec2_t bounds[4] = {spriteBounds.vmin,
+            vec2f(spriteBounds.xmax, spriteBounds.ymin),
+            vec2f(spriteBounds.xmin, spriteBounds.ymax),
+            spriteBounds.vmax};
+        for (int k = 0; k < 4; k++) {
+            vec2_t tpt;
+            bx::vec2MulMtx3x3(tpt.f, bounds[k].f, mats[i].f);
+            rectPushPoint(&sc->bounds, tpt);
+        }
+    }
+
+    // Sort sprites by order->texture->id and batch them
+    SortedSprite* sortedSprites = (SortedSprite*)BX_ALLOC(tmpAlloc, sizeof(SortedSprite)*numSprites);
+
+    for (int i = 0; i < numSprites; i++) {
+        const SpriteFrame& frame = sprites[i]->getCurFrame();
+        sortedSprites[i].index = i;
+        sortedSprites[i].sprite = sprites[i];
+        sortedSprites[i].key = MAKE_SPRITE_KEY(sprites[i]->order, frame.texHandle.value, sprites[i]->id);
+    }
+
+    if (numSprites > 1) {
+        std::sort(sortedSprites, sortedSprites + numSprites, [](const SortedSprite& a, const SortedSprite&b)->bool {
+            return a.key < b.key;
+        });
+    }
+
+    // Fill draw data (geometry)
+    mtx3x3_t preMat, finalMat;
+    int indexIdx = 0;
+    int vertexIdx = 0;
+
+    // Batching
+    bx::Array<SpriteDrawBatch> batches;
+    batches.create(32, 64, tmpAlloc);
+    uint32_t prevKey = UINT32_MAX;
+    SpriteDrawBatch* curBatch = nullptr;
+
+    for (int si = 0; si < numSprites; si++) {
+        const SortedSprite ss = sortedSprites[si];
+        Sprite* sprite = sprites[ss.index];
+        const SpriteFrame& frame = sprite->frames[sprite->curFrameIdx];
+
+        vec2_t halfSize = sprite->halfSize;
+        float pixelRatio = frame.pixelRatio;
+        SpriteFlag::Bits flipX = sprite->flip | frame.flags;
+        SpriteFlag::Bits flipY = sprite->flip | frame.flags;
+        float scalex, scaley;
+        if (halfSize.y <= 0) {
+            scalex = halfSize.x*2.0f;
+            scaley = scalex / pixelRatio;
+        } else if (halfSize.x <= 0) {
+            scaley = halfSize.y*2.0f;
+            scalex = scaley*pixelRatio;
+        } else {
+            scalex = halfSize.x*2.0f;
+            scaley = halfSize.y*2.0f;
+        }
+
+        vec2_t pos = sprite->posOffset - frame.pivot;
+        vec2_t scale = vec2f(scalex, scaley) * sprite->sizeMultiplier;
+
+        if (flipX & SpriteFlip::FlipX)
+            scale.x = -scale.x;
+        if (flipY & SpriteFlip::FlipY)
+            scale.y = -scale.y;
+
+        // Transform (offset x sprite's own matrix)
+        // PreMat = TranslateMat * ScaleMat
+        preMat.m11 = scale.x;       preMat.m12 = 0;             preMat.m13 = 0;
+        preMat.m21 = 0;             preMat.m22 = scale.y;       preMat.m23 = 0;
+        preMat.m31 = scale.x*pos.x; preMat.m32 = scale.y*pos.y; preMat.m33 = 1.0f;
+        bx::mtx3x3Mul(finalMat.f, preMat.f, mats[ss.index].f);
+
+        vec3_t transform1 = vec3f(finalMat.m11, finalMat.m12, finalMat.m21);
+        vec3_t transform2 = vec3f(finalMat.m22, finalMat.m31, finalMat.m32);
+        uint32_t color;
+        if (!colors)    color = ss.sprite->tint.n;
+        else            color = colors[ss.index].n;
+
+        // Batch
+        uint32_t batchKey = SPRITE_KEY_GET_BATCH(ss.key);
+        if (batchKey != prevKey) {
+            curBatch = batches.push();
+            curBatch->texHandle = frame.texHandle;
+            curBatch->numVerts = 0;
+            curBatch->numIndices = 0;
+            curBatch->startIdx = indexIdx;
+            prevKey = batchKey;
+        }
+
+        // Fill geometry data
+        if (frame.ssHandle.isValid()) {
+            SpriteSheet* sheet = getResourcePtr<SpriteSheet>(frame.ssHandle);
+            assert(frame.meshId != -1);
+            const SpriteMesh& mesh = sheet->meshes[frame.meshId];
+
+            for (int i = 0, c = mesh.numVerts; i < c; i++) {
+                int k = i + vertexIdx;
+                verts[k].pos = mesh.verts[i];
+                verts[k].transform1 = transform1;
+                verts[k].transform2 = transform2;
+                verts[k].coords = mesh.uvs[i];
+                verts[k].color = color;
+            }
+
+            for (int i = 0, c = mesh.numTris; i < c; i++) {
+                int k = i*3;
+                indices[k + indexIdx] = mesh.tris[k] + vertexIdx;
+                indices[k + indexIdx + 1] = mesh.tris[k + 1] + vertexIdx;
+                indices[k + indexIdx + 2] = mesh.tris[k + 2] + vertexIdx;
+            }
+
+            int numIndices = mesh.numTris*3;
+            indexIdx += numIndices;
+            vertexIdx += mesh.numVerts;
+            curBatch->numVerts += mesh.numVerts;
+            curBatch->numIndices += uint16_t(numIndices);
+        } else {
+            // Make a normalized quad
+            SpriteVertex& v0 = verts[vertexIdx];
+            SpriteVertex& v1 = verts[vertexIdx + 1];
+            SpriteVertex& v2 = verts[vertexIdx + 2];
+            SpriteVertex& v3 = verts[vertexIdx + 3];
+            v0.pos = vec2f(-0.5f, 0.5f);
+            v0.coords = vec2f(0, 0);
+
+            v1.pos = vec2f(0.5f, 0.5f);
+            v1.coords = vec2f(1.0f, 0);
+
+            v2.pos = vec2f(-0.5f, -0.5f);
+            v2.coords = vec2f(0, 1.0f);
+
+            v3.pos = vec2f(0.5f, -0.5f);
+            v3.coords = vec2f(1.0f, 1.0f);
+
+            v0.transform1 = v1.transform1 = v2.transform1 = v3.transform1 = transform1;
+            v0.transform2 = v1.transform2 = v2.transform2 = v3.transform2 = transform2;
+            v0.color = v1.color = v2.color = v3.color = color;
+
+            indices[indexIdx] = vertexIdx;
+            indices[indexIdx + 1] = vertexIdx + 1;
+            indices[indexIdx + 2] = vertexIdx + 2;
+            indices[indexIdx + 3] = vertexIdx + 2;
+            indices[indexIdx + 4] = vertexIdx + 1;
+            indices[indexIdx + 5] = vertexIdx + 3;
+
+            vertexIdx += 4;
+            indexIdx += 6;
+            curBatch->numVerts += 4;
+            curBatch->numIndices += 6;
+        }
+    }
+
+    // save batches
+    sc->numBatches = batches.getCount();
+    sc->batches = (SpriteDrawBatch*)BX_ALLOC(alloc, sizeof(SpriteDrawBatch)*sc->numBatches);
+    bx::memCopy(sc->batches, batches.getBuffer(), batches.getCount()*sizeof(SpriteDrawBatch));
+    batches.destroy();
+
+    // Create buffers
+    GfxDriverApi* gDriver = getGfxDriver();
+    sc->vb = gDriver->createVertexBuffer(gDriver->makeRef(sc->verts, sc->vbSize, nullptr, nullptr), SpriteVertex::Decl, 0);
+    sc->ib = gDriver->createIndexBuffer(gDriver->makeRef(sc->indices, sc->ibSize, nullptr, nullptr), 0);
+
+    // Add to SpriteCache list for graphics restore
+    g_spriteSys->spriteCacheList.add(&sc->lnode);
+
+    return sc;
+}
+
+void termite::drawSpriteCache(uint8_t viewId, SpriteCache* spriteCache, 
+                              ProgramHandle progOverride /*= ProgramHandle()*/, 
+                              SetSpriteStateCallback stateCallback /*= nullptr*/, void* stateUserData /*= nullptr*/)
+{
+    GfxDriverApi* gDriver = getGfxDriver();
+    SpriteCache* sc = spriteCache;
+
+    GfxState::Bits state = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite;
+    ProgramHandle prog = !progOverride.isValid() ? g_spriteSys->spriteProg : progOverride;
+    for (int i = 0, c = sc->numBatches; i < c; i++) {
+        const SpriteDrawBatch batch = sc->batches[i];
+        gDriver->setState(state, 0);
+        gDriver->setVertexBufferI(0, sc->vb, 0, batch.numVerts);
+        gDriver->setIndexBuffer(sc->ib, batch.startIdx, batch.numIndices);
+        if (batch.texHandle.isValid())
+            gDriver->setTexture(0, g_spriteSys->u_texture, getResourcePtr<Texture>(batch.texHandle)->handle, TextureFlag::FromTexture);
+
+        if (stateCallback) {
+            stateCallback(gDriver, stateUserData);
+        }
+        gDriver->submit(viewId, prog, 0, false);
+    }
+}
+
+void termite::destroySpriteCache(SpriteCache* spriteCache)
+{
+    SpriteCache* sc = spriteCache;
+    if (sc->alloc) {
+        g_spriteSys->spriteCacheList.remove(&sc->lnode);
+
+        if (sc->verts) {
+            BX_FREE(sc->alloc, sc->verts);
+        }
+
+        if (sc->indices) {
+            BX_FREE(sc->alloc, sc->indices);
+        }
+
+        if (sc->batches) {
+            BX_FREE(sc->alloc, sc->batches);
+        }
+
+        GfxDriverApi* gDriver = getGfxDriver();
+        if (sc->vb.isValid()) {
+            gDriver->destroyVertexBuffer(sc->vb);
+        }
+        if (sc->ib.isValid()) {
+            gDriver->destroyIndexBuffer(sc->ib);
+        }
+
+        BX_DELETE(sc->alloc, sc);
+    }
+}
+
+rect_t termite::getSpriteCacheBounds(SpriteCache* spriteCache)
+{
+    return spriteCache->bounds;
 }
 
 void termite::registerSpriteSheetToResourceLib()

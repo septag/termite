@@ -68,7 +68,17 @@ namespace termite
         typedef uint8_t Bits;
     };
 
-    // Backend interface for 
+    struct IoReadFlags
+    {
+        enum Enum
+        {
+            RawRead = 0x1
+        };
+
+        typedef uint8_t Bits;
+    };
+
+    // Backend interface for Io plugins
     struct IoDriverApi
     {
     public:
@@ -79,7 +89,7 @@ namespace termite
         void(*setCallbacks)(IoDriverEventsI* callbacks);
         IoDriverEventsI* (*getCallbacks)();
 
-        MemoryBlock* (*read)(const char* uri, IoPathType::Enum pathType/* = IoPathType::Assets*/);
+        MemoryBlock* (*read)(const char* uri, IoPathType::Enum pathType/* = IoPathType::Assets*/, IoReadFlags::Bits flags/* = 0*/);
         size_t(*write)(const char* uri, const MemoryBlock* mem, IoPathType::Enum pathType/* = IoPathType::Assets*/);
 
         IoStream* (*openStream)(const char* uri, IoStreamFlag flags);

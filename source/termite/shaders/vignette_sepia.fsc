@@ -6,6 +6,7 @@ SAMPLER2D(u_texture, 0);
 
 uniform vec4 u_vignetteParams;      // x=radius, y=softness, z=strength
 uniform vec4 u_sepiaParams;         // xyz=color, w=strength
+uniform vec4 u_vignetteColor;
 
 void main()
 {
@@ -16,7 +17,7 @@ void main()
     float len = length(pos);
     float vignette = smoothstep(u_vignetteParams.x, u_vignetteParams.x-u_vignetteParams.y, len);
 
-    color.rgb = mix(color.rgb, color.rgb * vignette, u_vignetteParams.z);
+    color.rgb = mix(u_vignetteParams.z*u_vignetteColor.rgb+color.rgb, color.rgb * vignette, u_vignetteParams.z);
 
     // Sepia
     float gray = dot(color.rgb, vec3(0.2999, 0.587, 0.114));

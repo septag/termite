@@ -9,6 +9,7 @@
 #include "bx/uint32_t.h"
 #include "bxx/array.h"
 #include "bxx/path.h"
+#include "bx/os.h"
 
 #define BX_IMPLEMENT_LOGGER
 #include "bxx/logger.h"
@@ -250,7 +251,8 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    if (args.inFilepath.getType() != bx::PathType::File) {
+    bx::FileInfo finfo;
+    if (!bx::stat(args.inFilepath.cstr(), finfo) || finfo.m_type != bx::FileInfo::Regular) {
         g_logger->fatal("File '%s' is invalid", args.inFilepath.cstr());
         return -1;
     }

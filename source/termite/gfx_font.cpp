@@ -212,14 +212,12 @@ namespace termite
         float y;
         float tx;
         float ty;
-        uint32_t color;
 
         static void init()
         {
             vdeclBegin(&Decl);
             vdeclAdd(&Decl, VertexAttrib::Position, 2, VertexAttribType::Float);
             vdeclAdd(&Decl, VertexAttrib::TexCoord0, 2, VertexAttribType::Float);
-            vdeclAdd(&Decl, VertexAttrib::Color0, 4, VertexAttribType::Uint8, true);
             vdeclEnd(&Decl);
         }
 
@@ -1012,7 +1010,7 @@ namespace termite
         if (sz > 1) {
             int midIdx = startIdx + sz/2;
             for (int i = startIdx; i < midIdx; i++) {
-                std::swap<FontGlyph>(glyphs[i], glyphs[endIdx-i-1]);
+                bx::xchg<FontGlyph>(glyphs[i], glyphs[startIdx+endIdx-i-1]);
             }
         }
     }
@@ -1123,9 +1121,7 @@ namespace termite
         return 0;
     }
 
-    void addText(TextBatch* batch, color_t color, float scale,
-                 const rect_t& rectFit, TextFlags::Bits flags,
-                 const char* text)
+    void addText(TextBatch* batch, float scale, const rect_t& rectFit, TextFlags::Bits flags, const char* text)
     {
         assert(batch);
 
@@ -1233,8 +1229,6 @@ namespace termite
             v3.tx = (gx + glyph.width) / texSize.x;
             v3.ty = (gy + glyph.height) / texSize.y;
 
-            v0.color = v1.color = v2.color = v3.color = color.n;
-
             x += glyph.xadvance*scale*(1.0f - dirInvFactor)*advanceScale;
 
 #if 0
@@ -1277,7 +1271,7 @@ namespace termite
         }
     }
 
-    void addTextf(TextBatch* batch, color_t color, float scale, const rect_t& rectFit, TextFlags::Bits flags, const char* fmt, ...)
+    void addTextf(TextBatch* batch, float scale, const rect_t& rectFit, TextFlags::Bits flags, const char* fmt, ...)
     {
         char text[256];
         va_list args;
@@ -1285,7 +1279,7 @@ namespace termite
         bx::vsnprintf(text, sizeof(text), fmt, args);
         va_end(args);
 
-        addText(batch, color, scale, rectFit, flags, text);
+        addText(batch, scale, rectFit, flags, text);
     }
 
     static void drawTextBatch(GfxDriverApi* gDriver, TextBatch* batch, uint8_t viewId, ProgramHandle prog, Font* font,
@@ -1304,8 +1298,8 @@ namespace termite
             memcpy(tib.data, batch->indices, reqIndices*sizeof(uint16_t));
 
             mtx4x4_t transformMat = batch->transformMtx;
-            transformMat.m31 += offsetPos.x;
-            transformMat.m32 += offsetPos.y;
+            transformMat.m41 += offsetPos.x;
+            transformMat.m42 += offsetPos.y;
             gDriver->setUniform(g_fontSys->uTransformMtx, transformMat.f, 1);
             gDriver->setUniform(g_fontSys->uColor, color.f, 1);
             gDriver->setState(gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite, 0);
@@ -1329,21 +1323,39 @@ namespace termite
         }
     }
 
-    void drawTextDropShadow(TextBatch* batch, uint8_t viewId, color_t shadowColor, vec2_t shadowAmount)
+    void drawText(TextBatch* batch, uint8_t viewId, color_t color)
     {
         if (batch->numChars > 0) {
             GfxDriverApi* gDriver = getGfxDriver();
             Font* font = getResourcePtr<Font>(batch->fontHandle);
 
-            vec2_t shadowOffset = vec2f(shadowAmount.x/font->scaleW, shadowAmount.y/font->scaleH);
-            gDriver->setUniform(g_fontSys->uParams, vec4f(0, 0, shadowOffset.x, shadowOffset.y).f, 1);
-            gDriver->setUniform(g_fontSys->uShadowColor, colorToVec4(shadowColor).f, 1);
-            ProgramHandle prog = (font->flags & FontFlags::DistantField) ? g_fontSys->dfShadowProg : g_fontSys->normalShadowProg;
-            drawTextBatch(gDriver, batch, viewId, prog, font, vec2f(0, 0), vec4f(1.0f, 1.0f, 1.0f, 1.0f));
+            ProgramHandle prog = (font->flags & FontFlags::DistantField) ? g_fontSys->dfProg : g_fontSys->normalProg;
+            drawTextBatch(gDriver, batch, viewId, prog, font, vec2f(0, 0), colorToVec4(color));
         }
     }
 
-    void drawTextOutline(TextBatch* batch, uint8_t viewId, color_t outlineColor /*= color1n(0xff000000)*/, float outlineAmount /*= 1.0f*/)
+    void drawTextDropShadow(TextBatch* batch, uint8_t viewId, color_t color, color_t shadowColor, vec2_t shadowAmount)
+    {
+        if (batch->numChars > 0) {
+            GfxDriverApi* gDriver = getGfxDriver();
+            Font* font = getResourcePtr<Font>(batch->fontHandle);
+
+            if (!(font->flags & FontFlags::Persian)) {
+                vec2_t shadowOffset = vec2f(shadowAmount.x/font->scaleW, shadowAmount.y/font->scaleH);
+                gDriver->setUniform(g_fontSys->uParams, vec4f(0, 0, shadowOffset.x, shadowOffset.y).f, 1);
+                gDriver->setUniform(g_fontSys->uShadowColor, colorToVec4(shadowColor).f, 1);
+                ProgramHandle prog = (font->flags & FontFlags::DistantField) ? g_fontSys->dfShadowProg : g_fontSys->normalShadowProg;
+                drawTextBatch(gDriver, batch, viewId, prog, font, vec2f(0, 0), colorToVec4(color));
+            } else {
+                vec2_t shadowOffset = vec2f(2.0f*shadowAmount.x/batch->screenSize.x, -2.0f*shadowAmount.y/batch->screenSize.y);
+                ProgramHandle prog = (font->flags & FontFlags::DistantField) ? g_fontSys->dfProg : g_fontSys->normalProg;
+                drawTextBatch(gDriver, batch, viewId, prog, font, shadowOffset, colorToVec4(shadowColor));
+                drawTextBatch(gDriver, batch, viewId, prog, font, vec2f(0, 0), colorToVec4(color));
+            }
+        }
+    }
+
+    void drawTextOutline(TextBatch* batch, uint8_t viewId, color_t color, color_t outlineColor, float outlineAmount)
     {
         if (batch->numChars > 0) {
             GfxDriverApi* gDriver = getGfxDriver();
@@ -1356,13 +1368,6 @@ namespace termite
             ProgramHandle prog = (font->flags & FontFlags::DistantField) ? g_fontSys->dfOutlineProg : g_fontSys->normalOutlineProg;
             drawTextBatch(gDriver, batch, viewId, prog, font, vec2f(0, 0), vec4f(1.0f, 1.0f, 1.0f, 1.0f));
         }
-    }
-
-    void drawTextDropShadowTwoPass(TextBatch* batch, uint8_t viewId, color_t shadowColor, vec2_t shadowAmount)
-    {
-        // Draw shadow with offset
-        drawText(batch, viewId, shadowAmount, colorToVec4(shadowColor));
-        drawText(batch, viewId, vec2f(0, 0), vec4f(1.0f, 1.0f, 1.0f, 1.0f));
     }
 
     void destroyTextBatch(TextBatch* batch)

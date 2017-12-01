@@ -6,6 +6,7 @@
 
 #include "bxx/pool.h"
 #include "bx/mutex.h"
+#include "bx/uint32_t.h"
 
 #include "bgfx/bgfx.h"
 #include "bgfx/platform.h"
@@ -298,6 +299,8 @@ static void resetView(uint8_t viewId)
 
 static uint32_t frame()
 {
+    g_bgfx.stats.allocTvbSize = 0;
+    g_bgfx.stats.allocTibSize = 0;
     return bgfx::frame();
 }
 
@@ -359,6 +362,7 @@ static const GfxStats& getStats()
 
     g_bgfx.stats.numViews = stats->numViews;
     memcpy(g_bgfx.stats.viewStats, stats->viewStats, sizeof(ViewStats)*stats->numViews);
+
     return g_bgfx.stats;
 }
 
@@ -830,13 +834,20 @@ static uint32_t getAvailTransientVertexBuffer(uint32_t num, const VertexDecl& de
 static void allocTransientVertexBuffer(TransientVertexBuffer* tvb, uint32_t num, const VertexDecl& decl)
 {
     bgfx::allocTransientVertexBuffer((bgfx::TransientVertexBuffer*)tvb, num, (const bgfx::VertexDecl&)decl);
+    g_bgfx.stats.allocTvbSize += tvb->size;
+    g_bgfx.stats.maxTvbSize = bx::uint32_max(g_bgfx.stats.allocTvbSize, g_bgfx.stats.maxTvbSize);
 }
 
 static bool allocTransientBuffers(TransientVertexBuffer* tvb, const VertexDecl& decl, uint32_t numVerts,
                                   TransientIndexBuffer* tib, uint16_t numIndices)
 {
-    return bgfx::allocTransientBuffers((bgfx::TransientVertexBuffer*)tvb, (const bgfx::VertexDecl&)decl, numVerts,
-                                       (bgfx::TransientIndexBuffer*)tib, numIndices);
+    bool r = bgfx::allocTransientBuffers((bgfx::TransientVertexBuffer*)tvb, (const bgfx::VertexDecl&)decl, numVerts,
+                                         (bgfx::TransientIndexBuffer*)tib, numIndices);
+    g_bgfx.stats.allocTvbSize += tvb->size;
+    g_bgfx.stats.maxTvbSize = bx::uint32_max(g_bgfx.stats.allocTvbSize, g_bgfx.stats.maxTvbSize);
+    g_bgfx.stats.allocTibSize += tib->size;
+    g_bgfx.stats.maxTibSize = bx::uint32_max(g_bgfx.stats.allocTibSize, g_bgfx.stats.maxTibSize);
+    return r;
 }
 
 static IndexBufferHandle createIndexBuffer(const GfxMemory* mem, GpuBufferFlag::Bits flags)
@@ -886,6 +897,8 @@ static uint32_t getAvailTransientIndexBuffer(uint32_t num)
 static void allocTransientIndexBuffer(TransientIndexBuffer* tib, uint32_t num)
 {
     bgfx::allocTransientIndexBuffer((bgfx::TransientIndexBuffer*)tib, num);
+    g_bgfx.stats.allocTibSize += tib->size;
+    g_bgfx.stats.maxTibSize = bx::uint32_max(g_bgfx.stats.allocTibSize, g_bgfx.stats.maxTibSize);
 }
 
 static void calcTextureSize(TextureInfo* info, uint16_t width, uint16_t height, uint16_t depth, bool cubemap,

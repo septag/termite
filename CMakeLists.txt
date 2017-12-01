@@ -286,6 +286,7 @@ if (BUILD_TOOLS)
     add_subdirectory(source/ls-model)
     add_subdirectory(source/modelc)
     add_subdirectory(source/animc)
+    add_subdirectory(source/encrypt)
 endif()
 
 # tests

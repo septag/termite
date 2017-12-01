@@ -382,6 +382,13 @@ namespace termite
 
         uint16_t  numViews;       //!< Number of view stats.
         ViewStats viewStats[256]; //!< View stats.
+
+        // Extra
+        uint32_t allocTvbSize;  // per-frame
+        uint32_t allocTibSize;
+        uint32_t maxTvbSize;
+        uint32_t maxTibSize;
+
     };
 
     struct HMDDesc

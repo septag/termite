@@ -49,10 +49,15 @@ namespace termite
                                                                          float radius, float softness, 
                                                                          float vignetteIntensity,
                                                                          float sepiaIntensity,
-                                                                         color_t sepiaColor);
+                                                                         color_t sepiaColor, 
+                                                                         color_t vignetteColor = color1n(0));
     TERMITE_API TextureHandle drawVignetteSepiaPostProcess(PostProcessVignetteSepia* vignette, uint8_t viewId,
                                                            FrameBufferHandle targetFb, TextureHandle sourceTexture, 
                                                            float intensity = 1.0f);
+    TERMITE_API TextureHandle drawVignettePostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId,
+                                                              FrameBufferHandle targetFb, TextureHandle sourceTexture,
+                                                              float softness, float radius, float intensity = 1.0f,
+                                                              vec4_t vignetteColor = vec4f(0, 0, 0, 0));
     TERMITE_API void destroyVignetteSepiaPostProcess(PostProcessVignetteSepia* vignette);
 
 } // namespace termite

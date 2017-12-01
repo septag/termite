@@ -8,6 +8,7 @@
 #include "bx/file.h"
 #include "bxx/array.h"
 #include "bxx/path.h"
+#include "bx/file.h"
 
 #define BX_IMPLEMENT_JSON
 #include "bxx/json.h"
@@ -1067,7 +1068,8 @@ int main(int argc, char** argv)
         return -1;
     }   
 
-    if (conf.inFilepath.getType() != bx::PathType::File) {
+    bx::FileInfo finfo;
+    if (!bx::stat(conf.inFilepath.cstr(), finfo) || finfo.m_type != bx::FileInfo::Regular) {
         g_logger->fatal("File '%s' is invalid", conf.inFilepath.cstr());
         return -1;
     }        

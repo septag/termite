@@ -22,6 +22,12 @@
 #   define TERMITE_API 
 #endif
 
+#if BX_COMPILER_CLANG || BX_COMPILER_GCC
+#   define T_HIDDEN __attribute__((visibility("hidden")))
+#else
+#   define T_HIDDEN
+#endif
+
 // Versioning Macros
 #define T_MAKE_VERSION(_Major, _Minor)  (uint32_t)(((_Major & 0xffff)<<16) | (_Minor & 0xffff))
 #define T_VERSION_MAJOR(_Ver) (uint16_t)((_Ver >> 16) & 0xffff)
