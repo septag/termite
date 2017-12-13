@@ -630,7 +630,7 @@ void vgArrow(VectorGfxContext* ctx, const vec2_t& p1, const vec2_t& p2, float li
 
     vec2_t d = p2 - p1;
     float totalLen = bx::vec2Length(d.f);
-    float t = bx::fmin(1.0f, arrowLength/totalLen);
+    float t = bx::min(1.0f, arrowLength/totalLen);
 
     vec2_t arrowStart;
     bx::vec2Lerp(arrowStart.f, p2.f, p1.f, t);

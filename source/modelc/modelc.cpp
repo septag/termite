@@ -832,6 +832,7 @@ static bool exportT3d(const char* t3dFilepath, const ModelData& model)
     }
 
     // Geos
+    size_t s = sizeof(t3dVertexAttrib::Enum);
     for (int i = 0; i < model.geos.getCount(); i++) {
         const ModelData::Geometry& geo = model.geos[i];
         file.write(&geo.g, sizeof(geo.g), &err);
@@ -841,9 +842,9 @@ static bool exportT3d(const char* t3dFilepath, const ModelData& model)
         if (geo.initPose)
             file.write(geo.initPose, sizeof(float)*12*geo.g.skel.numJoints, &err);
         if (geo.attribs)
-            file.write(geo.attribs, sizeof(t3dVertexAttrib)*geo.g.numAttribs, &err);
+            file.write(geo.attribs, sizeof(t3dVertexAttrib::Enum)*geo.g.numAttribs, &err);
         if (geo.indices)
-            file.write(geo.indices, sizeof(uint16_t)*geo.g.numTris * 3, &err);
+            file.write(geo.indices, sizeof(uint16_t)*geo.g.numTris*3, &err);
         if (geo.verts)
             file.write(geo.verts, geo.g.vertStride*geo.g.numVerts, &err);
     }

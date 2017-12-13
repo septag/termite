@@ -45,6 +45,17 @@ namespace bx
 		return u.f;
 	}
 
+	inline uint32_t floatFlip(uint32_t _value)
+	{
+		// Reference:
+		// http://archive.fo/2012.12.08-212402/http://stereopsis.com/radix.html
+		const uint32_t tmp0   = uint32_sra(_value, 31);
+		const uint32_t tmp1   = uint32_neg(tmp0);
+		const uint32_t mask   = uint32_or(tmp1, 0x80000000);
+		const uint32_t result = uint32_xor(_value, mask);
+		return result;
+	}
+
 	inline bool isNan(float _f)
 	{
 		const uint32_t tmp = floatToBits(_f) & INT32_MAX;
@@ -86,36 +97,6 @@ namespace bx
 		return ffloor(_f + 0.5f);
 	}
 
-	inline float fmin(float _a, float _b)
-	{
-		return _a < _b ? _a : _b;
-	}
-
-	inline float fmax(float _a, float _b)
-	{
-		return _a > _b ? _a : _b;
-	}
-
-	inline float fmin3(float _a, float _b, float _c)
-	{
-		return fmin(_a, fmin(_b, _c) );
-	}
-
-	inline float fmax3(float _a, float _b, float _c)
-	{
-		return fmax(_a, fmax(_b, _c) );
-	}
-
-	inline float fclamp(float _a, float _min, float _max)
-	{
-		return fmin(fmax(_a, _min), _max);
-	}
-
-	inline float fsaturate(float _a)
-	{
-		return fclamp(_a, 0.0f, 1.0f);
-	}
-
 	inline float flerp(float _a, float _b, float _t)
 	{
 		return _a + (_b - _a) * _t;
@@ -155,7 +136,7 @@ namespace bx
 	{
 		// http://realtimecollisiondetection.net/blog/?p=89
 		const float lhs = fabs(_a - _b);
-		const float rhs = _epsilon * fmax3(1.0f, fabs(_a), fabs(_b) );
+		const float rhs = _epsilon * max(1.0f, fabs(_a), fabs(_b) );
 		return lhs <= rhs;
 	}
 
@@ -208,8 +189,8 @@ namespace bx
 
 	inline float angleDiff(float _a, float _b)
 	{
-		const float dist = fwrap(_b - _a, kPi*2.0f);
-		return fwrap(dist*2.0f, kPi*2.0f) - dist;
+		const float dist = fwrap(_b - _a, kPi2);
+		return fwrap(dist*2.0f, kPi2) - dist;
 	}
 
 	inline float angleLerp(float _a, float _b, float _t)
@@ -323,16 +304,16 @@ namespace bx
 
 	inline void vec3Min(float* _result, const float* _a, const float* _b)
 	{
-		_result[0] = fmin(_a[0], _b[0]);
-		_result[1] = fmin(_a[1], _b[1]);
-		_result[2] = fmin(_a[2], _b[2]);
+		_result[0] = min(_a[0], _b[0]);
+		_result[1] = min(_a[1], _b[1]);
+		_result[2] = min(_a[2], _b[2]);
 	}
 
 	inline void vec3Max(float* _result, const float* _a, const float* _b)
 	{
-		_result[0] = fmax(_a[0], _b[0]);
-		_result[1] = fmax(_a[1], _b[1]);
-		_result[2] = fmax(_a[2], _b[2]);
+		_result[0] = max(_a[0], _b[0]);
+		_result[1] = max(_a[1], _b[1]);
+		_result[2] = max(_a[2], _b[2]);
 	}
 
 	inline void vec3Rcp(float* _result, const float* _a)

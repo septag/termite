@@ -86,7 +86,7 @@ namespace termite {
 
     static HttpRequestContext* g_httpReq = nullptr;
 
-    static int32_t reqThread(void* userData)
+    static int32_t reqThread(bx::Thread* _self, void* userData)
     {
         assert(g_httpReq);
         RestClient::init();

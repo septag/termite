@@ -110,7 +110,7 @@ namespace termite
             gfxWidth = 0;
             gfxHeight = 0;
             gfxDeviceId = 0;
-            gfxDriverFlags = 0;
+            gfxDriverFlags = BX_ENABLED(BX_PLATFORM_IOS) ? GfxResetFlag::HiDPi : 0;
             bx::memSet(keymap, 0x00, sizeof(keymap));
 
             audioFreq = AudioFreq::Freq22Khz;
@@ -175,9 +175,6 @@ namespace termite
     };
 
     // Public
-    TERMITE_API Config* loadConfig(const char* confFilepath);
-    TERMITE_API void freeConfig(Config* conf);
-
     TERMITE_API result_t initialize(const Config& conf, UpdateCallback updateFn = nullptr, 
                                     const GfxPlatformData* platformData = nullptr);
 

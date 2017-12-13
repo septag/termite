@@ -269,4 +269,38 @@ void termite::sdlRegisterShortcutKey(SDL_Keycode vkey, ModifierKey::Bits modKeys
     }
 }
 
+SDL_Window* termite::sdlCreateWindow(const char* name, int x, int y, int width, int height, uint32_t* pSdlWindowFlags)
+{
+    uint32_t windowFlags = SDL_WINDOW_SHOWN;
+
+    // Mobile and desktop flags are different
+    if (BX_ENABLED(BX_PLATFORM_IOS | BX_PLATFORM_ANDROID)) {
+        windowFlags |= SDL_WINDOW_BORDERLESS | SDL_WINDOW_FULLSCREEN_DESKTOP;
+
+        if (BX_ENABLED(BX_PLATFORM_IOS))
+            windowFlags |= SDL_WINDOW_ALLOW_HIGHDPI;
+    } else {
+        bool maximized = pSdlWindowFlags ? (*pSdlWindowFlags & SDL_WINDOW_MAXIMIZED) : false;
+        if (width == 0 || height == 0 || maximized)
+            windowFlags |= SDL_WINDOW_MAXIMIZED;
+
+        if (!pSdlWindowFlags || !((*pSdlWindowFlags) & SDL_WINDOW_FULLSCREEN_DESKTOP)) {
+            windowFlags |= SDL_WINDOW_RESIZABLE;
+        }
+
+        if (pSdlWindowFlags) {
+            windowFlags |= (*pSdlWindowFlags);
+        }
+    }
+
+    SDL_Window* wnd = SDL_CreateWindow(name,
+                            x == 0 ? SDL_WINDOWPOS_UNDEFINED : x,
+                            y == 0 ? SDL_WINDOWPOS_UNDEFINED : y,
+                            width, height, windowFlags);
+
+    if (pSdlWindowFlags)
+        *pSdlWindowFlags = windowFlags & (~SDL_WINDOW_MAXIMIZED);
+    return wnd;
+}
+
 #endif  // if termite_SDL2

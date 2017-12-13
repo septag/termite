@@ -14,6 +14,11 @@ namespace termite
     struct LoadModelParams
     {
         float resize;
+
+        LoadModelParams()
+        {
+            resize = 1.0f;
+        }
     };
 
     struct ModelInstance

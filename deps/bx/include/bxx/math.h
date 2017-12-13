@@ -132,14 +132,14 @@ namespace bx
 
     inline void vec2Min(float* __restrict _result, const float* __restrict _a, const float* __restrict _b)
     {
-        _result[0] = fmin(_a[0], _b[0]);
-        _result[1] = fmin(_a[1], _b[1]);
+        _result[0] = bx::min(_a[0], _b[0]);
+        _result[1] = bx::min(_a[1], _b[1]);
     }
 
     inline void vec2Max(float* __restrict _result, const float* __restrict _a, const float* __restrict _b)
     {
-        _result[0] = fmax(_a[0], _b[0]);
-        _result[1] = fmax(_a[1], _b[1]);
+        _result[0] = bx::max(_a[0], _b[0]);
+        _result[1] = bx::max(_a[1], _b[1]);
     }
 
     inline void vec2Lerp(float* __restrict _result, const float* __restrict _a, const float* __restrict _b, float _t)

@@ -138,7 +138,7 @@ void termite::camYaw(Camera* cam, float yaw)
     updateRotation(cam);
 }
 
-TERMITE_API void termite::camPitchYaw(Camera* cam, float pitch, float yaw)
+void termite::camPitchYaw(Camera* cam, float pitch, float yaw)
 {
     cam->pitch += pitch;
     cam->yaw += yaw;

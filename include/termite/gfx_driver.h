@@ -123,7 +123,7 @@ namespace termite
 
         // Misc
         void(*discard)();
-        uint32_t(*touch)(uint8_t id);
+        void(*touch)(uint8_t id);
         void(*setPaletteColor)(uint8_t index, uint32_t rgba);
         void(*setPaletteColorRgba)(uint8_t index, float rgba[4]);
         void(*setPaletteColorRgbaf)(uint8_t index, float r, float g, float b, float a);
@@ -176,10 +176,10 @@ namespace termite
         void(*setTexture)(uint8_t stage, UniformHandle sampler, TextureHandle handle, TextureFlag::Bits flags/* = TextureFlag::FromTexture*/);
 
         // Submit
-        uint32_t(*submit)(uint8_t viewId, ProgramHandle program, int32_t depth/* = 0*/, bool preserveState/* = false*/);
-        uint32_t(*submitWithOccQuery)(uint8_t viewId, ProgramHandle program, OcclusionQueryHandle occQuery,
+        void(*submit)(uint8_t viewId, ProgramHandle program, int32_t depth/* = 0*/, bool preserveState/* = false*/);
+        void(*submitWithOccQuery)(uint8_t viewId, ProgramHandle program, OcclusionQueryHandle occQuery,
                                       int32_t depth/* = 0*/, bool preserveState/* = false*/);
-        uint32_t(*submitIndirect)(uint8_t viewId, ProgramHandle program, IndirectBufferHandle indirectHandle,
+        void(*submitIndirect)(uint8_t viewId, ProgramHandle program, IndirectBufferHandle indirectHandle,
                                   uint16_t start, uint16_t num, int32_t depth/* = 0*/, bool preserveState/* = false*/);
 
         // Compute
@@ -194,10 +194,10 @@ namespace termite
                                 GpuAccessFlag::Enum access, TextureFormat::Enum fmt);
 
         // Compute Dispatch
-        uint32_t(*computeDispatch)(uint8_t viewId, ProgramHandle handle, uint32_t numX, uint32_t numY, uint32_t numZ,
-                                   GfxSubmitFlag::Bits flags/* = GfxSubmitFlag::Left*/);
-        uint32_t(*computeDispatchIndirect)(uint8_t viewId, ProgramHandle handle, IndirectBufferHandle indirectHandle,
-                                   uint16_t start, uint16_t num, GfxSubmitFlag::Bits flags/* = GfxSubmitFlag::Left*/);
+        void(*computeDispatch)(uint8_t viewId, ProgramHandle handle, uint32_t numX, uint32_t numY, uint32_t numZ,
+                               GfxSubmitFlag::Bits flags/* = GfxSubmitFlag::Left*/);
+        void(*computeDispatchIndirect)(uint8_t viewId, ProgramHandle handle, IndirectBufferHandle indirectHandle,
+                                       uint16_t start, uint16_t num, GfxSubmitFlag::Bits flags/* = GfxSubmitFlag::Left*/);
 
         // Blit
         void (*blit)(uint8_t viewId, TextureHandle dest, uint16_t destX, uint16_t destY, TextureHandle src,

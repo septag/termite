@@ -616,11 +616,11 @@ void termite::ddRect(DebugDrawContext* ctx, const vec3_t& minpt, const vec3_t& m
 void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spacing, float boldSpacing, float maxDepth,
                            color_t color, color_t boldColor)
 {
-    spacing = bx::fceil(bx::fclamp(spacing, 1.0f, 20.0f));
+    spacing = bx::fceil(bx::clamp(spacing, 1.0f, 20.0f));
 
     vec3_t corners[8];
     float ratio = float(ctx->viewport.xmax - ctx->viewport.xmin) / float(ctx->viewport.ymax - ctx->viewport.ymin);
-    cam.calcFrustumCorners(corners, ratio, -2.0f, bx::fmin(maxDepth, cam.ffar));
+    cam.calcFrustumCorners(corners, ratio, -2.0f, bx::min(maxDepth, cam.ffar));
 
     mtx4x4_t projToXz;
     mtxProjPlane(&projToXz, vec3f(0, 1.0f, 0));
@@ -695,7 +695,7 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spaci
 
     driver->setTransientVertexBuffer(0, &tvb);
     driver->setTransform(ident.f, 1);
-    driver->setState(GfxState::RGBWrite | GfxState::DepthTestLess | GfxState::PrimitiveLines, 0);
+    driver->setState(GfxState::RGBWrite | GfxState::DepthTestLess | GfxState::PrimitiveLines | GfxState::DepthWrite, 0);
     driver->setUniform(g_dbg->uColor, state->color.f, 1);
     driver->setTexture(0, g_dbg->uTexture, g_dbg->whiteTexture, TextureFlag::FromTexture);
     driver->submit(ctx->viewId, g_dbg->program, 0, false);
@@ -704,7 +704,7 @@ void termite::ddSnapGridXZ(DebugDrawContext* ctx, const Camera& cam, float spaci
 void termite::ddSnapGridXY(DebugDrawContext* ctx, const Camera2D& cam, float spacing, float boldSpacing,
                            color_t color, color_t boldColor, bool showVerticalInfo)
 {
-    spacing = bx::fceil(bx::fclamp(spacing, 1.0f, 20.0f));
+    spacing = bx::fceil(bx::clamp(spacing, 1.0f, 20.0f));
 
     rect_t rc = cam.getRect();
 

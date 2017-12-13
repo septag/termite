@@ -247,7 +247,7 @@ public:
     void render(float dt, uint8_t viewId, FrameBufferHandle renderFb, TextureHandle sourceTex, const vec2i_t& renderSize) override
     {
         m_elapsedTm += dt;
-        float normTm = bx::fmin(1.0f, m_elapsedTm / m_params.duration);
+        float normTm = bx::min(1.0f, m_elapsedTm / m_params.duration);
         vec4_t mixValue = vec4f(bx::fbias(normTm, m_params.biasFactor), 0, 0, 0);
         uint64_t extraState = (m_mode != FadeEffect::FadeOutAlpha && m_mode != FadeEffect::FadeInAlpha) ? 0 : 
             gfxStateBlendAlpha();

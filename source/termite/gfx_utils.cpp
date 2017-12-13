@@ -389,7 +389,7 @@ namespace termite
         vignette->width = width;
         vignette->height = height;
         vignette->radius = radius;
-        vignette->softness = bx::fclamp(softness, 0, 0.5f);
+        vignette->softness = bx::clamp<float>(softness, 0, 0.5f);
         vignette->sepiaColor = colorToVec4(sepiaColor);
         vignette->vignetteColor = colorToVec4(vignetteColor);
         vignette->vignetteIntensity = vignetteIntensity;
@@ -430,7 +430,29 @@ namespace termite
         return driver->getFrameBufferTexture(targetFb, 0);
     }
 
-    TextureHandle drawVignettePostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId, FrameBufferHandle targetFb, 
+    TextureHandle drawVignetteSepiaPostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId, 
+                                                       FrameBufferHandle targetFb, TextureHandle sourceTexture, 
+                                                       float intensity, float vigIntensity, float vigRadius)
+    {
+        GfxDriverApi* driver = g_gutils->driver;
+
+        vec4_t vigParams = vec4f(vigRadius != 0 ? vigRadius : vignette->radius, vignette->softness, intensity*vigIntensity, 0);
+        vec4_t sepiaParams = vec4f(vignette->sepiaColor.x, vignette->sepiaColor.y, vignette->sepiaColor.z,
+                                   intensity*vignette->sepiaIntensity);
+
+        driver->setViewRect(viewId, 0, 0, vignette->width, vignette->height);
+        driver->setViewFrameBuffer(viewId, targetFb);
+        driver->setState(GfxState::RGBWrite, 0);
+        driver->setTexture(0, vignette->uTexture, sourceTexture, TextureFlag::FromTexture);
+        driver->setUniform(vignette->uVignetteParams, vigParams.f, 1);
+        driver->setUniform(vignette->uSepiaParams, sepiaParams.f, 1);
+        driver->setUniform(vignette->uVignetteColor, vignette->vignetteColor.f, 1);
+
+        drawFullscreenQuad(viewId, vignette->prog);
+        return driver->getFrameBufferTexture(targetFb, 0);
+    }
+
+    TextureHandle drawVignettePostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId, FrameBufferHandle targetFb,
                                                   TextureHandle sourceTexture, float softness, float radius, float intensity,
                                                   vec4_t vignetteColor)
     {

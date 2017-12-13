@@ -458,7 +458,7 @@ void termite::deleteJob(JobHandle handle) T_THREAD_SAFE
     g_dispatcher->counterLock.unlock();
 }
 
-static int32_t threadFunc(void* userData)
+static int32_t threadFunc(bx::Thread* self, void* userData)
 {
     // Initialize thread data
     ThreadData* data = createThreadData(g_dispatcher->alloc, bx::getTid(), false);

@@ -87,8 +87,8 @@ namespace termite
                         cps[bezier->selectedPt].x += delta.x;
                     cps[bezier->selectedPt].y += delta.y;
                     bezier->controlPts[bezier->selectedPt] = convertToNorm(cps[bezier->selectedPt]);
-                    bezier->controlPts[bezier->selectedPt].x = bx::fclamp(bezier->controlPts[bezier->selectedPt].x, 0, 1.0f);
-                    bezier->controlPts[bezier->selectedPt].y = bx::fclamp(bezier->controlPts[bezier->selectedPt].y, -1.0f, 1.0f);
+                    bezier->controlPts[bezier->selectedPt].x = bx::clamp<float>(bezier->controlPts[bezier->selectedPt].x, 0, 1.0f);
+                    bezier->controlPts[bezier->selectedPt].y = bx::clamp(bezier->controlPts[bezier->selectedPt].y, -1.0f, 1.0f);
                     ImGui::ResetMouseDragDelta(0);
                 }
             } else if (bezier->selectedPt != -1 && !ImGui::IsMouseDown(0)) {
@@ -139,9 +139,9 @@ namespace termite
         ImVec2 ctrlPos = ImGui::GetCursorScreenPos();            // ImDrawList API uses screen coordinates!
         ImVec2 ctrlSize = ImGui::GetContentRegionAvail();        // Resize canvas to what's available
         if (size.x > 0)
-            ctrlSize.x = bx::fmin(size.x, ctrlSize.x);
+            ctrlSize.x = bx::min(size.x, ctrlSize.x);
         if (size.y > 0)
-            ctrlSize.y = bx::fmin(size.y, ctrlSize.y);
+            ctrlSize.y = bx::min(size.y, ctrlSize.y);
         if (ctrlSize.x < 50.0f)
             ctrlSize.x = 50.0f;
         if (ctrlSize.y < 50.0f)
@@ -252,9 +252,9 @@ namespace termite
         ImVec2 ctrlPos = ImGui::GetCursorScreenPos();            // ImDrawList API uses screen coordinates!
         ImVec2 ctrlSize = ImGui::GetContentRegionAvail();        // Resize canvas to what's available
         if (size.x > 0)
-            ctrlSize.x = bx::fmin(size.x, ctrlSize.x);
+            ctrlSize.x = bx::min(size.x, ctrlSize.x);
         if (size.y > 0)
-            ctrlSize.y = bx::fmin(size.y, ctrlSize.y);
+            ctrlSize.y = bx::min(size.y, ctrlSize.y);
         if (ctrlSize.x < 50.0f)
             ctrlSize.x = 50.0f;
         if (ctrlSize.y < 50.0f)
@@ -262,7 +262,7 @@ namespace termite
 
         const float fixedItemHeight = ImGui::GetTextLineHeight();
         const float changeItemHeight = fixedItemHeight*1.5f;
-        float totalHeight = bx::fmin(ctrlSize.y, changeItemHeight + fixedItemHeight*float(numValues-1));
+        float totalHeight = bx::min(ctrlSize.y, changeItemHeight + fixedItemHeight*float(numValues-1));
         float totalWidth = ctrlSize.x;
 
         ImGui::InvisibleButton(strId, ImVec2(totalWidth, totalHeight));
@@ -274,7 +274,7 @@ namespace termite
         // calculate maximum
         float maxValue = 0;
         for (int i = 0; i < numValues; i++) {
-            maxValue = bx::fmax(maxValue, values[i].y);
+            maxValue = bx::max(maxValue, values[i].y);
         }
 
         // Draw Items

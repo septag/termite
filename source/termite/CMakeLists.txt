@@ -84,7 +84,7 @@ add_library(termite ${BUILD_LIBRARY_TYPE}
 if (ANDROID)
     set(PUBLIC_LIBS log dl GLESv2 EGL android)
 elseif (UNIX)
-    set(PUBLIC_LIBS pthread dl)
+    set(PUBLIC_LIBS pthread dl m)
 endif()
 
 if (USE_CURL)
@@ -98,10 +98,6 @@ if (CMAKE_COMPILER_IS_GNUCC)
         set(PRIVATE_LIBS gcc gcc_s)        
     endif()
 endif()
-
-#if (ANDROID)
-#    set(PRIVATE_LIBS ${PRIVATE_LIBS} stdc++)
-#endif()
 
 # statically linked plugin libraries
 if (BUILD_STATIC)
@@ -136,7 +132,7 @@ endif()
 
 # PCH
 if (NOT ANDROID)
-    add_precompiled_header(termite pch.h)
+    add_precompiled_header(termite pch.h FORCEINCLUDE)
 endif()
 
 ## Install

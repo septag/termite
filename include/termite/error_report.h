@@ -1,6 +1,7 @@
 #pragma once
 
 #include "bx/allocator.h"
+#include "bxx/logger.h"
 
 // Maximum error stack size that is allocated inside error handler
 // Which means that more throws than the maximum number will not be saved unless they are 'Clear'ed
@@ -18,6 +19,16 @@
 #define T_ERR_NOT_INITIALIZED -5
 #define T_ERR_ALREADY_EXISTS -6
 #define T_ERR_IO_FAILED -7
+
+#if defined(_DEBUG) || termite_DEV
+#ifdef BX_CHECK
+#   undef BX_CHECK
+#endif
+#define BX_CHECK(_condition, _fmt, ...) \
+    if (!BX_IGNORE_C4127(_condition)) { \
+         bx::logPrintf(__FILE__, __LINE__, bx::LogType::Fatal, _fmt, ##__VA_ARGS__);    \
+    }
+#endif
 
 namespace termite
 {

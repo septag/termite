@@ -469,11 +469,11 @@ namespace termite
         auto readKeyValue = [](char* token, char* key, char* value, size_t maxChars) {
             char* equal = strchr(token, '=');
             if (equal) {
-                bx::strCopy(key, std::min<size_t>(maxChars, size_t(equal-token)+1), token);
+                bx::strCopy(key, (int)bx::min<size_t>(maxChars, size_t(equal-token)+1), token);
                 if (*(equal + 1) != '"')
-                    bx::strCopy(value, maxChars, equal + 1);
+                    bx::strCopy(value, (int)maxChars, equal + 1);
                 else
-                    bx::strCopy(value, maxChars, equal + 2);
+                    bx::strCopy(value, (int)maxChars, equal + 2);
                 size_t vlen = strlen(value);
                 if (value[vlen-1] == '"')
                     value[vlen-1] = 0;
@@ -488,7 +488,7 @@ namespace termite
             char snum[16];
             char* token = strchr(value, ',');
             while (token) {
-                bx::strCopy(snum, std::min<size_t>(sizeof(snum), size_t(token-value)+1), value);
+                bx::strCopy(snum, (int)bx::min<size_t>(sizeof(snum), size_t(token-value)+1), value);
                 if (index < maxNumbers)
                     numbers[index++] = (int16_t)bx::toInt(snum);
                 value = token + 1;
@@ -632,7 +632,7 @@ namespace termite
         int kernIdx = 0;
         int charIdx = 0;
         while (eol) {
-            bx::strCopy(line, std::min<size_t>(sizeof(line), size_t(eol - strbuff)+1), strbuff);
+            bx::strCopy(line, (int)std::min<size_t>(sizeof(line), size_t(eol - strbuff)+1), strbuff);
             size_t lineLen = strlen(line);
             if (lineLen > 0) {
                 if (line[lineLen-1] == '\r')

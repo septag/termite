@@ -54,6 +54,10 @@ namespace termite
     TERMITE_API TextureHandle drawVignetteSepiaPostProcess(PostProcessVignetteSepia* vignette, uint8_t viewId,
                                                            FrameBufferHandle targetFb, TextureHandle sourceTexture, 
                                                            float intensity = 1.0f);
+    TERMITE_API TextureHandle drawVignetteSepiaPostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId,
+                                                                   FrameBufferHandle targetFb, TextureHandle sourceTexture,
+                                                                   float intensity = 1.0f, float sepiaIntensity = 1.0f,
+                                                                   float sepiaRadius = 0);
     TERMITE_API TextureHandle drawVignettePostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId,
                                                               FrameBufferHandle targetFb, TextureHandle sourceTexture,
                                                               float softness, float radius, float intensity = 1.0f,

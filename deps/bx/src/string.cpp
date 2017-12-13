@@ -3,6 +3,7 @@
  * License: https://github.com/bkaradzic/bx#license-bsd-2-clause
  */
 
+#include "bx_p.h"
 #include <bx/allocator.h>
 #include <bx/hash.h>
 #include <bx/readerwriter.h>
@@ -10,6 +11,7 @@
 
 #if !BX_CRT_NONE
 #	include <stdio.h> // vsnprintf, vsnwprintf
+#	include <wchar.h> // vswprintf
 #endif // !BX_CRT_NONE
 
 namespace bx
@@ -167,17 +169,11 @@ namespace bx
         return strtoul(_str, nullptr, 10);
     }
 
-    typedef char(*CharFn)(char _ch);
+	typedef char (*CharFn)(char _ch);
 
 	inline char toNoop(char _ch)
 	{
 		return _ch;
-	}
-
-	template<typename Ty>
-	inline Ty min(Ty _a, Ty _b)
-	{
-		return _a > _b ? _b : _a;
 	}
 
 	template<CharFn fn>
@@ -348,9 +344,9 @@ namespace bx
 		return strCat(_dst, _dstSize, _str.getPtr(), min(_str.getLength(), _num) );
 	}
 
-	inline const char* strFind(const char* _str, int32_t _max, char _ch)
+	inline const char* strFindUnsafe(const char* _str, int32_t _len, char _ch)
 	{
-		for (int32_t ii = 0, len = strLen(_str, _max); ii < len; ++ii)
+		for (int32_t ii = 0; ii < _len; ++ii)
 		{
 			if (_str[ii] == _ch)
 			{
@@ -359,6 +355,11 @@ namespace bx
 		}
 
 		return NULL;
+	}
+
+	inline const char* strFind(const char* _str, int32_t _max, char _ch)
+	{
+		return strFindUnsafe(_str, strLen(_str, _max), _ch);
 	}
 
 	const char* strFind(const StringView& _str, char _ch)
@@ -366,9 +367,9 @@ namespace bx
 		return strFind(_str.getPtr(), _str.getLength(), _ch);
 	}
 
-	inline const char* strRFind(const char* _str, int32_t _max, char _ch)
+	inline const char* strRFindUnsafe(const char* _str, int32_t _len, char _ch)
 	{
-		for (int32_t ii = strLen(_str, _max); 0 <= ii; --ii)
+		for (int32_t ii = _len; 0 <= ii; --ii)
 		{
 			if (_str[ii] == _ch)
 			{
@@ -377,6 +378,11 @@ namespace bx
 		}
 
 		return NULL;
+	}
+
+	inline const char* strRFind(const char* _str, int32_t _max, char _ch)
+	{
+		return strRFindUnsafe(_str, strLen(_str, _max), _ch);
 	}
 
 	const char* strRFind(const StringView& _str, char _ch)
@@ -445,6 +451,50 @@ namespace bx
 			);
 	}
 
+	StringView strLTrim(const StringView& _str, const StringView& _chars)
+	{
+		const char* ptr   = _str.getPtr();
+		const char* chars = _chars.getPtr();
+		const uint32_t charsLen = _chars.getLength();
+
+		for (uint32_t ii = 0, len = _str.getLength(); ii < len; ++ii)
+		{
+			if (NULL == strFindUnsafe(chars, charsLen, ptr[ii]) )
+			{
+				return StringView(ptr + ii, len-ii);
+			}
+		}
+
+		return StringView();
+	}
+
+	StringView strRTrim(const StringView& _str, const StringView& _chars)
+	{
+		if (_str.isEmpty() )
+		{
+			return StringView();
+		}
+
+		const char* ptr   = _str.getPtr();
+		const char* chars = _chars.getPtr();
+		const uint32_t charsLen = _chars.getLength();
+
+		for (int32_t len = _str.getLength(), ii = len-1; 0 <= ii; --ii)
+		{
+			if (NULL == strFindUnsafe(chars, charsLen, ptr[ii]) )
+			{
+				return StringView(ptr, ii+1);
+			}
+		}
+
+		return StringView();
+	}
+
+	StringView strTrim(const StringView& _str, const StringView& _chars)
+	{
+		return strLTrim(strRTrim(_str, _chars), _chars);
+	}
+
 	const char* strnl(const char* _str)
 	{
 		for (; '\0' != *_str; _str += strLen(_str, 1024) )
@@ -497,10 +547,17 @@ namespace bx
 		return _str;
 	}
 
-	const char* strword(const char* _str)
+	const char* strSkipWord(const char* _str, int32_t _max)
 	{
-		for (char ch = *_str++; isAlphaNum(ch) || '_' == ch; ch = *_str++) {};
+		for (char ch = *_str++; 0 < _max && (isAlphaNum(ch) || '_' == ch); ch = *_str++, --_max) {};
 		return _str-1;
+	}
+
+	StringView strWord(const StringView& _str)
+	{
+		const char* ptr  = _str.getPtr();
+		const char* term = strSkipWord(ptr, _str.getLength() );
+		return StringView(ptr, term);
 	}
 
 	const char* strmb(const char* _str, char _open, char _close)

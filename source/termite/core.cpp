@@ -1,11 +1,11 @@
 #include "pch.h"
 
 #include "bx/readerwriter.h"
+#include "bx/filepath.h"
 #include "bx/os.h"
 #include "bx/cpu.h"
 #include "bx/file.h"
 #include "bxx/path.h"
-#include "bxx/inifile.h"
 #include "bxx/pool.h"
 #include "bxx/lock.h"
 #include "bxx/array.h"
@@ -369,41 +369,6 @@ static void remoteryInputHandlerCallback(const char* text, void* context)
     }
 }
 
-static void callbackConf(const char* key, const char* value, void* userParam)
-{
-    Config* conf = (Config*)userParam;
-
-    if (bx::strCmpI(key, "PluginPath") == 0)
-        conf->pluginPath = value;
-    else if (bx::strCmpI(key, "gfx_DeviceId") == 0)
-        sscanf(value, "%hu", &conf->gfxDeviceId);
-    else if (bx::strCmpI(key, "gfx_Width") == 0)
-        sscanf(value, "%hu", &conf->gfxWidth);
-    else if (bx::strCmpI(key, "gfx_Height") == 0)
-        sscanf(value, "%hu", &conf->gfxHeight);
-    else if (bx::strCmpI(key, "gfx_VSync") == 0)
-        conf->gfxDriverFlags |= bx::toBool(value) ? uint32_t(GfxResetFlag::VSync) : 0;
-}
-
-Config* termite::loadConfig(const char* confFilepath)
-{
-    assert(g_core);
-
-    Config* conf = BX_NEW(g_alloc, Config);
-    if (!parseIniFile(confFilepath, callbackConf, conf, g_alloc)) {
-        BX_WARN("Loading config file '%s' failed: Loading default config");
-    }
-
-    return conf;
-}
-
-void termite::freeConfig(Config* conf)
-{
-    assert(conf);
-
-    BX_DELETE(g_alloc, conf);
-}
-
 result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* platform)
 {
     if (g_core) {
@@ -470,13 +435,12 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
         // Initialize IO
         // If data path is chosen, set is as root path
         // If not, use the current directory as the root path
-        char curPath[256];
         const char* uri;
         if (!conf.dataUri.isEmpty()) {
             uri = conf.dataUri.cstr();
         } else {
-            bx::pwd(curPath, sizeof(curPath));
-            uri = curPath;
+            bx::FilePath curPath(bx::Dir::Current);
+            uri = curPath.get();
         }
 
         const PluginDesc& desc = getPluginDesc(pluginHandle);

@@ -9,6 +9,7 @@
 #define BX_FPU_MATH_H_HEADER_GUARD
 
 #include "bx.h"
+#include "uint32_t.h"
 
 namespace bx
 {
@@ -62,6 +63,9 @@ namespace bx
 	double bitsToDouble(uint64_t _a);
 
 	///
+	uint32_t floatFlip(uint32_t _value);
+
+	///
 	bool isNan(float _f);
 
 	///
@@ -87,24 +91,6 @@ namespace bx
 
 	///
 	float fround(float _f);
-
-	///
-	float fmin(float _a, float _b);
-
-	///
-	float fmax(float _a, float _b);
-
-	///
-	float fmin3(float _a, float _b, float _c);
-
-	///
-	float fmax3(float _a, float _b, float _c);
-
-	///
-	float fclamp(float _a, float _min, float _max);
-
-	///
-	float fsaturate(float _a);
 
 	///
 	float flerp(float _a, float _b, float _t);

@@ -35,4 +35,8 @@ namespace termite
     // vkey: SDLK_xxx 
     TERMITE_API void sdlRegisterShortcutKey(SDL_Keycode vkey, ModifierKey::Bits modKeys, ShortcutKeyCallback callback,
                                             void* userData = nullptr);
+
+    /// If width=0 OR height=0, show window maximized
+    TERMITE_API SDL_Window* sdlCreateWindow(const char* name, int x, int y, int width = 0, int height = 0, 
+                                            uint32_t* pSdlWindowFlags = nullptr);
 } // namespace termite

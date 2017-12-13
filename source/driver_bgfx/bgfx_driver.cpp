@@ -179,8 +179,6 @@ public:
     }
 };
 
-class BgfxProxyAllocator;
-
 struct BgfxSmallMemBlock
 {
     uint8_t buff[32];
@@ -194,7 +192,6 @@ struct BgfxWrapper
     GfxStats stats;
     HMDDesc hmd;
     GfxInternalData internal;
-    BgfxProxyAllocator* proxyAlloc;
     bx::Pool<BgfxSmallMemBlock> smallPool;
 
     BgfxWrapper()
@@ -205,57 +202,10 @@ struct BgfxWrapper
         bx::memSet(&stats, 0x00, sizeof(stats));
         bx::memSet(&hmd, 0x00, sizeof(hmd));
         bx::memSet(&internal, 0x00, sizeof(internal));
-        proxyAlloc = nullptr;
     }
 };
 
 static BgfxWrapper g_bgfx;
-
-// This allocator, only allocates small chunks (<32 bytes) from memory pool, which bgfx does it alot during frames
-// Bigger chunks are passed to default allocator
-class BgfxProxyAllocator : public bx::AllocatorI
-{
-    BX_CLASS(BgfxProxyAllocator
-             , NO_COPY
-             , NO_ASSIGNMENT
-    );
-
-public:
-    BgfxProxyAllocator(bx::AllocatorI* alloc, BgfxWrapper* bgfxWrapper)
-    {
-        m_alloc = alloc;
-        m_wrapper = bgfxWrapper;
-    }
-
-    void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) override
-    {
-        if (_size == 0) {
-            // free
-            if (m_wrapper->smallPool.owns((BgfxSmallMemBlock*)_ptr)) {
-                bx::MutexScope mtx(m_mutex);
-                m_wrapper->smallPool.deleteInstance((BgfxSmallMemBlock*)_ptr);
-                return nullptr;
-            }
-        } else if (_ptr == NULL) {
-            // malloc
-            if (_size <= sizeof(BgfxSmallMemBlock)) {
-                bx::MutexScope mtx(m_mutex);
-                BgfxSmallMemBlock* block = m_wrapper->smallPool.newInstance();
-                if (block)
-                    return block->buff;
-                else
-                    return nullptr;
-            }
-        } 
-
-        return m_alloc->realloc(_ptr, _size, _align, _file, _line);
-    }
-
-private:
-    bx::AllocatorI* m_alloc;
-    BgfxWrapper* m_wrapper;
-    bx::Mutex m_mutex;
-};
 
 static result_t initBgfx(uint16_t deviceId, GfxDriverEventsI* callbacks, bx::AllocatorI* alloc)
 {
@@ -266,10 +216,9 @@ static result_t initBgfx(uint16_t deviceId, GfxDriverEventsI* callbacks, bx::All
             return T_ERR_OUTOFMEM;
     }
 
-    g_bgfx.proxyAlloc = BX_NEW(alloc, BgfxProxyAllocator)(alloc, &g_bgfx);
     g_bgfx.smallPool.create(512, alloc);
 
-    return bgfx::init(bgfx::RendererType::Count, 0, deviceId, g_bgfx.callbacks, g_bgfx.proxyAlloc) ? 0 : T_ERR_FAILED;
+    return bgfx::init(bgfx::RendererType::Count, 0, deviceId, g_bgfx.callbacks, alloc) ? 0 : T_ERR_FAILED;
 }
 
 static void shutdownBgfx()
@@ -281,9 +230,6 @@ static void shutdownBgfx()
 
     if (g_bgfx.callbacks) {
         BX_DELETE(g_bgfx.alloc, g_bgfx.callbacks);
-    }
-    if (g_bgfx.proxyAlloc) {
-        BX_DELETE(g_bgfx.alloc, g_bgfx.proxyAlloc);
     }
 }
 
@@ -426,9 +372,9 @@ static void discard()
     bgfx::discard();
 }
 
-static uint32_t touch(uint8_t id)
+static void touch(uint8_t id)
 {
-    return bgfx::touch(id);
+    bgfx::touch(id);
 }
 
 static void setPaletteColor(uint8_t index, uint32_t rgba)
@@ -620,25 +566,25 @@ static void setTexture(uint8_t stage, UniformHandle sampler, TextureHandle handl
     bgfx::setTexture(stage, s, h, flags);
 }
 
-static uint32_t submit(uint8_t viewId, ProgramHandle program, int32_t depth, bool preserveState)
+static void submit(uint8_t viewId, ProgramHandle program, int32_t depth, bool preserveState)
 {
     BGFX_DECLARE_HANDLE(ProgramHandle, p, program);
-    return bgfx::submit(viewId, p, depth, preserveState);
+    bgfx::submit(viewId, p, depth, preserveState);
 }
 
-static uint32_t submitWithOccQuery(uint8_t viewId, ProgramHandle program, OcclusionQueryHandle occQuery, int32_t depth, bool preserveState)
+static void submitWithOccQuery(uint8_t viewId, ProgramHandle program, OcclusionQueryHandle occQuery, int32_t depth, bool preserveState)
 {
     BGFX_DECLARE_HANDLE(ProgramHandle, p, program);
     BGFX_DECLARE_HANDLE(OcclusionQueryHandle, o, occQuery);
-    return bgfx::submit(viewId, p, o, depth, preserveState);
+    bgfx::submit(viewId, p, o, depth, preserveState);
 }
 
-static uint32_t submitIndirect(uint8_t viewId, ProgramHandle program, IndirectBufferHandle indirectHandle, uint16_t start,
+static void submitIndirect(uint8_t viewId, ProgramHandle program, IndirectBufferHandle indirectHandle, uint16_t start,
     uint16_t num, int32_t depth, bool preserveState)
 {
     BGFX_DECLARE_HANDLE(ProgramHandle, p, program);
     BGFX_DECLARE_HANDLE(IndirectBufferHandle, i, indirectHandle);
-    return bgfx::submit(viewId, p, i, start, num, depth, preserveState);
+    bgfx::submit(viewId, p, i, start, num, depth, preserveState);
 }
 
 static void setComputeBufferIb(uint8_t stage, IndexBufferHandle handle, GpuAccessFlag::Enum access)
@@ -679,19 +625,19 @@ static void setComputeImage(uint8_t stage, UniformHandle sampler, TextureHandle 
     bgfx::setImage(stage, s, h, mip, (bgfx::Access::Enum)access, (bgfx::TextureFormat::Enum)fmt);
 }
 
-static uint32_t computeDispatch(uint8_t viewId, ProgramHandle handle, uint32_t numX, uint32_t numY, uint32_t numZ,
-                                GfxSubmitFlag::Bits flags)
+static void computeDispatch(uint8_t viewId, ProgramHandle handle, uint32_t numX, uint32_t numY, uint32_t numZ,
+                            GfxSubmitFlag::Bits flags)
 {
     BGFX_DECLARE_HANDLE(ProgramHandle, h, handle);
-    return bgfx::dispatch(viewId, h, numX, numY, numZ, flags);
+    bgfx::dispatch(viewId, h, numX, numY, numZ, flags);
 }
 
-static uint32_t computeDispatchIndirect(uint8_t viewId, ProgramHandle handle, IndirectBufferHandle indirectHandle,
-                                        uint16_t start, uint16_t num, GfxSubmitFlag::Bits flags)
+static void computeDispatchIndirect(uint8_t viewId, ProgramHandle handle, IndirectBufferHandle indirectHandle,
+                                    uint16_t start, uint16_t num, GfxSubmitFlag::Bits flags)
 {
     BGFX_DECLARE_HANDLE(ProgramHandle, h, handle);
     BGFX_DECLARE_HANDLE(IndirectBufferHandle, i, indirectHandle);
-    return bgfx::dispatch(viewId, h, i, start, num, flags);
+    bgfx::dispatch(viewId, h, i, start, num, flags);
 }
 
 static void blit(uint8_t viewId, TextureHandle dest, uint16_t destX, uint16_t destY, TextureHandle src,

@@ -238,12 +238,13 @@ static bool loadModel10(bx::MemoryReader* data, const t3dHeader& header, const R
         } // skeleton
 
         // Vertex Decl
+        t3dVertexAttrib::Enum attribs[t3dVertexAttrib::Count];
+        data->read(attribs, sizeof(t3dVertexAttrib::Enum) * tgeo.numAttribs, &err);
+
         vdeclBegin(&geo.vdecl);
         for (int c = 0; c < tgeo.numAttribs; c++) {
-            t3dVertexAttrib::Enum tatt;
-            data->read(&tatt, sizeof(tatt), &err);
-            VertexAttrib::Enum att = (VertexAttrib::Enum)tatt;
-            int num;
+            VertexAttrib::Enum att = (VertexAttrib::Enum)attribs[c];
+            int num = 0;
             VertexAttribType::Enum type;
             bool normalized = false;
 

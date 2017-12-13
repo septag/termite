@@ -298,3 +298,7 @@ endif()
 if (BUILD_FISHERBOY)
     add_subdirectory(fisherboy)
 endif()
+
+if (BUILD_MODELVIEWER)
+    add_subdirectory(model_viewer)
+endif()

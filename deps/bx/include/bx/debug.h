@@ -30,4 +30,18 @@ namespace bx
 
 } // namespace bx
 
+#if BX_CONFIG_CHECK_ASSERT
+#   ifdef BX_ASSERT
+#       undef BX_ASSERT
+#   endif
+
+#define BX_ASSERT(_condition, _msg, ...) \
+    if (!(_condition)) {  \
+        bx::debugPrintf(_msg, ##__VA_ARGS__);   \
+        bx::debugBreak();   \
+    }
+#else
+#   define BX_ASSERT(_condition, _msg, ...)
+#endif
+
 #endif // BX_DEBUG_H_HEADER_GUARD
