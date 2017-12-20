@@ -88,7 +88,8 @@ namespace termite
             AlignLeft = 0x4,
             RightToLeft = 0x8,
             LeftToRight = 0x10,
-            Narrow = 0x20
+            Narrow = 0x20,
+            Multiline = 0x40
         };
 
         typedef uint8_t Bits;
@@ -98,6 +99,7 @@ namespace termite
     TERMITE_API void beginText(TextBatch* batch, const mtx4x4_t& viewProjMtx, const vec2_t screenSize);
     TERMITE_API void addText(TextBatch* batch, float scale, const rect_t& rectFit, TextFlags::Bits flags, const char* text);
     TERMITE_API void addTextf(TextBatch* batch, float scale, const rect_t& rectFit, TextFlags::Bits flags, const char* fmt, ...);
+    TERMITE_API void resetText(TextBatch* batch);   // Reset char buffer, so we can render with another color
     TERMITE_API void drawText(TextBatch* batch, uint8_t viewId, color_t color);
     TERMITE_API void drawTextDropShadow(TextBatch* batch, uint8_t viewId, color_t color,
                                         color_t shadowColor = color1n(0xff000000), vec2_t shadowAmount = vec2f(2.0f, 2.0f));

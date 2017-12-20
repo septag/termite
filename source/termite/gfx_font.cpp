@@ -1030,7 +1030,7 @@ namespace termite
 
         if (!(font->flags & (FontFlags::Persian | FontFlags::Unicode))) {
             // Normal font (ascii)
-            int len = std::min<int>(maxChars, (int)strlen(text));
+            int len = bx::min<int>(maxChars, (int)strlen(text));
             for (int i = 0; i < len; i++) {
                 int gIdx = font->glyphTable.find(text[i]);
                 if (gIdx != -1) {
@@ -1121,6 +1121,33 @@ namespace termite
         return 0;
     }
 
+    static void resolveMultiline(Font* font, FontGlyph* glyphs, float* ys, int numGlyphs, float maxWidth, float scale)
+    {
+        float w = 0;
+        float lineIdx = 0;
+        float lineHeight = float(font->lineHeight) * scale;
+        int spaceIdx = -1;
+
+        for (int i = 0; i < numGlyphs; i++) {
+            FontGlyph* glyph = &glyphs[i];
+
+            w += bx::fceil(glyph->xadvance * scale);
+            if (glyph->charId == 32)
+                spaceIdx = i;
+            ys[i] = lineIdx * lineHeight;
+
+            // proceed to next line ?
+            // If we have reached the end of line, cut the line from the last space
+            if (w > (maxWidth - 1.0f) && spaceIdx != -1) {
+                lineIdx++;
+                for (int k = spaceIdx + 1; k <= i; k++)
+                    ys[k] = lineIdx * lineHeight;
+                spaceIdx = -1;
+                w = 0;
+            }
+        }
+    }
+
     void addText(TextBatch* batch, float scale, const rect_t& rectFit, TextFlags::Bits flags, const char* text)
     {
         assert(batch);
@@ -1142,13 +1169,13 @@ namespace termite
         }
         
         vec2_t texSize = vec2f(font->scaleW, font->scaleH);
-        FontGlyph glyphs[256];
+        FontGlyph glyphs[512];
         int len = resolveGlyphs(text, font, glyphs, BX_COUNTOF(glyphs));
         if (len == 0)
             return;
 
         // Crop Characters
-        len = std::min<int>(len, batch->maxChars - batch->numChars);
+        len = bx::min<int>(len, batch->maxChars - batch->numChars);
 
         // Convert to screen rectangle
         auto projectToScreen = [viewProjMtx, screenSize](float x, float y)->vec2_t
@@ -1187,9 +1214,20 @@ namespace termite
         float advanceScale = 1.0f;
         if (flags & TextFlags::Narrow)
             advanceScale = 0.9f;
+
+        float* ys = (float*)alloca(sizeof(float)*len);
+        memset(ys, 0x00, sizeof(float)*len);
+        if (flags & TextFlags::Multiline) {
+            resolveMultiline(font, glyphs, ys, len, screenRect.xmax - screenRect.xmin, scale);
+        }
        
+        float xMax = 0;
         for (int i = 0; i < len; i++) {
             const FontGlyph& glyph = glyphs[i];
+            if (i > 0 && ys[i] > ys[i-1]) {
+                xMax = x < 0 ? bx::min(x, xMax) : bx::max(x, xMax);
+                x = 0;
+            }
                 
             TextVertex& v0 = verts[vertexIdx];
             TextVertex& v1 = verts[vertexIdx + 1];
@@ -1207,25 +1245,25 @@ namespace termite
 
             // Top-Left
             v0.x = x + xoffset;
-            v0.y = yoffset;
+            v0.y = yoffset + ys[i];
             v0.tx = gx / texSize.x;
             v0.ty = gy / texSize.y;
 
             // Top-Right
             v1.x = x + xoffset + gw;
-            v1.y = yoffset;
+            v1.y = yoffset + ys[i];
             v1.tx = (gx + glyph.width) / texSize.x;
             v1.ty = gy / texSize.y;
 
             // Bottom-Left
             v2.x = x + xoffset;
-            v2.y = yoffset + gh;
+            v2.y = yoffset + gh + ys[i];
             v2.tx = gx / texSize.x;
             v2.ty = (gy + glyph.height) / texSize.y;
 
             // Bottom-Right
             v3.x = x + xoffset + gw;
-            v3.y = yoffset + gh;
+            v3.y = yoffset + gh + ys[i];
             v3.tx = (gx + glyph.width) / texSize.x;
             v3.ty = (gy + glyph.height) / texSize.y;
 
@@ -1251,17 +1289,31 @@ namespace termite
             indexIdx += 6;
         }
 
+        if (xMax == 0)
+            xMax = x;
+
         batch->numChars += len;
 
         // We have the final width, Calculate alignment
         vec2_t pos = vec2f(0, -font->lineHeight*0.5f*scale);
 
-        if (flags & TextFlags::AlignCenter) {
-            pos = pos + ((screenRect.vmax + screenRect.vmin)*0.5f - vec2f(x*0.5f, 0));
-        } else if (flags & TextFlags::AlignLeft) {
-            pos = pos + vec2f(screenRect.xmin - x*dirInvFactor, (screenRect.ymax + screenRect.ymin)*0.5f);
-        } else if (flags & TextFlags::AlignRight) {
-            pos = pos + vec2f(screenRect.xmax - x*(1.0f - dirInvFactor), (screenRect.ymax + screenRect.ymin)*0.5f);
+        if (!(flags & TextFlags::Multiline)) {
+            if (flags & TextFlags::AlignCenter) {
+                pos = pos + ((screenRect.vmax + screenRect.vmin)*0.5f - vec2f(xMax*0.5f, 0));
+            } else if (flags & TextFlags::AlignLeft) {
+                pos = pos + vec2f(screenRect.xmin - xMax*dirInvFactor, (screenRect.ymax + screenRect.ymin)*0.5f);
+            } else if (flags & TextFlags::AlignRight) {
+                pos = pos + vec2f(screenRect.xmax - xMax*(1.0f - dirInvFactor), (screenRect.ymax + screenRect.ymin)*0.5f);
+            }
+        } else {
+            // In multiline, don't vertically align to center
+            if (flags & TextFlags::AlignCenter) {
+                pos = pos + ((screenRect.vmax + screenRect.vmin)*0.5f - vec2f(xMax*0.5f, 0));
+            } else if (flags & TextFlags::AlignLeft) {
+                pos = pos + vec2f(screenRect.xmin - xMax*dirInvFactor, screenRect.ymin);
+            } else if (flags & TextFlags::AlignRight) {
+                pos = pos + vec2f(screenRect.xmax - xMax*(1.0f - dirInvFactor), screenRect.ymin);
+            }
         }
 
         // Transform vertices by pos
@@ -1280,6 +1332,11 @@ namespace termite
         va_end(args);
 
         addText(batch, scale, rectFit, flags, text);
+    }
+
+    void resetText(TextBatch* batch)
+    {
+        batch->numChars = 0;
     }
 
     static void drawTextBatch(GfxDriverApi* gDriver, TextBatch* batch, uint8_t viewId, ProgramHandle prog, Font* font,

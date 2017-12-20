@@ -1,5 +1,7 @@
 #include "pch.h"
 
+#if termite_CURL
+
 #include "restclient-cpp/restclient.h"
 #include "restclient-cpp/connection.h"
 
@@ -294,3 +296,5 @@ namespace termite {
     }
 
 }
+
+#endif // termite_CURL

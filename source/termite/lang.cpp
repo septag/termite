@@ -27,7 +27,7 @@ namespace termite
     struct LangEntry
     {
         size_t idHash;
-        char text[128];
+        char text[256];
     };
 
     struct Lang

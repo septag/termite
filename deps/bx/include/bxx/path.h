@@ -86,10 +86,10 @@ namespace bx
 
         // Name only
         char* r = strrchr(p.text, '.');
-        if (r && r > ri) {
+        if (r) {
             *r = 0;
             r = strrchr(p.text, '.');
-            if (r && r > ri)
+            if (r)
                 *r = 0;
         }
         return p;
