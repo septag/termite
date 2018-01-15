@@ -37,7 +37,7 @@ namespace bx
 
 #define BX_ASSERT(_condition, _msg, ...) \
     if (!(_condition)) {  \
-        bx::debugPrintf(_msg, ##__VA_ARGS__);   \
+        bx::debugPrintf(BX_CONCATENATE(_msg, "\n"), ##__VA_ARGS__);   \
         bx::debugBreak();   \
     }
 #else

@@ -7,8 +7,9 @@ SAMPLER2D(u_texture, 0);
 void main()
 {
 #if COLOR_ADD
-    gl_FragColor = v_color0 + texture2D(u_texture, v_texcoord0);
+    gl_FragColor = v_color0 + texture2D(u_texture, v_texcoord0.xy);
 #else
-    gl_FragColor = v_color0 * texture2D(u_texture, v_texcoord0);
+    float glow = v_texcoord0.z;
+    gl_FragColor = v_color0 * texture2D(u_texture, v_texcoord0.xy) + vec4(glow, glow, glow, 0);
 #endif
 }

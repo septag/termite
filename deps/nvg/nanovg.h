@@ -599,9 +599,9 @@ struct NVGparams {
 typedef struct NVGparams NVGparams;
 
 namespace bx { struct AllocatorI; }
-namespace termite { struct GfxDriverApi;  struct GfxApi_v0; }
+namespace tee { struct GfxDriver;  struct GfxApi; }
 
-NVGcontext* nvgCreate(int edgeaa, unsigned char _viewId, termite::GfxDriverApi* driver, termite::GfxApi_v0* gfxApi,
+NVGcontext* nvgCreate(int edgeaa, unsigned char _viewId, tee::GfxDriver* driver, tee::GfxApi* gfxApi,
 					  bx::AllocatorI* _allocator = NULL);
 void nvgViewId(struct NVGcontext* ctx, unsigned char _viewId);
 void nvgDelete(struct NVGcontext* ctx);

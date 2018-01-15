@@ -2,7 +2,7 @@
 
 #include "types.h"
 
-namespace termite
+namespace tee
 {
     struct TextureT {};
     struct FrameBufferT {};
@@ -180,10 +180,10 @@ namespace termite
         enum Enum
         {
             None = 0x00000000,
-            Wireframe = 0x00000001,
-            IFH = 0x00000002,
-            Stats = 0x00000004,
-            Text = 0x00000008
+            Wireframe = 0x00000001,     // wireframe for all primitives
+            IFH = 0x00000002,           // fast hardware test, no draw calls will be submitted, for profiling
+            Stats = 0x00000004,         // Stats display
+            Text = 0x00000008           // debug text
         };
 
         typedef uint32_t Bits;
@@ -675,15 +675,17 @@ namespace termite
         };
     };
 
-    struct GpuBufferFlag
+    struct GfxBufferFlag
     {
         enum Enum
         {
             None = 0x0000,
             ComputeRead = 0x0100,
             ComputeWrite = 0x0200,
+            DrawIndirect = 0x0400,
             Resizable = 0x0800,
-            Index32 = 0x1000
+            Index32 = 0x1000,
+            ComputeReadWrite = (ComputeRead|ComputeWrite)
         };
 
         typedef uint16_t Bits;
@@ -795,111 +797,110 @@ namespace termite
         uint16_t layer;       //!< Cubemap side or depth layer/slice.
     };
 
-} // namespace termite
-
-namespace termite
-{
-    inline GfxStencilState::Bits gfxStencilFuncRef(uint8_t _ref)
-    {
-        return (uint32_t)_ref & 0x000000ff;
-    }
-
-    inline GfxStencilState::Bits gfxStencilRMask(uint8_t mask)
-    {
-        return ((uint32_t)mask << 8) & 0x0000ff00;
-    }
-
-    inline GfxState::Bits gfxStateDefault()
-    {
-        return GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::DepthTestLess | GfxState::DepthWrite | 
-               GfxState::CullCW | GfxState::MSAA;
-    }
-
-    inline GfxState::Bits gfxStateAlphaRef(uint8_t _ref)
-    {
-        return (((uint64_t)(_ref) << 40) & 0x0000ff0000000000);
-    }
-
-    inline GfxState::Bits gfxStateBlendFuncSeparate(GfxState::Enum srcRGB, GfxState::Enum dstRGB, GfxState::Enum srcA, GfxState::Enum dstA)
-    {
-        return (((uint64_t)srcRGB | ((uint64_t)dstRGB << 4)) | (((uint64_t)srcA | ((uint64_t)dstA << 4)) << 8));
-    }
-
-    inline GfxState::Bits gfxStateBlendEqSeparate(GfxState::Enum rgb, GfxState::Enum a)
-    {
-        return ((uint64_t)rgb | ((uint64_t)a << 3));
-    }
-
-    inline GfxState::Bits gfxStateBlendFunc(GfxState::Enum src, GfxState::Enum dst)
-    {
-        return gfxStateBlendFuncSeparate(src, dst, src, dst);
-    }
-
-    inline GfxState::Bits gfxStateBlendEq(GfxState::Enum eq)
-    {
-        return gfxStateBlendEqSeparate(eq, eq);
-    }
-
-    inline GfxState::Bits gfxStateBlendAdd()
-    {
-        return gfxStateBlendFunc(GfxState::BlendOne, GfxState::BlendOne);
-    }
-
-    inline GfxState::Bits gfxStateBlendAlpha()
-    {
-        return gfxStateBlendFunc(GfxState::BlendSrcAlpha, GfxState::BlendInvSrcAlpha);
-    }
-
-    inline GfxState::Bits gfxStateBlendDarken()
-    {
-        return gfxStateBlendFunc(GfxState::BlendOne, GfxState::BlendOne) | gfxStateBlendEq(GfxState::BlendEqMin);
-    }
-
-    inline GfxState::Bits gfxStateBlendLighten()
-    {
-        return gfxStateBlendFunc(GfxState::BlendOne, GfxState::BlendOne) | gfxStateBlendEq(GfxState::BlendEqMax);
-    }
-
-    inline GfxState::Bits gfxStateBlendMultiply()
-    {
-        return gfxStateBlendFunc(GfxState::BlendDestColor, GfxState::BlendZero);
-    }
-
-    inline GfxState::Bits gfxStateBlendNormal()
-    {
-        return gfxStateBlendFunc(GfxState::BlendOne, GfxState::BlendInvSrcAlpha);
-    }
-
-    inline GfxState::Bits gfxStateBlendScreen()
-    {
-        return gfxStateBlendFunc(GfxState::BlendOne, GfxState::BlendInvSrcColor);
-    }
-
-    inline GfxState::Bits gfxStateBlendLinearBurn()
-    {
-        return gfxStateBlendFunc(GfxState::BlendDestColor, GfxState::BlendInvDestColor) | gfxStateBlendEq(GfxState::BlendEqSub);
-    }
-
-    inline const char* gfxRendererTypeToStr(RendererType::Enum type)
-    {
-        switch (type) {
-        case RendererType::Direct3D9:
-            return "Direct3D9";
-        case RendererType::Direct3D11:
-            return "Direct3D11";
-        case RendererType::Direct3D12:
-            return "Direct3D12";
-        case RendererType::Metal:
-            return "Metal";
-        case RendererType::OpenGLES:
-            return "OpenGLES";
-        case RendererType::OpenGL:
-            return "OpenGL";
-        case RendererType::Vulkan:
-            return "Vulcan";
-        case RendererType::Noop:
-            return "Null";
+    namespace gfx {
+        inline GfxStencilState::Bits stencilFuncRef(uint8_t _ref)
+        {
+            return (uint32_t)_ref & 0x000000ff;
         }
-        return "Unknown";
+
+        inline GfxStencilState::Bits stencilRMask(uint8_t mask)
+        {
+            return ((uint32_t)mask << 8) & 0x0000ff00;
+        }
+
+        inline GfxState::Bits stateDefault()
+        {
+            return GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::DepthTestLess | GfxState::DepthWrite |
+                GfxState::CullCW | GfxState::MSAA;
+        }
+
+        inline GfxState::Bits stateAlphaRef(uint8_t _ref)
+        {
+            return (((uint64_t)(_ref) << 40) & 0x0000ff0000000000);
+        }
+
+        inline GfxState::Bits stateBlendFuncSeparate(GfxState::Enum srcRGB, GfxState::Enum dstRGB, GfxState::Enum srcA, GfxState::Enum dstA)
+        {
+            return (((uint64_t)srcRGB | ((uint64_t)dstRGB << 4)) | (((uint64_t)srcA | ((uint64_t)dstA << 4)) << 8));
+        }
+
+        inline GfxState::Bits stateBlendEqSeparate(GfxState::Enum rgb, GfxState::Enum a)
+        {
+            return ((uint64_t)rgb | ((uint64_t)a << 3));
+        }
+
+        inline GfxState::Bits stateBlendFunc(GfxState::Enum src, GfxState::Enum dst)
+        {
+            return stateBlendFuncSeparate(src, dst, src, dst);
+        }
+
+        inline GfxState::Bits stateBlendEq(GfxState::Enum eq)
+        {
+            return stateBlendEqSeparate(eq, eq);
+        }
+
+        inline GfxState::Bits stateBlendAdd()
+        {
+            return stateBlendFunc(GfxState::BlendOne, GfxState::BlendOne);
+        }
+
+        inline GfxState::Bits stateBlendAlpha()
+        {
+            return stateBlendFunc(GfxState::BlendSrcAlpha, GfxState::BlendInvSrcAlpha);
+        }
+
+        inline GfxState::Bits stateBlendDarken()
+        {
+            return stateBlendFunc(GfxState::BlendOne, GfxState::BlendOne) | stateBlendEq(GfxState::BlendEqMin);
+        }
+
+        inline GfxState::Bits stateBlendLighten()
+        {
+            return stateBlendFunc(GfxState::BlendOne, GfxState::BlendOne) | stateBlendEq(GfxState::BlendEqMax);
+        }
+
+        inline GfxState::Bits stateBlendMultiply()
+        {
+            return stateBlendFunc(GfxState::BlendDestColor, GfxState::BlendZero);
+        }
+
+        inline GfxState::Bits stateBlendNormal()
+        {
+            return stateBlendFunc(GfxState::BlendOne, GfxState::BlendInvSrcAlpha);
+        }
+
+        inline GfxState::Bits stateBlendScreen()
+        {
+            return stateBlendFunc(GfxState::BlendOne, GfxState::BlendInvSrcColor);
+        }
+
+        inline GfxState::Bits stateBlendLinearBurn()
+        {
+            return stateBlendFunc(GfxState::BlendDestColor, GfxState::BlendInvDestColor) | stateBlendEq(GfxState::BlendEqSub);
+        }
+
+        inline const char* rendererTypeToStr(RendererType::Enum type)
+        {
+            switch (type) {
+            case RendererType::Direct3D9:
+                return "Direct3D9";
+            case RendererType::Direct3D11:
+                return "Direct3D11";
+            case RendererType::Direct3D12:
+                return "Direct3D12";
+            case RendererType::Metal:
+                return "Metal";
+            case RendererType::OpenGLES:
+                return "OpenGLES";
+            case RendererType::OpenGL:
+                return "OpenGL";
+            case RendererType::Vulkan:
+                return "Vulcan";
+            case RendererType::Noop:
+                return "Null";
+            }
+            return "Unknown";
+        }
     }
-}
+} // namespace tee
+

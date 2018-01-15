@@ -1,6 +1,6 @@
 #pragma once
 
-namespace termite
+namespace tee
 {
     enum class LogProxyOptions : unsigned char
     {

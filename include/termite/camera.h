@@ -1,9 +1,8 @@
 #pragma once
 
-#include "vec_math.h"
 #include "gfx_utils.h"
 
-namespace termite
+namespace tee
 {
     struct CameraPlane
     {
@@ -24,28 +23,28 @@ namespace termite
     struct Camera2D;
 
     // Camera
-    TERMITE_API void camInit(Camera* cam, float fov = 60.0f, float fnear = 0.1f, float ffar = 100.0f);
-    TERMITE_API void camLookAt(Camera* cam, const vec3_t pos, const vec3_t lookat);
-    TERMITE_API void camCalcFrustumCorners(const Camera* cam, vec3_t result[8], float aspectRatio, 
+    TEE_API void camInit(Camera* cam, float fov = 60.0f, float fnear = 0.1f, float ffar = 100.0f);
+    TEE_API void camLookAt(Camera* cam, const vec3_t pos, const vec3_t lookat);
+    TEE_API void camCalcFrustumCorners(const Camera* cam, vec3_t result[8], float aspectRatio, 
                                            float nearOverride = 0, float farOverride = 0);
-    TERMITE_API void camCalcFrustumPlanes(plane_t result[CameraPlane::Count], const mtx4x4_t& viewProjMtx);
-    TERMITE_API void camPitch(Camera* cam, float pitch);
-    TERMITE_API void camYaw(Camera* cam, float yaw);
-    TERMITE_API void camPitchYaw(Camera* cam, float pitch, float yaw);
-    TERMITE_API void camRoll(Camera* cam, float roll);
-    TERMITE_API void camForward(Camera* cam, float fwd);
-    TERMITE_API void camStrafe(Camera* cam, float strafe);
-    TERMITE_API mtx4x4_t camViewMtx(const Camera* cam);
-    TERMITE_API mtx4x4_t camProjMtx(const Camera* cam, float aspectRatio);
+    TEE_API void camCalcFrustumPlanes(plane_t result[CameraPlane::Count], const mat4_t& viewProjMtx);
+    TEE_API void camPitch(Camera* cam, float pitch);
+    TEE_API void camYaw(Camera* cam, float yaw);
+    TEE_API void camPitchYaw(Camera* cam, float pitch, float yaw);
+    TEE_API void camRoll(Camera* cam, float roll);
+    TEE_API void camForward(Camera* cam, float fwd);
+    TEE_API void camStrafe(Camera* cam, float strafe);
+    TEE_API mat4_t camViewMtx(const Camera* cam);
+    TEE_API mat4_t camProjMtx(const Camera* cam, float aspectRatio);
 
     // Camera2D
-    TERMITE_API void cam2dInit(Camera2D* cam, float refWidth, float refHeight, 
-                               DisplayPolicy::Enum policy, float zoom = 1.0f, const vec2_t pos = vec2f(0, 0));
-    TERMITE_API void cam2dPan(Camera2D* cam, vec2_t pan);
-    TERMITE_API void cam2dZoom(Camera2D* cam, float zoom);
-    TERMITE_API mtx4x4_t cam2dViewMtx(const Camera2D& cam);
-    TERMITE_API mtx4x4_t cam2dProjMtx(const Camera2D& cam);
-    TERMITE_API rect_t cam2dGetRect(const Camera2D& cam);
+    TEE_API void cam2dInit(Camera2D* cam, float refWidth, float refHeight, 
+                               DisplayPolicy::Enum policy, float zoom = 1.0f, const vec2_t pos = vec2(0, 0));
+    TEE_API void cam2dPan(Camera2D* cam, vec2_t pan);
+    TEE_API void cam2dZoom(Camera2D* cam, float zoom);
+    TEE_API mat4_t cam2dViewMtx(const Camera2D& cam);
+    TEE_API mat4_t cam2dProjMtx(const Camera2D& cam);
+    TEE_API rect_t cam2dGetRect(const Camera2D& cam);
 
     struct Camera
     {
@@ -77,7 +76,7 @@ namespace termite
             camCalcFrustumCorners(this, _result, _aspectRatio, _nearOverride, _farOverride);
         }
 
-        inline void calcFrustumPlanes(plane_t _result[CameraPlane::Count], const mtx4x4_t& _viewProjMtx) const
+        inline void calcFrustumPlanes(plane_t _result[CameraPlane::Count], const mat4_t& _viewProjMtx) const
         {
             camCalcFrustumPlanes(_result, _viewProjMtx);
         }
@@ -112,12 +111,12 @@ namespace termite
             camStrafe(this, _strafe);
         }
 
-        inline mtx4x4_t getViewMtx() const
+        inline mat4_t getViewMtx() const
         {
             return camViewMtx(this);
         }
 
-        inline mtx4x4_t getProjMtx(float _aspectRatio) const
+        inline mat4_t getProjMtx(float _aspectRatio) const
         {
             return camProjMtx(this, _aspectRatio);
         }
@@ -133,7 +132,7 @@ namespace termite
         DisplayPolicy::Enum policy;
 
         inline void init(float _refWidth, float _refHeight, DisplayPolicy::Enum _policy, 
-                         float _zoom = 1.0f, const vec2_t _pos = vec2f(0, 0))
+                         float _zoom = 1.0f, const vec2_t _pos = vec2(0, 0))
         {
             cam2dInit(this, _refWidth, _refHeight, _policy, _zoom, _pos);
         }
@@ -153,12 +152,12 @@ namespace termite
             return zoom + zoom*zoomPercentOffset;
         }
 
-        inline mtx4x4_t getViewMtx() const
+        inline mat4_t getViewMtx() const
         {
             return cam2dViewMtx(*this);
         }
 
-        inline mtx4x4_t getProjMtx() const
+        inline mat4_t getProjMtx() const
         {
             return cam2dProjMtx(*this);
         }
@@ -168,4 +167,4 @@ namespace termite
             return cam2dGetRect(*this);
         }
     };
-} // namespace termite
+} // namespace tee

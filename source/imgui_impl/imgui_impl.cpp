@@ -1,7 +1,7 @@
 #ifdef termite_SHARED_LIB
 #undef termite_SHARED_LIB
 #endif
-#include "termite/core.h"
+#include "termite/tee.h"
 
 #include "bx/math.h"
 #include "bx/uint32_t.h"
@@ -10,15 +10,15 @@
 
 #include "imgui_impl.h"
 
-#include T_MAKE_SHADER_PATH(shaders_h,imgui.fso)
-#include T_MAKE_SHADER_PATH(shaders_h,imgui.vso)
+#include TEE_MAKE_SHADER_PATH(shaders_h,imgui.fso)
+#include TEE_MAKE_SHADER_PATH(shaders_h,imgui.vso)
 
-using namespace termite;
+using namespace tee;
 
 struct ImGuiImpl
 {
     bx::AllocatorI* alloc;
-    GfxDriverApi* driver;
+    GfxDriver* driver;
     ProgramHandle progHandle;
     
     TextureHandle fontTexHandle;
@@ -44,11 +44,11 @@ struct imVertexPosCoordColor
     
     static void init()
     {
-        vdeclBegin(&Decl);
-        vdeclAdd(&Decl, VertexAttrib::Position, 2, VertexAttribType::Float);
-        vdeclAdd(&Decl, VertexAttrib::TexCoord0, 2, VertexAttribType::Float);
-        vdeclAdd(&Decl, VertexAttrib::Color0, 4, VertexAttribType::Uint8, true);
-        vdeclEnd(&Decl);
+        gfx::beginDecl(&Decl);
+        gfx::addAttrib(&Decl, VertexAttrib::Position, 2, VertexAttribType::Float);
+        gfx::addAttrib(&Decl, VertexAttrib::TexCoord0, 2, VertexAttribType::Float);
+        gfx::addAttrib(&Decl, VertexAttrib::Color0, 4, VertexAttribType::Uint8, true);
+        gfx::endDecl(&Decl);
     }
     static VertexDecl Decl;
 };
@@ -71,7 +71,7 @@ static void imguiDrawLists(ImDrawData* data)
 {
     assert(g_Im);
 
-    GfxDriverApi* driver = g_Im->driver;
+    GfxDriver* driver = g_Im->driver;
 
     float proj[16];
     float width = ImGui::GetIO().DisplaySize.x;
@@ -79,7 +79,7 @@ static void imguiDrawLists(ImDrawData* data)
     uint8_t viewId = g_Im->viewId;
     bx::mtxOrtho(proj, 0.0f, width, height, 0.0f, -1.0f, 1.0f, 0, false);
 
-    GfxState::Bits state = gfxStateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite;
+    GfxState::Bits state = gfx::stateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite;
     driver->touch(viewId);
     driver->setViewRectRatio(viewId, 0, 0, BackbufferRatio::Equal);
     driver->setViewMode(viewId, ViewMode::Sequential);
@@ -148,17 +148,17 @@ static void imguiDrawLists(ImDrawData* data)
     }
 }
 
-int termite::initImGui(uint8_t viewId, GfxDriverApi* driver,
+int tee::initImGui(uint8_t viewId, GfxDriver* driver,
 					   bx::AllocatorI* alloc, const int* keymap, const char* iniFilename, void* nativeWindowHandle)
 {
     if (g_Im) {
         assert(false);
-        return T_ERR_FAILED;
+        return false;
     }
 
     g_Im = BX_NEW(alloc, ImGuiImpl);
     if (!g_Im) {
-        return T_ERR_OUTOFMEM;
+        return false;
     }
     g_Im->alloc = alloc;
     g_Im->driver = driver;
@@ -168,17 +168,17 @@ int termite::initImGui(uint8_t viewId, GfxDriverApi* driver,
     // Create Graphic objects
     ShaderHandle fragmentShader = driver->createShader(driver->makeRef(imgui_fso, sizeof(imgui_fso), nullptr, nullptr));
     if (!fragmentShader.isValid()) {
-        return T_ERR_FAILED;
+        return false;
     }
 
     ShaderHandle vertexShader = driver->createShader(driver->makeRef(imgui_vso, sizeof(imgui_vso), nullptr, nullptr));
     if (!vertexShader.isValid()) {
-        return T_ERR_FAILED;
+        return false;
     }
 
     g_Im->progHandle = driver->createProgram(vertexShader, fragmentShader, true);
     if (!g_Im->progHandle.isValid()) {
-        return T_ERR_FAILED;
+        return false;
     }
     g_Im->uniformTexture = driver->createUniform("u_texture", UniformType::Int1, 1);   
 
@@ -218,23 +218,23 @@ int termite::initImGui(uint8_t viewId, GfxDriverApi* driver,
                                                  TextureFlag::MinPoint|TextureFlag::MagPoint, 
                                                  driver->makeRef(fontData, fontWidth*fontHeight*bpp, nullptr, nullptr));
     if (!g_Im->fontTexHandle.isValid()) {
-        return T_ERR_FAILED;
+        return false;
     }
     conf.Fonts->TexID = (void*)&g_Im->fontTexHandle;
 
     ImGui::NewFrame();
 
-    return 0;
+    return true;
 }
 
-void termite::shutdownImGui()
+void tee::shutdownImGui()
 {
     //
     if (!g_Im)
         return;
 
     bx::AllocatorI* alloc = g_Im->alloc;
-    GfxDriverApi* driver = g_Im->driver;
+    GfxDriver* driver = g_Im->driver;
 
     ImGui::Shutdown();
     if (g_Im->uniformTexture.isValid())

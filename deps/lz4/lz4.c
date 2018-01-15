@@ -96,19 +96,26 @@
 *  Compiler Options
 **************************************/
 #ifdef _MSC_VER    /* Visual Studio */
-#  define FORCE_INLINE static __forceinline
 #  include <intrin.h>
 #  pragma warning(disable : 4127)        /* disable: C4127: conditional expression is constant */
 #  pragma warning(disable : 4293)        /* disable: C4293: too large shift (32-bits) */
-#else
-#  if defined(__GNUC__) || defined(__clang__)
-#    define FORCE_INLINE static inline __attribute__((always_inline))
-#  elif defined(__cplusplus) || (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
-#    define FORCE_INLINE static inline
-#  else
-#    define FORCE_INLINE static
-#  endif
 #endif  /* _MSC_VER */
+
+#ifndef FORCE_INLINE
+#  ifdef _MSC_VER    /* Visual Studio */
+#    define FORCE_INLINE static __forceinline
+#  else
+#    if defined (__cplusplus) || defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
+#      ifdef __GNUC__
+#        define FORCE_INLINE static inline __attribute__((always_inline))
+#      else
+#        define FORCE_INLINE static inline
+#      endif
+#    else
+#      define FORCE_INLINE static
+#    endif /* __STDC_VERSION__ */
+#  endif  /* _MSC_VER */
+#endif /* FORCE_INLINE */
 
 #if (defined(__GNUC__) && (__GNUC__ >= 3)) || (defined(__INTEL_COMPILER) && (__INTEL_COMPILER >= 800)) || defined(__clang__)
 #  define expect(expr,value)    (__builtin_expect ((expr),(value)) )
@@ -938,6 +945,7 @@ void LZ4_resetStream (LZ4_stream_t* LZ4_stream)
 
 int LZ4_freeStream (LZ4_stream_t* LZ4_stream)
 {
+    if (!LZ4_stream) return 0;   /* support free on NULL */
     FREEMEM(LZ4_stream);
     return (0);
 }
@@ -1277,11 +1285,6 @@ int LZ4_decompress_fast(const char* source, char* dest, int originalSize)
 
 /*===== streaming decompression functions =====*/
 
-/*
- * If you prefer dynamic allocation methods,
- * LZ4_createStreamDecode()
- * provides a pointer (void*) towards an initialized LZ4_streamDecode_t structure.
- */
 LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 {
     LZ4_streamDecode_t* lz4s = (LZ4_streamDecode_t*) ALLOCATOR(1, sizeof(LZ4_streamDecode_t));
@@ -1290,6 +1293,7 @@ LZ4_streamDecode_t* LZ4_createStreamDecode(void)
 
 int LZ4_freeStreamDecode (LZ4_streamDecode_t* LZ4_stream)
 {
+    if (!LZ4_stream) return 0;   /* support free on NULL */
     FREEMEM(LZ4_stream);
     return 0;
 }

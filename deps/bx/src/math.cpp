@@ -3,10 +3,9 @@
  * License: https://github.com/bkaradzic/bx#license-bsd-2-clause
  */
 
-#include "bx_p.h"
 #include <bx/math.h>
-
 #include <math.h>
+#include "math.h"
 
 namespace bx
 {
@@ -742,3 +741,5 @@ namespace bx
 	}
 
 } // namespace bx
+
+

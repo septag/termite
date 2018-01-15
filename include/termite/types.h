@@ -7,46 +7,44 @@
 #ifdef termite_SHARED_LIB
 #ifdef termite_EXPORTS
 #   if BX_COMPILER_MSVC
-#       define TERMITE_API __declspec(dllexport) 
+#       define TEE_API __declspec(dllexport) 
 #   else
-#       define TERMITE_API __attribute__ ((visibility("default")))
+#       define TEE_API __attribute__ ((visibility("default")))
 #   endif
 #else
 #   if BX_COMPILER_MSVC
-#       define TERMITE_API __declspec(dllimport)
+#       define TEE_API __declspec(dllimport)
 #   else
-#       define TERMITE_API __attribute__ ((visibility("default")))
+#       define TEE_API __attribute__ ((visibility("default")))
 #   endif
 #endif
 #else
-#   define TERMITE_API 
+#   define TEE_API 
 #endif
 
 #if BX_COMPILER_CLANG || BX_COMPILER_GCC
-#   define T_HIDDEN __attribute__((visibility("hidden")))
+#   define TEE_HIDDEN __attribute__((visibility("hidden")))
 #else
-#   define T_HIDDEN
+#   define TEE_HIDDEN
 #endif
 
 // Versioning Macros
-#define T_MAKE_VERSION(_Major, _Minor)  (uint32_t)(((_Major & 0xffff)<<16) | (_Minor & 0xffff))
-#define T_VERSION_MAJOR(_Ver) (uint16_t)((_Ver >> 16) & 0xffff)
-#define T_VERSION_MINOR(_Ver) (uint16_t)(_Ver & 0xffff)
-#define T_FAILED(_R) (_R) < 0
-#define T_OK(_R) (_R) >= 0
+#define TEE_MAKE_VERSION(_Major, _Minor)  (uint32_t)(((_Major & 0xffff)<<16) | (_Minor & 0xffff))
+#define TEE_VERSION_MAJOR(_Ver) (uint16_t)((_Ver >> 16) & 0xffff)
+#define TEE_VERSION_MINOR(_Ver) (uint16_t)(_Ver & 0xffff)
 
 // Shader and Path
-#define T_XSTR(s) #s
-#define T_STR(s) T_XSTR(s)
-#define T_CONCAT_PATH_3(s1, s2, s3) T_STR(s1/s2/s3)
-#define T_MAKE_SHADER_PATH_PLATFORM(Prefix, Platform, Filename) T_CONCAT_PATH_3(Prefix,Platform,Filename)
-#define T_MAKE_SHADER_PATH(Prefix, Filename) T_MAKE_SHADER_PATH_PLATFORM(Prefix,termite_SHADER_APPEND_PATH,Filename)
+#define TEE_XSTR(s) #s
+#define TEE_STR(s) TEE_XSTR(s)
+#define TEE_CONCAT_PATH_3(s1, s2, s3) TEE_STR(s1/s2/s3)
+#define TEE_MAKE_SHADER_PATH_PLATFORM(Prefix, Platform, Filename) TEE_CONCAT_PATH_3(Prefix,Platform,Filename)
+#define TEE_MAKE_SHADER_PATH(Prefix, Filename) TEE_MAKE_SHADER_PATH_PLATFORM(Prefix,termite_SHADER_APPEND_PATH,Filename)
 
+// For self-documenting code
+#define TEE_THREAD_SAFE
 
-namespace termite
+namespace tee
 {
-    typedef int result_t;	// used for returning results see error_report and T_FAILED
-
     // Phantom types are used to define strong types that use the same base type
     // For example Phantom<int, TextureHandle>, Pantom<int, ResourceHandle>
     template <typename Tx, typename _Meaning, Tx _Invalid = 0>
@@ -95,4 +93,4 @@ namespace termite
     {
         return Tx(uintptr_t(ptr));
     }
-} // namespace termite
+} // namespace tee

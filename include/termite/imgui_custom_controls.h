@@ -3,7 +3,7 @@
 #include "bx/allocator.h"
 #include "imgui/imgui.h"
 
-namespace termite
+namespace tee
 {
     struct ImGuiBezierEd
     {
@@ -28,33 +28,26 @@ namespace termite
         }
     };
 
-    void imguiBezierEditor(ImGuiBezierEd* bezier, const char* strId, const ImVec2& size, 
-                           bool lockEnds = true, bool showText = true, bool showMirrorY = false);
-
-    struct ImGuiFishLayout
+    struct ImGuiGridSelect
     {
         enum LayoutState
         {
             None = 0,
-            Fish,
-            EnemyFish
+            Green,
+            Red
         };
 
         ImVec2 padding;
         LayoutState layout[16];
         bool mouseDown[2];
 
-        ImGuiFishLayout()
+        ImGuiGridSelect()
         {
             padding = ImVec2(0, 0);
             bx::memSet(layout, 0x00, sizeof(layout));
             mouseDown[0] = mouseDown[1] = false;
         }
     };
-    void imguiFishLayout(ImGuiFishLayout* layout, const char* strId, const ImVec2& size);
-
-    /// Values: x=start, y=end
-    bool imguiGaunt(const char* strId, ImVec2* values, int numValues, int* changeIdx, const ImVec2& size);
 
     template <uint32_t _Max>
     struct ImGuiGraphData
@@ -96,4 +89,14 @@ namespace termite
             num = 0;
         }
     };
+
+    namespace imgui {
+        void bezierEditor(ImGuiBezierEd* bezier, const char* strId, const ImVec2& size,
+                          bool lockEnds = true, bool showText = true, bool showMirrorY = false);
+
+        void gridSelect(ImGuiGridSelect* layout, const char* strId, const ImVec2& size);
+
+        /// Values: x=start, y=end
+        bool gaunt(const char* strId, ImVec2* values, int numValues, int* changeIdx, const ImVec2& size);
+    }
 }

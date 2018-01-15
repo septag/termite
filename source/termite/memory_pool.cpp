@@ -11,10 +11,10 @@
 #include "bxx/linear_allocator.h"
 #include "bx/string.h"
 
-#define T_IMGUI_API
+#define TEE_IMGUI_API
 #include "plugin_api.h"
 
-using namespace termite;
+using namespace tee;
 
 #define DEFAULT_MAX_PAGES_PER_POOL 32     // 32 pages per pool
 #define DEFAULT_PAGE_SIZE 2*1024*1024     // 2MB
@@ -116,16 +116,16 @@ static void destroyBucket(PageBucket* bucket, bx::AllocatorI* alloc)
     BX_FREE(alloc, bucket);
 }
 
-result_t termite::initMemoryPool(bx::AllocatorI* alloc, size_t pageSize /*= 0*/, int maxPagesPerPool /* =0*/)
+bool tee::initMemoryPool(bx::AllocatorI* alloc, size_t pageSize /*= 0*/, int maxPagesPerPool /* =0*/)
 {
     if (g_mempool) {
         assert(false);
-        return T_ERR_FAILED;
+        return false;
     }
 
     g_mempool = BX_NEW(alloc, MemoryPool);
     if (!g_mempool)
-        return T_ERR_OUTOFMEM;
+        return false;
     g_mempool->alloc = alloc;
 
     maxPagesPerPool = maxPagesPerPool > 0 ? maxPagesPerPool : DEFAULT_MAX_PAGES_PER_POOL;
@@ -133,10 +133,10 @@ result_t termite::initMemoryPool(bx::AllocatorI* alloc, size_t pageSize /*= 0*/,
     g_mempool->maxPagesPerBucket = maxPagesPerPool;
     g_mempool->pageSize = pageSize;
 
-    return 0;
+    return true;
 }
 
-void termite::shutdownMemoryPool()
+void tee::shutdownMemoryPool()
 {
     if (!g_mempool) {
         return;
@@ -165,7 +165,7 @@ static bx::AllocatorI* newPage(PageBucket* bucket, uint64_t tag)
     return &page->linAlloc;
 }
 
-bx::AllocatorI* termite::allocMemPage(uint64_t tag) T_THREAD_SAFE
+bx::AllocatorI* tee::allocMemPage(uint64_t tag) TEE_THREAD_SAFE
 {
     assert(g_mempool);
 
@@ -189,7 +189,7 @@ bx::AllocatorI* termite::allocMemPage(uint64_t tag) T_THREAD_SAFE
     return ::newPage(bucket, tag);
 }
 
-void termite::freeMemTag(uint64_t tag) T_THREAD_SAFE
+void tee::freeMemTag(uint64_t tag) TEE_THREAD_SAFE
 {
     assert(g_mempool);
 
@@ -216,12 +216,12 @@ void termite::freeMemTag(uint64_t tag) T_THREAD_SAFE
     }
 }
 
-size_t termite::getNumMemPages() T_THREAD_SAFE
+size_t tee::getNumMemPages() TEE_THREAD_SAFE
 {
     return g_mempool->numPages;
 }
 
-size_t termite::getMemPoolAllocSize() T_THREAD_SAFE
+size_t tee::getMemPoolAllocSize() TEE_THREAD_SAFE
 {
     bx::ReadLockScope lock(g_mempool->lock);
 
@@ -238,7 +238,7 @@ size_t termite::getMemPoolAllocSize() T_THREAD_SAFE
 }
 
 
-size_t termite::getMemTagAllocSize(uint64_t tag) T_THREAD_SAFE
+size_t tee::getMemTagAllocSize(uint64_t tag) TEE_THREAD_SAFE
 {
     bx::ReadLockScope lock(g_mempool->lock);
     
@@ -255,7 +255,7 @@ size_t termite::getMemTagAllocSize(uint64_t tag) T_THREAD_SAFE
     return sz;
 }
 
-int termite::getMemTags(uint64_t* tags, int maxTags, size_t* pageSizes) T_THREAD_SAFE
+int tee::getMemTags(uint64_t* tags, int maxTags, size_t* pageSizes) TEE_THREAD_SAFE
 {
     bx::ReadLockScope lock(g_mempool->lock);
     
@@ -272,7 +272,7 @@ int termite::getMemTags(uint64_t* tags, int maxTags, size_t* pageSizes) T_THREAD
     return count;
 }
 
-void termite::debugMemoryPool(ImGuiApi_v0* imgui)
+void tee::debugMemoryPool(ImGuiApi* imgui)
 {
     imgui->setNextWindowSize(ImVec2(350.0f, 200.0f), ImGuiSetCond_FirstUseEver);
     if (imgui->begin("Memory Pool", nullptr, 0)) {
@@ -314,7 +314,7 @@ void termite::debugMemoryPool(ImGuiApi_v0* imgui)
     imgui->end();
 }
 
-void* termite::PageAllocator::realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line)
+void* tee::PageAllocator::realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line)
 {
     if (_size <= g_mempool->pageSize) {
         if (_size > 0) {

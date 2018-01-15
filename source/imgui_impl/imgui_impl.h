@@ -3,9 +3,9 @@
 #include "imgui.h"
 #include "ImGuizmo.h"
 
-namespace termite
+namespace tee
 {
-    int initImGui(uint8_t viewId, GfxDriverApi* driver, bx::AllocatorI* alloc, 
+    int initImGui(uint8_t viewId, GfxDriver* driver, bx::AllocatorI* alloc, 
 				  const int* keymap, const char* iniFilename = nullptr, void* nativeWindowHandle = nullptr);
     void shutdownImGui();
-} // namespace termite
+} // namespace tee

@@ -4,16 +4,17 @@
 #include "gfx_utils.h"
 #include "io_driver.h"
 
-#include T_MAKE_SHADER_PATH(shaders_h, blit.vso)
-#include T_MAKE_SHADER_PATH(shaders_h, blit.fso)
-#include T_MAKE_SHADER_PATH(shaders_h, blur.vso)
-#include T_MAKE_SHADER_PATH(shaders_h, blur.fso)
-#include T_MAKE_SHADER_PATH(shaders_h, vignette_sepia.vso)
-#include T_MAKE_SHADER_PATH(shaders_h, vignette_sepia.fso)
+#include "internal.h"
 
-namespace termite
+#include TEE_MAKE_SHADER_PATH(shaders_h, blit.vso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, blit.fso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, blur.vso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, blur.fso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, vignette_sepia.vso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, vignette_sepia.fso)
+
+namespace tee
 {
-
     struct VertexFs
     {
         float x, y;
@@ -23,10 +24,10 @@ namespace termite
 
         static void init()
         {
-            vdeclBegin(&Decl);
-            vdeclAdd(&Decl, VertexAttrib::Position, 2, VertexAttribType::Float);
-            vdeclAdd(&Decl, VertexAttrib::TexCoord0, 2, VertexAttribType::Float);
-            vdeclEnd(&Decl);
+            gfx::beginDecl(&Decl);
+            gfx::addAttrib(&Decl, VertexAttrib::Position, 2, VertexAttribType::Float);
+            gfx::addAttrib(&Decl, VertexAttrib::TexCoord0, 2, VertexAttribType::Float);
+            gfx::endDecl(&Decl);
         }
     };
     VertexDecl VertexFs::Decl;
@@ -74,7 +75,7 @@ namespace termite
             width = height = 0;
             radius = 0;
             softness = 0.45f;   
-            vignetteColor = vec4f(0, 0, 0, 0);
+            vignetteColor = vec4(0, 0, 0, 0);
         }
     };
 
@@ -82,7 +83,7 @@ namespace termite
     {
         VertexBufferHandle fsVb;
         IndexBufferHandle fsIb;
-        GfxDriverApi* driver;
+        GfxDriver* driver;
 
         ProgramHandle blitProg;
         UniformHandle uTexture;
@@ -92,19 +93,19 @@ namespace termite
         {
         }
     };
-    static GfxUtils* g_gutils = nullptr;
+    static GfxUtils* gUtils = nullptr;
 
-    result_t initGfxUtils(GfxDriverApi* driver)
+    bool gfx::initGfxUtils(GfxDriver* driver)
     {
-        if (g_gutils) {
+        if (gUtils) {
             assert(0);
-            return T_ERR_ALREADY_INITIALIZED;
+            return false;
         }
 
-        g_gutils = BX_NEW(getHeapAlloc(), GfxUtils);
-        if (!g_gutils)
-            return T_ERR_OUTOFMEM;
-        g_gutils->driver = driver;
+        gUtils = BX_NEW(getHeapAlloc(), GfxUtils);
+        if (!gUtils)
+            return false;
+        gUtils->driver = driver;
 
         VertexFs::init();
         static VertexFs fsQuad[] = {
@@ -129,56 +130,56 @@ namespace termite
         };
 
 
-        if (!g_gutils->fsVb.isValid()) {
-            g_gutils->fsVb = driver->createVertexBuffer(driver->makeRef(fsQuad, sizeof(VertexFs) * 4, nullptr, nullptr),
-                                                        VertexFs::Decl, GpuBufferFlag::None);
-            if (!g_gutils->fsVb.isValid())
-                return T_ERR_FAILED;
+        if (!gUtils->fsVb.isValid()) {
+            gUtils->fsVb = driver->createVertexBuffer(driver->makeRef(fsQuad, sizeof(VertexFs) * 4, nullptr, nullptr),
+                                                        VertexFs::Decl, GfxBufferFlag::None);
+            if (!gUtils->fsVb.isValid())
+                return false;
         }
 
-        if (!g_gutils->fsIb.isValid()) {
-            g_gutils->fsIb = driver->createIndexBuffer(driver->makeRef(indices, sizeof(uint16_t) * 6, nullptr, nullptr),
-                                                       GpuBufferFlag::None);
-            if (!g_gutils->fsIb.isValid())
-                return T_ERR_FAILED;
+        if (!gUtils->fsIb.isValid()) {
+            gUtils->fsIb = driver->createIndexBuffer(driver->makeRef(indices, sizeof(uint16_t) * 6, nullptr, nullptr),
+                                                       GfxBufferFlag::None);
+            if (!gUtils->fsIb.isValid())
+                return false;
         }
 
-        g_gutils->blitProg = driver->createProgram(
+        gUtils->blitProg = driver->createProgram(
             driver->createShader(driver->makeRef(blit_vso, sizeof(blit_vso), nullptr, nullptr)),
             driver->createShader(driver->makeRef(blit_fso, sizeof(blit_fso), nullptr, nullptr)),
             true);
-        if (!g_gutils->blitProg.isValid())
-            return T_ERR_FAILED;
+        if (!gUtils->blitProg.isValid())
+            return false;
 
-        g_gutils->uTexture = driver->createUniform("u_texture", UniformType::Int1, 1);
+        gUtils->uTexture = driver->createUniform("u_texture", UniformType::Int1, 1);
 
-        return 0;
+        return true;
     }
 
-    void shutdownGfxUtils()
+    void gfx::shutdownGfxUtils()
     {
-        if (!g_gutils)
+        if (!gUtils)
             return;
 
-        if (g_gutils->uTexture.isValid())
-            g_gutils->driver->destroyUniform(g_gutils->uTexture);
-        if (g_gutils->blitProg.isValid())
-            g_gutils->driver->destroyProgram(g_gutils->blitProg);
-        if (g_gutils->fsVb.isValid())
-            g_gutils->driver->destroyVertexBuffer(g_gutils->fsVb);
-        if (g_gutils->fsIb.isValid())
-            g_gutils->driver->destroyIndexBuffer(g_gutils->fsIb);
-        g_gutils->fsVb.reset();
-        g_gutils->fsIb.reset();
-        BX_DELETE(getHeapAlloc(), g_gutils);
-        g_gutils = nullptr;
+        if (gUtils->uTexture.isValid())
+            gUtils->driver->destroyUniform(gUtils->uTexture);
+        if (gUtils->blitProg.isValid())
+            gUtils->driver->destroyProgram(gUtils->blitProg);
+        if (gUtils->fsVb.isValid())
+            gUtils->driver->destroyVertexBuffer(gUtils->fsVb);
+        if (gUtils->fsIb.isValid())
+            gUtils->driver->destroyIndexBuffer(gUtils->fsIb);
+        gUtils->fsVb.reset();
+        gUtils->fsIb.reset();
+        BX_DELETE(getHeapAlloc(), gUtils);
+        gUtils = nullptr;
     }
 
     /* references :
     *  http://en.wikipedia.org/wiki/Gaussian_blur
     *  http://en.wikipedia.org/wiki/Normal_distribution
     */
-    void calcGaussKernel(vec4_t* kernel, int kernelSize, float stdDev, float intensity)
+    void gfx::calcGaussKernel(vec4_t* kernel, int kernelSize, float stdDev, float intensity)
     {
         assert(kernelSize % 2 == 1);    // should be Odd number
 
@@ -192,7 +193,7 @@ namespace termite
             float x = p / float(hk);
             float w = bx::fexp2(-(x*x) / (2.0f*stdDevSqr)) / k;
             sum += w;
-            kernel[i] = vec4f(p, p, w, 0.0f);
+            kernel[i] = vec4(p, p, w, 0.0f);
         }
 
         // Normalize
@@ -207,19 +208,19 @@ namespace termite
         releaseMemoryBlock((MemoryBlock*)userData);
     }
 
-    ProgramHandle loadShaderProgram(GfxDriverApi* gfxDriver, IoDriverApi* ioDriver, const char* vsFilepath, 
+    ProgramHandle gfx::loadProgram(GfxDriver* gfxDriver, IoDriver* ioDriver, const char* vsFilepath, 
                                     const char* fsFilepath)
     {
-        GfxDriverApi* driver = gfxDriver;
+        GfxDriver* driver = gfxDriver;
         MemoryBlock* vso = ioDriver->read(vsFilepath, IoPathType::Assets, 0);
         if (!vso) {
-            T_ERROR("Opening file '%s' failed", vsFilepath);
+            TEE_ERROR("Opening file '%s' failed", vsFilepath);
             return ProgramHandle();
         }
 
         MemoryBlock* fso = ioDriver->read(fsFilepath, IoPathType::Assets, 0);
         if (!fso) {
-            T_ERROR("Opening file '%s' failed", fsFilepath);
+            TEE_ERROR("Opening file '%s' failed", fsFilepath);
             return ProgramHandle();
         }
 
@@ -232,37 +233,37 @@ namespace termite
         return driver->createProgram(vs, fs, true);
     }
 
-    void blitToFramebuffer(uint8_t viewId, TextureHandle texture)
+    void gfx::blitToFramebuffer(uint8_t viewId, TextureHandle texture)
     {
         assert(texture.isValid());
 
-        GfxDriverApi* driver = g_gutils->driver;
+        GfxDriver* driver = gUtils->driver;
 
         driver->setState(GfxState::RGBWrite | GfxState::AlphaWrite, 0);
-        driver->setTexture(0, g_gutils->uTexture, texture, TextureFlag::FromTexture);
-        drawFullscreenQuad(viewId, g_gutils->blitProg);
+        driver->setTexture(0, gUtils->uTexture, texture, TextureFlag::FromTexture);
+        gfx::drawFullscreenQuad(viewId, gUtils->blitProg);
     }
 
-    void drawFullscreenQuad(uint8_t viewId, ProgramHandle prog)
+    void gfx::drawFullscreenQuad(uint8_t viewId, ProgramHandle prog)
     {
-        assert(g_gutils->fsIb.isValid());
-        assert(g_gutils->fsVb.isValid());
+        assert(gUtils->fsIb.isValid());
+        assert(gUtils->fsVb.isValid());
 
-        GfxDriverApi* driver = g_gutils->driver;
+        GfxDriver* driver = gUtils->driver;
 
-        driver->setVertexBuffer(0, g_gutils->fsVb);
-        driver->setIndexBuffer(g_gutils->fsIb, 0, 6);
+        driver->setVertexBuffer(0, gUtils->fsVb);
+        driver->setIndexBuffer(gUtils->fsIb, 0, 6);
         driver->submit(viewId, prog, 0, false);
     }
 
-    vec2i_t getRelativeDisplaySize(int refWidth, int refHeight, int targetWidth, int targetHeight, DisplayPolicy::Enum policy)
+    ivec2_t gfx::getRelativeDisplaySize(int refWidth, int refHeight, int targetWidth, int targetHeight, DisplayPolicy::Enum policy)
     {
         float w, h;
         float ratio = float(refWidth) / float(refHeight);
         switch (policy) {
         case DisplayPolicy::FitToHeight:
             h = float(targetHeight);
-            w = h*ratio;
+            w = bx::min(float(refWidth), h*ratio);
             break;
 
         case DisplayPolicy::FitToWidth:
@@ -271,17 +272,17 @@ namespace termite
             break;
         }
 
-        return vec2i(int(w), int(h));
+        return ivec2(int(w), int(h));
     }
 
-    PostProcessBlur* createBlurPostProcess(bx::AllocatorI* alloc, uint16_t width, uint16_t height, float stdDev,
+    PostProcessBlur* gfx::createBlurPostProcess(bx::AllocatorI* alloc, uint16_t width, uint16_t height, float stdDev,
                                            TextureFormat::Enum fmt /*= TextureFormat::RGBA8*/)
     {
         PostProcessBlur* blur = BX_NEW(alloc, PostProcessBlur)(alloc);
         if (!blur)
             return nullptr;
 
-        GfxDriverApi* driver = g_gutils->driver;
+        GfxDriver* driver = gUtils->driver;
         for (int i = 0; i < 2; i++) {
             blur->fbs[i] = driver->createFrameBuffer(width, height, fmt,
                                                      TextureFlag::RT |
@@ -305,15 +306,15 @@ namespace termite
         return blur;
     }
 
-    TextureHandle drawBlurPostProcess(PostProcessBlur* blur, uint8_t* viewId, TextureHandle sourceTexture, float radius)
+    TextureHandle gfx::drawBlurPostProcess(PostProcessBlur* blur, uint8_t* viewId, TextureHandle sourceTexture, float radius)
     {
         uint8_t vid = *viewId;
-        GfxDriverApi* driver = g_gutils->driver;
+        GfxDriver* driver = gUtils->driver;
 
         // Downsample to our first blur frameBuffer
         driver->setViewFrameBuffer(vid, blur->fbs[0]);
         driver->setViewRect(vid, 0, 0, blur->width, blur->height);
-        blitToFramebuffer(vid, sourceTexture);
+        gfx::blitToFramebuffer(vid, sourceTexture);
         vid++;
 
         vec4_t kernel[BLUR_KERNEL_SIZE];
@@ -332,7 +333,7 @@ namespace termite
         driver->setState(GfxState::RGBWrite, 0);
         driver->setTexture(0, blur->uTexture, blur->textures[0], TextureFlag::FromTexture);
         driver->setUniform(blur->uBlurKernel, kernel, BLUR_KERNEL_SIZE);
-        drawFullscreenQuad(vid, blur->prog);
+        gfx::drawFullscreenQuad(vid, blur->prog);
         vid++;
 
         // Blur vertically to 1st framebuffer
@@ -346,23 +347,23 @@ namespace termite
         driver->setState(GfxState::RGBWrite, 0);
         driver->setTexture(0, blur->uTexture, blur->textures[1], TextureFlag::FromTexture);
         driver->setUniform(blur->uBlurKernel, kernel, BLUR_KERNEL_SIZE);
-        drawFullscreenQuad(vid, blur->prog);
+        gfx::drawFullscreenQuad(vid, blur->prog);
         vid++;
 
         *viewId = vid;
         return blur->textures[0];
     }
 
-    TextureHandle getBlurPostProcessTexture(PostProcessBlur* blur)
+    TextureHandle gfx::getBlurPostProcessTexture(PostProcessBlur* blur)
     {
         return blur->textures[0];
     }
 
-    void destroyBlurPostProcess(PostProcessBlur* blur)
+    void gfx::destroyBlurPostProcess(PostProcessBlur* blur)
     {
         assert(blur);
 
-        GfxDriverApi* driver = g_gutils->driver;
+        GfxDriver* driver = gUtils->driver;
         if (blur->fbs[0].isValid())
             driver->destroyFrameBuffer(blur->fbs[0]);
         if (blur->fbs[1].isValid())
@@ -378,20 +379,20 @@ namespace termite
         BX_DELETE(blur->alloc, blur);
     }
 
-    PostProcessVignetteSepia* createVignetteSepiaPostProcess(bx::AllocatorI* alloc, uint16_t width, uint16_t height, 
+    PostProcessVignetteSepia* gfx::createVignetteSepiaPostProcess(bx::AllocatorI* alloc, uint16_t width, uint16_t height, 
                                                              float radius, float softness, 
                                                              float vignetteIntensity, float sepiaIntensity, 
-                                                             color_t sepiaColor, color_t vignetteColor)
+                                                             ucolor_t sepiaColor, ucolor_t vignetteColor)
     {
-        GfxDriverApi* driver = g_gutils->driver;
+        GfxDriver* driver = gUtils->driver;
 
         PostProcessVignetteSepia* vignette = BX_NEW(alloc, PostProcessVignetteSepia)(alloc);
         vignette->width = width;
         vignette->height = height;
         vignette->radius = radius;
         vignette->softness = bx::clamp<float>(softness, 0, 0.5f);
-        vignette->sepiaColor = colorToVec4(sepiaColor);
-        vignette->vignetteColor = colorToVec4(vignetteColor);
+        vignette->sepiaColor = tmath::ucolorToVec4(sepiaColor);
+        vignette->vignetteColor = tmath::ucolorToVec4(vignetteColor);
         vignette->vignetteIntensity = vignetteIntensity;
         vignette->sepiaIntensity = sepiaIntensity;
 
@@ -408,14 +409,14 @@ namespace termite
         return vignette;
     }
 
-    TextureHandle drawVignetteSepiaPostProcess(PostProcessVignetteSepia* vignette, uint8_t viewId,
+    TextureHandle gfx::drawVignetteSepiaPostProcess(PostProcessVignetteSepia* vignette, uint8_t viewId,
                                                FrameBufferHandle targetFb, TextureHandle sourceTexture,
                                                float intensity)
     {
-        GfxDriverApi* driver = g_gutils->driver;
+        GfxDriver* driver = gUtils->driver;
 
-        vec4_t vigParams = vec4f(vignette->radius, vignette->softness, intensity*vignette->vignetteIntensity, 0);
-        vec4_t sepiaParams = vec4f(vignette->sepiaColor.x, vignette->sepiaColor.y, vignette->sepiaColor.z, 
+        vec4_t vigParams = vec4(vignette->radius, vignette->softness, intensity*vignette->vignetteIntensity, 0);
+        vec4_t sepiaParams = vec4(vignette->sepiaColor.x, vignette->sepiaColor.y, vignette->sepiaColor.z, 
                                    intensity*vignette->sepiaIntensity);
 
         driver->setViewRect(viewId, 0, 0, vignette->width, vignette->height);
@@ -426,18 +427,18 @@ namespace termite
         driver->setUniform(vignette->uSepiaParams, sepiaParams.f, 1);
         driver->setUniform(vignette->uVignetteColor, vignette->vignetteColor.f, 1);
 
-        drawFullscreenQuad(viewId, vignette->prog);
+        gfx::drawFullscreenQuad(viewId, vignette->prog);
         return driver->getFrameBufferTexture(targetFb, 0);
     }
 
-    TextureHandle drawVignetteSepiaPostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId, 
+    TextureHandle gfx::drawVignetteSepiaPostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId, 
                                                        FrameBufferHandle targetFb, TextureHandle sourceTexture, 
                                                        float intensity, float vigIntensity, float vigRadius)
     {
-        GfxDriverApi* driver = g_gutils->driver;
+        GfxDriver* driver = gUtils->driver;
 
-        vec4_t vigParams = vec4f(vigRadius != 0 ? vigRadius : vignette->radius, vignette->softness, intensity*vigIntensity, 0);
-        vec4_t sepiaParams = vec4f(vignette->sepiaColor.x, vignette->sepiaColor.y, vignette->sepiaColor.z,
+        vec4_t vigParams = vec4(vigRadius != 0 ? vigRadius : vignette->radius, vignette->softness, intensity*vigIntensity, 0);
+        vec4_t sepiaParams = vec4(vignette->sepiaColor.x, vignette->sepiaColor.y, vignette->sepiaColor.z,
                                    intensity*vignette->sepiaIntensity);
 
         driver->setViewRect(viewId, 0, 0, vignette->width, vignette->height);
@@ -448,18 +449,18 @@ namespace termite
         driver->setUniform(vignette->uSepiaParams, sepiaParams.f, 1);
         driver->setUniform(vignette->uVignetteColor, vignette->vignetteColor.f, 1);
 
-        drawFullscreenQuad(viewId, vignette->prog);
+        gfx::drawFullscreenQuad(viewId, vignette->prog);
         return driver->getFrameBufferTexture(targetFb, 0);
     }
 
-    TextureHandle drawVignettePostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId, FrameBufferHandle targetFb,
+    TextureHandle gfx::drawVignettePostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId, FrameBufferHandle targetFb,
                                                   TextureHandle sourceTexture, float softness, float radius, float intensity,
                                                   vec4_t vignetteColor)
     {
-        GfxDriverApi* driver = g_gutils->driver;
+        GfxDriver* driver = gUtils->driver;
 
-        vec4_t vigParams = vec4f(radius, softness, intensity, 0);
-        vec4_t sepiaParams = vec4f(1.0f, 1.0f, 1.0f, 0);
+        vec4_t vigParams = vec4(radius, softness, intensity, 0);
+        vec4_t sepiaParams = vec4(1.0f, 1.0f, 1.0f, 0);
 
         driver->setViewRect(viewId, 0, 0, vignette->width, vignette->height);
         driver->setViewFrameBuffer(viewId, targetFb);
@@ -468,15 +469,15 @@ namespace termite
         driver->setUniform(vignette->uVignetteParams, vigParams.f, 1);
         driver->setUniform(vignette->uSepiaParams, sepiaParams.f, 1);
         driver->setUniform(vignette->uVignetteColor, vignetteColor.f, 1);
-        drawFullscreenQuad(viewId, vignette->prog);
+        gfx::drawFullscreenQuad(viewId, vignette->prog);
         return driver->getFrameBufferTexture(targetFb, 0);
     }
 
-    void destroyVignetteSepiaPostProcess(PostProcessVignetteSepia* vignette)
+    void gfx::destroyVignetteSepiaPostProcess(PostProcessVignetteSepia* vignette)
     {
         assert(vignette);
 
-        GfxDriverApi* driver = g_gutils->driver;
+        GfxDriver* driver = gUtils->driver;
         if (vignette->uTexture.isValid())
             driver->destroyUniform(vignette->uTexture);
         if (vignette->uVignetteParams.isValid())

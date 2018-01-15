@@ -32,17 +32,17 @@
 
 #include "../../include/termite/gfx_driver.h"
 
-#define T_GFX_API
+#define TEE_GFX_API
 #include "../../include/termite/plugin_api.h"
 
 BX_PRAGMA_DIAGNOSTIC_IGNORED_MSVC(4244); // warning C4244: '=' : conversion from '' to '', possible loss of data
 
 namespace
 {
-#include T_MAKE_SHADER_PATH(shaders_h, nanovg_fill.vso)
-#include T_MAKE_SHADER_PATH(shaders_h, nanovg_fill.fso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, nanovg_fill.vso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, nanovg_fill.fso)
 
-	static termite::VertexDecl s_nvgDecl;
+	static tee::VertexDecl s_nvgDecl;
 
 	enum GLNVGshaderType
 	{
@@ -59,7 +59,7 @@ namespace
 
 	struct GLNVGtexture
 	{
-		termite::TextureHandle id;
+		tee::TextureHandle id;
 		int width, height;
 		int type;
 		int flags;
@@ -117,27 +117,27 @@ namespace
 	struct GLNVGcontext
 	{
 		bx::AllocatorI* m_allocator;
-		termite::GfxDriverApi* driver;
-		termite::GfxApi_v0* gfxApi;
+		tee::GfxDriver* driver;
+		tee::GfxApi* gfxApi;
 
-		termite::ProgramHandle prog;
-		termite::UniformHandle u_scissorMat;
-		termite::UniformHandle u_paintMat;
-		termite::UniformHandle u_innerCol;
-		termite::UniformHandle u_outerCol;
-		termite::UniformHandle u_viewSize;
-		termite::UniformHandle u_scissorExtScale;
-		termite::UniformHandle u_extentRadius;
-		termite::UniformHandle u_params;
-		termite::UniformHandle u_halfTexel;
+		tee::ProgramHandle prog;
+		tee::UniformHandle u_scissorMat;
+		tee::UniformHandle u_paintMat;
+		tee::UniformHandle u_innerCol;
+		tee::UniformHandle u_outerCol;
+		tee::UniformHandle u_viewSize;
+		tee::UniformHandle u_scissorExtScale;
+		tee::UniformHandle u_extentRadius;
+		tee::UniformHandle u_params;
+		tee::UniformHandle u_halfTexel;
 
-		termite::UniformHandle s_tex;
+		tee::UniformHandle s_tex;
 
-		termite::GfxState::Bits state;
-		termite::TextureHandle th;
-		termite::TextureHandle texMissing;
+		tee::GfxState::Bits state;
+		tee::TextureHandle th;
+		tee::TextureHandle texMissing;
 
-		termite::TransientVertexBuffer tvb;
+		tee::TransientVertexBuffer tvb;
 		uint8_t m_viewId;
 
 		struct GLNVGtexture* textures;
@@ -238,8 +238,8 @@ namespace
 	{
         struct GLNVGcontext* gl = (struct GLNVGcontext*)_userPtr;
 
-		const termite::GfxMemory* vs_nanovg_fill;
-		const termite::GfxMemory* fs_nanovg_fill;
+		const tee::GfxMemory* vs_nanovg_fill;
+		const tee::GfxMemory* fs_nanovg_fill;
 
 		vs_nanovg_fill = gl->driver->makeRef(nanovg_fill_vso, sizeof(nanovg_fill_vso), nullptr, nullptr);
 		fs_nanovg_fill = gl->driver->makeRef(nanovg_fill_fso, sizeof(nanovg_fill_fso), nullptr, nullptr);
@@ -249,34 +249,34 @@ namespace
 						, gl->driver->createShader(fs_nanovg_fill)
 						, true
 						);
-		const termite::GfxMemory* mem = gl->driver->alloc(4*4*4);
+		const tee::GfxMemory* mem = gl->driver->alloc(4*4*4);
 		uint32_t* bgra8 = (uint32_t*)mem->data;
 		bx::memSet(bgra8, 0, 4*4*4);
-		gl->texMissing = gl->driver->createTexture2D(4, 4, false, 1, termite::TextureFormat::BGRA8, termite::TextureFlag::None, mem);
+		gl->texMissing = gl->driver->createTexture2D(4, 4, false, 1, tee::TextureFormat::BGRA8, tee::TextureFlag::None, mem);
 
-		gl->u_scissorMat      = gl->driver->createUniform("u_scissorMat",      termite::UniformType::Mat3, 1);
-		gl->u_paintMat        = gl->driver->createUniform("u_paintMat",        termite::UniformType::Mat3, 1);
-		gl->u_innerCol        = gl->driver->createUniform("u_innerCol",        termite::UniformType::Vec4, 1);
-		gl->u_outerCol        = gl->driver->createUniform("u_outerCol",        termite::UniformType::Vec4, 1);
-		gl->u_viewSize        = gl->driver->createUniform("u_viewSize",        termite::UniformType::Vec4, 1);
-		gl->u_scissorExtScale = gl->driver->createUniform("u_scissorExtScale", termite::UniformType::Vec4, 1);
-		gl->u_extentRadius    = gl->driver->createUniform("u_extentRadius",    termite::UniformType::Vec4, 1);
-		gl->u_params          = gl->driver->createUniform("u_params",          termite::UniformType::Vec4, 1);
-		gl->s_tex             = gl->driver->createUniform("s_tex",             termite::UniformType::Int1, 1);
+		gl->u_scissorMat      = gl->driver->createUniform("u_scissorMat",      tee::UniformType::Mat3, 1);
+		gl->u_paintMat        = gl->driver->createUniform("u_paintMat",        tee::UniformType::Mat3, 1);
+		gl->u_innerCol        = gl->driver->createUniform("u_innerCol",        tee::UniformType::Vec4, 1);
+		gl->u_outerCol        = gl->driver->createUniform("u_outerCol",        tee::UniformType::Vec4, 1);
+		gl->u_viewSize        = gl->driver->createUniform("u_viewSize",        tee::UniformType::Vec4, 1);
+		gl->u_scissorExtScale = gl->driver->createUniform("u_scissorExtScale", tee::UniformType::Vec4, 1);
+		gl->u_extentRadius    = gl->driver->createUniform("u_extentRadius",    tee::UniformType::Vec4, 1);
+		gl->u_params          = gl->driver->createUniform("u_params",          tee::UniformType::Vec4, 1);
+		gl->s_tex             = gl->driver->createUniform("s_tex",             tee::UniformType::Int1, 1);
 
-		if (gl->driver->getRendererType() == termite::RendererType::Direct3D9)
+		if (gl->driver->getRendererType() == tee::RendererType::Direct3D9)
 		{
-			gl->u_halfTexel   = gl->driver->createUniform("u_halfTexel",       termite::UniformType::Vec4, 1);
+			gl->u_halfTexel   = gl->driver->createUniform("u_halfTexel",       tee::UniformType::Vec4, 1);
 		}
 		else
 		{
 			gl->u_halfTexel.reset();
 		}
 
-		gl->gfxApi->vdeclBegin(&s_nvgDecl, termite::RendererType::Noop);
-		gl->gfxApi->vdeclAdd(&s_nvgDecl, termite::VertexAttrib::Position, 2, termite::VertexAttribType::Float, false, false);
-		gl->gfxApi->vdeclAdd(&s_nvgDecl, termite::VertexAttrib::TexCoord0, 2, termite::VertexAttribType::Float, false, false);
-		gl->gfxApi->vdeclEnd(&s_nvgDecl);
+		gl->gfxApi->beginDecl(&s_nvgDecl, tee::RendererType::Noop);
+		gl->gfxApi->addAttrib(&s_nvgDecl, tee::VertexAttrib::Position, 2, tee::VertexAttribType::Float, false, false);
+		gl->gfxApi->addAttrib(&s_nvgDecl, tee::VertexAttrib::TexCoord0, 2, tee::VertexAttribType::Float, false, false);
+		gl->gfxApi->endDecl(&s_nvgDecl);
 
 		int align = 16;
 		gl->fragSize = sizeof(struct GLNVGfragUniforms) + align - sizeof(struct GLNVGfragUniforms) % align;
@@ -302,7 +302,7 @@ namespace
 		uint32_t bytesPerPixel = NVG_TEXTURE_RGBA == tex->type ? 4 : 1;
 		uint32_t pitch = tex->width * bytesPerPixel;
 
-		const termite::GfxMemory* mem = NULL;
+		const tee::GfxMemory* mem = NULL;
 		if (NULL != _rgba)
 		{
 			mem = gl->driver->copy(_rgba, tex->height * pitch);
@@ -311,8 +311,8 @@ namespace
 		tex->id = gl->driver->createTexture2D(tex->width
 						, tex->height
 						, false, 1
-						, NVG_TEXTURE_RGBA == _type ? termite::TextureFormat::RGBA8 : termite::TextureFormat::R8
-						, termite::TextureFlag::None, nullptr);
+						, NVG_TEXTURE_RGBA == _type ? tee::TextureFormat::RGBA8 : tee::TextureFormat::R8
+						, tee::TextureFlag::None, nullptr);
 
 		if (NULL != mem)
 		{
@@ -509,7 +509,7 @@ namespace
 		gl->driver->setUniform(gl->u_extentRadius,    &frag->extent[0], 1);
 		gl->driver->setUniform(gl->u_params,          &frag->feather, 1);
 
-		termite::TextureHandle handle = gl->texMissing;
+		tee::TextureHandle handle = gl->texMissing;
 
 		if (image != 0)
 		{
@@ -540,7 +540,7 @@ namespace
 	static void fan(GLNVGcontext* gl, uint32_t _start, uint32_t _count)
 	{
 		uint32_t numTris = _count-2;
-		termite::TransientIndexBuffer tib;
+		tee::TransientIndexBuffer tib;
 		gl->driver->allocTransientIndexBuffer(&tib, numTris*3);
 		uint16_t* data = (uint16_t*)tib.data;
 		for (uint32_t ii = 0; ii < numTris; ++ii)
@@ -565,21 +565,21 @@ namespace
 		{
 			if (2 < paths[i].fillCount)
 			{
-				gl->driver->setState(termite::GfxState::None, 0);
+				gl->driver->setState(tee::GfxState::None, 0);
 				gl->driver->setStencil(
-					termite::GfxStencilState::TestAlways 
-					| termite::gfxStencilRMask(0xff)
-					| termite::GfxStencilState::OpStencilFailKeep
-					| termite::GfxStencilState::OpDepthFailKeep
-					| termite::GfxStencilState::OpDepthPassIncr
-					, termite::GfxStencilState::TestAlways
-					| termite::gfxStencilRMask(0xff)
-					| termite::GfxStencilState::OpStencilFailKeep 
-					| termite::GfxStencilState::OpDepthFailKeep
-					| termite::GfxStencilState::OpDepthPassDecr
+					tee::GfxStencilState::TestAlways 
+					| tee::gfx::stencilRMask(0xff)
+					| tee::GfxStencilState::OpStencilFailKeep
+					| tee::GfxStencilState::OpDepthFailKeep
+					| tee::GfxStencilState::OpDepthPassIncr
+					, tee::GfxStencilState::TestAlways
+					| tee::gfx::stencilRMask(0xff)
+					| tee::GfxStencilState::OpStencilFailKeep 
+					| tee::GfxStencilState::OpDepthFailKeep
+					| tee::GfxStencilState::OpDepthPassDecr
 					);
 				gl->driver->setTransientVertexBuffer(0, &gl->tvb);
-				gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
+				gl->driver->setTexture(0, gl->s_tex, gl->th, tee::TextureFlag::FromTexture);
 				fan(gl, paths[i].fillOffset, paths[i].fillCount);
 				gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
 			}
@@ -593,16 +593,16 @@ namespace
 			// Draw fringes
 			for (i = 0; i < npaths; i++)
 			{
-				gl->driver->setState(gl->state | termite::GfxState::PrimitiveTriStrip, 0);
+				gl->driver->setState(gl->state | tee::GfxState::PrimitiveTriStrip, 0);
 				gl->driver->setStencil(
-					termite::GfxStencilState::TestEqual
-					| termite::gfxStencilRMask(0xff)
-					| termite::GfxStencilState::OpStencilFailKeep 
-					| termite::GfxStencilState::OpDepthFailKeep
-					| termite::GfxStencilState::OpDepthPassKeep
-					, termite::GfxStencilState::None);
+					tee::GfxStencilState::TestEqual
+					| tee::gfx::stencilRMask(0xff)
+					| tee::GfxStencilState::OpStencilFailKeep 
+					| tee::GfxStencilState::OpDepthFailKeep
+					| tee::GfxStencilState::OpDepthPassKeep
+					, tee::GfxStencilState::None);
 				gl->driver->setTransientVertexBufferI(0, &gl->tvb, paths[i].strokeOffset, paths[i].strokeCount);
-				gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
+				gl->driver->setTexture(0, gl->s_tex, gl->th, tee::TextureFlag::FromTexture);
 				gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
 			}
 		}
@@ -610,15 +610,15 @@ namespace
 		// Draw fill
 		gl->driver->setState(gl->state, 0);
 		gl->driver->setTransientVertexBufferI(0, &gl->tvb, call->vertexOffset, call->vertexCount);
-		gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
+		gl->driver->setTexture(0, gl->s_tex, gl->th, tee::TextureFlag::FromTexture);
 		gl->driver->setStencil(
-				termite::GfxStencilState::TestNotEqual
-				| termite::gfxStencilRMask(0xff)
-				| termite::GfxStencilState::OpStencilFailZero
-				| termite::GfxStencilState::OpDepthFailZero
-				| termite::GfxStencilState::OpDepthPassZero
+				tee::GfxStencilState::TestNotEqual
+				| tee::gfx::stencilRMask(0xff)
+				| tee::GfxStencilState::OpStencilFailZero
+				| tee::GfxStencilState::OpDepthFailZero
+				| tee::GfxStencilState::OpDepthPassZero
 				,
-				termite::GfxStencilState::None
+				tee::GfxStencilState::None
 				);
 		gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
 	}
@@ -635,7 +635,7 @@ namespace
 			if (paths[i].fillCount == 0) continue;
 			gl->driver->setState(gl->state, 0);
 			gl->driver->setTransientVertexBuffer(0, &gl->tvb);
-			gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
+			gl->driver->setTexture(0, gl->s_tex, gl->th, tee::TextureFlag::FromTexture);
 			fan(gl, paths[i].fillOffset, paths[i].fillCount);
 			gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
 		}
@@ -645,9 +645,9 @@ namespace
 			// Draw fringes
 			for (i = 0; i < npaths; i++)
 			{
-				gl->driver->setState(gl->state | termite::GfxState::PrimitiveTriStrip, 0);
+				gl->driver->setState(gl->state | tee::GfxState::PrimitiveTriStrip, 0);
 				gl->driver->setTransientVertexBufferI(0, &gl->tvb, paths[i].strokeOffset, paths[i].strokeCount);
-				gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
+				gl->driver->setTexture(0, gl->s_tex, gl->th, tee::TextureFlag::FromTexture);
 				gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
 			}
 		}
@@ -663,9 +663,9 @@ namespace
 		// Draw Strokes
 		for (i = 0; i < npaths; i++)
 		{
-			gl->driver->setState(gl->state | termite::GfxState::PrimitiveTriStrip, 0);
+			gl->driver->setState(gl->state | tee::GfxState::PrimitiveTriStrip, 0);
 			gl->driver->setTransientVertexBufferI(0, &gl->tvb, paths[i].strokeOffset, paths[i].strokeCount);
-			gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
+			gl->driver->setTexture(0, gl->s_tex, gl->th, tee::TextureFlag::FromTexture);
 			gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
 		}
 	}
@@ -678,7 +678,7 @@ namespace
 
 			gl->driver->setState(gl->state, 0);
 			gl->driver->setTransientVertexBufferI(0, &gl->tvb, call->vertexOffset, call->vertexCount);
-			gl->driver->setTexture(0, gl->s_tex, gl->th, termite::TextureFlag::FromTexture);
+			gl->driver->setTexture(0, gl->s_tex, gl->th, tee::TextureFlag::FromTexture);
 			gl->driver->submit(gl->m_viewId, gl->prog, 0, false);
 		}
 	}
@@ -701,7 +701,7 @@ namespace
 
 			memcpy(gl->tvb.data, gl->verts, gl->nverts * sizeof(struct NVGvertex) );
 
-			gl->state = termite::GfxState::RGBWrite | termite::GfxState::AlphaWrite;
+			gl->state = tee::GfxState::RGBWrite | tee::GfxState::AlphaWrite;
 
 // 			if (alphaBlend == NVG_PREMULTIPLIED_ALPHA)
 // 			{
@@ -712,7 +712,7 @@ namespace
 // 			}
 // 			else
 			{
-				gl->state |= termite::gfxStateBlendFunc(termite::GfxState::BlendSrcAlpha, termite::GfxState::BlendInvSrcAlpha);
+				gl->state |= tee::gfx::stateBlendFunc(tee::GfxState::BlendSrcAlpha, tee::GfxState::BlendInvSrcAlpha);
 			}
 
 			gl->driver->setUniform(gl->u_viewSize, gl->view, 1);
@@ -1008,7 +1008,7 @@ namespace
 
 } // namespace
 
-NVGcontext* nvgCreate(int edgeaa, unsigned char _viewId, termite::GfxDriverApi* driver, termite::GfxApi_v0* gfxApi, 
+NVGcontext* nvgCreate(int edgeaa, unsigned char _viewId, tee::GfxDriver* driver, tee::GfxApi* gfxApi, 
 					  bx::AllocatorI* _allocator)
 {
 	if (NULL == _allocator)

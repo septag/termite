@@ -1,6 +1,6 @@
-#include "termite/core.h"
+#include "termite/tee.h"
 
-#define T_CORE_API
+#define TEE_CORE_API
 #include "termite/plugin_api.h"
 #include "termite/gfx_driver.h"
 
@@ -11,14 +11,14 @@
 #include "bgfx/bgfx.h"
 #include "bgfx/platform.h"
 
-#include <cstdarg>
-#include <cstdio>
-#include <cassert>
+#include <stdarg.h>
+#include <stdio.h>
+#include <assert.h>
 
 //
-using namespace termite;
+using namespace tee;
 
-static CoreApi_v0* g_core = nullptr;
+static CoreApi* gTee = nullptr;
 
 #define BGFX_DECLARE_HANDLE(_Type, _Name, _Handle) bgfx::_Type _Name; _Name.idx = _Handle.value
 
@@ -146,7 +146,7 @@ public:
     ///
     void profilerBegin(const char* _name, uint32_t _abgr, const char* _filePath, uint16_t _line) override
     {
-        T_PROFILE_BEGIN_STR(g_core, _name, 0);
+        TEE_PROFILE_BEGIN_STR(gTee, _name, 0);
     }
 
     /// Profiler region begin with string literal name.
@@ -175,7 +175,7 @@ public:
     ///
     virtual void profilerEnd() override
     {
-        T_PROFILE_END(g_core);
+        TEE_PROFILE_END(gTee);
     }
 };
 
@@ -205,20 +205,20 @@ struct BgfxWrapper
     }
 };
 
-static BgfxWrapper g_bgfx;
+static BgfxWrapper gBgfx;
 
-static result_t initBgfx(uint16_t deviceId, GfxDriverEventsI* callbacks, bx::AllocatorI* alloc)
+static bool initBgfx(uint16_t deviceId, GfxDriverEventsI* callbacks, bx::AllocatorI* alloc)
 {
-    g_bgfx.alloc = alloc;
+    gBgfx.alloc = alloc;
     if (callbacks) {
-        g_bgfx.callbacks = BX_NEW(alloc, BgfxCallbacks)(callbacks);
-        if (!g_bgfx.callbacks)
-            return T_ERR_OUTOFMEM;
+        gBgfx.callbacks = BX_NEW(alloc, BgfxCallbacks)(callbacks);
+        if (!gBgfx.callbacks)
+            return false;
     }
 
-    g_bgfx.smallPool.create(512, alloc);
+    gBgfx.smallPool.create(512, alloc);
 
-    return bgfx::init(bgfx::RendererType::Count, 0, deviceId, g_bgfx.callbacks, alloc) ? 0 : T_ERR_FAILED;
+    return bgfx::init(bgfx::RendererType::Count, 0, deviceId, gBgfx.callbacks, alloc);
 }
 
 static void shutdownBgfx()
@@ -226,10 +226,10 @@ static void shutdownBgfx()
     bgfx::frame();
     bgfx::shutdown();
 
-    g_bgfx.smallPool.destroy();
+    gBgfx.smallPool.destroy();
 
-    if (g_bgfx.callbacks) {
-        BX_DELETE(g_bgfx.alloc, g_bgfx.callbacks);
+    if (gBgfx.callbacks) {
+        BX_DELETE(gBgfx.alloc, gBgfx.callbacks);
     }
 }
 
@@ -245,8 +245,8 @@ static void resetView(uint8_t viewId)
 
 static uint32_t frame()
 {
-    g_bgfx.stats.allocTvbSize = 0;
-    g_bgfx.stats.allocTibSize = 0;
+    gBgfx.stats.allocTvbSize = 0;
+    gBgfx.stats.allocTibSize = 0;
     return bgfx::frame();
 }
 
@@ -263,71 +263,71 @@ static RendererType::Enum getRendererType()
 static const GfxCaps& getCaps()
 {
     const bgfx::Caps* caps = bgfx::getCaps();
-    g_bgfx.caps.type = (RendererType::Enum)caps->rendererType;
-    g_bgfx.caps.deviceId = caps->deviceId;
-    g_bgfx.caps.supported = caps->supported;
-    g_bgfx.caps.vendorId = caps->vendorId;
-    g_bgfx.caps.homogeneousDepth = caps->homogeneousDepth;
-    g_bgfx.caps.originBottomLeft = caps->originBottomLeft;
-    g_bgfx.caps.numGPUs = caps->numGPUs;
+    gBgfx.caps.type = (RendererType::Enum)caps->rendererType;
+    gBgfx.caps.deviceId = caps->deviceId;
+    gBgfx.caps.supported = caps->supported;
+    gBgfx.caps.vendorId = caps->vendorId;
+    gBgfx.caps.homogeneousDepth = caps->homogeneousDepth;
+    gBgfx.caps.originBottomLeft = caps->originBottomLeft;
+    gBgfx.caps.numGPUs = caps->numGPUs;
         
     for (int i = 0; i < 4; i++) {
-        g_bgfx.caps.gpu[i].deviceId = caps->gpu[i].deviceId;
-        g_bgfx.caps.gpu[i].vendorId = caps->gpu[i].vendorId;
+        gBgfx.caps.gpu[i].deviceId = caps->gpu[i].deviceId;
+        gBgfx.caps.gpu[i].vendorId = caps->gpu[i].vendorId;
     }
 
     static_assert(TextureFormat::Count == bgfx::TextureFormat::Count, "TextureFormat is not synced with Bgfx");
-    memcpy(g_bgfx.caps.formats, caps->formats, sizeof(TextureFormat::Enum)*TextureFormat::Count);
+    memcpy(gBgfx.caps.formats, caps->formats, sizeof(TextureFormat::Enum)*TextureFormat::Count);
 
-    return g_bgfx.caps;
+    return gBgfx.caps;
 }
 
 static const GfxStats& getStats()
 {
     const bgfx::Stats* stats = bgfx::getStats();
-    g_bgfx.stats.cpuTimeFrame = stats->cpuTimeFrame;
-    g_bgfx.stats.cpuTimeBegin = stats->cpuTimeBegin;
-    g_bgfx.stats.cpuTimeEnd = stats->cpuTimeEnd;
-    g_bgfx.stats.cpuTimerFreq = stats->cpuTimerFreq;
+    gBgfx.stats.cpuTimeFrame = stats->cpuTimeFrame;
+    gBgfx.stats.cpuTimeBegin = stats->cpuTimeBegin;
+    gBgfx.stats.cpuTimeEnd = stats->cpuTimeEnd;
+    gBgfx.stats.cpuTimerFreq = stats->cpuTimerFreq;
 
-    g_bgfx.stats.gpuTimeBegin = stats->gpuTimeBegin;
-    g_bgfx.stats.gpuTimeEnd = stats->gpuTimeEnd;
-    g_bgfx.stats.gpuTimerFreq = stats->gpuTimerFreq;
+    gBgfx.stats.gpuTimeBegin = stats->gpuTimeBegin;
+    gBgfx.stats.gpuTimeEnd = stats->gpuTimeEnd;
+    gBgfx.stats.gpuTimerFreq = stats->gpuTimerFreq;
 
-    g_bgfx.stats.waitRender = stats->waitRender;
-    g_bgfx.stats.waitSubmit = stats->waitSubmit;
+    gBgfx.stats.waitRender = stats->waitRender;
+    gBgfx.stats.waitSubmit = stats->waitSubmit;
 
-    g_bgfx.stats.numDraw = stats->numDraw;
-    g_bgfx.stats.numCompute = stats->numCompute;
-    g_bgfx.stats.maxGpuLatency = stats->maxGpuLatency;
+    gBgfx.stats.numDraw = stats->numDraw;
+    gBgfx.stats.numCompute = stats->numCompute;
+    gBgfx.stats.maxGpuLatency = stats->maxGpuLatency;
 
-    g_bgfx.stats.width = stats->width;
-    g_bgfx.stats.height = stats->height;
-    g_bgfx.stats.textWidth = stats->textWidth;
-    g_bgfx.stats.textHeight = stats->textHeight;
+    gBgfx.stats.width = stats->width;
+    gBgfx.stats.height = stats->height;
+    gBgfx.stats.textWidth = stats->textWidth;
+    gBgfx.stats.textHeight = stats->textHeight;
 
-    g_bgfx.stats.numViews = stats->numViews;
-    memcpy(g_bgfx.stats.viewStats, stats->viewStats, sizeof(ViewStats)*stats->numViews);
+    gBgfx.stats.numViews = stats->numViews;
+    memcpy(gBgfx.stats.viewStats, stats->viewStats, sizeof(ViewStats)*stats->numViews);
 
-    return g_bgfx.stats;
+    return gBgfx.stats;
 }
 
 static const HMDDesc& getHMD()
 {
     const bgfx::HMD* hmd = bgfx::getHMD();
-    g_bgfx.hmd.deviceWidth = hmd->deviceWidth;
-    g_bgfx.hmd.deviceHeight = hmd->deviceHeight;
-    g_bgfx.hmd.width = hmd->width;
-    g_bgfx.hmd.height = hmd->height;
-    g_bgfx.hmd.flags = hmd->flags;
+    gBgfx.hmd.deviceWidth = hmd->deviceWidth;
+    gBgfx.hmd.deviceHeight = hmd->deviceHeight;
+    gBgfx.hmd.width = hmd->width;
+    gBgfx.hmd.height = hmd->height;
+    gBgfx.hmd.flags = hmd->flags;
 
     for (int i = 0; i < 2; i++) {
-        memcpy(g_bgfx.hmd.eye[i].rotation, hmd->eye[i].rotation, sizeof(float) * 4);
-        memcpy(g_bgfx.hmd.eye[i].translation, hmd->eye[i].translation, sizeof(float) * 3);
-        memcpy(g_bgfx.hmd.eye[i].fov, hmd->eye[i].fov, sizeof(float) * 4);
-        memcpy(g_bgfx.hmd.eye[i].viewOffset, hmd->eye[i].viewOffset, sizeof(float) * 3);
+        memcpy(gBgfx.hmd.eye[i].rotation, hmd->eye[i].rotation, sizeof(float) * 4);
+        memcpy(gBgfx.hmd.eye[i].translation, hmd->eye[i].translation, sizeof(float) * 3);
+        memcpy(gBgfx.hmd.eye[i].fov, hmd->eye[i].fov, sizeof(float) * 4);
+        memcpy(gBgfx.hmd.eye[i].viewOffset, hmd->eye[i].viewOffset, sizeof(float) * 3);
     }
-    return g_bgfx.hmd;
+    return gBgfx.hmd;
 }
 
 static RenderFrameType::Enum renderFrame()
@@ -349,9 +349,9 @@ static void setPlatformData(const GfxPlatformData& data)
 static const GfxInternalData& getInternalData()
 {
     const bgfx::InternalData* d = bgfx::getInternalData();
-    g_bgfx.internal.caps = &getCaps();
-    g_bgfx.internal.context = d->context;
-    return g_bgfx.internal;
+    gBgfx.internal.caps = &getCaps();
+    gBgfx.internal.context = d->context;
+    return gBgfx.internal;
 }
 
 static void overrideInternal(TextureHandle handle, uintptr_t ptr)
@@ -667,7 +667,7 @@ static const GfxMemory* copy(const void* data, uint32_t size)
     return (const GfxMemory*)bgfx::copy(data, size);
 }
 
-static const GfxMemory* makeRef(const void* data, uint32_t size, gfxReleaseMemCallback releaseFn, void* userData)
+static const GfxMemory* makeRef(const void* data, uint32_t size, GfxReleaseMemCallback releaseFn, void* userData)
 {
     return (const GfxMemory*)bgfx::makeRef(data, size, releaseFn, userData);
 }
@@ -731,7 +731,7 @@ static void setUniform(UniformHandle handle, const void* value, uint16_t num)
     bgfx::setUniform(h, value, num);
 }
 
-static VertexBufferHandle createVertexBuffer(const GfxMemory* mem, const VertexDecl& decl, GpuBufferFlag::Bits flags)
+static VertexBufferHandle createVertexBuffer(const GfxMemory* mem, const VertexDecl& decl, GfxBufferFlag::Bits flags)
 {
     VertexBufferHandle handle;
     handle.value = bgfx::createVertexBuffer((const bgfx::Memory*)mem, (const bgfx::VertexDecl&)decl, flags).idx;
@@ -739,7 +739,7 @@ static VertexBufferHandle createVertexBuffer(const GfxMemory* mem, const VertexD
 }
 
 static DynamicVertexBufferHandle createDynamicVertexBuffer(uint32_t numVertices, const VertexDecl& decl, 
-                                                           GpuBufferFlag::Bits flags)
+                                                           GfxBufferFlag::Bits flags)
 {
     DynamicVertexBufferHandle handle;
     handle.value = bgfx::createDynamicVertexBuffer(numVertices, (const bgfx::VertexDecl&)decl, flags).idx;
@@ -747,7 +747,7 @@ static DynamicVertexBufferHandle createDynamicVertexBuffer(uint32_t numVertices,
 }
 
 static DynamicVertexBufferHandle createDynamicVertexBufferMem(const GfxMemory* mem, const VertexDecl& decl,
-                                                              GpuBufferFlag::Bits flags = GpuBufferFlag::None)
+                                                              GfxBufferFlag::Bits flags = GfxBufferFlag::None)
 {
     DynamicVertexBufferHandle handle;
     handle.value = bgfx::createDynamicVertexBuffer((const bgfx::Memory*)mem, (const bgfx::VertexDecl&)decl, flags).idx;
@@ -780,8 +780,8 @@ static uint32_t getAvailTransientVertexBuffer(uint32_t num, const VertexDecl& de
 static void allocTransientVertexBuffer(TransientVertexBuffer* tvb, uint32_t num, const VertexDecl& decl)
 {
     bgfx::allocTransientVertexBuffer((bgfx::TransientVertexBuffer*)tvb, num, (const bgfx::VertexDecl&)decl);
-    g_bgfx.stats.allocTvbSize += tvb->size;
-    g_bgfx.stats.maxTvbSize = bx::uint32_max(g_bgfx.stats.allocTvbSize, g_bgfx.stats.maxTvbSize);
+    gBgfx.stats.allocTvbSize += tvb->size;
+    gBgfx.stats.maxTvbSize = bx::uint32_max(gBgfx.stats.allocTvbSize, gBgfx.stats.maxTvbSize);
 }
 
 static bool allocTransientBuffers(TransientVertexBuffer* tvb, const VertexDecl& decl, uint32_t numVerts,
@@ -789,28 +789,28 @@ static bool allocTransientBuffers(TransientVertexBuffer* tvb, const VertexDecl& 
 {
     bool r = bgfx::allocTransientBuffers((bgfx::TransientVertexBuffer*)tvb, (const bgfx::VertexDecl&)decl, numVerts,
                                          (bgfx::TransientIndexBuffer*)tib, numIndices);
-    g_bgfx.stats.allocTvbSize += tvb->size;
-    g_bgfx.stats.maxTvbSize = bx::uint32_max(g_bgfx.stats.allocTvbSize, g_bgfx.stats.maxTvbSize);
-    g_bgfx.stats.allocTibSize += tib->size;
-    g_bgfx.stats.maxTibSize = bx::uint32_max(g_bgfx.stats.allocTibSize, g_bgfx.stats.maxTibSize);
+    gBgfx.stats.allocTvbSize += tvb->size;
+    gBgfx.stats.maxTvbSize = bx::uint32_max(gBgfx.stats.allocTvbSize, gBgfx.stats.maxTvbSize);
+    gBgfx.stats.allocTibSize += tib->size;
+    gBgfx.stats.maxTibSize = bx::uint32_max(gBgfx.stats.allocTibSize, gBgfx.stats.maxTibSize);
     return r;
 }
 
-static IndexBufferHandle createIndexBuffer(const GfxMemory* mem, GpuBufferFlag::Bits flags)
+static IndexBufferHandle createIndexBuffer(const GfxMemory* mem, GfxBufferFlag::Bits flags)
 {
     IndexBufferHandle handle;
     handle.value = bgfx::createIndexBuffer((const bgfx::Memory*)mem, flags).idx;
     return handle;
 }
 
-static DynamicIndexBufferHandle createDynamicIndexBuffer(uint32_t num, GpuBufferFlag::Bits flags)
+static DynamicIndexBufferHandle createDynamicIndexBuffer(uint32_t num, GfxBufferFlag::Bits flags)
 {
     DynamicIndexBufferHandle handle;
     handle.value = bgfx::createDynamicIndexBuffer(num, flags).idx;
     return handle;
 }
 
-static DynamicIndexBufferHandle createDynamicIndexBufferMem(const GfxMemory* mem, GpuBufferFlag::Bits flags)
+static DynamicIndexBufferHandle createDynamicIndexBufferMem(const GfxMemory* mem, GfxBufferFlag::Bits flags)
 {
     DynamicIndexBufferHandle handle;
     handle.value = bgfx::createDynamicIndexBuffer((const bgfx::Memory*)mem, flags).idx;
@@ -843,8 +843,8 @@ static uint32_t getAvailTransientIndexBuffer(uint32_t num)
 static void allocTransientIndexBuffer(TransientIndexBuffer* tib, uint32_t num)
 {
     bgfx::allocTransientIndexBuffer((bgfx::TransientIndexBuffer*)tib, num);
-    g_bgfx.stats.allocTibSize += tib->size;
-    g_bgfx.stats.maxTibSize = bx::uint32_max(g_bgfx.stats.allocTibSize, g_bgfx.stats.maxTibSize);
+    gBgfx.stats.allocTibSize += tib->size;
+    gBgfx.stats.maxTibSize = bx::uint32_max(gBgfx.stats.allocTibSize, gBgfx.stats.maxTibSize);
 }
 
 static void calcTextureSize(TextureInfo* info, uint16_t width, uint16_t height, uint16_t depth, bool cubemap,
@@ -1042,13 +1042,13 @@ PluginDesc* getBgfxDriverDesc()
     strcpy(desc.name, "Bgfx");
     strcpy(desc.description, "Bgfx Driver");
     desc.type = PluginType::GraphicsDriver;
-    desc.version = T_MAKE_VERSION(1, 0);
+    desc.version = TEE_MAKE_VERSION(1, 0);
     return &desc;
 }
 
 void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 {
-    static GfxDriverApi api;
+    static GfxDriver api;
     bx::memSet(&api, 0x00, sizeof(api));
     api.init = initBgfx;
     api.shutdown = shutdownBgfx;
@@ -1195,7 +1195,7 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     static_assert(sizeof(VertexDecl) == sizeof(bgfx::VertexDecl), "VertexDecl mismatch");
     static_assert(sizeof(GfxMemory) == sizeof(bgfx::Memory), "Memory mismatch");
 
-    g_core = (CoreApi_v0*)getApi(ApiId::Core, 0);
+    gTee = (CoreApi*)getApi(ApiId::Core, 0);
 
     return &api;
 }
@@ -1205,9 +1205,9 @@ void shutdownBgfxDriver()
 }
 
 #ifdef termite_SHARED_LIB
-T_PLUGIN_EXPORT void* termiteGetPluginApi(uint16_t apiId, uint32_t version)
+TEE_PLUGIN_EXPORT void* termiteGetPluginApi(uint16_t apiId, uint32_t version)
 {
-    static PluginApi_v0 v0;
+    static PluginApi v0;
 
     if (version == 0) {
         v0.init = initBgfxDriver;

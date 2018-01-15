@@ -19,8 +19,9 @@
 
 #define LSMODEL_VERSION "0.1"
 
-static bx::DefaultAllocator g_alloc;
-using namespace termite;
+static bx::DefaultAllocator gAlloc;
+
+using namespace tee;
 
 static void showHelp()
 {
@@ -69,7 +70,7 @@ int main(int argc, char **argv)
     }
 
     // Output result
-    bx::JsonNodeAllocator alloc(&g_alloc);
+    bx::JsonNodeAllocator alloc(&gAlloc);
     bx::JsonNode* jroot = bx::createJsonNode(&alloc, nullptr, bx::JsonType::Object);
     bx::JsonNode* jchilds;
 
@@ -87,10 +88,10 @@ int main(int argc, char **argv)
         }
     }
 
-    char* result = bx::makeJson(jroot, &g_alloc, false);
+    char* result = bx::makeJson(jroot, &gAlloc, false);
     jroot->destroy();
     bx::logPrint(__FILE__, __LINE__, bx::LogType::Text, result);
-    BX_FREE(&g_alloc, result);
+    BX_FREE(&gAlloc, result);
     return 0;
 }
 

@@ -2,7 +2,7 @@
 
 #include "bx/bx.h"
 
-namespace termite
+namespace tee
 {
     struct IoStream;
 
@@ -79,11 +79,11 @@ namespace termite
     };
 
     // Backend interface for Io plugins
-    struct IoDriverApi
+    struct IoDriver
     {
     public:
-        result_t(*init)(bx::AllocatorI* alloc, const char* uri, const void* params, IoDriverEventsI* callbacks/* = nullptr*/,
-                        IoFlags::Bits flags/* = 0*/);
+        bool (*init)(bx::AllocatorI* alloc, const char* uri, const void* params, IoDriverEventsI* callbacks/* = nullptr*/, 
+                     IoFlags::Bits flags/* = 0*/);
         void(*shutdown)();
 
         void(*setCallbacks)(IoDriverEventsI* callbacks);
@@ -106,7 +106,7 @@ namespace termite
     // Used for plugins that support both async and blocking modes
     struct IoDriverDual
     {
-        IoDriverApi* blocking;
-        IoDriverApi* async;
+        IoDriver* blocking;
+        IoDriver* async;
     };
-} // namespace termite
+} // namespace tee

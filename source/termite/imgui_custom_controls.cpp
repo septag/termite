@@ -6,9 +6,10 @@
 #include "bx/string.h"
 #include "bx/math.h"
 
-namespace termite
+namespace tee
 {
-    void imguiBezierEditor(ImGuiBezierEd* bezier, const char* strId, const ImVec2& size, bool lockEnds, bool showText, bool showMirrorY)
+    void imgui::bezierEditor(ImGuiBezierEd* bezier, const char* strId, const ImVec2& size, bool lockEnds, bool showText, 
+                             bool showMirrorY)
     {
         const float hsize = 5.0f;
         ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -127,7 +128,7 @@ namespace termite
         ImGui::PopClipRect();
     }
 
-    void imguiFishLayout(ImGuiFishLayout* layout, const char* strId, const ImVec2& size)
+    void imgui::gridSelect(ImGuiGridSelect* layout, const char* strId, const ImVec2& size)
     {
         const float cellLS = 1.0f;
 
@@ -177,17 +178,17 @@ namespace termite
 
                 if (ImGui::IsMouseHoveringRect(ra, rb)) {
                     if (!layout->mouseDown[0] && mouseDown[0]) {
-                        layout->layout[i] = layout->layout[i] != ImGuiFishLayout::None ? 
-                            ImGuiFishLayout::None : ImGuiFishLayout::Fish;
+                        layout->layout[i] = layout->layout[i] != ImGuiGridSelect::None ? 
+                            ImGuiGridSelect::None : ImGuiGridSelect::Green;
                     } else if (!layout->mouseDown[1] && mouseDown[1]) {
-                        if (layout->layout[i] != ImGuiFishLayout::None) {
-                            layout->layout[i] = ImGuiFishLayout::None;
+                        if (layout->layout[i] != ImGuiGridSelect::None) {
+                            layout->layout[i] = ImGuiGridSelect::None;
                         } else {
                             for (int k = 0; k < 16; k++) {
-                                if (layout->layout[k] == ImGuiFishLayout::EnemyFish)
-                                    layout->layout[k] = ImGuiFishLayout::None;
+                                if (layout->layout[k] == ImGuiGridSelect::Red)
+                                    layout->layout[k] = ImGuiGridSelect::None;
                             }
-                            layout->layout[i] = ImGuiFishLayout::EnemyFish;
+                            layout->layout[i] = ImGuiGridSelect::Red;
                         }
                     }
                 }
@@ -199,7 +200,7 @@ namespace termite
 
         // Cells
         for (int i = 0; i < 16; i++) {
-            if (layout->layout[i] != ImGuiFishLayout::Fish)
+            if (layout->layout[i] != ImGuiGridSelect::Green)
                 continue;
 
             float ix = float(i%4);
@@ -215,7 +216,7 @@ namespace termite
         }
 
         for (int i = 0; i < 16; i++) {
-            if (layout->layout[i] != ImGuiFishLayout::EnemyFish)
+            if (layout->layout[i] != ImGuiGridSelect::Red)
                 continue;
             float ix = float(i%4);
             float iy = float(i/4);
@@ -245,7 +246,7 @@ namespace termite
 
     }
 
-    bool imguiGaunt(const char* strId, ImVec2* values, int numValues, int* changeIdx, const ImVec2& size)
+    bool imgui::gaunt(const char* strId, ImVec2* values, int numValues, int* changeIdx, const ImVec2& size)
     {
         ImDrawList* drawList = ImGui::GetWindowDrawList();
 

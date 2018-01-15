@@ -1,215 +1,220 @@
 #include "pch.h"
 
-#include <cstring>
-#include <cstdarg>
+#include <string.h>
+#include <stdarg.h>
 #include <string>
 
 #include "bx/string.h"
 #include "bx/mutex.h"
 
-struct ErrorItem
-{
-    char* desc;
-    char* source;
-    int line;
-};
+#include "error_report.h"
+#include "internal.h"
 
-struct ErrorReport
-{
-    bx::AllocatorI* alloc;
-    bx::Mutex mtx;
-    ErrorItem* reports[T_ERROR_MAX_STACK_SIZE];
-    int numReports;
-    char* fullString;
-
-    ErrorReport(bx::AllocatorI* _alloc)
+namespace tee {
+    struct ErrorItem
     {
-        alloc = _alloc;
-        numReports = 0;
-        fullString = nullptr;
-        bx::memSet(reports, 0x00, sizeof(ErrorItem*)*T_ERROR_MAX_STACK_SIZE);
-    }
-};
+        char* desc;
+        char* source;
+        int line;
+    };
 
-static ErrorReport* g_err = nullptr;
+    struct ErrorReport
+    {
+        bx::AllocatorI* alloc;
+        bx::Mutex mtx;
+        ErrorItem* reports[TEE_ERROR_MAX_STACK_SIZE];
+        int numReports;
+        char* fullString;
 
-int termite::initErrorReport(bx::AllocatorI* alloc)
-{
-    if (g_err) {
-        assert(false);
-        return T_ERR_ALREADY_INITIALIZED;
-    }
-
-    g_err = BX_NEW(alloc, ErrorReport)(alloc);
-    if (!g_err)
-        return T_ERR_OUTOFMEM;
-
-    return 0;
-}
-
-void termite::shutdownErrorReport()
-{
-    if (!g_err) {
-        assert(false);
-        return;
-    }
-
-    bx::AllocatorI* alloc = g_err->alloc;
-    assert(alloc);
-
-    for (int i = 0; i < T_ERROR_MAX_STACK_SIZE; i++) {
-        if (g_err->reports[i])
-            BX_FREE(alloc, g_err->reports[i]);
-    }
-
-    if (g_err->fullString)
-        BX_FREE(alloc, g_err->fullString);
-
-    BX_FREE(alloc, g_err);
-    g_err = nullptr;
-}
-
-void termite::reportError(const char* source, int line, const char* desc)
-{
-    if (!g_err)
-        return;
-    bx::MutexScope mtx(g_err->mtx);
-
-    if (g_err->numReports == T_ERROR_MAX_STACK_SIZE)
-        return;
-    bx::AllocatorI* alloc = g_err->alloc;
-
-    size_t totalSize =
-        sizeof(ErrorItem) +
-        (desc ? (strlen(desc) + 1) : 0) +
-        (source ? (strlen(source) + 1) : 0);
-    uint8_t* buff = (uint8_t*)BX_ALLOC(alloc, totalSize);
-
-    if (buff) {
-        ErrorItem* report = (ErrorItem*)buff;
-        buff += sizeof(ErrorItem);
-        if (desc) {
-            report->desc = (char*)buff;
-            buff += strlen(desc) + 1;
-            strcpy(report->desc, desc);
-        } else {
-            report->desc = nullptr;
+        ErrorReport(bx::AllocatorI* _alloc)
+        {
+            alloc = _alloc;
+            numReports = 0;
+            fullString = nullptr;
+            bx::memSet(reports, 0x00, sizeof(ErrorItem*)*TEE_ERROR_MAX_STACK_SIZE);
         }
+    };
 
-        if (source) {
-            report->source = (char*)buff;
-            strcpy(report->source, source);
-        } else {
-            report->source = nullptr;
-        }
+    static ErrorReport* gErr = nullptr;
 
-        report->line = line;
-        g_err->reports[g_err->numReports++] = report;
-    }
-}
-
-void termite::reportErrorf(const char* source, int line, const char* fmt, ...)
-{
-    if (fmt) {
-        char text[4096];
-
-        va_list args;
-        va_start(args, fmt);
-        vsnprintf(text, sizeof(text), fmt, args);
-        va_end(args);
-
-        reportError(source, line, text);
-    } else {
-        reportError(source, line, nullptr);
-    }
-}
-
-const char* termite::getErrorCallstack()
-{
-    if (!g_err)
-        return "";
-
-    bx::MutexScope mtx(g_err->mtx);
-    if (!g_err->numReports)
-        return "";
-
-    size_t size = 0;
-    for (int i = g_err->numReports - 1; i >= 0; i--) {
-        const ErrorItem* r = g_err->reports[i];
-
-        char line[256];
-        bx::snprintf(line, sizeof(line), "- %s (Line:%d)\n", r->source ? r->source : "", r->line);
-        size += strlen(line) + 1;
-
-        g_err->fullString = (char*)BX_REALLOC(g_err->alloc, g_err->fullString, size);
-        if (!g_err->fullString) {
+    bool err::init(bx::AllocatorI* alloc)
+    {
+        if (gErr) {
             assert(false);
-            return "";
+            return false;
         }
 
-        if (i == g_err->numReports - 1)
-            strcpy(g_err->fullString, line);
-        else
-            strcat(g_err->fullString, line);
+        gErr = BX_NEW(alloc, ErrorReport)(alloc);
+        if (!gErr)
+            return false;
+
+        return true;
     }
 
-    return g_err->fullString;
-}
+    void err::shutdown()
+    {
+        if (!gErr) {
+            assert(false);
+            return;
+        }
 
-const char* termite::getErrorString()
-{
-    if (!g_err)
-        return "";
+        bx::AllocatorI* alloc = gErr->alloc;
+        assert(alloc);
 
-    bx::MutexScope mtx(g_err->mtx);
-    if (!g_err->numReports)
-        return "";
+        for (int i = 0; i < TEE_ERROR_MAX_STACK_SIZE; i++) {
+            if (gErr->reports[i])
+                BX_FREE(alloc, gErr->reports[i]);
+        }
 
-    size_t size = 0;
-    for (int i = g_err->numReports - 1; i >= 0; i--) {
-        const ErrorItem* r = g_err->reports[i];
+        if (gErr->fullString)
+            BX_FREE(alloc, gErr->fullString);
 
-        std::string line = std::string("- ") + (r->desc ? r->desc : "") + std::string("\n");
+        BX_FREE(alloc, gErr);
+        gErr = nullptr;
+    }
 
-        size += line.length() + 1;
+    void err::report(const char* source, int line, const char* desc)
+    {
+        if (!gErr)
+            return;
+        bx::MutexScope mtx(gErr->mtx);
 
-        g_err->fullString = (char*)BX_REALLOC(g_err->alloc, g_err->fullString, size);
-        if (!g_err->fullString) {
-            assert(0);
+        if (gErr->numReports == TEE_ERROR_MAX_STACK_SIZE)
+            return;
+        bx::AllocatorI* alloc = gErr->alloc;
+
+        size_t totalSize =
+            sizeof(ErrorItem) +
+            (desc ? (strlen(desc) + 1) : 0) +
+            (source ? (strlen(source) + 1) : 0);
+        uint8_t* buff = (uint8_t*)BX_ALLOC(alloc, totalSize);
+
+        if (buff) {
+            ErrorItem* report = (ErrorItem*)buff;
+            buff += sizeof(ErrorItem);
+            if (desc) {
+                report->desc = (char*)buff;
+                buff += strlen(desc) + 1;
+                strcpy(report->desc, desc);
+            } else {
+                report->desc = nullptr;
+            }
+
+            if (source) {
+                report->source = (char*)buff;
+                strcpy(report->source, source);
+            } else {
+                report->source = nullptr;
+            }
+
+            report->line = line;
+            gErr->reports[gErr->numReports++] = report;
+        }
+    }
+
+    void err::reportf(const char* source, int line, const char* fmt, ...)
+    {
+        if (fmt) {
+            char text[4096];
+
+            va_list args;
+            va_start(args, fmt);
+            vsnprintf(text, sizeof(text), fmt, args);
+            va_end(args);
+
+            err::report(source, line, text);
+        } else {
+            err::report(source, line, nullptr);
+        }
+    }
+
+    const char* err::getCallback()
+    {
+        if (!gErr)
+            return "";
+
+        bx::MutexScope mtx(gErr->mtx);
+        if (!gErr->numReports)
+            return "";
+
+        size_t size = 0;
+        for (int i = gErr->numReports - 1; i >= 0; i--) {
+            const ErrorItem* r = gErr->reports[i];
+
+            char line[256];
+            bx::snprintf(line, sizeof(line), "- %s (Line:%d)\n", r->source ? r->source : "", r->line);
+            size += strlen(line) + 1;
+
+            gErr->fullString = (char*)BX_REALLOC(gErr->alloc, gErr->fullString, size);
+            if (!gErr->fullString) {
+                assert(false);
+                return "";
+            }
+
+            if (i == gErr->numReports - 1)
+                strcpy(gErr->fullString, line);
+            else
+                strcat(gErr->fullString, line);
+        }
+
+        return gErr->fullString;
+    }
+
+    const char* err::getString()
+    {
+        if (!gErr)
+            return "";
+
+        bx::MutexScope mtx(gErr->mtx);
+        if (!gErr->numReports)
+            return "";
+
+        size_t size = 0;
+        for (int i = gErr->numReports - 1; i >= 0; i--) {
+            const ErrorItem* r = gErr->reports[i];
+
+            std::string line = std::string("- ") + (r->desc ? r->desc : "") + std::string("\n");
+
+            size += line.length() + 1;
+
+            gErr->fullString = (char*)BX_REALLOC(gErr->alloc, gErr->fullString, size);
+            if (!gErr->fullString) {
+                assert(0);
+                return "";
+            }
+            if (i == gErr->numReports - 1)
+                strcpy(gErr->fullString, line.c_str());
+            else
+                strcat(gErr->fullString, line.c_str());
+        }
+
+        return gErr->fullString;
+    }
+
+    const char* err::getLastString()
+    {
+        if (!gErr)
+            return "";
+
+        bx::MutexScope mtx(gErr->mtx);
+        if (gErr->numReports) {
+            return gErr->reports[gErr->numReports - 1]->desc ? gErr->reports[gErr->numReports - 1]->desc : "";
+        } else {
             return "";
         }
-        if (i == g_err->numReports - 1)
-            strcpy(g_err->fullString, line.c_str());
-        else
-            strcat(g_err->fullString, line.c_str());
     }
 
-    return g_err->fullString;
-}
+    void err::clear()
+    {
+        if (!gErr)
+            return;
+        bx::MutexScope mtx(gErr->mtx);
 
-const char* termite::getLastErrorString()
-{
-    if (!g_err)
-        return "";
-
-    bx::MutexScope mtx(g_err->mtx);
-    if (g_err->numReports) {
-        return g_err->reports[g_err->numReports - 1]->desc ? g_err->reports[g_err->numReports - 1]->desc : "";
-    } else {
-        return "";
+        for (int i = 0; i < gErr->numReports; i++) {
+            BX_FREE(gErr->alloc, gErr->reports[i]);
+            gErr->reports[i] = nullptr;
+        }
+        gErr->numReports = 0;
     }
-}
 
-void termite::clearErrors()
-{
-    if (!g_err)
-        return;
-    bx::MutexScope mtx(g_err->mtx);
-
-    for (int i = 0; i < g_err->numReports; i++) {
-        BX_FREE(g_err->alloc, g_err->reports[i]);
-        g_err->reports[i] = nullptr;
-    }
-    g_err->numReports = 0;
-}
-
+}   // namespace tee

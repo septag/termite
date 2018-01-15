@@ -2,20 +2,20 @@
 
 #include "bx/bx.h"
 #include "gfx_defines.h"
-#include "progressive_loader.h"
-#include "vec_math.h"
+#include "incremental_loader.h"
+#include "math.h"
 
-namespace termite
+namespace tee
 {
     struct SceneManager;
     struct Scene;
     struct SceneLinkT {};
     typedef PhantomType<uint16_t, SceneLinkT, UINT16_MAX> SceneLinkHandle;
 
-    TERMITE_API SceneManager* createSceneManager(bx::AllocatorI* alloc);
-    TERMITE_API void destroySceneManager(SceneManager* smgr);
-    TERMITE_API void destroySceneManagerGraphics(SceneManager* smgr);
-    TERMITE_API bool resetSceneManagerGraphics(SceneManager* smgr, FrameBufferHandle mainFb, FrameBufferHandle effectFb);
+    TEE_API SceneManager* createSceneManager(bx::AllocatorI* alloc);
+    TEE_API void destroySceneManager(SceneManager* smgr);
+    TEE_API void destroySceneManagerGraphics(SceneManager* smgr);
+    TEE_API bool resetSceneManagerGraphics(SceneManager* smgr, FrameBufferHandle mainFb, FrameBufferHandle effectFb);
 
     struct SceneFlag
     {
@@ -83,13 +83,19 @@ namespace termite
     class BX_NO_VTABLE SceneCallbacksI
     {
     public:
-        virtual void loadResources(Scene* scene, const CProgressiveLoader& loader) = 0;
+        virtual void loadResources(Scene* scene, const CIncrLoader& loader) = 0;
         virtual SceneCallbackResult::Enum createObjects(Scene* scene) = 0;
         virtual void onEnter(Scene* scene, Scene* prevScene) = 0;
         virtual bool onExit(Scene* scene, Scene* nextScene) = 0;        // Return TRUE to permit the scene to unload
         virtual SceneCallbackResult::Enum destroyObjects(Scene* scene) = 0;
-        virtual void unloadResources(Scene* scene, const CProgressiveLoader& loader) = 0;
+        virtual void unloadResources(Scene* scene, const CIncrLoader& loader) = 0;
         virtual void update(Scene* scene, float dt, uint8_t& viewId, FrameBufferHandle renderFb, bool mustClearFb) = 0;
+    };
+
+    class BX_NO_VTABLE SceneCallbacksDelayI
+    {
+    public:
+        virtual bool delayNextScene() = 0;
     };
 
     class BX_NO_VTABLE SceneTransitionEffectCallbacksI
@@ -98,60 +104,62 @@ namespace termite
         virtual bool create() = 0;
         virtual void destroy() = 0;
         virtual void begin(const void* params, uint8_t viewId) = 0;
-        virtual void render(float dt, uint8_t viewId, FrameBufferHandle renderFb, TextureHandle srcTex, const vec2i_t& renderSize) = 0;
+        virtual void render(float dt, uint8_t viewId, FrameBufferHandle renderFb, TextureHandle srcTex, const ivec2_t& renderSize) = 0;
         virtual void end() = 0;
         virtual bool isDone() const = 0;
     };
 
-    TERMITE_API Scene* createScene(SceneManager* mgr, 
-                                   const char* name, 
-                                   SceneCallbacksI* callbacks,
-                                   uint32_t tag = 0,
-                                   SceneFlag::Bits flags = 0, 
-                                   const LoadingScheme& loadScheme = LoadingScheme(),
-                                   void* userData = nullptr,
-                                   uint8_t order = 0);
-    TERMITE_API void destroyScene(SceneManager* mgr, Scene* scene);
+    TEE_API Scene* createScene(SceneManager* mgr, 
+                               const char* name, 
+                               SceneCallbacksI* callbacks,
+                               uint32_t tag = 0,
+                               SceneFlag::Bits flags = 0, 
+                               const IncrLoadingScheme& loadScheme = IncrLoadingScheme(),
+                               void* userData = nullptr,
+                               uint8_t order = 0);
+    TEE_API void destroyScene(SceneManager* mgr, Scene* scene);
 
-    TERMITE_API void* getSceneUserData(Scene* scene);
-    TERMITE_API const char* getSceneName(Scene* scene);
+    TEE_API void* getSceneUserData(Scene* scene);
+    TEE_API const char* getSceneName(Scene* scene);
+    TEE_API uint32_t getSceneTag(Scene* scene);
+    TEE_API void setSceneDelayCallbacks(Scene* scene, SceneCallbacksDelayI* delayCallbacks);
 
     //
-    TERMITE_API bool registerSceneTransitionEffect(SceneManager* mgr, const char* name, 
-                                                   SceneTransitionEffectCallbacksI* callbacks, uint32_t paramSize);
+    TEE_API bool registerSceneTransitionEffect(SceneManager* mgr, const char* name, 
+                                               SceneTransitionEffectCallbacksI* callbacks, uint32_t paramSize);
 
     // Links
-    TERMITE_API SceneLinkHandle linkScene(SceneManager* mgr, Scene* sceneA, Scene* sceneB, 
+    TEE_API SceneLinkHandle linkScene(SceneManager* mgr, Scene* sceneA, Scene* sceneB, 
                                           const SceneLinkDef& def = SceneLinkDef());
-    TERMITE_API void removeSceneLink(SceneManager* mgr, SceneLinkHandle handle);
-    TERMITE_API void triggerSceneLink(SceneManager* mgr, SceneLinkHandle handle);
-    TERMITE_API void changeSceneLink(SceneManager* mgr, SceneLinkHandle handle, Scene* sceneB);
+    TEE_API void removeSceneLink(SceneManager* mgr, SceneLinkHandle handle);
+    TEE_API void triggerSceneLink(SceneManager* mgr, SceneLinkHandle handle);
+    TEE_API void changeSceneLink(SceneManager* mgr, SceneLinkHandle handle, Scene* sceneB);
 
     // 
-    TERMITE_API Scene* findScene(SceneManager* mgr, const char* name, FindSceneMode::Enum mode = FindSceneMode::All);
-    TERMITE_API int findSceneByTag(SceneManager* mgr, Scene** pScenes, int maxScenes, uint32_t tag, FindSceneMode::Enum mode = FindSceneMode::All);
+    TEE_API Scene* findScene(SceneManager* mgr, const char* name, FindSceneMode::Enum mode = FindSceneMode::All);
+    TEE_API int findSceneByTag(SceneManager* mgr, Scene** pScenes, int maxScenes, uint32_t tag, FindSceneMode::Enum mode = FindSceneMode::All);
 
     // 
-    TERMITE_API void updateSceneManager(SceneManager* mgr, float dt, uint8_t* viewId,
-                                        const vec2i_t renderSize,
+    TEE_API void updateSceneManager(SceneManager* mgr, float dt, uint8_t* viewId,
+                                        const ivec2_t renderSize,
                                         FrameBufferHandle* pRenderFb = nullptr, TextureHandle* pRenderTex = nullptr);
-    TERMITE_API void startSceneManager(SceneManager* mgr, Scene* entryScene, 
+    TEE_API void startSceneManager(SceneManager* mgr, Scene* entryScene, 
                                        FrameBufferHandle mainFb, FrameBufferHandle effectFb);
-    TERMITE_API void debugSceneManager(SceneManager* mgr);
+    TEE_API void debugSceneManager(SceneManager* mgr);
 
     // "FadeIn"/"FadeOut" Effect Params
-    struct FadeEffectParams
+    struct SceneFadeEffectParams
     {
         vec4_t fadeColor;
         float duration;
         float biasFactor;   // between (0-1): values 0~0.5 slower slope, values 0.5~1.0 are faster slope
 
-        FadeEffectParams(color_t _fadeColor = color1n(0xff000000), float _duration = 0.5f, float _biasFactor = 0.2f)
+        SceneFadeEffectParams(ucolor_t _fadeColor = ucolor(0xff000000), float _duration = 0.5f, float _biasFactor = 0.2f)
         {
-            fadeColor = colorToVec4(_fadeColor);
+            fadeColor = tmath::ucolorToVec4(_fadeColor);
             duration = _duration;
             biasFactor = _biasFactor;
         }
     };
 
-} // namespace termite
+} // namespace tee

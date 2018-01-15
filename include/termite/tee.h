@@ -1,6 +1,7 @@
 #pragma once
 
-#include <cassert>
+#include <assert.h>
+#include <math.h>
 
 // Stuff we need from stl
 #include <algorithm>
@@ -18,26 +19,25 @@
 
 #include "types.h"
 #include "error_report.h"
+#include "tmath.h"
+
 #include "gfx_defines.h"
 #include "sound_driver.h"
 
-// For self-documenting code
-#define T_THREAD_SAFE
-
-#define T_MID_TEMP 0x666ce76b992f595e 
+#define TEE_MEMID_TEMP 0x666ce76b992f595e 
 
 #if BX_PLATFORM_ANDROID
 #include <jni.h>
 #endif
 
-namespace termite
+namespace tee
 {
     struct GfxPlatformData;
-    class ResourceLib;
-    struct GfxDriverApi;
-    struct IoDriverApi;
+    class AssetLib;
+    struct GfxDriver;
+    struct IoDriver;
     struct RendererApi;
-    struct PhysDriver2DApi;
+    struct PhysDriver2D;
 
     struct InitEngineFlags
     {
@@ -175,77 +175,73 @@ namespace termite
     };
 
     // Public
-    TERMITE_API result_t initialize(const Config& conf, UpdateCallback updateFn = nullptr, 
-                                    const GfxPlatformData* platformData = nullptr);
+    TEE_API bool init(const Config& conf, UpdateCallback updateFn = nullptr, const GfxPlatformData* platformData = nullptr);
 
     // Note: User Shutdown happens before IO and memory stuff
     //       In order for user to clean-up any memory or save stuff
-    TERMITE_API void shutdown(ShutdownCallback callback = nullptr, void* userData = nullptr);
-    TERMITE_API void doFrame();
-    TERMITE_API void pause();
-    TERMITE_API void resume();
-    TERMITE_API bool isPaused();
-    TERMITE_API void resetTempAlloc();
-    TERMITE_API void resetBackbuffer(uint16_t width, uint16_t height);
+    TEE_API void shutdown(ShutdownCallback callback = nullptr, void* userData = nullptr);
+    TEE_API void doFrame();
+    TEE_API void pause();
+    TEE_API void resume();
+    TEE_API bool isPaused();
+    TEE_API void resetTempAlloc();
+    TEE_API void resetBackbuffer(uint16_t width, uint16_t height);
 
-    TERMITE_API double getFrameTime();
-    TERMITE_API double getElapsedTime();
-    TERMITE_API double getFps();
-    TERMITE_API double getSmoothFrameTime();
-    TERMITE_API uint64_t getFrameIndex();
+    TEE_API double getFrameTime();
+    TEE_API double getElapsedTime();
+    TEE_API double getFps();
+    TEE_API double getSmoothFrameTime();
+    TEE_API uint64_t getFrameIndex();
 
-    TERMITE_API MemoryBlock* createMemoryBlock(uint32_t size, bx::AllocatorI* alloc = nullptr);
-    TERMITE_API MemoryBlock* refMemoryBlockPtr(const void* data, uint32_t size);
-    TERMITE_API MemoryBlock* refMemoryBlock(MemoryBlock* mem);
-    TERMITE_API MemoryBlock* copyMemoryBlock(const void* data, uint32_t size, bx::AllocatorI* alloc = nullptr);
-    TERMITE_API void releaseMemoryBlock(MemoryBlock* mem);
+    TEE_API MemoryBlock* createMemoryBlock(uint32_t size, bx::AllocatorI* alloc = nullptr);
+    TEE_API MemoryBlock* refMemoryBlockPtr(const void* data, uint32_t size);
+    TEE_API MemoryBlock* refMemoryBlock(MemoryBlock* mem);
+    TEE_API MemoryBlock* copyMemoryBlock(const void* data, uint32_t size, bx::AllocatorI* alloc = nullptr);
+    TEE_API void releaseMemoryBlock(MemoryBlock* mem);
 
-    TERMITE_API MemoryBlock* readTextFile(const char* absFilepath);
-    TERMITE_API MemoryBlock* readBinaryFile(const char* absFilepath);
-    TERMITE_API bool saveBinaryFile(const char* absFilepath, const MemoryBlock* mem);
+    TEE_API MemoryBlock* readTextFile(const char* absFilepath);
+    TEE_API MemoryBlock* readBinaryFile(const char* absFilepath);
+    TEE_API bool saveBinaryFile(const char* absFilepath, const MemoryBlock* mem);
 
-    TERMITE_API MemoryBlock* encryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc = nullptr, 
+    TEE_API MemoryBlock* encryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc = nullptr, 
                                                 const uint8_t* key = nullptr, const uint8_t* iv = nullptr);
-    TERMITE_API MemoryBlock* decryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc = nullptr, 
+    TEE_API MemoryBlock* decryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc = nullptr, 
                                                 const uint8_t* key = nullptr, const uint8_t* iv = nullptr);
-    TERMITE_API void cipherXOR(uint8_t* outputBuff, const uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize);
+    TEE_API void cipherXOR(uint8_t* outputBuff, const uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize);
 
-    TERMITE_API void restartRandom();
-    TERMITE_API float getRandomFloatUniform(float a, float b);
-    TERMITE_API int getRandomIntUniform(int a, int b);    
-    TERMITE_API float getRandomFloatNormal(float mean, float sigma);
+    TEE_API void restartRandom();
+    TEE_API float getRandomFloatUniform(float a, float b);
+    TEE_API int getRandomIntUniform(int a, int b);    
+    TEE_API float getRandomFloatNormal(float mean, float sigma);
 
     // UI Input
-    TERMITE_API void inputSendMouse(float mousePos[2], int mouseButtons[3], float mouseWheel);
-    TERMITE_API void inputSendChars(const char* chars);
-    TERMITE_API void inputSendKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl);
+    TEE_API void inputSendMouse(float mousePos[2], int mouseButtons[3], float mouseWheel);
+    TEE_API void inputSendChars(const char* chars);
+    TEE_API void inputSendKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl);
 
     // Development
-    TERMITE_API GfxDriverApi* getGfxDriver() T_THREAD_SAFE;
-    TERMITE_API IoDriverApi* getBlockingIoDriver() T_THREAD_SAFE;
-    TERMITE_API IoDriverApi* getAsyncIoDriver() T_THREAD_SAFE;
-    TERMITE_API RendererApi* getRenderer() T_THREAD_SAFE;
-    TERMITE_API SoundDriverApi* getSoundDriver() T_THREAD_SAFE;
-    TERMITE_API PhysDriver2DApi* getPhys2dDriver() T_THREAD_SAFE;
-    TERMITE_API uint32_t getEngineVersion() T_THREAD_SAFE;
-    TERMITE_API bx::AllocatorI* getHeapAlloc() T_THREAD_SAFE;
-    TERMITE_API bx::AllocatorI* getTempAlloc() T_THREAD_SAFE;
-    TERMITE_API const Config& getConfig() T_THREAD_SAFE;
-    TERMITE_API const char* getCacheDir() T_THREAD_SAFE;
-    TERMITE_API const char* getDataDir() T_THREAD_SAFE;
-    TERMITE_API void dumpGfxLog() T_THREAD_SAFE;
-    TERMITE_API bool needGfxReset() T_THREAD_SAFE;
+    TEE_API GfxDriver* getGfxDriver() TEE_THREAD_SAFE;
+    TEE_API IoDriver* getBlockingIoDriver() TEE_THREAD_SAFE;
+    TEE_API IoDriver* getAsyncIoDriver() TEE_THREAD_SAFE;
+    TEE_API RendererApi* getRenderer() TEE_THREAD_SAFE;
+    TEE_API SimpleSoundDriver* getSoundDriver() TEE_THREAD_SAFE;
+    TEE_API PhysDriver2D* getPhys2dDriver() TEE_THREAD_SAFE;
+    TEE_API uint32_t getEngineVersion() TEE_THREAD_SAFE;
+    TEE_API bx::AllocatorI* getHeapAlloc() TEE_THREAD_SAFE;
+    TEE_API bx::AllocatorI* getTempAlloc() TEE_THREAD_SAFE;
+    TEE_API const Config& getConfig() TEE_THREAD_SAFE;
+    TEE_API const char* getCacheDir() TEE_THREAD_SAFE;
+    TEE_API const char* getDataDir() TEE_THREAD_SAFE;
+    TEE_API void dumpGfxLog() TEE_THREAD_SAFE;
+    TEE_API bool needGfxReset() TEE_THREAD_SAFE;
 
-    TERMITE_API void shutdownGraphics();
-    TERMITE_API bool resetGraphics(const GfxPlatformData* platform);
+    TEE_API void shutdownGraphics();
+    TEE_API bool resetGraphics(const GfxPlatformData* platform);
 
     // Remote Console
-    TERMITE_API void registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback);
+    TEE_API void registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback);
 
-    TERMITE_API const HardwareStats& getHardwareStats();
-
-    // TEMP
-    TERMITE_API void setPointerCheck(void* ptr);
+    TEE_API const HardwareStats& getHardwareStats();
 
 #if BX_PLATFORM_ANDROID
     struct JavaMethod
@@ -267,9 +263,9 @@ namespace termite
     // Calls a method in java
     // for classPath, methodName and methodSig parameters, see:
     //      http://journals.ecs.soton.ac.uk/java/tutorial/native1.1/implementing/method.html
-    TERMITE_API JavaMethod androidFindMethod(const char* methodName, const char* methodSig, const char* classPath = nullptr,
+    TEE_API JavaMethod androidFindMethod(const char* methodName, const char* methodSig, const char* classPath = nullptr,
                                              JavaMethodType::Enum type = JavaMethodType::Method);
 #endif
 
-} // namespace termite
+} // namespace tee
 

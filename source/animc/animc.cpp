@@ -1,5 +1,5 @@
-#include <cstdio>
-#include <cstdlib>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "bx/allocator.h"
 #include "bx/commandline.h"
@@ -27,9 +27,9 @@
 
 #define ANIMC_VERSION "0.1"
 
-using namespace termite;
+using namespace tee;
 
-static bx::DefaultAllocator g_alloc;
+static bx::DefaultAllocator gAlloc;
 static LogFormatProxy* g_logger = nullptr;
 
 struct Args
@@ -111,7 +111,7 @@ static AnimData* importAnim(const Args& args)
         return nullptr;
     }
 
-    AnimData::Channel* channels = (AnimData::Channel*)BX_ALLOC(&g_alloc, sizeof(AnimData::Channel)*numChannels);
+    AnimData::Channel* channels = (AnimData::Channel*)BX_ALLOC(&gAlloc, sizeof(AnimData::Channel)*numChannels);
     if (!channels)
         return nullptr;
     bx::memSet(channels, 0x00, sizeof(AnimData::Channel)*numChannels);
@@ -124,8 +124,8 @@ static AnimData* importAnim(const Args& args)
             AnimData::Channel* channel = &channels[k + channelOffset];
 
             bx::strCopy(channel->c.bindto, sizeof(channel->c.bindto), achannel->mNodeName.data);
-            channel->poss = (float*)BX_ALLOC(&g_alloc, sizeof(float) * 4 * numFrames);
-            channel->rots = (float*)BX_ALLOC(&g_alloc, sizeof(float) * 4 * numFrames);
+            channel->poss = (float*)BX_ALLOC(&gAlloc, sizeof(float) * 4 * numFrames);
+            channel->rots = (float*)BX_ALLOC(&gAlloc, sizeof(float) * 4 * numFrames);
             if (!channel->poss || !channel->rots)
                 return nullptr;
 
@@ -159,7 +159,7 @@ static AnimData* importAnim(const Args& args)
     }
 
     // Write
-    AnimData* anim = (AnimData*)BX_ALLOC(&g_alloc, sizeof(AnimData));
+    AnimData* anim = (AnimData*)BX_ALLOC(&gAlloc, sizeof(AnimData));
     if (!anim)
         return nullptr;
     anim->channels = channels;
@@ -265,12 +265,12 @@ int main(int argc, char** argv)
     // cleanup
     for (int i = 0; i < anim->numChannels; i++) {
         if (anim->channels[i].poss)
-            BX_FREE(&g_alloc, anim->channels[i].poss);
+            BX_FREE(&gAlloc, anim->channels[i].poss);
         if (anim->channels[i].rots)
-            BX_FREE(&g_alloc, anim->channels[i].rots);
+            BX_FREE(&gAlloc, anim->channels[i].rots);
     }
-    BX_FREE(&g_alloc, anim->channels);
-    BX_FREE(&g_alloc, anim);
+    BX_FREE(&gAlloc, anim->channels);
+    BX_FREE(&gAlloc, anim);
 
     return ret;
 }

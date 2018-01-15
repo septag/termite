@@ -2,13 +2,13 @@
 
 #include "bx/allocator.h"
 #include "bxx/hash_table.h"
-#include "resource_lib.h"
-#include "vec_math.h"
+#include "assetlib.h"
+#include "math.h"
 
-namespace termite
+namespace tee
 {
     struct Font;
-    struct TextBatch;
+    struct TextDraw;
 
     struct FontFileFormat
     {
@@ -64,21 +64,6 @@ namespace termite
         int kernIdx;
     };
 
-    result_t initFontSystem(bx::AllocatorI* alloc, const vec2_t refScreenSize = vec2f(-1.0f, -1.0f));
-    void shutdownFontSystem();
-
-    bool initFontSystemGraphics();
-    void shutdownFontSystemGraphics();
-
-    // Font Info (Custom rendering)
-    TERMITE_API ResourceHandle getFontTexture(Font* font, int pageId = 0);
-    TERMITE_API vec2_t getFontTextureSize(Font* font);
-    TERMITE_API float getFontLineHeight(Font* font);
-    TERMITE_API float getFontTextWidth(Font* font, const char* text, int len, float* firstcharWidth);
-    TERMITE_API int findFontCharGlyph(Font* font, uint16_t chId);
-    TERMITE_API const FontGlyph& getFontGlyph(Font* font, int index);
-    TERMITE_API float getFontGlyphKerning(Font* font, int glyphIdx, int nextGlyphIdx);
-
     struct TextFlags
     {
         enum Enum
@@ -95,18 +80,28 @@ namespace termite
         typedef uint8_t Bits;
     };
 
-    TERMITE_API TextBatch* createTextBatch(int maxChars, ResourceHandle fontHandle, bx::AllocatorI* alloc);
-    TERMITE_API void beginText(TextBatch* batch, const mtx4x4_t& viewProjMtx, const vec2_t screenSize);
-    TERMITE_API void addText(TextBatch* batch, float scale, const rect_t& rectFit, TextFlags::Bits flags, const char* text);
-    TERMITE_API void addTextf(TextBatch* batch, float scale, const rect_t& rectFit, TextFlags::Bits flags, const char* fmt, ...);
-    TERMITE_API void resetText(TextBatch* batch);   // Reset char buffer, so we can render with another color
-    TERMITE_API void drawText(TextBatch* batch, uint8_t viewId, color_t color);
-    TERMITE_API void drawTextDropShadow(TextBatch* batch, uint8_t viewId, color_t color,
-                                        color_t shadowColor = color1n(0xff000000), vec2_t shadowAmount = vec2f(2.0f, 2.0f));
-    TERMITE_API void drawTextOutline(TextBatch* batch, uint8_t viewId, color_t color,
-                                     color_t outlineColor = color1n(0xff000000), float outlineAmount = 0.5f);
+    namespace gfx {
+        // Font Info (Custom rendering)
+        TEE_API AssetHandle getFontTexture(Font* font, int pageId = 0);
+        TEE_API vec2_t getFontTextureSize(Font* font);
+        TEE_API float getFontLineHeight(Font* font);
+        TEE_API float getFontTextWidth(Font* font, const char* text, int len, float* firstcharWidth);
+        TEE_API int findFontCharGlyph(Font* font, uint16_t chId);
+        TEE_API const FontGlyph& getFontGlyph(Font* font, int index);
+        TEE_API float getFontGlyphKerning(Font* font, int glyphIdx, int nextGlyphIdx);
 
-    TERMITE_API void destroyTextBatch(TextBatch* batch);
-
-    void registerFontToResourceLib();
-} // namespace termite
+        // Text Drawing
+        TEE_API TextDraw* createTextDraw(int maxChars, AssetHandle fontHandle, bx::AllocatorI* alloc);
+        TEE_API void beginText(TextDraw* batch, const mat4_t& viewProjMtx, const vec2_t screenSize);
+        TEE_API void endText(TextDraw* batch);
+        TEE_API void addText(TextDraw* batch, float scale, const rect_t& rectFit, TextFlags::Bits flags, const char* text);
+        TEE_API void addTextf(TextDraw* batch, float scale, const rect_t& rectFit, TextFlags::Bits flags, const char* fmt, ...);
+        TEE_API void resetText(TextDraw* batch);   // Reset char buffer, so we can render with another color
+        TEE_API void drawText(TextDraw* batch, uint8_t viewId, ucolor_t color);
+        TEE_API void drawTextDropShadow(TextDraw* batch, uint8_t viewId, ucolor_t color,
+                                        ucolor_t shadowColor = ucolor(0xff000000), vec2_t shadowAmount = vec2(2.0f, 2.0f));
+        TEE_API void drawTextOutline(TextDraw* batch, uint8_t viewId, ucolor_t color,
+                                     ucolor_t outlineColor = ucolor(0xff000000), float outlineAmount = 0.5f);
+        TEE_API void destroyTextDraw(TextDraw* batch);
+    }
+} // namespace tee

@@ -2,7 +2,7 @@
 
 #include "bx/allocator.h"
 
-namespace termite
+namespace tee
 {
     struct Event;
 
@@ -14,16 +14,14 @@ namespace termite
     // Triggers when 'Run' callback returns true
     typedef void(*TriggerEventCallback)(void* userData);
 
-    // 
-    result_t initEventDispatcher(bx::AllocatorI* alloc);
-    void shutdownEventDispatcher();
-
-    void runEventDispatcher(float dt);
-
-    TERMITE_API Event* registerEvent(RunEventCallback runCallback, TriggerEventCallback triggerCallback, 
-                                     bool destroyOnTrigger = true,
-                                     const void* runParams = nullptr, size_t paramsSize = 0, void* triggerUserData = nullptr);
-    TERMITE_API void unregisterEvent(Event* ev);
+    // API
+    TEE_API Event* registerEvent(RunEventCallback runCallback, 
+                                 TriggerEventCallback triggerCallback, 
+                                 bool destroyOnTrigger = true,
+                                 const void* runParams = nullptr, 
+                                 size_t paramsSize = 0, 
+                                 void* triggerUserData = nullptr);
+    TEE_API void unregisterEvent(Event* ev);
 
     template <typename Ty>
     Event* registerEvent(RunEventCallback runCallback, TriggerEventCallback triggerCallback, bool destroyOnTrigger = true,
@@ -33,6 +31,6 @@ namespace termite
     }
 
     
-    TERMITE_API Event* registerTimerEvent(TriggerEventCallback callback, float interval, bool runOnce, void* userData = nullptr);
-} // namespace termite
+    TEE_API Event* registerTimerEvent(TriggerEventCallback callback, float interval, bool runOnce, void* userData = nullptr);
+} // namespace tee
 

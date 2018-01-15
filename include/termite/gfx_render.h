@@ -2,16 +2,16 @@
 
 #include "bx/bx.h"
 
-namespace termite
+namespace tee
 {
-    struct GfxDriverApi;
     struct GfxPlatformData;
+    struct GfxDriver;
 
     struct RendererApi
     {
-		result_t(*init)(bx::AllocatorI* alloc, GfxDriverApi* driver);
+		bool (*init)(bx::AllocatorI* alloc, GfxDriver* driver);
 		void(*shutdown)();
 		void(*render)(const void* renderData);
     };
-} // namespace termite
+} // namespace tee
 

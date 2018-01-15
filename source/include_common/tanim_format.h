@@ -7,7 +7,7 @@
 
 #pragma pack(push, 1)
 
-namespace termite
+namespace tee
 {
     struct taChannel
     {
@@ -48,6 +48,6 @@ namespace termite
         taChannel* channels;
 #endif
     };
-} // namespace termite
+} // namespace tee
 
 #pragma pack(pop)

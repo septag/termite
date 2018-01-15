@@ -4,7 +4,7 @@
 #include "bx/allocator.h"
 #include "types.h"
 
-namespace termite
+namespace tee
 {
     struct AudioFreq
     {
@@ -34,25 +34,23 @@ namespace termite
         };
     };
 
-    struct SoundChunkT {};
-    struct MusicT {};
-    typedef PhantomType<void*, SoundChunkT, nullptr> SoundChunkHandle;
-    typedef PhantomType<void*, MusicT, nullptr> MusicHandle;
+    struct SoundChunk;
+    struct Music;
 
     typedef void (*SoundFinishedCallback)(int channelId, void* userData);
     typedef void (*MusicFinishedCallback)(void* userData);
 
     /// This is actually SDL_mixer wrapper
-    struct SoundDriverApi
+    struct SimpleSoundDriver
     {
-        result_t(*init)(AudioFreq::Enum freq/* = AudioFreq::Freq22Khz*/, 
-                        AudioChannels::Enum channels/* = AudioChannels::Mono*/,
-                        int bufferSize/* = 4096*/);
+        bool (*init)(AudioFreq::Enum freq/* = AudioFreq::Freq22Khz*/, 
+                     AudioChannels::Enum channels/* = AudioChannels::Mono*/,
+                     int bufferSize/* = 4096*/);
         void(*shutdown)();
 
         // Chunks
         /// Returns previous volume
-        uint8_t (*setChunkVolume)(SoundChunkHandle handle, uint8_t vol);
+        uint8_t (*setChunkVolume)(SoundChunk* handle, uint8_t vol);
         
         // Channels
         int(*setChannels)(int numChannels);
@@ -88,25 +86,25 @@ namespace termite
         bool(*isPlaying)(int channelId);
         bool(*isPaused)(int channelId);
         SoundFadeStatus::Enum (*getFadingStatus)(int channelId);
-        SoundChunkHandle(*getChannelChunk)(int channelId); 
+        SoundChunk*(*getChannelChunk)(int channelId); 
 
         /// numLoops = -1, infinite loop
         /// channelId = -1, play on a free 
         /// Returns the channel being played on, or -1 if any errors happened
-        int(*play)(int channelId, SoundChunkHandle handle, int numLoops/* = 0*/);
+        int(*play)(int channelId, SoundChunk* handle, int numLoops/* = 0*/);
 
         /// maxTimeMilli = -1, play infinite just like 'play'
-        int(*playTimed)(int channelId, SoundChunkHandle handle, int numLoops/* = 0*/, int maxTimeMilli/* = -1*/);
+        int(*playTimed)(int channelId, SoundChunk* handle, int numLoops/* = 0*/, int maxTimeMilli/* = -1*/);
 
-        int(*playFadeIn)(int channelId, SoundChunkHandle handle, int numLoops, int timeMilli);
+        int(*playFadeIn)(int channelId, SoundChunk* handle, int numLoops, int timeMilli);
 
-        int(*playFadeInTimed)(int channelId, SoundChunkHandle handle, int numLoops/* = 0*/, int timeMilli, 
+        int(*playFadeInTimed)(int channelId, SoundChunk* handle, int numLoops/* = 0*/, int timeMilli, 
                               int maxTimeMilli/* = -1*/);
 
         // Music
-        bool(*playMusic)(MusicHandle handle, int numLoops/* = -1*/);
-        bool(*playMusicFadeIn)(MusicHandle handle, int numLoops/* = -1*/, int timeMilli);
-        bool(*playMusicFadeInPos)(MusicHandle handle, int numLoops/* = -1*/, int timeMilli, double posTime);
+        bool(*playMusic)(Music* handle, int numLoops/* = -1*/);
+        bool(*playMusicFadeIn)(Music* handle, int numLoops/* = -1*/, int timeMilli);
+        bool(*playMusicFadeInPos)(Music* handle, int numLoops/* = -1*/, int timeMilli, double posTime);
         bool(*setMusicPos)(double posTime);
         void(*pauseMusic)();
         void(*resumeMusic)();

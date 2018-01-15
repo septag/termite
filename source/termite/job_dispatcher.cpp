@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "job_dispatcher.h"
+#include "internal.h"
 
 #include "bx/cpu.h"
 #include "bx/thread.h"
@@ -17,7 +18,7 @@
 #include <mutex>
 #include <thread>
 
-using namespace termite;
+using namespace tee;
 
 #define DEFAULT_MAX_SMALL_FIBERS 128
 #define DEFAULT_MAX_BIG_FIBERS 32
@@ -136,7 +137,7 @@ struct JobDispatcher
     }
 };
 
-static JobDispatcher* g_dispatcher = nullptr;
+static JobDispatcher* gDispatcher = nullptr;
 
 FiberPool::FiberPool()
 {
@@ -241,7 +242,7 @@ static fcontext_stack_t* popWaitStack(ThreadData* data)
 static void fiberCallback(fcontext_transfer_t transfer)
 {
     Fiber* fiber = (Fiber*)transfer.data;
-    ThreadData* data = (ThreadData*)g_dispatcher->threadData.get();
+    ThreadData* data = (ThreadData*)gDispatcher->threadData.get();
 
     data->running = fiber;
 
@@ -271,7 +272,7 @@ Fiber* FiberPool::newFiber(JobCallback callbackFn, void* userData, uint16_t inde
         fiber->callback = callbackFn;
         fiber->userData = userData;
         fiber->jobIndex = index;
-        fiber->waitCounter = &g_dispatcher->dummyCounter;
+        fiber->waitCounter = &gDispatcher->dummyCounter;
         fiber->counter = counter;
         fiber->priority = priority;
         fiber->ownerPool = pool;
@@ -292,17 +293,17 @@ static void jobPusherCallback(fcontext_transfer_t transfer)
 {
     ThreadData* data = (ThreadData*)transfer.data;
 
-    while (!g_dispatcher->stop) {
+    while (!gDispatcher->stop) {
         // Wait for a job to be placed in the job queue
         if (!data->main)
-            g_dispatcher->semaphore.wait();     // Decreases list counter on continue
+            gDispatcher->semaphore.wait();     // Decreases list counter on continue
 
         Fiber* fiber = nullptr;
         bool listNotEmpty = false;
-        g_dispatcher->jobLock.lock();
+        gDispatcher->jobLock.lock();
         {
             for (int i = 0; i < JobPriority::Count && !fiber; i++) {
-                bx::List<Fiber*>& list = g_dispatcher->waitList[i];
+                bx::List<Fiber*>& list = gDispatcher->waitList[i];
                 Fiber::LNode* node = list.getFirst();
                 while (node) {
                     listNotEmpty = true;
@@ -319,7 +320,7 @@ static void jobPusherCallback(fcontext_transfer_t transfer)
                 }
             }
         }
-        g_dispatcher->jobLock.unlock();
+        gDispatcher->jobLock.unlock();
 
         if (fiber) {
             // If jobPusher is called within another 'Wait' call, get back to it's context, which should be the same working thread
@@ -331,7 +332,7 @@ static void jobPusherCallback(fcontext_transfer_t transfer)
                 jump_fcontext(fiber->context, fiber);
             }
         } else if (!data->main && listNotEmpty) {
-            g_dispatcher->semaphore.post(); // Increase the list counter because we didn't pull any jobs
+            gDispatcher->semaphore.post(); // Increase the list counter because we didn't pull any jobs
         }
 
         // In the main thread, we have to quit the loop and get back to the caller
@@ -343,17 +344,17 @@ static void jobPusherCallback(fcontext_transfer_t transfer)
     jump_fcontext(transfer.ctx, transfer.data);
 }
 
-static JobHandle dispatch(const JobDesc* jobs, uint16_t numJobs, FiberPool* pool) T_THREAD_SAFE
+static JobHandle dispatch(const JobDesc* jobs, uint16_t numJobs, FiberPool* pool) TEE_THREAD_SAFE
 {
     // Get dispatcher counter to assign to jobs
-    ThreadData* data = (ThreadData*)g_dispatcher->threadData.get();
+    ThreadData* data = (ThreadData*)gDispatcher->threadData.get();
 
     // Get a counter
-    g_dispatcher->counterLock.lock();
-    JobCounter* counter = &g_dispatcher->counterPool.newInstance()->counter;
-    g_dispatcher->counterLock.unlock();
+    gDispatcher->counterLock.lock();
+    JobCounter* counter = &gDispatcher->counterPool.newInstance()->counter;
+    gDispatcher->counterLock.unlock();
     if (!counter) {
-        BX_WARN("Exceeded maximum jobCounters (Max = %d)", g_dispatcher->counterPool.getMaxItems());
+        BX_WARN("Exceeded maximum jobCounters (Max = %d)", gDispatcher->counterPool.getMaxItems());
         return nullptr;
     }
 
@@ -378,36 +379,36 @@ static JobHandle dispatch(const JobDesc* jobs, uint16_t numJobs, FiberPool* pool
         if (data->running)
             data->running->waitCounter = counter;
 
-        g_dispatcher->jobLock.lock();
+        gDispatcher->jobLock.lock();
         for (uint32_t i = 0; i < count; i++)
-            g_dispatcher->waitList[fibers[i]->priority].addToEnd(&fibers[i]->lnode);
-        g_dispatcher->jobLock.unlock();
+            gDispatcher->waitList[fibers[i]->priority].addToEnd(&fibers[i]->lnode);
+        gDispatcher->jobLock.unlock();
 
         // post to semaphore so worker threads can continue and fetch them
-        g_dispatcher->semaphore.post(count);
+        gDispatcher->semaphore.post(count);
     } else {
         // No job created ...
-        bx::LockScope mutex(g_dispatcher->counterLock);
-        g_dispatcher->counterPool.deleteInstance((CounterContainer*)counter);
+        bx::LockScope lock(gDispatcher->counterLock);
+        gDispatcher->counterPool.deleteInstance((CounterContainer*)counter);
         counter = nullptr;
     }
 
     return counter;
 }
 
-JobHandle termite::dispatchSmallJobs(const JobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE
+JobHandle tee::dispatchSmallJobs(const JobDesc* jobs, uint16_t numJobs) TEE_THREAD_SAFE
 {
-    return dispatch(jobs, numJobs, &g_dispatcher->smallFibers);
+    return dispatch(jobs, numJobs, &gDispatcher->smallFibers);
 }
 
-JobHandle termite::dispatchBigJobs(const JobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE
+JobHandle tee::dispatchBigJobs(const JobDesc* jobs, uint16_t numJobs) TEE_THREAD_SAFE
 {
-    return dispatch(jobs, numJobs, &g_dispatcher->bigFibers);
+    return dispatch(jobs, numJobs, &gDispatcher->bigFibers);
 }
 
-void termite::waitAndDeleteJob(JobHandle handle) T_THREAD_SAFE
+void tee::waitAndDeleteJob(JobHandle handle) TEE_THREAD_SAFE
 {
-    ThreadData* data = (ThreadData*)g_dispatcher->threadData.get();
+    ThreadData* data = (ThreadData*)gDispatcher->threadData.get();
 
     while (*handle > 0) {
         // Jump back to worker thread (current job is not finished)
@@ -426,11 +427,11 @@ void termite::waitAndDeleteJob(JobHandle handle) T_THREAD_SAFE
             data->running = nullptr;
             fiber->ownerThread = data->threadId;
 
-            g_dispatcher->jobLock.lock();
-            g_dispatcher->waitList[fiber->priority].addToEnd(&fiber->lnode);
-            g_dispatcher->jobLock.unlock();
+            gDispatcher->jobLock.lock();
+            gDispatcher->waitList[fiber->priority].addToEnd(&fiber->lnode);
+            gDispatcher->jobLock.unlock();
 
-            g_dispatcher->semaphore.post();
+            gDispatcher->semaphore.post();
         }
 
         // Switch to job-pusher To see if we can process any remaining jobs
@@ -441,63 +442,63 @@ void termite::waitAndDeleteJob(JobHandle handle) T_THREAD_SAFE
     }
 
     // Delete the counter
-    g_dispatcher->counterLock.lock();
-    g_dispatcher->counterPool.deleteInstance((CounterContainer*)handle);
-    g_dispatcher->counterLock.unlock();
+    gDispatcher->counterLock.lock();
+    gDispatcher->counterPool.deleteInstance((CounterContainer*)handle);
+    gDispatcher->counterLock.unlock();
 }
 
-bool termite::isJobDone(JobHandle handle) T_THREAD_SAFE
+bool tee::isJobDone(JobHandle handle) TEE_THREAD_SAFE
 {
     return *handle == 0;
 }
 
-void termite::deleteJob(JobHandle handle) T_THREAD_SAFE
+void tee::deleteJob(JobHandle handle) TEE_THREAD_SAFE
 {
-    g_dispatcher->counterLock.lock();
-    g_dispatcher->counterPool.deleteInstance((CounterContainer*)handle);
-    g_dispatcher->counterLock.unlock();
+    gDispatcher->counterLock.lock();
+    gDispatcher->counterPool.deleteInstance((CounterContainer*)handle);
+    gDispatcher->counterLock.unlock();
 }
 
 static int32_t threadFunc(bx::Thread* self, void* userData)
 {
     // Initialize thread data
-    ThreadData* data = createThreadData(g_dispatcher->alloc, bx::getTid(), false);
+    ThreadData* data = createThreadData(gDispatcher->alloc, bx::getTid(), false);
     if (!data)
         return -1;
-    g_dispatcher->threadData.set(data);     
+    gDispatcher->threadData.set(data);     
 
     fcontext_stack_t* stack = pushWaitStack(data);
     fcontext_t threadCtx = make_fcontext(stack->sptr, stack->ssize, jobPusherCallback);
     jump_fcontext(threadCtx, data);
 
-    destroyThreadData(data, g_dispatcher->alloc);
+    destroyThreadData(data, gDispatcher->alloc);
     return 0;
 }
 
-result_t termite::initJobDispatcher(bx::AllocatorI* alloc,
-                          uint16_t maxSmallFibers, uint32_t smallFiberStackSize,
-                          uint16_t maxBigFibers, uint32_t bigFiberStackSize,
-                          bool lockThreadsToCores, uint8_t numThreads)
+bool tee::initJobDispatcher(bx::AllocatorI* alloc, 
+                            uint16_t maxSmallFibers, uint32_t smallFiberStackSize, 
+                            uint16_t maxBigFibers, uint32_t bigFiberStackSize, 
+                            bool lockThreadsToCores, uint8_t numThreads)
 {
-    if (g_dispatcher) {
+    if (gDispatcher) {
         assert(false);
-        return T_ERR_FAILED;
+        return false;
     }
-    g_dispatcher = BX_NEW(alloc, JobDispatcher);
-    if (!g_dispatcher)
-        return T_ERR_OUTOFMEM;
-    g_dispatcher->alloc = alloc;
+    gDispatcher = BX_NEW(alloc, JobDispatcher);
+    if (!gDispatcher)
+        return false;
+    gDispatcher->alloc = alloc;
 
     // Main thread data and stack
-    g_dispatcher->mainStack = create_fcontext_stack(8 * 1024);
-    if (!g_dispatcher->mainStack.sptr) {
-        return T_ERR_FAILED;
+    gDispatcher->mainStack = create_fcontext_stack(8 * 1024);
+    if (!gDispatcher->mainStack.sptr) {
+        return false;
     }
 
     ThreadData* mainData = createThreadData(alloc, bx::getTid(), true);
     if (!mainData)
-        return T_ERR_FAILED;
-    g_dispatcher->threadData.set(mainData);
+        return false;
+    gDispatcher->threadData.set(mainData);
 
     // Create fibers with stack memories
     maxSmallFibers = maxSmallFibers ? maxSmallFibers : DEFAULT_MAX_SMALL_FIBERS;
@@ -505,11 +506,11 @@ result_t termite::initJobDispatcher(bx::AllocatorI* alloc,
     smallFiberStackSize = smallFiberStackSize ? smallFiberStackSize : DEFAULT_SMALL_STACKSIZE;
     bigFiberStackSize = bigFiberStackSize ? bigFiberStackSize : DEFAULT_BIG_STACKSIZE;
 
-    if (!g_dispatcher->counterPool.create(maxSmallFibers + maxBigFibers, alloc) ||
-        !g_dispatcher->bigFibers.create(maxBigFibers, bigFiberStackSize, alloc) ||
-        !g_dispatcher->smallFibers.create(maxSmallFibers, smallFiberStackSize, alloc)) 
+    if (!gDispatcher->counterPool.create(maxSmallFibers + maxBigFibers, alloc) ||
+        !gDispatcher->bigFibers.create(maxBigFibers, bigFiberStackSize, alloc) ||
+        !gDispatcher->smallFibers.create(maxSmallFibers, smallFiberStackSize, alloc)) 
     {
-        return T_ERR_OUTOFMEM;
+        return false;
     }
 
     // Create threads
@@ -521,48 +522,48 @@ result_t termite::initJobDispatcher(bx::AllocatorI* alloc,
     numThreads = (uint8_t)std::min<uint16_t>(numCores, numThreads);
 
     if (numThreads > 0) {
-        g_dispatcher->threads = (bx::Thread**)BX_ALLOC(alloc, sizeof(bx::Thread*)*numThreads);
-        assert(g_dispatcher->threads);
+        gDispatcher->threads = (bx::Thread**)BX_ALLOC(alloc, sizeof(bx::Thread*)*numThreads);
+        assert(gDispatcher->threads);
         
-        g_dispatcher->numThreads = numThreads;
+        gDispatcher->numThreads = numThreads;
         for (uint8_t i = 0; i < numThreads; i++) {
-            g_dispatcher->threads[i] = BX_NEW(alloc, bx::Thread);
+            gDispatcher->threads[i] = BX_NEW(alloc, bx::Thread);
             char name[32];
             bx::snprintf(name, sizeof(name), "TJobThread #%d", i + 1);
-            g_dispatcher->threads[i]->init(threadFunc, nullptr, 8 * 1024, name);
+            gDispatcher->threads[i]->init(threadFunc, nullptr, 8 * 1024, name);
         }
     }
-    return 0;
+    return true;
 }
 
-void termite::shutdownJobDispatcher()
+void tee::shutdownJobDispatcher()
 {
-    if (!g_dispatcher)
+    if (!gDispatcher)
         return;
 
     // Command all worker threads to stop
-    g_dispatcher->stop = 1;
-    g_dispatcher->semaphore.post(g_dispatcher->numThreads + 1);
-    for (uint8_t i = 0; i < g_dispatcher->numThreads; i++) {
-        g_dispatcher->threads[i]->shutdown();
-        BX_DELETE(g_dispatcher->alloc, g_dispatcher->threads[i]);
+    gDispatcher->stop = 1;
+    gDispatcher->semaphore.post(gDispatcher->numThreads + 1);
+    for (uint8_t i = 0; i < gDispatcher->numThreads; i++) {
+        gDispatcher->threads[i]->shutdown();
+        BX_DELETE(gDispatcher->alloc, gDispatcher->threads[i]);
     }
-    BX_FREE(g_dispatcher->alloc, g_dispatcher->threads);
+    BX_FREE(gDispatcher->alloc, gDispatcher->threads);
 
-    ThreadData* data = (ThreadData*)g_dispatcher->threadData.get();
-    destroyThreadData(data, g_dispatcher->alloc);
+    ThreadData* data = (ThreadData*)gDispatcher->threadData.get();
+    destroyThreadData(data, gDispatcher->alloc);
 
-    g_dispatcher->bigFibers.destroy();
-    g_dispatcher->smallFibers.destroy();
-    destroy_fcontext_stack(&g_dispatcher->mainStack);
+    gDispatcher->bigFibers.destroy();
+    gDispatcher->smallFibers.destroy();
+    destroy_fcontext_stack(&gDispatcher->mainStack);
 
-    g_dispatcher->counterPool.destroy();
+    gDispatcher->counterPool.destroy();
 
-    BX_DELETE(g_dispatcher->alloc, g_dispatcher);
-    g_dispatcher = nullptr;
+    BX_DELETE(gDispatcher->alloc, gDispatcher);
+    gDispatcher = nullptr;
 }
 
-uint8_t termite::getNumWorkerThreads()
+uint8_t tee::getNumWorkerThreads()
 {
-	return g_dispatcher->numThreads;
+	return gDispatcher->numThreads;
 }

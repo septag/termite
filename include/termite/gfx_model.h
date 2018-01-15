@@ -2,46 +2,54 @@
 
 #include "bx/bx.h"
 
-#include "gfx_driver.h"
-#include "resource_lib.h"
-#include "vec_math.h"
+#include "assetlib.h"
 #include "gfx_material.h"
 
-#define MODELS_MEMORY_TAG 0x463fd3c75716947e 
-
-namespace termite
+namespace tee
 {
     struct LoadModelParams
     {
+        enum VertexBufferType
+        {
+            StaticVb = 0,
+            DynamicVb
+        };
+
+        VertexBufferType vbType;
         float resize;
 
         LoadModelParams()
         {
+            vbType = VertexBufferType::StaticVb;
             resize = 1.0f;
         }
     };
 
+    //
     struct ModelInstance
     {
-        ResourceHandle modelHandle;
+        AssetHandle modelHandle;
+        union {
+            VertexBufferHandle* vertexBuffers;     // 1-1 to geometries
+            DynamicVertexBufferHandle* dynVertexBuffers;
+        };
+        IndexBufferHandle* indexBuffers;       // 1-1 to geometries
+        MaterialHandle* mtls;                  // 1-1 to materials in model
     };
 
+    // This is the actual Descriptor for every model
+    // With this data, you can create model instances and perform any model operations
     struct Model
     {
         struct Node
         {
             char name[32];
-            mtx4x4_t localMtx;
+            mat4_t localMtx;
             int parent;
             int mesh;
             int numChilds;
             int* childs;
             aabb_t bb;
-        };
-
-        struct Material
-        {
-            MaterialHandle handle;
         };
 
         struct Submesh
@@ -61,16 +69,16 @@ namespace termite
         struct Joint
         {
             char name[32];
-            mtx4x4_t offsetMtx;
+            mat4_t offsetMtx;
             int parent;
         };
 
         struct Skeleton
         {
-            mtx4x4_t rootMtx;
+            mat4_t rootMtx;
             int numJoints;
             Joint* joints;
-            mtx4x4_t* initPose;
+            mat4_t* initPose;
         };
 
         struct Geometry
@@ -78,33 +86,41 @@ namespace termite
             int numVerts;
             int numIndices;
             VertexDecl vdecl;
-            void* verts;
-            uint16_t* indices;
+
+            GfxBufferFlag::Bits vbFlags;// VertexBuffer creation flags
+            void* verts;                // Vertex buffer (on cpu)
+
+            GfxBufferFlag::Bits ibFlags; // Index buffer creation flags
+            union {
+                uint16_t* indices;      
+                uint32_t* indicesUint;
+            };
             Skeleton* skel;
+
+            // We keep these two buffers for caching, If buffer type is static these buffers are not changed so we don't
+            // need any more extra buffers created for every instance
+            VertexBufferHandle vertexBuffer;     // 1 for each geometry
+            IndexBufferHandle indexBuffer;       // 1 for each geometry
         };
 
         int numNodes;
         int numGeos;
-        int numMaterials;
         int numMeshes;
+        int numMtls;
 
-        mtx4x4_t rootMtx;
+        mat4_t rootMtx;
 
         Node* nodes;
         Geometry* geos;
-        Material* mtls;
         Mesh* meshes;
+        MaterialDecl* mtls;
+        bool vbIsDynamic;
     };
 
-    result_t initModelLoader(GfxDriverApi* driver, bx::AllocatorI* alloc);
-    void shutdownModelLoader();
+    namespace gfx {
+        TEE_API ModelInstance* createModelInstance(AssetHandle modelHandle, bx::AllocatorI* alloc);
+        TEE_API void destroyModelInstance(ModelInstance* inst);
+    }
 
-    void registerModelToResourceLib();
-
-    ModelInstance* createModelInstance(Model* model);
-
-    TERMITE_API VertexBufferHandle getModelVertexBuffer(Model* model, int index);
-    TERMITE_API IndexBufferHandle getModelIndexBuffer(Model* model, int index);
-
-} // namespace termite
+} // namespace tee
 

@@ -1,6 +1,7 @@
 #include "pch.h"
-#include "core.h"
+#include "tee.h"
 #include "lang.h"
+#include "internal.h"
 
 #include "bxx/hash_table.h"
 #include "tinystl/hash.h"
@@ -11,16 +12,16 @@
 
 using namespace rapidjson;
 
-namespace termite
+namespace tee
 {
-    class LangLoader : public ResourceCallbacksI
+    class LangLoader : public AssetLibCallbacksI
     {
     public:
         LangLoader() {}
 
-        bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc) override;
+        bool loadObj(const MemoryBlock* mem, const AssetParams& params, uintptr_t* obj, bx::AllocatorI* alloc) override;
         void unloadObj(uintptr_t obj, bx::AllocatorI* alloc) override;
-        void onReload(ResourceHandle handle, bx::AllocatorI* alloc) override {}
+        void onReload(AssetHandle handle, bx::AllocatorI* alloc) override {}
     };
 
     //
@@ -44,9 +45,9 @@ namespace termite
         }
     };
 
-    static LangLoader g_langLoader;
+    static LangLoader gLangLoader;
 
-    const char* getText(Lang* lang, const char* strId)
+    const char* lang::getText(Lang* lang, const char* strId)
     {
         if (lang) {
             int index = lang->idTable.find(tinystl::hash_string(strId, strlen(strId)));
@@ -56,19 +57,19 @@ namespace termite
         return "";
     }
 
-    void registerLangToResourceLib()
+    void lang::registerToAssetLib()
     {
-        ResourceTypeHandle handle;
-        handle = registerResourceType("lang", &g_langLoader, 0, 0, 0);
+        AssetTypeHandle handle;
+        handle = asset::registerType("lang", &gLangLoader, 0, 0, 0);
         assert(handle.isValid());
     }
 
-    bool LangLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
+    bool LangLoader::loadObj(const MemoryBlock* mem, const AssetParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
     {
         bx::AllocatorI* heapAlloc = getHeapAlloc();
         char* jsonStr = (char*)BX_ALLOC(heapAlloc, mem->size + 1);
         if (!jsonStr) {
-            T_ERROR("Out of Memory");
+            TEE_ERROR("Out of Memory");
             return false;
         }
         memcpy(jsonStr, mem->data, mem->size);
@@ -79,14 +80,14 @@ namespace termite
         BxsAllocator jpool(4096, &jalloc);
         BxsDocument jdoc(&jpool, 1024, &jalloc);
         if (jdoc.ParseInsitu(jsonStr).HasParseError()) {
-            T_ERROR("Parse Json Error: %s (Pos: %d)", GetParseError_En(jdoc.GetParseError()), jdoc.GetErrorOffset());
+            TEE_ERROR("Parse Json Error: %s (Pos: %d)", GetParseError_En(jdoc.GetParseError()), jdoc.GetErrorOffset());
             BX_FREE(heapAlloc, jsonStr);
             return false;
         }
 
         const BxsValue& jEntries = jdoc.GetArray();
         if (jEntries.Size() == 0) {
-            T_ERROR("Language File is empty");
+            TEE_ERROR("Language File is empty");
             BX_FREE(heapAlloc, jsonStr);
             return false;
         }

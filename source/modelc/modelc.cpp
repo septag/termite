@@ -26,9 +26,9 @@
 
 #define MODELC_VERSION "0.1"
 
-using namespace termite;
+using namespace tee;
 
-static bx::DefaultAllocator g_alloc;
+static bx::DefaultAllocator gAlloc;
 static LogFormatProxy* g_logger = nullptr;
 
 struct Args
@@ -90,10 +90,10 @@ struct ModelData
 
     ModelData()
     {
-        geos.create(10, 10, &g_alloc);
-        mtls.create(10, 20, &g_alloc);
-        meshes.create(10, 10, &g_alloc);
-        nodes.create(10, 10, &g_alloc);
+        geos.create(10, 10, &gAlloc);
+        mtls.create(10, 20, &gAlloc);
+        meshes.create(10, 10, &gAlloc);
+        nodes.create(10, 10, &gAlloc);
     }
 
     ~ModelData()
@@ -101,35 +101,35 @@ struct ModelData
         for (int i = 0; i < geos.getCount(); i++) {
             const Geometry& geo = geos[i];
             if (geo.verts)
-                BX_FREE(&g_alloc, geo.verts);
+                BX_FREE(&gAlloc, geo.verts);
             if (geo.attribs)
-                BX_FREE(&g_alloc, geo.attribs);
+                BX_FREE(&gAlloc, geo.attribs);
             if (geo.attribOffsets)
-                BX_FREE(&g_alloc, geo.attribOffsets);
+                BX_FREE(&gAlloc, geo.attribOffsets);
             if (geo.indices)
-                BX_FREE(&g_alloc, geo.indices);
+                BX_FREE(&gAlloc, geo.indices);
             if (geo.joints)
-                BX_FREE(&g_alloc, geo.joints);
+                BX_FREE(&gAlloc, geo.joints);
             if (geo.initPose)
-                BX_FREE(&g_alloc, geo.initPose);
+                BX_FREE(&gAlloc, geo.initPose);
         }
 
         for (int i = 0; i < meshes.getCount(); i++) {
             const Mesh& m = meshes[i];
             if (m.submeshes)
-                BX_FREE(&g_alloc, m.submeshes);
+                BX_FREE(&gAlloc, m.submeshes);
         }
 
         for (int i = 0; i < mtls.getCount(); i++) {
             const Material& mtl = mtls[i];
             if (mtl.textures)
-                BX_FREE(&g_alloc, mtl.textures);
+                BX_FREE(&gAlloc, mtl.textures);
         }
 
         for (int i = 0; i < nodes.getCount(); i++) {
             const Node& node = nodes[i];
             if (node.childs)
-                BX_FREE(&g_alloc, node.childs);
+                BX_FREE(&gAlloc, node.childs);
         }
 
         geos.destroy();
@@ -220,10 +220,10 @@ static int findGeoBoneIndex(const bx::Array<aiNode*>& bones, const char *name)
 
 static void setupGeoJoints(const aiScene* scene, const bx::Array<aiNode*>& bones,
                            const bx::Array<aiBone*>& skinBones, const Args& conf,
-                           const mtx4x4_t& rootMtx, t3dJoint* joints, float* initPose)
+                           const mat4_t& rootMtx, t3dJoint* joints, float* initPose)
 {
-    mtx4x4_t offsetMtx;
-    mtx4x4_t scaleMtx;
+    mat4_t offsetMtx;
+    mat4_t scaleMtx;
     bx::mtxScale(scaleMtx.f, conf.scale, conf.scale, conf.scale);
 
     for (int i = 0; i < bones.getCount(); i++) {
@@ -236,7 +236,7 @@ static void setupGeoJoints(const aiScene* scene, const bx::Array<aiNode*>& bones
         if (skinBone)
             offsetMtx = convertMtx(skinBone->mOffsetMatrix, conf.zaxis);
         else
-            offsetMtx = mtx4x4Ident();
+            offsetMtx = mat4I();
 
         saveMtx(offsetMtx, joints[i].offsetMtx);
         joints[i].parent = -1;
@@ -246,7 +246,7 @@ static void setupGeoJoints(const aiScene* scene, const bx::Array<aiNode*>& bones
         if (ajointNode) {
             joints[i].parent = ajointNode->mParent ?
                 findGeoBoneIndex(bones, ajointNode->mParent->mName.C_Str()) : -1;
-            mtx4x4_t jointMtx = convertMtx(ajointNode->mTransformation, conf.zaxis);
+            mat4_t jointMtx = convertMtx(ajointNode->mTransformation, conf.zaxis);
             if (ajointNode->mParent == scene->mRootNode) {
                 jointMtx = (jointMtx * rootMtx) * scaleMtx;
             }
@@ -266,7 +266,7 @@ static int findAttrib(const t3dVertexAttrib::Enum* attribs, int numAttribs, t3dV
 
 static int importGeo(const aiScene* scene, ModelData* model, unsigned int* ameshIds,
                      uint32_t numMeshes, bool mainNode, t3dSubmesh* submeshes,
-                     const Args& conf, const mtx4x4_t& rootMtx)
+                     const Args& conf, const mat4_t& rootMtx)
 {
     ModelData::Geometry* geo = model->geos.push();
     bx::memSet(geo, 0x00, sizeof(ModelData::Geometry));
@@ -277,8 +277,8 @@ static int importGeo(const aiScene* scene, ModelData* model, unsigned int* amesh
     int numTris = 0;
     bool skin = false;
 
-    bones.create(100, 100, &g_alloc);
-    skinBones.create(100, 100, &g_alloc);
+    bones.create(100, 100, &gAlloc);
+    skinBones.create(100, 100, &gAlloc);
 
     for (uint32_t i = 0; i < numMeshes; i++) {
         aiMesh* submesh = scene->mMeshes[ameshIds[i]];
@@ -379,8 +379,8 @@ static int importGeo(const aiScene* scene, ModelData* model, unsigned int* amesh
     }
     geo->g.numAttribs = numAttribs;
     geo->g.vertStride = vertStride;
-    geo->attribs = (t3dVertexAttrib::Enum*)BX_ALLOC(&g_alloc, sizeof(t3dVertexAttrib::Enum)*numAttribs);
-    geo->attribOffsets = (int*)BX_ALLOC(&g_alloc, sizeof(int)*numAttribs);
+    geo->attribs = (t3dVertexAttrib::Enum*)BX_ALLOC(&gAlloc, sizeof(t3dVertexAttrib::Enum)*numAttribs);
+    geo->attribOffsets = (int*)BX_ALLOC(&gAlloc, sizeof(int)*numAttribs);
     assert(geo->attribs);
     memcpy(geo->attribs, attribs, sizeof(t3dVertexAttrib::Enum)*numAttribs);
     memcpy(geo->attribOffsets, attribOffsets, sizeof(int)*numAttribs);
@@ -393,25 +393,25 @@ static int importGeo(const aiScene* scene, ModelData* model, unsigned int* amesh
 
         // Setup joints
         geo->g.skel.numJoints = bones.getCount();
-        geo->joints = (t3dJoint*)BX_ALLOC(&g_alloc, sizeof(t3dJoint)*bones.getCount());
-        geo->initPose = (float*)BX_ALLOC(&g_alloc, sizeof(float)*12*bones.getCount());
+        geo->joints = (t3dJoint*)BX_ALLOC(&gAlloc, sizeof(t3dJoint)*bones.getCount());
+        geo->initPose = (float*)BX_ALLOC(&gAlloc, sizeof(float)*12*bones.getCount());
         assert(geo->joints);
         assert(geo->initPose);
 
-        mtx4x4_t jointRoot = convertMtx(scene->mRootNode->mTransformation, conf.zaxis);
+        mat4_t jointRoot = convertMtx(scene->mRootNode->mTransformation, conf.zaxis);
         setupGeoJoints(scene, bones, skinBones, conf, jointRoot, geo->joints, geo->initPose);
 
         saveMtx(jointRoot, geo->g.skel.rootMtx);
     }
 
     // Vertices and Indices
-    geo->indices = (uint16_t*)BX_ALLOC(&g_alloc, numTris*sizeof(uint16_t) * 3);
+    geo->indices = (uint16_t*)BX_ALLOC(&gAlloc, numTris*sizeof(uint16_t) * 3);
     assert(geo->indices);
 
     int indexOffset = 0;
     int vertOffset = 0;
 
-    geo->verts = BX_ALLOC(&g_alloc, numVerts*vertStride);
+    geo->verts = BX_ALLOC(&gAlloc, numVerts*vertStride);
     assert(geo->verts);
     uint8_t* verts = (uint8_t*)geo->verts;
 
@@ -442,11 +442,11 @@ static int importGeo(const aiScene* scene, ModelData* model, unsigned int* amesh
         // Transform vertices by rootMtx if it's not skinned and it's the main node
         // Skinned meshes are transformed by their joints
         // child nodes are transformed by parent (main), so they don't need to be xformed by root
-        mtx4x4_t vertMtx;
+        mat4_t vertMtx;
         if (!skin && mainNode)
             vertMtx = rootMtx;
         else
-            vertMtx = mtx4x4Ident();
+            vertMtx = mat4I();
 
         for (uint32_t k = 0; k < submesh->mNumVertices; k++) {
             uint32_t idx = k + vertOffset;
@@ -624,7 +624,7 @@ static int importMaterial(const aiScene* scene, ModelData* model, aiMaterial* am
 
     if (tcount) {
         mtl->m.numTextures = tcount;
-        mtl->textures = (t3dTexture*)BX_ALLOC(&g_alloc, sizeof(t3dTexture)*tcount);
+        mtl->textures = (t3dTexture*)BX_ALLOC(&gAlloc, sizeof(t3dTexture)*tcount);
         memcpy(mtl->textures, textures, sizeof(t3dTexture)*tcount);
     }
 
@@ -633,13 +633,13 @@ static int importMaterial(const aiScene* scene, ModelData* model, aiMaterial* am
 
 static int importMesh(const aiScene* scene, ModelData* model, unsigned int* ameshIds,
                       unsigned int numMeshes, bool mainNode, const Args& conf,
-                      const mtx4x4_t& rootMtx)
+                      const mat4_t& rootMtx)
 {
     ModelData::Mesh* mesh = model->meshes.push();
     bx::memSet(mesh, 0x00, sizeof(ModelData::Mesh));
 
     mesh->m.numSubmeshes = (int)numMeshes;
-    mesh->submeshes = (t3dSubmesh*)BX_ALLOC(&g_alloc, sizeof(t3dSubmesh)*numMeshes);
+    mesh->submeshes = (t3dSubmesh*)BX_ALLOC(&gAlloc, sizeof(t3dSubmesh)*numMeshes);
     assert(mesh->submeshes);
     bx::memSet(mesh->submeshes, 0x00, sizeof(t3dSubmesh)*numMeshes);
 
@@ -660,23 +660,23 @@ static int importMesh(const aiScene* scene, ModelData* model, unsigned int* ames
 
 static aabb_t calcGeoBoundsNoSkin(const ModelData::Geometry& geo)
 {
-    aabb_t bb = aabbEmpty();
+    aabb_t bb = aabbZero();
     for (int i = 0; i < geo.g.numVerts; i++) {
         const float* poss = (const float*)((uint8_t*)geo.verts + i*geo.g.vertStride);
-        aabbPushPoint(&bb, vec3f(poss[0], poss[1], poss[2]));
+        tmath::aabbPushPoint(&bb, vec3(poss[0], poss[1], poss[2]));
     }
     return bb;
 }
 
 static aabb_t calcGeoBoundsSkin(const ModelData::Geometry& geo)
 {
-    aabb_t bb = aabbEmpty();
+    aabb_t bb = aabbZero();
     int numJoints = geo.g.skel.numJoints;
 
-    mtx4x4_t* skinMtxs = (mtx4x4_t*)alloca(sizeof(mtx4x4_t)*numJoints);
+    mat4_t* skinMtxs = (mat4_t*)alloca(sizeof(mat4_t)*numJoints);
 
-    mtx4x4_t* initPose = (mtx4x4_t*)alloca(sizeof(mtx4x4_t)*numJoints);
-    memcpy(initPose, geo.initPose, sizeof(mtx4x4_t)*numJoints);
+    mat4_t* initPose = (mat4_t*)alloca(sizeof(mat4_t)*numJoints);
+    memcpy(initPose, geo.initPose, sizeof(mat4_t)*numJoints);
 
     for (int i = 0; i < numJoints; i++) {
         const t3dJoint* joint = &geo.joints[i];
@@ -690,7 +690,7 @@ static aabb_t calcGeoBoundsSkin(const ModelData::Geometry& geo)
         // Offset matrix
         joint = &geo.joints[i];
         const float* off = joint->offsetMtx;
-        mtx4x4_t offsetMtx = mtx4x4f3(off[0], off[1], off[2],
+        mat4_t offsetMtx = mat4(off[0], off[1], off[2],
                                       off[3], off[4], off[5],
                                       off[6], off[7], off[8],
                                       off[9], off[10], off[11]);
@@ -707,11 +707,11 @@ static aabb_t calcGeoBoundsSkin(const ModelData::Geometry& geo)
         const int* indices = (const int*)((uint8_t*)geo.verts + i*geo.g.vertStride + indicesOffset);
         const float* weights = (const float*)((uint8_t*)geo.verts + i*geo.g.vertStride + weightOffset);
 
-        vec3_t pos = vec3f(poss[0], poss[1], poss[2]);
-        vec3_t skinned = vec3f(0, 0, 0);
+        vec3_t pos = vec3(poss[0], poss[1], poss[2]);
+        vec3_t skinned = vec3(0, 0, 0);
 
         for (int c = 0; c < 4; c++) {
-            const mtx4x4_t& mtx = skinMtxs[indices[c]];
+            const mat4_t& mtx = skinMtxs[indices[c]];
             float w = weights[c];
 
             vec3_t sp;
@@ -719,7 +719,7 @@ static aabb_t calcGeoBoundsSkin(const ModelData::Geometry& geo)
             bx::vec3Mul(sp.f, sp.f, w);
             bx::vec3Add(skinned.f, skinned.f, sp.f);
 
-            aabbPushPoint(&bb, skinned);
+            tmath::aabbPushPoint(&bb, skinned);
         }
     }
 
@@ -727,7 +727,7 @@ static aabb_t calcGeoBoundsSkin(const ModelData::Geometry& geo)
 }
 
 static int importNodeRecursive(const aiScene* scene, aiNode* anode, ModelData* model, const Args& conf, int parent, 
-                               mtx4x4_t& rootMtx)
+                               mat4_t& rootMtx)
 {
     ModelData::Node* node = model->nodes.push();
     bx::memSet(node, 0x00, sizeof(ModelData::Node));
@@ -736,13 +736,13 @@ static int importNodeRecursive(const aiScene* scene, aiNode* anode, ModelData* m
     node->n.parent = parent;
 
     // Calculate local transform mat of the node
-    mtx4x4_t localMtx;
+    mat4_t localMtx;
     if (parent == -1) {
         // Calculate rootMtx
-        mtx4x4_t resizeMtx;     
+        mat4_t resizeMtx;     
         bx::mtxScale(resizeMtx.f, conf.scale, conf.scale, conf.scale);
 
-        mtx4x4_t sceneRoot = convertMtx(scene->mRootNode->mTransformation, conf.zaxis);
+        mat4_t sceneRoot = convertMtx(scene->mRootNode->mTransformation, conf.zaxis);
         rootMtx = convertMtx(anode->mTransformation, conf.zaxis);
         rootMtx = (rootMtx * sceneRoot) * resizeMtx;
 
@@ -785,7 +785,7 @@ static int importNodeRecursive(const aiScene* scene, aiNode* anode, ModelData* m
     // Recurse for child nodes
     if (anode->mNumChildren) {
         node->n.numChilds = anode->mNumChildren;
-        node->childs = (int*)BX_ALLOC(&g_alloc, sizeof(int)*anode->mNumChildren);
+        node->childs = (int*)BX_ALLOC(&gAlloc, sizeof(int)*anode->mNumChildren);
         for (int i = 0; i < node->n.numChilds; i++) {
             node->childs[i] = importNodeRecursive(scene, anode->mChildren[i], model, conf, myidx, rootMtx);
             if (node->childs[i] == -1)
@@ -884,7 +884,7 @@ static bx::JsonNode* jsonCreateVec3(bx::AllocatorI* alloc, const char* name, con
 
 static bool exportMeta(const char* metaJsonFilepath, const ModelData& model)
 {
-    bx::JsonNodeAllocator alloc(&g_alloc);
+    bx::JsonNodeAllocator alloc(&gAlloc);
     bx::JsonNode* jroot = bx::createJsonNode(&alloc, nullptr, bx::JsonType::Object);
     bx::JsonNode* jmtls = bx::createJsonNode(&alloc, "materials", bx::JsonType::Array);
     jroot->addChild(jmtls);
@@ -924,7 +924,7 @@ static bool exportMeta(const char* metaJsonFilepath, const ModelData& model)
 
     // Save/Show
     if (metaJsonFilepath[0]) {
-        char* jmeta = bx::makeJson(jroot, &g_alloc, false);
+        char* jmeta = bx::makeJson(jroot, &gAlloc, false);
         if (!jmeta)
             return false;
         bx::FileWriter file;
@@ -933,13 +933,13 @@ static bool exportMeta(const char* metaJsonFilepath, const ModelData& model)
             return false;
         file.write(jmeta, (int)strlen(jmeta) + 1, &err);
         file.close();
-        BX_FREE(&g_alloc, jmeta);
+        BX_FREE(&gAlloc, jmeta);
     } else {
-        char* jmeta = bx::makeJson(jroot, &g_alloc, false);
+        char* jmeta = bx::makeJson(jroot, &gAlloc, false);
         if (!jmeta)
             return false;
         bx::logPrint(__FILE__, __LINE__, bx::LogType::Text, jmeta);
-        BX_FREE(&g_alloc, jmeta);
+        BX_FREE(&gAlloc, jmeta);
     }
 
     jroot->destroy();
@@ -988,7 +988,7 @@ static bool importModel(const Args& conf)
 
     // Import model (Geometry, meshes, materials)
     ModelData model;
-    mtx4x4_t rootMtx = mtx4x4Ident();
+    mat4_t rootMtx = mat4I();
     if (importNodeRecursive(scene, anode, &model, conf, -1, rootMtx) == -1) {
         g_logger->fatal("Model import '%s' failed", conf.modelName);
         return false;

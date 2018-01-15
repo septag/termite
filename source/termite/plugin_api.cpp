@@ -1,10 +1,11 @@
 #include "pch.h"
 
-#define T_CORE_API
-#define T_GFX_API
-#define T_IMGUI_API
-#define T_COMPONENT_API
-#define T_CAMERA_API
+#define TEE_CORE_API
+#define TEE_GFX_API
+#define TEE_IMGUI_API
+#define TEE_ECS_API
+#define TEE_MATH_API
+#define TEE_ASSET_API
 #include "plugin_api.h"
 
 #include "gfx_utils.h"
@@ -14,273 +15,285 @@
 
 #include "imgui_custom_controls.h"
 
-using namespace termite;
+using namespace tee;
 
 static void* getImGuiApi(uint32_t version)
 {
-	static ImGuiApi_v0 api;
-	bx::memSet(&api, 0x00, sizeof(api));
+	static ImGuiApi imguiApi;
+	bx::memSet(&imguiApi, 0x00, sizeof(imguiApi));
 
-	api.begin = static_cast<bool(*)(const char*, bool*, ImGuiWindowFlags)>(ImGui::Begin);
-	api.beginWithSize = static_cast<bool(*)(const char*, bool*, const ImVec2&, float, ImGuiWindowFlags)>(ImGui::Begin);
-	api.end = ImGui::End;
-	api.beginChild = static_cast<bool(*)(const char*, const ImVec2&, bool, ImGuiWindowFlags)>(ImGui::BeginChild);
-	api.beginChildId = static_cast<bool(*)(ImGuiID, const ImVec2&, bool, ImGuiWindowFlags)>(ImGui::BeginChild);
-	api.endChild = ImGui::EndChild;
-	api.getContentRegionMax = ImGui::GetContentRegionMax;
-	api.getContentRegionAvail = ImGui::GetContentRegionAvail;
-	api.getContentRegionAvailWidth = ImGui::GetContentRegionAvailWidth;
-	api.getWindowContentRegionWidth = ImGui::GetWindowContentRegionWidth;
-	api.getWindowContentRegionMin = ImGui::GetWindowContentRegionMin;
-	api.getWindowContentRegionMax = ImGui::GetWindowContentRegionMax;
-	api.getWindowDrawList = ImGui::GetWindowDrawList;
-	api.getWindowFont = ImGui::GetWindowFont;
-	api.getWindowFontSize = ImGui::GetWindowFontSize;
-	api.setWindowFontScale = ImGui::SetWindowFontScale;
-	api.getWindowPos = ImGui::GetWindowPos;
-	api.getWindowFontSize = ImGui::GetWindowFontSize;
-	api.getWindowWidth = ImGui::GetWindowWidth;
-	api.getWindowHeight = ImGui::GetWindowHeight;
-	api.isWindowCollapsed = ImGui::IsWindowCollapsed;
-	api.setNextWindowPos = ImGui::SetNextWindowPos;
-	api.setNextWindowPosCenter = ImGui::SetNextWindowPosCenter;
-	api.setNextWindowSize = ImGui::SetNextWindowSize;
-	api.setNextWindowContentSize = ImGui::SetNextWindowContentSize;
-	api.setNextWindowContentWidth = ImGui::SetNextWindowContentWidth;
-	api.setNextWindowFocus = ImGui::SetNextWindowFocus;
-	api.setWindowCollapsed = ImGui::SetWindowCollapsed;
-	api.setNextWindowFocus = ImGui::SetNextWindowFocus;
-	api.setNextWindowCollapsed = ImGui::SetWindowCollapsed;
-	api.setWindowPos = static_cast<void(*)(const ImVec2&, ImGuiSetCond)>(ImGui::SetWindowPos);
-	api.setWindowPosName = static_cast<void(*)(const char*, const ImVec2&, ImGuiSetCond)>(ImGui::SetWindowPos);
-	api.setWindowSize = static_cast<void(*)(const ImVec2&, ImGuiSetCond)>(ImGui::SetWindowSize);
-	api.setWindowSizeName = static_cast<void(*)(const char*, const ImVec2&, ImGuiSetCond)>(ImGui::SetWindowSize);
-	api.setWindowCollapsed = static_cast<void(*)(bool, ImGuiSetCond)>(ImGui::SetWindowCollapsed);
-	api.setWindowCollapsedName = static_cast<void(*)(const char*, bool, ImGuiSetCond)>(ImGui::SetWindowCollapsed);
-	api.setWindowFocus = static_cast<void(*)()>(ImGui::SetWindowFocus);
-	api.setWindowFocusName = static_cast<void(*)(const char*)>(ImGui::SetWindowFocus);
-	api.getScrollX = ImGui::GetScrollX;
-	api.getScrollY = ImGui::GetScrollY;
-	api.getScrollMaxX = ImGui::GetScrollMaxX;
-	api.getScrollMaxY = ImGui::GetScrollMaxY;
-	api.setScrollX = ImGui::SetScrollX;
-	api.setScrollY = ImGui::SetScrollY;
-	api.setScrollHere = ImGui::SetScrollHere;
-	api.setScrollFromPosY = ImGui::SetScrollFromPosY;
-	api.setKeyboardFocusHere = ImGui::SetKeyboardFocusHere;
-	api.setStateStorage = ImGui::SetStateStorage;
-	api.getStateStorage = ImGui::GetStateStorage;
-	api.pushFont = ImGui::PushFont;
-	api.popFont = ImGui::PopFont;
-	api.pushStyleColor = ImGui::PushStyleColor;
-	api.popStyleColor = ImGui::PopStyleColor;
-	api.pushStyleVar = static_cast<void(*)(ImGuiStyleVar, float)>(ImGui::PushStyleVar);
-	api.pushStyleVarVec2 = static_cast<void(*)(ImGuiStyleVar, const ImVec2&)>(ImGui::PushStyleVar);
-	api.popStyleVar = static_cast<void(*)(int)>(ImGui::PopStyleVar);
-	api.pushItemWidth = ImGui::PushItemWidth;
-	api.popItemWidth = ImGui::PopItemWidth;
-	api.calcItemWidth = ImGui::CalcItemWidth;
-	api.pushTextWrapPos = ImGui::PushTextWrapPos;
-	api.popTextWrapPos = ImGui::PopTextWrapPos;
-	api.pushAllowKeyboardFocus = ImGui::PushAllowKeyboardFocus;
-	api.popAllowKeyboardFocus = ImGui::PopAllowKeyboardFocus;
-	api.pushButtonRepeat = ImGui::PushButtonRepeat;
-	api.popButtonRepeat = ImGui::PopButtonRepeat;
-	api.beginGroup = ImGui::BeginGroup;
-	api.endGroup = ImGui::EndGroup;
-	api.separator = ImGui::Separator;
-	api.sameLine = ImGui::SameLine;
-	api.spacing = ImGui::Spacing;
-	api.dummy = ImGui::Dummy;
-	api.indent = ImGui::Indent;
-	api.unindent = ImGui::Unindent;
-	api.columns = ImGui::Columns;
-	api.nextColumn = ImGui::NextColumn;
-	api.getColumnIndex = ImGui::GetColumnIndex;
-	api.getColumnOffset = ImGui::GetColumnOffset;
-	api.setColumnOffset = ImGui::SetColumnOffset;
-	api.getColumnWidth = ImGui::GetColumnWidth;
-	api.getColumnsCount = ImGui::GetColumnsCount;
-	api.getCursorPos = ImGui::GetCursorPos;
-	api.getCursorPosX = ImGui::GetCursorPosX;
-	api.getCursorPosY = ImGui::GetCursorPosY;
-	api.getCursorStartPos = ImGui::GetCursorStartPos;
-	api.getCursorScreenPos = ImGui::GetCursorScreenPos;
-	api.setCursorScreenPos = ImGui::SetCursorScreenPos;
-	api.alignFirstTextHeightToWidgets = ImGui::AlignFirstTextHeightToWidgets;
-	api.getTextLineHeight = ImGui::GetTextLineHeight;
-	api.getTextLineHeightWithSpacing = ImGui::GetTextLineHeightWithSpacing;
-	api.getItemsLineHeightWithSpacing = ImGui::GetItemsLineHeightWithSpacing;
-	api.pushID = static_cast<void(*)(const char*)>(ImGui::PushID);
-	api.pushIDStr = static_cast<void(*)(const char*, const char*)>(ImGui::PushID);
-	api.pushIDPtr = static_cast<void(*)(const void*)>(ImGui::PushID);
-	api.pushIDInt = static_cast<void(*)(int)>(ImGui::PushID);
-	api.popID = ImGui::PopID;
-	api.getIDStr = static_cast<ImGuiID(*)(const char*)>(ImGui::GetID);
-	api.getIDPtr = static_cast<ImGuiID(*)(const void*)>(ImGui::GetID);
-	api.getIDSubStr = static_cast<ImGuiID(*)(const char*, const char*)>(ImGui::GetID);
-	api.text = ImGui::Text;
-	api.textV = ImGui::TextV;
-	api.textColored = ImGui::TextColored;
-	api.textColoredV = ImGui::TextColoredV;
-	api.textDisabled = ImGui::TextDisabled;
-	api.textDisabledV = ImGui::TextDisabledV;
-	api.textWrapped = ImGui::TextWrapped;
-	api.textWrappedV = ImGui::TextWrappedV;
-	api.textUnformatted = ImGui::TextUnformatted;
-	api.labelText = ImGui::LabelText;
-	api.labelTextV = ImGui::LabelTextV;
-	api.bullet = ImGui::Bullet;
-	api.bulletText = ImGui::BulletText;
-	api.bulletTextV = ImGui::BulletTextV;
-	api.button = ImGui::Button;
-	api.smallButton = ImGui::SmallButton;
-	api.invisibleButton = ImGui::InvisibleButton;
-	api.image = ImGui::Image;
-	api.imageButton = ImGui::ImageButton;
-	api.collapsingHeader = ImGui::CollapsingHeader;
-	api.checkbox = ImGui::Checkbox;
-	api.checkboxFlags = ImGui::CheckboxFlags;
-	api.radioButton = static_cast<bool(*)(const char*, bool)>(ImGui::RadioButton);
-	api.radioButtonInt = static_cast<bool(*)(const char*, int*, int)>(ImGui::RadioButton);
-	api.combo = static_cast<bool(*)(const char*, int*, const char**, int, int)>(ImGui::Combo);
-	api.comboZeroSep = static_cast<bool(*)(const char*, int*, const char*, int)>(ImGui::Combo);
-	api.comboGetter = static_cast<bool(*)(const char*, int*, bool(*)(void*, int, const char**), void*, int, int)>(ImGui::Combo);
-	api.colorButton = ImGui::ColorButton;
-	api.colorEdit3 = ImGui::ColorEdit3;
-	api.colorEdit4 = ImGui::ColorEdit4;
-	api.colorEditMode = ImGui::ColorEditMode;
-	api.plotLines = static_cast<void(*)(const char*, const float*, int, int, const char*, float, float, ImVec2, int)>(ImGui::PlotLines);
-	api.plotLinesGetter = static_cast<void(*)(const char*, float(*)(void*, int), void*, int, int, const char*, float, float, ImVec2)>(ImGui::PlotLines);
-	api.plotHistogram = static_cast<void(*)(const char*, const float*, int, int, const char*, float, float, ImVec2, int)>(ImGui::PlotHistogram);
-	api.plotHistogramGetter = static_cast<void(*)(const char*, float(*)(void*, int), void*, int, int, const char*, float, float, ImVec2)>(ImGui::PlotHistogram);
-	api.progressBar = ImGui::ProgressBar;
-	api.dragFloat = ImGui::DragFloat;
-	api.dragFloat2 = ImGui::DragFloat2;
-	api.dragFloat3 = ImGui::DragFloat3;
-	api.dragFloat4 = ImGui::DragFloat4;
-	api.dragFloatRange2 = ImGui::DragFloatRange2;
-	api.dragInt = ImGui::DragInt;
-	api.dragInt2 = ImGui::DragInt2;
-	api.dragInt3 = ImGui::DragInt3;
-	api.dragInt4 = ImGui::DragInt4;
-	api.dragIntRange2 = ImGui::DragIntRange2;
-	api.inputText = ImGui::InputText;
-	api.inputTextMultiline = ImGui::InputTextMultiline;
-	api.inputFloat = ImGui::InputFloat;
-	api.inputFloat2 = ImGui::InputFloat2;
-	api.inputFloat3 = ImGui::InputFloat3;
-	api.inputFloat4 = ImGui::InputFloat4;
-	api.inputInt = ImGui::InputInt;
-	api.inputInt2 = ImGui::InputInt2;
-	api.inputInt3 = ImGui::InputInt3;
-	api.inputInt4 = ImGui::InputInt4;
-	api.sliderFloat = ImGui::SliderFloat;
-	api.sliderFloat2 = ImGui::SliderFloat2;
-	api.sliderFloat3 = ImGui::SliderFloat3;
-	api.sliderFloat4 = ImGui::SliderFloat4;
-	api.sliderAngle = ImGui::SliderAngle;
-	api.sliderInt = ImGui::SliderInt;
-	api.sliderInt2 = ImGui::SliderInt2;
-	api.sliderInt3 = ImGui::SliderInt3;
-	api.sliderInt4 = ImGui::SliderInt4;
-	api.vSliderFloat = ImGui::VSliderFloat;
-	api.vSliderInt = ImGui::VSliderInt;
-	api.treeNode = static_cast<bool(*)(const char*)>(ImGui::TreeNode);
-	api.treeNodeFmt = static_cast<bool(*)(const char* str_id, const char* fmt, ...)>(ImGui::TreeNode);
-	api.treeNodePtrFmt = static_cast<bool(*)(const void* ptr_id, const char* fmt, ...)>(ImGui::TreeNode);
-	api.treeNodeV = static_cast<bool(*)(const char*, const char*, va_list)>(ImGui::TreeNodeV);
-	api.treeNodeVPtr = static_cast<bool(*)(const void*, const char*, va_list)>(ImGui::TreeNodeV);
-	api.treePush = static_cast<void(*)(const char*)>(ImGui::TreePush);
-	api.treePushPtr = static_cast<void(*)(const void*)>(ImGui::TreePush);
-	api.treePop = ImGui::TreePop;
-	api.setNextTreeNodeOpened = ImGui::SetNextTreeNodeOpened;
-	api.selectable = static_cast<bool(*)(const char*, bool, ImGuiSelectableFlags, const ImVec2&)>(ImGui::Selectable);
-	api.selectableSel = static_cast<bool(*)(const char*, bool*, ImGuiSelectableFlags, const ImVec2&)>(ImGui::Selectable);
-	api.listBox = static_cast<bool(*)(const char*, int*, const char**, int, int)>(ImGui::ListBox);
-	api.listBoxGetter = static_cast<bool(*)(const char*, int*, bool(*)(void*, int, const char**), void*, int, int)>(ImGui::ListBox);
-	api.listBoxHeader = static_cast<bool(*)(const char*, const ImVec2&)>(ImGui::ListBoxHeader);
-	api.listBoxHeader2 = static_cast<bool(*)(const char*, int, int)>(ImGui::ListBoxHeader);
-	api.listBoxFooter = static_cast<void(*)()>(ImGui::ListBoxFooter);
-	api.valueBool = static_cast<void(*)(const char*, bool)>(ImGui::Value);
-	api.valueInt = static_cast<void(*)(const char*, int)>(ImGui::Value);
-	api.valueUint = static_cast<void(*)(const char*, unsigned int)>(ImGui::Value);
-	api.valueFloat = static_cast<void(*)(const char*, float, const char*)>(ImGui::Value);
-	api.valueColor = static_cast<void(*)(const char*, const ImVec4&)>(ImGui::ValueColor);
-	api.valueColorUint = static_cast<void(*)(const char*, unsigned int)>(ImGui::ValueColor);
+	imguiApi.begin = static_cast<bool(*)(const char*, bool*, ImGuiWindowFlags)>(ImGui::Begin);
+	imguiApi.beginWithSize = static_cast<bool(*)(const char*, bool*, const ImVec2&, float, ImGuiWindowFlags)>(ImGui::Begin);
+	imguiApi.end = ImGui::End;
+	imguiApi.beginChild = static_cast<bool(*)(const char*, const ImVec2&, bool, ImGuiWindowFlags)>(ImGui::BeginChild);
+	imguiApi.beginChildId = static_cast<bool(*)(ImGuiID, const ImVec2&, bool, ImGuiWindowFlags)>(ImGui::BeginChild);
+	imguiApi.endChild = ImGui::EndChild;
+	imguiApi.getContentRegionMax = ImGui::GetContentRegionMax;
+	imguiApi.getContentRegionAvail = ImGui::GetContentRegionAvail;
+	imguiApi.getContentRegionAvailWidth = ImGui::GetContentRegionAvailWidth;
+	imguiApi.getWindowContentRegionWidth = ImGui::GetWindowContentRegionWidth;
+	imguiApi.getWindowContentRegionMin = ImGui::GetWindowContentRegionMin;
+	imguiApi.getWindowContentRegionMax = ImGui::GetWindowContentRegionMax;
+	imguiApi.getWindowDrawList = ImGui::GetWindowDrawList;
+	imguiApi.getWindowFont = ImGui::GetWindowFont;
+	imguiApi.getWindowFontSize = ImGui::GetWindowFontSize;
+	imguiApi.setWindowFontScale = ImGui::SetWindowFontScale;
+	imguiApi.getWindowPos = ImGui::GetWindowPos;
+	imguiApi.getWindowFontSize = ImGui::GetWindowFontSize;
+	imguiApi.getWindowWidth = ImGui::GetWindowWidth;
+	imguiApi.getWindowHeight = ImGui::GetWindowHeight;
+	imguiApi.isWindowCollapsed = ImGui::IsWindowCollapsed;
+	imguiApi.setNextWindowPos = ImGui::SetNextWindowPos;
+	imguiApi.setNextWindowPosCenter = ImGui::SetNextWindowPosCenter;
+	imguiApi.setNextWindowSize = ImGui::SetNextWindowSize;
+	imguiApi.setNextWindowContentSize = ImGui::SetNextWindowContentSize;
+	imguiApi.setNextWindowContentWidth = ImGui::SetNextWindowContentWidth;
+	imguiApi.setNextWindowFocus = ImGui::SetNextWindowFocus;
+	imguiApi.setWindowCollapsed = ImGui::SetWindowCollapsed;
+	imguiApi.setNextWindowFocus = ImGui::SetNextWindowFocus;
+	imguiApi.setNextWindowCollapsed = ImGui::SetWindowCollapsed;
+	imguiApi.setWindowPos = static_cast<void(*)(const ImVec2&, ImGuiSetCond)>(ImGui::SetWindowPos);
+	imguiApi.setWindowPosName = static_cast<void(*)(const char*, const ImVec2&, ImGuiSetCond)>(ImGui::SetWindowPos);
+	imguiApi.setWindowSize = static_cast<void(*)(const ImVec2&, ImGuiSetCond)>(ImGui::SetWindowSize);
+	imguiApi.setWindowSizeName = static_cast<void(*)(const char*, const ImVec2&, ImGuiSetCond)>(ImGui::SetWindowSize);
+	imguiApi.setWindowCollapsed = static_cast<void(*)(bool, ImGuiSetCond)>(ImGui::SetWindowCollapsed);
+	imguiApi.setWindowCollapsedName = static_cast<void(*)(const char*, bool, ImGuiSetCond)>(ImGui::SetWindowCollapsed);
+	imguiApi.setWindowFocus = static_cast<void(*)()>(ImGui::SetWindowFocus);
+	imguiApi.setWindowFocusName = static_cast<void(*)(const char*)>(ImGui::SetWindowFocus);
+	imguiApi.getScrollX = ImGui::GetScrollX;
+	imguiApi.getScrollY = ImGui::GetScrollY;
+	imguiApi.getScrollMaxX = ImGui::GetScrollMaxX;
+	imguiApi.getScrollMaxY = ImGui::GetScrollMaxY;
+	imguiApi.setScrollX = ImGui::SetScrollX;
+	imguiApi.setScrollY = ImGui::SetScrollY;
+	imguiApi.setScrollHere = ImGui::SetScrollHere;
+	imguiApi.setScrollFromPosY = ImGui::SetScrollFromPosY;
+	imguiApi.setKeyboardFocusHere = ImGui::SetKeyboardFocusHere;
+	imguiApi.setStateStorage = ImGui::SetStateStorage;
+	imguiApi.getStateStorage = ImGui::GetStateStorage;
+	imguiApi.pushFont = ImGui::PushFont;
+	imguiApi.popFont = ImGui::PopFont;
+	imguiApi.pushStyleColor = ImGui::PushStyleColor;
+	imguiApi.popStyleColor = ImGui::PopStyleColor;
+	imguiApi.pushStyleVar = static_cast<void(*)(ImGuiStyleVar, float)>(ImGui::PushStyleVar);
+	imguiApi.pushStyleVarVec2 = static_cast<void(*)(ImGuiStyleVar, const ImVec2&)>(ImGui::PushStyleVar);
+	imguiApi.popStyleVar = static_cast<void(*)(int)>(ImGui::PopStyleVar);
+	imguiApi.pushItemWidth = ImGui::PushItemWidth;
+	imguiApi.popItemWidth = ImGui::PopItemWidth;
+	imguiApi.calcItemWidth = ImGui::CalcItemWidth;
+	imguiApi.pushTextWrapPos = ImGui::PushTextWrapPos;
+	imguiApi.popTextWrapPos = ImGui::PopTextWrapPos;
+	imguiApi.pushAllowKeyboardFocus = ImGui::PushAllowKeyboardFocus;
+	imguiApi.popAllowKeyboardFocus = ImGui::PopAllowKeyboardFocus;
+	imguiApi.pushButtonRepeat = ImGui::PushButtonRepeat;
+	imguiApi.popButtonRepeat = ImGui::PopButtonRepeat;
+	imguiApi.beginGroup = ImGui::BeginGroup;
+	imguiApi.endGroup = ImGui::EndGroup;
+	imguiApi.separator = ImGui::Separator;
+	imguiApi.sameLine = ImGui::SameLine;
+	imguiApi.spacing = ImGui::Spacing;
+	imguiApi.dummy = ImGui::Dummy;
+	imguiApi.indent = ImGui::Indent;
+	imguiApi.unindent = ImGui::Unindent;
+	imguiApi.columns = ImGui::Columns;
+	imguiApi.nextColumn = ImGui::NextColumn;
+	imguiApi.getColumnIndex = ImGui::GetColumnIndex;
+	imguiApi.getColumnOffset = ImGui::GetColumnOffset;
+	imguiApi.setColumnOffset = ImGui::SetColumnOffset;
+	imguiApi.getColumnWidth = ImGui::GetColumnWidth;
+	imguiApi.getColumnsCount = ImGui::GetColumnsCount;
+	imguiApi.getCursorPos = ImGui::GetCursorPos;
+	imguiApi.getCursorPosX = ImGui::GetCursorPosX;
+	imguiApi.getCursorPosY = ImGui::GetCursorPosY;
+	imguiApi.getCursorStartPos = ImGui::GetCursorStartPos;
+	imguiApi.getCursorScreenPos = ImGui::GetCursorScreenPos;
+	imguiApi.setCursorScreenPos = ImGui::SetCursorScreenPos;
+	imguiApi.alignFirstTextHeightToWidgets = ImGui::AlignFirstTextHeightToWidgets;
+	imguiApi.getTextLineHeight = ImGui::GetTextLineHeight;
+	imguiApi.getTextLineHeightWithSpacing = ImGui::GetTextLineHeightWithSpacing;
+	imguiApi.getItemsLineHeightWithSpacing = ImGui::GetItemsLineHeightWithSpacing;
+	imguiApi.pushID = static_cast<void(*)(const char*)>(ImGui::PushID);
+	imguiApi.pushIDStr = static_cast<void(*)(const char*, const char*)>(ImGui::PushID);
+	imguiApi.pushIDPtr = static_cast<void(*)(const void*)>(ImGui::PushID);
+	imguiApi.pushIDInt = static_cast<void(*)(int)>(ImGui::PushID);
+	imguiApi.popID = ImGui::PopID;
+	imguiApi.getIDStr = static_cast<ImGuiID(*)(const char*)>(ImGui::GetID);
+	imguiApi.getIDPtr = static_cast<ImGuiID(*)(const void*)>(ImGui::GetID);
+	imguiApi.getIDSubStr = static_cast<ImGuiID(*)(const char*, const char*)>(ImGui::GetID);
+	imguiApi.text = ImGui::Text;
+	imguiApi.textV = ImGui::TextV;
+	imguiApi.textColored = ImGui::TextColored;
+	imguiApi.textColoredV = ImGui::TextColoredV;
+	imguiApi.textDisabled = ImGui::TextDisabled;
+	imguiApi.textDisabledV = ImGui::TextDisabledV;
+	imguiApi.textWrapped = ImGui::TextWrapped;
+	imguiApi.textWrappedV = ImGui::TextWrappedV;
+	imguiApi.textUnformatted = ImGui::TextUnformatted;
+	imguiApi.labelText = ImGui::LabelText;
+	imguiApi.labelTextV = ImGui::LabelTextV;
+	imguiApi.bullet = ImGui::Bullet;
+	imguiApi.bulletText = ImGui::BulletText;
+	imguiApi.bulletTextV = ImGui::BulletTextV;
+	imguiApi.button = ImGui::Button;
+	imguiApi.smallButton = ImGui::SmallButton;
+	imguiApi.invisibleButton = ImGui::InvisibleButton;
+	imguiApi.image = ImGui::Image;
+	imguiApi.imageButton = ImGui::ImageButton;
+	imguiApi.collapsingHeader = ImGui::CollapsingHeader;
+	imguiApi.checkbox = ImGui::Checkbox;
+	imguiApi.checkboxFlags = ImGui::CheckboxFlags;
+	imguiApi.radioButton = static_cast<bool(*)(const char*, bool)>(ImGui::RadioButton);
+	imguiApi.radioButtonInt = static_cast<bool(*)(const char*, int*, int)>(ImGui::RadioButton);
+	imguiApi.combo = static_cast<bool(*)(const char*, int*, const char**, int, int)>(ImGui::Combo);
+	imguiApi.comboZeroSep = static_cast<bool(*)(const char*, int*, const char*, int)>(ImGui::Combo);
+	imguiApi.comboGetter = static_cast<bool(*)(const char*, int*, bool(*)(void*, int, const char**), void*, int, int)>(ImGui::Combo);
+	imguiApi.colorButton = ImGui::ColorButton;
+	imguiApi.colorEdit3 = ImGui::ColorEdit3;
+	imguiApi.colorEdit4 = ImGui::ColorEdit4;
+	imguiApi.colorEditMode = ImGui::ColorEditMode;
+	imguiApi.plotLines = static_cast<void(*)(const char*, const float*, int, int, const char*, float, float, ImVec2, int)>(ImGui::PlotLines);
+	imguiApi.plotLinesGetter = static_cast<void(*)(const char*, float(*)(void*, int), void*, int, int, const char*, float, float, ImVec2)>(ImGui::PlotLines);
+	imguiApi.plotHistogram = static_cast<void(*)(const char*, const float*, int, int, const char*, float, float, ImVec2, int)>(ImGui::PlotHistogram);
+	imguiApi.plotHistogramGetter = static_cast<void(*)(const char*, float(*)(void*, int), void*, int, int, const char*, float, float, ImVec2)>(ImGui::PlotHistogram);
+	imguiApi.progressBar = ImGui::ProgressBar;
+	imguiApi.dragFloat = ImGui::DragFloat;
+	imguiApi.dragFloat2 = ImGui::DragFloat2;
+	imguiApi.dragFloat3 = ImGui::DragFloat3;
+	imguiApi.dragFloat4 = ImGui::DragFloat4;
+	imguiApi.dragFloatRange2 = ImGui::DragFloatRange2;
+	imguiApi.dragInt = ImGui::DragInt;
+	imguiApi.dragInt2 = ImGui::DragInt2;
+	imguiApi.dragInt3 = ImGui::DragInt3;
+	imguiApi.dragInt4 = ImGui::DragInt4;
+	imguiApi.dragIntRange2 = ImGui::DragIntRange2;
+	imguiApi.inputText = ImGui::InputText;
+	imguiApi.inputTextMultiline = ImGui::InputTextMultiline;
+	imguiApi.inputFloat = ImGui::InputFloat;
+	imguiApi.inputFloat2 = ImGui::InputFloat2;
+	imguiApi.inputFloat3 = ImGui::InputFloat3;
+	imguiApi.inputFloat4 = ImGui::InputFloat4;
+	imguiApi.inputInt = ImGui::InputInt;
+	imguiApi.inputInt2 = ImGui::InputInt2;
+	imguiApi.inputInt3 = ImGui::InputInt3;
+	imguiApi.inputInt4 = ImGui::InputInt4;
+	imguiApi.sliderFloat = ImGui::SliderFloat;
+	imguiApi.sliderFloat2 = ImGui::SliderFloat2;
+	imguiApi.sliderFloat3 = ImGui::SliderFloat3;
+	imguiApi.sliderFloat4 = ImGui::SliderFloat4;
+	imguiApi.sliderAngle = ImGui::SliderAngle;
+	imguiApi.sliderInt = ImGui::SliderInt;
+	imguiApi.sliderInt2 = ImGui::SliderInt2;
+	imguiApi.sliderInt3 = ImGui::SliderInt3;
+	imguiApi.sliderInt4 = ImGui::SliderInt4;
+	imguiApi.vSliderFloat = ImGui::VSliderFloat;
+	imguiApi.vSliderInt = ImGui::VSliderInt;
+	imguiApi.treeNode = static_cast<bool(*)(const char*)>(ImGui::TreeNode);
+	imguiApi.treeNodeFmt = static_cast<bool(*)(const char* str_id, const char* fmt, ...)>(ImGui::TreeNode);
+	imguiApi.treeNodePtrFmt = static_cast<bool(*)(const void* ptr_id, const char* fmt, ...)>(ImGui::TreeNode);
+	imguiApi.treeNodeV = static_cast<bool(*)(const char*, const char*, va_list)>(ImGui::TreeNodeV);
+	imguiApi.treeNodeVPtr = static_cast<bool(*)(const void*, const char*, va_list)>(ImGui::TreeNodeV);
+	imguiApi.treePush = static_cast<void(*)(const char*)>(ImGui::TreePush);
+	imguiApi.treePushPtr = static_cast<void(*)(const void*)>(ImGui::TreePush);
+	imguiApi.treePop = ImGui::TreePop;
+	imguiApi.setNextTreeNodeOpened = ImGui::SetNextTreeNodeOpened;
+	imguiApi.selectable = static_cast<bool(*)(const char*, bool, ImGuiSelectableFlags, const ImVec2&)>(ImGui::Selectable);
+	imguiApi.selectableSel = static_cast<bool(*)(const char*, bool*, ImGuiSelectableFlags, const ImVec2&)>(ImGui::Selectable);
+	imguiApi.listBox = static_cast<bool(*)(const char*, int*, const char**, int, int)>(ImGui::ListBox);
+	imguiApi.listBoxGetter = static_cast<bool(*)(const char*, int*, bool(*)(void*, int, const char**), void*, int, int)>(ImGui::ListBox);
+	imguiApi.listBoxHeader = static_cast<bool(*)(const char*, const ImVec2&)>(ImGui::ListBoxHeader);
+	imguiApi.listBoxHeader2 = static_cast<bool(*)(const char*, int, int)>(ImGui::ListBoxHeader);
+	imguiApi.listBoxFooter = static_cast<void(*)()>(ImGui::ListBoxFooter);
+	imguiApi.valueBool = static_cast<void(*)(const char*, bool)>(ImGui::Value);
+	imguiApi.valueInt = static_cast<void(*)(const char*, int)>(ImGui::Value);
+	imguiApi.valueUint = static_cast<void(*)(const char*, unsigned int)>(ImGui::Value);
+	imguiApi.valueFloat = static_cast<void(*)(const char*, float, const char*)>(ImGui::Value);
+	imguiApi.valueColor = static_cast<void(*)(const char*, const ImVec4&)>(ImGui::ValueColor);
+	imguiApi.valueColorUint = static_cast<void(*)(const char*, unsigned int)>(ImGui::ValueColor);
 
-	api.setTooltip = ImGui::SetTooltip;
-	api.setTooltipV = ImGui::SetTooltipV;
-	api.beginTooltip = ImGui::BeginTooltip;
-	api.endTooltip = ImGui::EndTooltip;
+	imguiApi.setTooltip = ImGui::SetTooltip;
+	imguiApi.setTooltipV = ImGui::SetTooltipV;
+	imguiApi.beginTooltip = ImGui::BeginTooltip;
+	imguiApi.endTooltip = ImGui::EndTooltip;
 
-	api.beginMainMenuBar = ImGui::BeginMainMenuBar;
-	api.endMainMenuBar = ImGui::EndMainMenuBar;
-	api.beginMenuBar = ImGui::BeginMenuBar;
-	api.endMenuBar = ImGui::EndMenuBar;
-	api.beginMenu = ImGui::BeginMenu;
-	api.endMenu = ImGui::EndMenu;
-	api.menuItem = static_cast<bool(*)(const char*, const char*, bool, bool)>(ImGui::MenuItem);
-	api.menuItemSel = static_cast<bool(*)(const char*, const char*, bool*, bool)>(ImGui::MenuItem);
+	imguiApi.beginMainMenuBar = ImGui::BeginMainMenuBar;
+	imguiApi.endMainMenuBar = ImGui::EndMainMenuBar;
+	imguiApi.beginMenuBar = ImGui::BeginMenuBar;
+	imguiApi.endMenuBar = ImGui::EndMenuBar;
+	imguiApi.beginMenu = ImGui::BeginMenu;
+	imguiApi.endMenu = ImGui::EndMenu;
+	imguiApi.menuItem = static_cast<bool(*)(const char*, const char*, bool, bool)>(ImGui::MenuItem);
+	imguiApi.menuItemSel = static_cast<bool(*)(const char*, const char*, bool*, bool)>(ImGui::MenuItem);
 
-	api.openPopup = ImGui::OpenPopup;
-	api.beginPopup = ImGui::BeginPopup;
-	api.beginPopupModal = ImGui::BeginPopupModal;
-	api.beginPopupContextItem = ImGui::BeginPopupContextItem;
-	api.beginPopupContextWindow = ImGui::BeginPopupContextWindow;
-	api.beginPopupContextVoid = ImGui::BeginPopupContextVoid;
-	api.endPopup = ImGui::EndPopup;
-	api.closeCurrentPopup = ImGui::CloseCurrentPopup;
-	api.beginChildFrame = ImGui::BeginChildFrame;
-	api.endChildFrame = ImGui::EndChildFrame;
+	imguiApi.openPopup = ImGui::OpenPopup;
+	imguiApi.beginPopup = ImGui::BeginPopup;
+	imguiApi.beginPopupModal = ImGui::BeginPopupModal;
+	imguiApi.beginPopupContextItem = ImGui::BeginPopupContextItem;
+	imguiApi.beginPopupContextWindow = ImGui::BeginPopupContextWindow;
+	imguiApi.beginPopupContextVoid = ImGui::BeginPopupContextVoid;
+	imguiApi.endPopup = ImGui::EndPopup;
+	imguiApi.closeCurrentPopup = ImGui::CloseCurrentPopup;
+	imguiApi.beginChildFrame = ImGui::BeginChildFrame;
+	imguiApi.endChildFrame = ImGui::EndChildFrame;
 
-	api.isMouseHoveringAnyWindow = ImGui::IsMouseHoveringAnyWindow;
-	api.isMouseHoveringWindow = ImGui::IsMouseHoveringWindow;
-    api.isItemHovered = ImGui::IsItemHovered;
-    api.isWindowFocused = ImGui::IsWindowFocused;
-    api.isRootWindowOrAnyChildFocused = ImGui::IsRootWindowOrAnyChildFocused;
-    api.isRootWindowFocused = ImGui::IsRootWindowFocused;
-    api.isMouseClicked = ImGui::IsMouseClicked;
-    api.isMouseDoubleClicked = ImGui::IsMouseDoubleClicked;
-    api.isAnyItemActive = ImGui::IsAnyItemActive;
-    api.isAnyItemHovered = ImGui::IsAnyItemHovered;
+	imguiApi.isMouseHoveringAnyWindow = ImGui::IsMouseHoveringAnyWindow;
+	imguiApi.isMouseHoveringWindow = ImGui::IsMouseHoveringWindow;
+    imguiApi.isItemHovered = ImGui::IsItemHovered;
+    imguiApi.isWindowFocused = ImGui::IsWindowFocused;
+    imguiApi.isRootWindowOrAnyChildFocused = ImGui::IsRootWindowOrAnyChildFocused;
+    imguiApi.isRootWindowFocused = ImGui::IsRootWindowFocused;
+    imguiApi.isMouseClicked = ImGui::IsMouseClicked;
+    imguiApi.isMouseDoubleClicked = ImGui::IsMouseDoubleClicked;
+    imguiApi.isAnyItemActive = ImGui::IsAnyItemActive;
+    imguiApi.isAnyItemHovered = ImGui::IsAnyItemHovered;
 
-    api.isOverGuizmo = ImGuizmo::IsOver;
-    api.isUsingGuizmo = ImGuizmo::IsUsing;
-    api.enableGuizmo = ImGuizmo::Enable;
-    api.decomposeMatrixToComponents = ImGuizmo::DecomposeMatrixToComponents;
-    api.recomposeMatrixFromComponents = ImGuizmo::RecomposeMatrixFromComponents;
-    api.manipulateGuizmo = ImGuizmo::Manipulate;
-    api.drawCubeGuizmo = ImGuizmo::DrawCube;
+    imguiApi.isOverGuizmo = ImGuizmo::IsOver;
+    imguiApi.isUsingGuizmo = ImGuizmo::IsUsing;
+    imguiApi.enableGuizmo = ImGuizmo::Enable;
+    imguiApi.decomposeMatrixToComponents = ImGuizmo::DecomposeMatrixToComponents;
+    imguiApi.recomposeMatrixFromComponents = ImGuizmo::RecomposeMatrixFromComponents;
+    imguiApi.manipulateGuizmo = ImGuizmo::Manipulate;
+    imguiApi.drawCubeGuizmo = ImGuizmo::DrawCube;
 
-    api.bezierEditor = imguiBezierEditor;
-    api.fishLayout = imguiFishLayout;
-    api.gaunt = imguiGaunt;
+    imguiApi.bezierEditor = imgui::bezierEditor;
+    imguiApi.fishLayout = imgui::gridSelect;
+    imguiApi.gaunt = imgui::gaunt;
 
-	return &api;
+	return &imguiApi;
 }
 
-static void* getComponentApi(uint32_t version)
+static void* getAssetApi(uint32_t version) {
+    static AssetApi assetApi;
+    bx::memSet(&assetApi, 0x00, sizeof(assetApi));
+
+    assetApi.registerType = asset::registerType;
+    assetApi.load = asset::load;
+    assetApi.loadMem = asset::loadMem;
+    assetApi.unload = asset::unload;
+
+    return &assetApi;
+}
+
+static void* getEcsApi(uint32_t version)
 {
-	static ComponentApi_v0 api;
-	bx::memSet(&api, 0x00, sizeof(api));
+	static EcsApi ecsApi;
+	bx::memSet(&ecsApi, 0x00, sizeof(ecsApi));
 
 	switch (version) {
 	case 0:
-		api.createEntityManager = createEntityManager;
-		api.destroyEntityManager = destroyEntityManager;
-		api.createEntity = createEntity;
-		api.destroyEntity = destroyEntity;
-		api.isEntityAlive = isEntityAlive;
-		api.registerComponentType = registerComponentType;
-		api.createComponent = createComponent;
-		api.findComponentTypeByNameHash = findComponentTypeByNameHash;
-		api.getComponent = getComponent;
-		api.getComponentData = getComponentData;
-        api.createComponentGroup = createComponentGroup;
-        api.destroyComponentGroup = destroyComponentGroup;
-        api.runComponentGroup = runComponentGroup;
-		return &api;
+		ecsApi.createEntityManager = ecs::createEntityManager;
+		ecsApi.destroyEntityManager = ecs::destroyEntityManager;
+		ecsApi.create = ecs::create;
+		ecsApi.destroy = ecs::destroy;
+		ecsApi.isAlive = ecs::isAlive;
+		ecsApi.registerComponent = ecs::registerComponent;
+		ecsApi.createComponent = ecs::createComponent;
+		ecsApi.findTypeByHash = ecs::findType;
+		ecsApi.get = ecs::get;
+		ecsApi.getData = ecs::getData;
+        ecsApi.createGroup = ecs::createGroup;
+        ecsApi.destroyGroup = ecs::destroyGroup;
+        ecsApi.updateGroup = ecs::updateGroup;
+		return &ecsApi;
 	default:
 		return nullptr;
 	}
@@ -288,30 +301,30 @@ static void* getComponentApi(uint32_t version)
 
 static void* getCameraApi(uint32_t version)
 {
-    static CameraApi_v0 api;
-    bx::memSet(&api, 0x00, sizeof(api));
+    static MathApi mathApi;
+    bx::memSet(&mathApi, 0x00, sizeof(mathApi));
 
     switch (version) {
     case 0:
-        api.camInit = camInit;
-        api.camLookAt = camLookAt;
-        api.camCalcFrustumCorners = camCalcFrustumCorners;
-        api.camCalcFrustumPlanes = camCalcFrustumPlanes;
-        api.camPitch = camPitch;
-        api.camYaw = camYaw;
-        api.camPitchYaw = camPitchYaw;
-        api.camRoll = camRoll;
-        api.camForward = camForward;
-        api.camStrafe = camStrafe;
-        api.camViewMtx = camViewMtx;
-        api.camProjMtx = camProjMtx;
-        api.cam2dInit = cam2dInit;
-        api.cam2dPan = cam2dPan;
-        api.cam2dZoom = cam2dZoom;
-        api.cam2dViewMtx = cam2dViewMtx;
-        api.cam2dProjMtx = cam2dProjMtx;
-        api.cam2dGetRect = cam2dGetRect;
-        return &api;
+        mathApi.camInit = camInit;
+        mathApi.camLookAt = camLookAt;
+        mathApi.camCalcFrustumCorners = camCalcFrustumCorners;
+        mathApi.camCalcFrustumPlanes = camCalcFrustumPlanes;
+        mathApi.camPitch = camPitch;
+        mathApi.camYaw = camYaw;
+        mathApi.camPitchYaw = camPitchYaw;
+        mathApi.camRoll = camRoll;
+        mathApi.camForward = camForward;
+        mathApi.camStrafe = camStrafe;
+        mathApi.camViewMtx = camViewMtx;
+        mathApi.camProjMtx = camProjMtx;
+        mathApi.cam2dInit = cam2dInit;
+        mathApi.cam2dPan = cam2dPan;
+        mathApi.cam2dZoom = cam2dZoom;
+        mathApi.cam2dViewMtx = cam2dViewMtx;
+        mathApi.cam2dProjMtx = cam2dProjMtx;
+        mathApi.cam2dGetRect = cam2dGetRect;
+        return &mathApi;
     default:
         return nullptr;
     }
@@ -319,61 +332,60 @@ static void* getCameraApi(uint32_t version)
 
 static void* getCoreApi(uint32_t version)
 {
-    static CoreApi_v0 core0;
-    bx::memSet(&core0, 0x00, sizeof(core0));
+    static CoreApi coreApi;
+    bx::memSet(&coreApi, 0x00, sizeof(coreApi));
 
-    core0.copyMemoryBlock = copyMemoryBlock;
-    core0.createMemoryBlock = createMemoryBlock;
-    core0.readTextFile = readTextFile;
-    core0.refMemoryBlock = refMemoryBlock;
-    core0.refMemoryBlockPtr = refMemoryBlockPtr;
-    core0.releaseMemoryBlock = releaseMemoryBlock;
-    core0.getElapsedTime = getElapsedTime;
-    core0.reportError = reportError;
-    core0.reportErrorf = reportErrorf;
-    core0.logBeginProgress = bx::logBeginProgress;
-    core0.logEndProgress = bx::logEndProgress;
-    core0.logPrint = bx::logPrint;
-    core0.logPrintf = bx::logPrintf;
-    core0.getConfig = getConfig;
-    core0.getEngineVersion = getEngineVersion;
-    core0.getTempAlloc = getTempAlloc;
-    core0.getGfxDriver = getGfxDriver;
-    core0.getAsyncIoDriver = getAsyncIoDriver;
-    core0.getBlockingIoDriver = getBlockingIoDriver;
-    core0.getPhys2dDriver = getPhys2dDriver;
-    core0.registerResourceType = registerResourceType;
+    coreApi.copyMemoryBlock = copyMemoryBlock;
+    coreApi.createMemoryBlock = createMemoryBlock;
+    coreApi.readTextFile = readTextFile;
+    coreApi.refMemoryBlock = refMemoryBlock;
+    coreApi.refMemoryBlockPtr = refMemoryBlockPtr;
+    coreApi.releaseMemoryBlock = releaseMemoryBlock;
+    coreApi.getElapsedTime = getElapsedTime;
+    coreApi.reportError = err::report;
+    coreApi.reportErrorf = err::reportf;
+    coreApi.logBeginProgress = bx::logBeginProgress;
+    coreApi.logEndProgress = bx::logEndProgress;
+    coreApi.logPrint = bx::logPrint;
+    coreApi.logPrintf = bx::logPrintf;
+    coreApi.getConfig = getConfig;
+    coreApi.getEngineVersion = getEngineVersion;
+    coreApi.getTempAlloc = getTempAlloc;
+    coreApi.getGfxDriver = getGfxDriver;
+    coreApi.getAsyncIoDriver = getAsyncIoDriver;
+    coreApi.getBlockingIoDriver = getBlockingIoDriver;
+    coreApi.getPhys2dDriver = getPhys2dDriver;
 #if RMT_ENABLED
-    core0.beginCPUSample = _rmt_BeginCPUSample;
-    core0.endCPUSample = _rmt_EndCPUSample;
+    coreApi.beginCPUSample = _rmt_BeginCPUSample;
+    coreApi.endCPUSample = _rmt_EndCPUSample;
 #endif
-    core0.dispatchBigJobs = dispatchBigJobs;
-    core0.dispatchSmallJobs = dispatchSmallJobs;
-    core0.waitAndDeleteJob = waitAndDeleteJob;
-    core0.isJobDone = isJobDone;
-    core0.deleteJob = deleteJob;
+    coreApi.dispatchBigJobs = dispatchBigJobs;
+    coreApi.dispatchSmallJobs = dispatchSmallJobs;
+    coreApi.waitAndDeleteJob = waitAndDeleteJob;
+    coreApi.isJobDone = isJobDone;
+    coreApi.deleteJob = deleteJob;
 
-    return &core0;
+    return &coreApi;
 }
 
 static void* getGfxApi(uint32_t version)
 {
-    static GfxApi_v0 gfx0;
-    gfx0.calcGaussKernel = calcGaussKernel;
-    gfx0.drawFullscreenQuad = drawFullscreenQuad;
-    gfx0.loadShaderProgram = loadShaderProgram;
-    gfx0.vdeclAdd = vdeclAdd;
-    gfx0.vdeclBegin = vdeclBegin;
-    gfx0.vdeclEnd = vdeclEnd;
-    gfx0.vdeclDecode = vdeclDecode;
-    gfx0.vdeclGetSize = vdeclGetSize;
-    gfx0.vdeclHas = vdeclHas;
-    gfx0.vdeclSkip = vdeclSkip;
+    static GfxApi gfxApi;
+    gfxApi.calcGaussKernel = gfx::calcGaussKernel;
+    gfxApi.drawFullscreenQuad = gfx::drawFullscreenQuad;
+    gfxApi.loadShaderProgram = gfx::loadProgram;
+    gfxApi.addAttrib = gfx::addAttrib;
+    gfxApi.beginDecl = gfx::beginDecl;
+    gfxApi.endDecl = gfx::endDecl;
+    gfxApi.decodeAttrib = gfx::decodeAttrib;
+    gfxApi.getDeclSize = gfx::getDeclSize;
+    gfxApi.hasAttrib = gfx::hasAttrib;
+    gfxApi.skipAttrib = gfx::skipAttrib;
 
-    return &gfx0;
+    return &gfxApi;
 }
 
-void* termite::getEngineApi(uint16_t apiId, uint32_t version)
+void* tee::getEngineApi(uint16_t apiId, uint32_t version)
 {
     switch (apiId) {
     case ApiId::Core:
@@ -389,7 +401,10 @@ void* termite::getEngineApi(uint16_t apiId, uint32_t version)
         return getCameraApi(version);
 
     case ApiId::Component:
-        return getComponentApi(version);
+        return getEcsApi(version);
+
+    case ApiId::Asset:
+        return getAssetApi(version);
 
     default:
         assert(0);

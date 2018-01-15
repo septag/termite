@@ -10,6 +10,11 @@ endif()
 source_group(source FILES ${SOURCE_FILES})
 source_group(include FILES ${INCLUDE_FILES})
 
+#inline sources
+file(GLOB INLINE_SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "inline/*.inline")
+source_group(source\\inline FILES ${INLINE_SOURCE_FILES})
+
+
 ## Shaders
 set(SHADER_SOURCES "shaders/ddraw.vsc"          "shaders/ddraw.fsc" 
                    "shaders/vg.vsc"             "shaders/vg.fsc"
@@ -63,6 +68,7 @@ source_group(shaders\\compiled FILES ${BLUR_SHADER_FILES})
 add_library(termite ${BUILD_LIBRARY_TYPE} 
             ${SOURCE_FILES} 
             ${INCLUDE_FILES} 
+            ${INLINE_SOURCE_FILES} 
             ${SHADER_SOURCES} 
             ${SPRITE_SHADER_SOURCES}
             ${FADE_SHADER_SOURCES} 

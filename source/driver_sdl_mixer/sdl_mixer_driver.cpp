@@ -1,32 +1,32 @@
-#include "termite/core.h"
+#include "termite/tee.h"
 #include "termite/sound_driver.h"
-#define T_CORE_API
+#define TEE_CORE_API
+#define TEE_ASSET_API
 #include "termite/plugin_api.h"
-#include "termite/resource_lib.h"
 
 #include "SDL_mixer.h"
 #include "beep_ogg.h"
 
-using namespace termite;
+using namespace tee;
 
-class SoundLoader : public ResourceCallbacksI
+class SoundLoader : public AssetLibCallbacksI
 {
 public:
     SoundLoader() {}
 
-    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc) override;
+    bool loadObj(const MemoryBlock* mem, const AssetParams& params, uintptr_t* obj, bx::AllocatorI* alloc) override;
     void unloadObj(uintptr_t obj, bx::AllocatorI* alloc) override;
-    void onReload(ResourceHandle handle, bx::AllocatorI* alloc) override;
+    void onReload(AssetHandle handle, bx::AllocatorI* alloc) override;
 };
 
-class MusicLoader : public ResourceCallbacksI
+class MusicLoader : public AssetLibCallbacksI
 {
 public:
     MusicLoader() {}
 
-    bool loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc) override;
+    bool loadObj(const MemoryBlock* mem, const AssetParams& params, uintptr_t* obj, bx::AllocatorI* alloc) override;
     void unloadObj(uintptr_t obj, bx::AllocatorI* alloc) override;
-    void onReload(ResourceHandle handle, bx::AllocatorI* alloc) override;
+    void onReload(AssetHandle handle, bx::AllocatorI* alloc) override;
 };
 
 struct MusicData
@@ -46,7 +46,8 @@ struct MusicData
 struct MixerWrapper
 {
     bx::AllocatorI* alloc;
-    CoreApi_v0* core;
+    CoreApi* core;
+    AssetApi* asset;
 
     SoundLoader loader;
     MusicLoader musLoader;
@@ -75,61 +76,61 @@ struct MixerWrapper
     }
 };
 
-static MixerWrapper g_mixer;
+static MixerWrapper gSdlMixer;
 
 static void mixerSoundFinishedCallback(int channelId)
 {
-    assert(g_mixer.soundFinishedFn);
-    g_mixer.soundFinishedFn(channelId, g_mixer.soundFinishedUserData);
+    assert(gSdlMixer.soundFinishedFn);
+    gSdlMixer.soundFinishedFn(channelId, gSdlMixer.soundFinishedUserData);
 }
 
 static void mixerMusicFinishedCallback()
 {
-    assert(g_mixer.musicFinishedFn);
-    g_mixer.musicFinishedFn(g_mixer.musicFinishedUserData);
+    assert(gSdlMixer.musicFinishedFn);
+    gSdlMixer.musicFinishedFn(gSdlMixer.musicFinishedUserData);
 }
 
-static result_t mixerInit(AudioFreq::Enum freq/* = AudioFreq::Freq22Khz*/,
+static bool mixerInit(AudioFreq::Enum freq/* = AudioFreq::Freq22Khz*/,
                           AudioChannels::Enum channels/* = AudioChannels::Mono*/,
                           int bufferSize/* = 4096*/)
 {
-    assert(g_mixer.core);
-    assert(g_mixer.alloc);
+    assert(gSdlMixer.core);
+    assert(gSdlMixer.alloc);
 
     if (Mix_OpenAudio(int(freq), MIX_DEFAULT_FORMAT, int(channels), bufferSize)) {
-        T_ERROR_API(g_mixer.core, "Initializing SDL_AudioMixer failed: %s", Mix_GetError());
-        return T_ERR_FAILED;
+        TEE_ERROR_API(gSdlMixer.core, "Initializing SDL_AudioMixer failed: %s", Mix_GetError());
+        return false;
     }
     
     Mix_Init(MIX_INIT_OGG);
     Mix_GetError();
 
     // Create Beep sound for failed loads
-    g_mixer.failChunk = Mix_LoadWAV_RW(SDL_RWFromConstMem(kBeepOGG, sizeof(kBeepOGG)), 1);
+    gSdlMixer.failChunk = Mix_LoadWAV_RW(SDL_RWFromConstMem(kBeepOGG, sizeof(kBeepOGG)), 1);
 
     // Register sound loader to resource_lib
-    g_mixer.core->registerResourceType("sound", &g_mixer.loader, 0, uintptr_t(g_mixer.failChunk), 0);
-    g_mixer.core->registerResourceType("music", &g_mixer.musLoader, 0, 0, 0);
+    gSdlMixer.asset->registerType("sound", &gSdlMixer.loader, 0, uintptr_t(gSdlMixer.failChunk), 0);
+    gSdlMixer.asset->registerType("music", &gSdlMixer.musLoader, 0, 0, 0);
 
-    return 0;
+    return true;
 }
 
 static void mixerShutdown()
 {
-    assert(g_mixer.core);
-    assert(g_mixer.alloc);
+    assert(gSdlMixer.core);
+    assert(gSdlMixer.alloc);
 
-    if (g_mixer.failChunk)
-        Mix_FreeChunk(g_mixer.failChunk);
+    if (gSdlMixer.failChunk)
+        Mix_FreeChunk(gSdlMixer.failChunk);
 
     Mix_Quit();
     Mix_CloseAudio();
 }
 
-static uint8_t mixerSetChunkVolume(SoundChunkHandle handle, uint8_t vol)
+static uint8_t mixerSetChunkVolume(SoundChunk* handle, uint8_t vol)
 {
     static const uint8_t N = UINT8_MAX/MIX_MAX_VOLUME;
-    return handle.isValid() ? Mix_VolumeChunk((Mix_Chunk*)handle.value, vol/N)*N : 0;
+    return handle ? Mix_VolumeChunk((Mix_Chunk*)handle, vol/N)*N : 0;
 }
 
 static int mixerSetChannels(int numChannels)
@@ -215,8 +216,8 @@ void mixerFadeout(int channelId, int timeMilli)
 
 void mixerSetFinishedCallback(SoundFinishedCallback callback, void* userData)
 {
-    g_mixer.soundFinishedFn = callback;
-    g_mixer.soundFinishedUserData = userData;
+    gSdlMixer.soundFinishedFn = callback;
+    gSdlMixer.soundFinishedUserData = userData;
     Mix_ChannelFinished(callback ? mixerSoundFinishedCallback : nullptr);
 }
 
@@ -232,12 +233,12 @@ bool mixerIsPaused(int channelId)
 
 void mixerSetGlobalSoundEnabled(bool enabled)
 {
-    g_mixer.soundEnabled = enabled;
+    gSdlMixer.soundEnabled = enabled;
 }
 
 void mixerSetGlobalMusicEnabled(bool enabled)
 {
-    g_mixer.musicEnabled = enabled;
+    gSdlMixer.musicEnabled = enabled;
 }
 
 SoundFadeStatus::Enum mixerGetFadingStatus(int channelId)
@@ -255,64 +256,64 @@ SoundFadeStatus::Enum mixerGetFadingStatus(int channelId)
     }
 }
 
-SoundChunkHandle mixerGetChannelChunk(int channelId)
+SoundChunk* mixerGetChannelChunk(int channelId)
 {
     Mix_Chunk* chunk = Mix_GetChunk(channelId);
-    return SoundChunkHandle(chunk);
+    return (SoundChunk*)chunk;
 }
 
-int mixerPlay(int channelId, SoundChunkHandle handle, int numLoops/* = 0*/)
+int mixerPlay(int channelId, SoundChunk* handle, int numLoops/* = 0*/)
 {
-    if (handle.isValid() && g_mixer.soundEnabled)
-        return Mix_PlayChannel(channelId, (Mix_Chunk*)handle.value, numLoops);
+    if (handle && gSdlMixer.soundEnabled)
+        return Mix_PlayChannel(channelId, (Mix_Chunk*)handle, numLoops);
     else
         return 0;
 }
 
-int mixerPlayTimed(int channelId, SoundChunkHandle handle, int numLoops/* = 0*/, int maxTimeMilli/* = -1*/)
+int mixerPlayTimed(int channelId, SoundChunk* handle, int numLoops/* = 0*/, int maxTimeMilli/* = -1*/)
 {
-    if (handle.isValid() && g_mixer.soundEnabled)
-        return Mix_PlayChannelTimed(channelId, (Mix_Chunk*)handle.value, numLoops, maxTimeMilli);
+    if (handle && gSdlMixer.soundEnabled)
+        return Mix_PlayChannelTimed(channelId, (Mix_Chunk*)handle, numLoops, maxTimeMilli);
     else
         return 0;
 }
 
-int mixerPlayFadeIn(int channelId, SoundChunkHandle handle, int numLoops, int timeMilli)
+int mixerPlayFadeIn(int channelId, SoundChunk* handle, int numLoops, int timeMilli)
 {
-    if (handle.isValid() && g_mixer.soundEnabled)
-        return Mix_FadeInChannel(channelId, (Mix_Chunk*)handle.value, numLoops, timeMilli);
+    if (handle && gSdlMixer.soundEnabled)
+        return Mix_FadeInChannel(channelId, (Mix_Chunk*)handle, numLoops, timeMilli);
     else
         return 0;
 }
 
-int mixerPlayFadeInTimed(int channelId, SoundChunkHandle handle, int numLoops/* = 0*/, int timeMilli, int maxTimeMilli/* = -1*/)
+int mixerPlayFadeInTimed(int channelId, SoundChunk* handle, int numLoops/* = 0*/, int timeMilli, int maxTimeMilli/* = -1*/)
 {
-    if (handle.isValid() && g_mixer.soundEnabled)
-        return Mix_FadeInChannelTimed(channelId, (Mix_Chunk*)handle.value, numLoops, timeMilli, maxTimeMilli);
+    if (handle && gSdlMixer.soundEnabled)
+        return Mix_FadeInChannelTimed(channelId, (Mix_Chunk*)handle, numLoops, timeMilli, maxTimeMilli);
     else
         return 0;
 }
 
-bool mixerPlayMusic(MusicHandle handle, int numLoops/* = -1*/)
+bool mixerPlayMusic(Music* handle, int numLoops/* = -1*/)
 {
-    if (handle.isValid() && g_mixer.musicEnabled)
-        return Mix_PlayMusic(((MusicData*)handle.value)->mus, numLoops) == 0 ? true : false;
+    if (handle && gSdlMixer.musicEnabled)
+        return Mix_PlayMusic(((MusicData*)handle)->mus, numLoops) == 0 ? true : false;
     else
         return false;
 }
 
-bool mixerPlayMusicFadeIn(MusicHandle handle, int numLoops/* = -1*/, int timeMilli)
+bool mixerPlayMusicFadeIn(Music* handle, int numLoops/* = -1*/, int timeMilli)
 {
-    if (handle.isValid() && g_mixer.musicEnabled)
-        return Mix_FadeInMusic(((MusicData*)handle.value)->mus, numLoops, timeMilli) == 0 ? true : false;
+    if (handle && gSdlMixer.musicEnabled)
+        return Mix_FadeInMusic(((MusicData*)handle)->mus, numLoops, timeMilli) == 0 ? true : false;
     else
         return false;
 }
 
-bool mixerPlayMusicFadeInPos(MusicHandle handle, int numLoops/* = -1*/, int timeMilli, double posTime)
+bool mixerPlayMusicFadeInPos(Music* handle, int numLoops/* = -1*/, int timeMilli, double posTime)
 {
-    if (handle.isValid() && g_mixer.musicEnabled)
-        return Mix_FadeInMusicPos(((MusicData*)handle.value)->mus, numLoops, timeMilli, posTime) == 0 ? true : false;
+    if (handle && gSdlMixer.musicEnabled)
+        return Mix_FadeInMusicPos(((MusicData*)handle)->mus, numLoops, timeMilli, posTime) == 0 ? true : false;
     else
         return false;
 }
@@ -349,8 +350,8 @@ void mixerFadeoutMusic(int timeMilli)
 
 void mixerSetMusicFinishedCallback(MusicFinishedCallback callback, void* userData)
 {
-    g_mixer.musicFinishedFn = callback;
-    g_mixer.musicFinishedUserData = userData;
+    gSdlMixer.musicFinishedFn = callback;
+    gSdlMixer.musicFinishedUserData = userData;
     Mix_HookMusicFinished(callback ? mixerMusicFinishedCallback : nullptr);
 }
 
@@ -369,7 +370,7 @@ SoundFadeStatus::Enum mixerGetMusicStatus()
     return SoundFadeStatus::NoFading;
 }
 
-bool SoundLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
+bool SoundLoader::loadObj(const MemoryBlock* mem, const AssetParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
 {
     SDL_RWops* rw = SDL_RWFromConstMem(mem->data, (int)mem->size);
     Mix_Chunk* chunk = Mix_LoadWAV_RW(rw, 1);
@@ -388,21 +389,21 @@ void SoundLoader::unloadObj(uintptr_t obj, bx::AllocatorI* alloc)
     }
 }
 
-void SoundLoader::onReload(ResourceHandle handle, bx::AllocatorI* alloc)
+void SoundLoader::onReload(AssetHandle handle, bx::AllocatorI* alloc)
 {
 }
 
 
-bool MusicLoader::loadObj(const MemoryBlock* mem, const ResourceTypeParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
+bool MusicLoader::loadObj(const MemoryBlock* mem, const AssetParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
 {
     MusicData* mdata;
     if (alloc)
         mdata = BX_NEW(alloc, MusicData);
     else
-        mdata = BX_NEW(g_mixer.alloc, MusicData);
+        mdata = BX_NEW(gSdlMixer.alloc, MusicData);
 
     // Copy memory to data
-    mdata->buff = BX_ALLOC(alloc ? alloc : g_mixer.alloc, mem->size);
+    mdata->buff = BX_ALLOC(alloc ? alloc : gSdlMixer.alloc, mem->size);
     if (!mdata->buff)
         return false;
     memcpy(mdata->buff, mem->data, mem->size);
@@ -426,12 +427,12 @@ void MusicLoader::unloadObj(uintptr_t obj, bx::AllocatorI* alloc)
     }
 
     if (mdata->buff) {
-        BX_FREE(alloc ? alloc : g_mixer.alloc, mdata->buff);
+        BX_FREE(alloc ? alloc : gSdlMixer.alloc, mdata->buff);
     }
-    BX_DELETE(alloc ? alloc : g_mixer.alloc, mdata);
+    BX_DELETE(alloc ? alloc : gSdlMixer.alloc, mdata);
 }
 
-void MusicLoader::onReload(ResourceHandle handle, bx::AllocatorI* alloc)
+void MusicLoader::onReload(AssetHandle handle, bx::AllocatorI* alloc)
 {
 
 }
@@ -442,19 +443,20 @@ PluginDesc* getSdlMixerDriverDesc()
     static PluginDesc desc;
     strcpy(desc.name, "SDL_mixer");
     strcpy(desc.description, "SDL_mixer Driver");
-    desc.type = PluginType::SoundDriver;
-    desc.version = T_MAKE_VERSION(1, 0);
+    desc.type = PluginType::SimpleSoundDriver;
+    desc.version = TEE_MAKE_VERSION(1, 0);
     return &desc;
 }
 
 void* initSdlMixerDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 {
-    g_mixer.core = (CoreApi_v0*)getApi(uint16_t(ApiId::Core), 0);
-    if (!g_mixer.core)
+    gSdlMixer.core = (CoreApi*)getApi(uint16_t(ApiId::Core), 0);
+    gSdlMixer.asset = (AssetApi*)getApi(uint16_t(ApiId::Asset), 0);
+    if (!gSdlMixer.core || !gSdlMixer.asset)
         return nullptr;
-    g_mixer.alloc = alloc;
+    gSdlMixer.alloc = alloc;
     
-    static SoundDriverApi soundApi;
+    static SimpleSoundDriver soundApi;
     bx::memSet(&soundApi, 0x00, sizeof(soundApi));
 
     soundApi.init = mixerInit;
@@ -509,9 +511,9 @@ void shutdownSdlMixerDriver()
 }
 
 #ifdef termite_SHARED_LIB
-T_PLUGIN_EXPORT void* termiteGetPluginApi(uint16_t apiId, uint32_t version)
+TEE_PLUGIN_EXPORT void* termiteGetPluginApi(uint16_t apiId, uint32_t version)
 {
-    static PluginApi_v0 v0;
+    static PluginApi v0;
 
     if (version == 0) {
         v0.init = initSdlMixerDriver;

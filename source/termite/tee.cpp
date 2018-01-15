@@ -11,26 +11,27 @@
 #include "bxx/array.h"
 #include "bxx/string.h"
 
-#include "gfx_defines.h"
+#include "gfx_driver.h"
 #include "gfx_font.h"
 #include "gfx_utils.h"
 #include "gfx_texture.h"
-#include "gfx_vg.h"
+#include "gfx_debugdraw2d.h"
 #include "gfx_debugdraw.h"
 #include "gfx_model.h"
 #include "gfx_render.h"
 #include "gfx_sprite.h"
-#include "resource_lib.h"
+#include "assetlib.h"
 #include "io_driver.h"
 #include "job_dispatcher.h"
 #include "memory_pool.h"
 #include "plugin_system.h"
-#include "component_system.h"
+#include "ecs.h"
 #include "event_dispatcher.h"
 #include "physics_2d.h"
 #include "command_system.h"
 #include "sound_driver.h"
 #include "lang.h"
+#include "internal.h"
 
 #ifdef termite_SDL2
 #  include <SDL.h>
@@ -70,11 +71,11 @@
 #define RANDOM_NUMBER_POOL 10000
 
 #define T_ENC_SIGN 0x54454e43        // "TENC"
-#define T_ENC_VERSION T_MAKE_VERSION(1, 0)       
+#define T_ENC_VERSION TEE_MAKE_VERSION(1, 0)       
 
 #include "bxx/rapidjson_allocator.h"
 
-using namespace termite;
+using namespace tee;
 
 typedef std::chrono::high_resolution_clock TClock;
 typedef std::chrono::high_resolution_clock::time_point TClockTimePt;
@@ -98,7 +99,7 @@ struct FrameData
 
 struct HeapMemoryImpl
 {
-    termite::MemoryBlock m;
+    tee::MemoryBlock m;
     volatile int32_t refcount;
     bx::AllocatorI* alloc;
 
@@ -175,7 +176,7 @@ struct ConsoleCommand
     ConsoleCommand() : cmdHash(0) {}
 };
 
-struct Core
+struct Tee
 {
     HardwareStats hwStats;
     UpdateCallback updateFn;
@@ -185,10 +186,10 @@ struct Core
     double timeMultiplier;
     bx::Pool<HeapMemoryImpl> memPool;
     bx::Lock memPoolLock;
-    GfxDriverApi* gfxDriver;
+    GfxDriver* gfxDriver;
     IoDriverDual* ioDriver;
-    PhysDriver2DApi* phys2dDriver;
-    SoundDriverApi* sndDriver;
+    PhysDriver2D* phys2dDriver;
+    SimpleSoundDriver* sndDriver;
     PageAllocator tempAlloc;
     GfxDriverEvents gfxDriverEvents;
     LogCache* gfxLogCache;
@@ -207,8 +208,8 @@ struct Core
     bool init;
     bool gfxReset;
 
-    Core() :
-        tempAlloc(T_MID_TEMP),
+    Tee() :
+        tempAlloc(TEE_MEMID_TEMP),
         randEngine(randDevice())
     {
         memset(&hwStats, 0x00, sizeof(hwStats));
@@ -232,20 +233,18 @@ struct Core
 };
 
 #ifdef _DEBUG
-static bx::LeakCheckAllocator g_allocStub;
+static bx::LeakCheckAllocator gAllocStub;
 #else
-static bx::DefaultAllocator g_allocStub;
+static bx::DefaultAllocator gAllocStub;
 #endif
-static bx::AllocatorI* g_alloc = &g_allocStub;
+static bx::AllocatorI* gAlloc = &gAllocStub;
 
-static bx::Path g_dataDir;
-static bx::Path g_cacheDir;
-static Core* g_core = nullptr;
+static bx::Path gDataDir;
+static bx::Path gCacheDir;
+static Tee* gTee = nullptr;
 
 // Define rapidjson static allocator 
-bx::AllocatorI* rapidjson::BxAllocatorStatic::Alloc = g_alloc;
-
-static void* mi_ptr_check = nullptr;
+bx::AllocatorI* rapidjson::BxAllocatorStatic::Alloc = gAlloc;
 
 #if BX_PLATFORM_ANDROID
 static JavaVM* g_javaVM = nullptr;
@@ -263,22 +262,22 @@ extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteInitEngi
     g_activityObj = env->NewGlobalRef(obj);
     
     const char* str = env->GetStringUTFChars(dataDir, nullptr);
-    bx::strCopy(g_dataDir.getBuffer(), sizeof(g_dataDir), str);
+    bx::strCopy(gDataDir.getBuffer(), sizeof(gDataDir), str);
     env->ReleaseStringUTFChars(dataDir, str);
 
     str = env->GetStringUTFChars(cacheDir, nullptr);
-    bx::strCopy(g_cacheDir.getBuffer(), sizeof(g_cacheDir), str);
+    bx::strCopy(gCacheDir.getBuffer(), sizeof(gCacheDir), str);
     env->ReleaseStringUTFChars(cacheDir, str);
 }
 
 
 extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteSetGraphicsReset(JNIEnv* env, jclass cls)
 {
-    if (g_core)
-        g_core->gfxReset = true;
+    if (gTee)
+        gTee->gfxReset = true;
 }
 
-JavaMethod termite::androidFindMethod(const char* methodName, const char* methodSig, const char* classPath,
+JavaMethod tee::androidFindMethod(const char* methodName, const char* methodSig, const char* classPath,
                                       JavaMethodType::Enum type)
 {
     assert(g_javaVM);
@@ -325,22 +324,22 @@ JavaMethod termite::androidFindMethod(const char* methodName, const char* method
 
 static void* remoteryMallocCallback(void* mm_context, rmtU32 size)
 {
-    return BX_ALLOC(g_alloc, size);
+    return BX_ALLOC(gAlloc, size);
 }
 
 static void remoteryFreeCallback(void* mm_context, void* ptr)
 {
-    BX_FREE(g_alloc, ptr);
+    BX_FREE(gAlloc, ptr);
 }
 
 static void* remoteryReallocCallback(void* mm_context, void* ptr, rmtU32 size)
 {
-    return BX_REALLOC(g_alloc, ptr, size);
+    return BX_REALLOC(gAlloc, ptr, size);
 }
 
 static void remoteryInputHandlerCallback(const char* text, void* context)
 {
-    assert(g_core);
+    assert(gTee);
 
     const int maxArgs = 16;
     bx::String64 args[maxArgs];
@@ -356,80 +355,79 @@ static void remoteryInputHandlerCallback(const char* text, void* context)
     if (numArgs > 0) {
         // find and execute command
         size_t cmdHash = tinystl::hash_string(args[0].cstr(), args[0].getLength());
-        for (int i = 0; i < g_core->consoleCmds.getCount(); i++) {
-            if (g_core->consoleCmds[i].cmdHash == cmdHash) {
+        for (int i = 0; i < gTee->consoleCmds.getCount(); i++) {
+            if (gTee->consoleCmds[i].cmdHash == cmdHash) {
                 const char* cargs[maxArgs];
                 for (int k = 0; k < numArgs; k++)
                     cargs[k] = args[k].cstr();
 
-                g_core->consoleCmds[i].callback(numArgs, cargs);
+                gTee->consoleCmds[i].callback(numArgs, cargs);
                 break;
             }
         }
     }
 }
 
-result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* platform)
+bool tee::init(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* platform)
 {
-    if (g_core) {
+    if (gTee) {
         assert(false);
-        return T_ERR_ALREADY_INITIALIZED;
+        return false;
     }
 
-    g_core = BX_NEW(g_alloc, Core);
-    if (!g_core)
-        return T_ERR_OUTOFMEM;
+    bx::enableLogToFileHandle(stdout, stderr);
 
-    memcpy(&g_core->conf, &conf, sizeof(g_core->conf));
+    gTee = BX_NEW(gAlloc, Tee);
+    if (!gTee)
+        return false;
+
+    memcpy(&gTee->conf, &conf, sizeof(gTee->conf));
 
     // Hardware stats
-    g_core->hwStats.numCores = std::thread::hardware_concurrency();
-    g_core->hwStats.processMemUsed = bx::getProcessMemoryUsed();
+    gTee->hwStats.numCores = std::thread::hardware_concurrency();
+    gTee->hwStats.processMemUsed = bx::getProcessMemoryUsed();
 
-    g_core->updateFn = updateFn;
+    gTee->updateFn = updateFn;
 
     // Set Data and Cache Dir paths
 #if !BX_PLATFORM_ANDROID
-    g_dataDir = conf.dataUri;
-    g_dataDir.normalizeSelf();
-    g_cacheDir = bx::getTempDir();        
+    gDataDir = conf.dataUri;
+    gDataDir.normalizeSelf();
+    gCacheDir = bx::getTempDir();        
 #endif
 
     // Error handler
-    if (initErrorReport(g_alloc)) {
-        return T_ERR_FAILED;
+    if (!err::init(gAlloc)) {
+        return false;
     }
 
     // Memory pool for MemoryBlock objects
-    if (!g_core->memPool.create(MEM_POOL_BUCKET_SIZE, g_alloc))
-        return T_ERR_OUTOFMEM;
+    if (!gTee->memPool.create(MEM_POOL_BUCKET_SIZE, gAlloc))
+        return false;
 
-    if (initMemoryPool(g_alloc, conf.pageSize*1024, conf.maxPagesPerPool))
-        return T_ERR_OUTOFMEM;
+    if (!initMemoryPool(gAlloc, conf.pageSize*1024, conf.maxPagesPerPool))
+        return false;
 
     // Random pools
-    g_core->randomPoolInt = (int*)BX_ALLOC(g_alloc, sizeof(int)*RANDOM_NUMBER_POOL);
-    g_core->randomPoolFloat = (float*)BX_ALLOC(g_alloc, sizeof(float)*RANDOM_NUMBER_POOL);
-    if (!g_core->randomPoolInt || !g_core->randomPoolFloat)
-        return T_ERR_OUTOFMEM;
+    gTee->randomPoolInt = (int*)BX_ALLOC(gAlloc, sizeof(int)*RANDOM_NUMBER_POOL);
+    gTee->randomPoolFloat = (float*)BX_ALLOC(gAlloc, sizeof(float)*RANDOM_NUMBER_POOL);
+    if (!gTee->randomPoolInt || !gTee->randomPoolFloat)
+        return false;
     restartRandom();    // fill random values
 
     // Initialize plugins system and enumerate plugins
-    if (initPluginSystem(conf.pluginPath.cstr(), g_alloc)) {
-        T_ERROR("Engine init failed: PluginSystem failed");
-        return T_ERR_FAILED;
+    if (!initPluginSystem(conf.pluginPath.cstr(), gAlloc)) {
+        TEE_ERROR("Engine init failed: PluginSystem failed");
+        return false;
     }
 
-    int r;
-    PluginHandle pluginHandle;
-
     // IO
-    r = findPluginByName(!conf.ioName.isEmpty() ? conf.ioName.cstr() : "DiskIO_Lite" , 0, &pluginHandle, 1, PluginType::IoDriver);
-    if (r > 0) {
-        g_core->ioDriver = (IoDriverDual*)initPlugin(pluginHandle, g_alloc);
-        if (!g_core->ioDriver) {
-            T_ERROR("Engine init failed: Could not find IO driver");
-            return T_ERR_FAILED;
+    PluginHandle ioPlugin = findPlugin(!conf.ioName.isEmpty() ? conf.ioName.cstr() : "DiskIO_Lite", PluginType::IoDriver);
+    if (ioPlugin.isValid()) {
+        gTee->ioDriver = (IoDriverDual*)initPlugin(ioPlugin, gAlloc);
+        if (!gTee->ioDriver) {
+            TEE_ERROR("Engine init failed: Could not find IO driver");
+            return false;
         }
 
         // Initialize IO
@@ -443,168 +441,171 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
             uri = curPath.get();
         }
 
-        const PluginDesc& desc = getPluginDesc(pluginHandle);
-        BX_BEGINP("Initializing IO Driver: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version), T_VERSION_MINOR(desc.version));
-        if (T_FAILED(g_core->ioDriver->blocking->init(g_alloc, uri, nullptr, nullptr, IoFlags::ExtractLZ4)) ||
-            T_FAILED(g_core->ioDriver->async->init(g_alloc, uri, nullptr, nullptr, IoFlags::ExtractLZ4)))
+        const PluginDesc& desc = getPluginDesc(ioPlugin);
+        BX_BEGINP("Initializing IO Driver: %s v%d.%d", desc.name, TEE_VERSION_MAJOR(desc.version), TEE_VERSION_MINOR(desc.version));
+        if (!gTee->ioDriver->blocking->init(gAlloc, uri, nullptr, nullptr, IoFlags::ExtractLZ4) ||
+            !gTee->ioDriver->async->init(gAlloc, uri, nullptr, nullptr, IoFlags::ExtractLZ4))
         {
             BX_END_FATAL();
-            T_ERROR("Engine init failed: Initializing IoDriver failed");
-            return T_ERR_FAILED;
+            TEE_ERROR("Engine init failed: Initializing IoDriver failed");
+            return false;
         }
         BX_END_OK();
     }
 
-    if (!g_core->ioDriver) {
-        T_ERROR("Engine init failed: No IoDriver is detected");
-        return T_ERR_FAILED;
+    if (!gTee->ioDriver) {
+        TEE_ERROR("Engine init failed: No IoDriver is detected");
+        return false;
     }
 
     BX_BEGINP("Initializing Resource Library");
-    if (T_FAILED(initResourceLib(BX_ENABLED(termite_DEV) ? ResourceLibInitFlag::HotLoading : 0, g_core->ioDriver->async, g_alloc))) 
+    if (!asset::init(BX_ENABLED(termite_DEV) ? AssetLibInitFlags::HotLoading : 0, gTee->ioDriver->async, gAlloc)) 
     {
-        T_ERROR("Core init failed: Creating default ResourceLib failed");
-        return T_ERR_FAILED;
+        TEE_ERROR("Core init failed: Creating default ResourceLib failed");
+        return false;
     }
     BX_END_OK();
 
     // Renderer
     if (!conf.rendererName.isEmpty()) {
-        r = findPluginByName(conf.rendererName.cstr(), 0, &pluginHandle, 1, PluginType::Renderer);
-        if (r > 0) {
-            g_core->renderer = (RendererApi*)initPlugin(pluginHandle, g_alloc);
-            const PluginDesc& desc = getPluginDesc(pluginHandle);
-            BX_TRACE("Found Renderer: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version), T_VERSION_MINOR(desc.version));
+        PluginHandle rendererPlugin = findPlugin(conf.rendererName.cstr(), PluginType::Renderer);
+        if (rendererPlugin.isValid()) {
+            gTee->renderer = (RendererApi*)initPlugin(rendererPlugin, gAlloc);
+            const PluginDesc& desc = getPluginDesc(rendererPlugin);
+            BX_TRACE("Found Renderer: %s v%d.%d", desc.name, TEE_VERSION_MAJOR(desc.version), TEE_VERSION_MINOR(desc.version));
 
             if (!platform) {
-                T_ERROR("Core init failed: PlatformData is not provided for Renderer");
-                return T_ERR_FAILED;
+                TEE_ERROR("Core init failed: PlatformData is not provided for Renderer");
+                return false;
             }
         } 
     }
 
     // Graphics Device
     if (!conf.gfxName.isEmpty())    {
-        r = findPluginByName(conf.gfxName.cstr(), 0, &pluginHandle, 1, PluginType::GraphicsDriver);
-        if (r > 0) {
-            g_core->gfxDriver = (GfxDriverApi*)initPlugin(pluginHandle, g_alloc);
+        PluginHandle gfxPlugin = findPlugin(conf.gfxName.cstr(), PluginType::GraphicsDriver);
+        if (gfxPlugin.isValid()) {
+            gTee->gfxDriver = (GfxDriver*)initPlugin(gfxPlugin, gAlloc);
         }
 
-        if (!g_core->gfxDriver) {
-            T_ERROR("Core init failed: Could not detect Graphics driver: %s", conf.gfxName.cstr());
-            return T_ERR_FAILED;
+        if (!gTee->gfxDriver) {
+            TEE_ERROR("Core init failed: Could not detect Graphics driver: %s", conf.gfxName.cstr());
+            return false;
         }
 
-        const PluginDesc& desc = getPluginDesc(pluginHandle);
-        BX_BEGINP("Initializing Graphics Driver: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version),
-                  T_VERSION_MINOR(desc.version));
+        const PluginDesc& desc = getPluginDesc(gfxPlugin);
+        BX_BEGINP("Initializing Graphics Driver: %s v%d.%d", desc.name, TEE_VERSION_MAJOR(desc.version),
+                  TEE_VERSION_MINOR(desc.version));
         if (platform)
-            g_core->gfxDriver->setPlatformData(*platform);
-        if (T_FAILED(g_core->gfxDriver->init(conf.gfxDeviceId, &g_core->gfxDriverEvents, g_alloc))) {
+            gTee->gfxDriver->setPlatformData(*platform);
+        if (!gTee->gfxDriver->init(conf.gfxDeviceId, &gTee->gfxDriverEvents, gAlloc)) {
             BX_END_FATAL();
             dumpGfxLog();
-            T_ERROR("Core init failed: Could not initialize Graphics driver");
-            return T_ERR_FAILED;
+            TEE_ERROR("Core init failed: Could not initialize Graphics driver");
+            return false;
         }
         BX_END_OK();
         dumpGfxLog();
 
         // Initialize Renderer with Gfx Driver
-        if (g_core->renderer) {
+        if (gTee->renderer) {
             BX_BEGINP("Initializing Renderer");
-            if (T_FAILED(g_core->renderer->init(g_alloc, g_core->gfxDriver))) {
+            if (!gTee->renderer->init(gAlloc, gTee->gfxDriver)) {
                 BX_END_FATAL();
-                T_ERROR("Core init failed: Could not initialize Renderer");
-                return T_ERR_FAILED;
+                TEE_ERROR("Core init failed: Could not initialize Renderer");
+                return false;
             }
             BX_END_OK();
         }
 
         // Init and Register graphics resource loaders
-        initTextureLoader(g_core->gfxDriver, g_alloc);
-        registerTextureToResourceLib();
+        gfx::initTextureLoader(gTee->gfxDriver, gAlloc);
+        gfx::registerTextureToAssetLib();
 
-        initModelLoader(g_core->gfxDriver, g_alloc);
-        registerModelToResourceLib();
+        gfx::initModelLoader(gTee->gfxDriver, gAlloc);
+        gfx::registerModelToAssetLib();
 
-        initFontSystem(g_alloc, vec2f(float(conf.refScreenWidth), float(conf.refScreenHeight)));
-        registerFontToResourceLib();
+        gfx::initFontSystem(gAlloc, vec2(float(conf.refScreenWidth), float(conf.refScreenHeight)));
+        gfx::registerFontToAssetLib();
 
         // VectorGraphics
-        if (initVectorGfx(g_alloc, g_core->gfxDriver)) {
-            T_ERROR("Initializing Vector Graphics failed");
-            return T_ERR_FAILED;
+        if (!gfx::initDebugDraw2D(gAlloc, gTee->gfxDriver)) {
+            TEE_ERROR("Initializing Vector Graphics failed");
+            return false;
         }
 
         // Debug graphics
-        if (initDebugDraw(g_alloc, g_core->gfxDriver)) {
-            T_ERROR("Initializing Editor Draw failed");
-            return T_ERR_FAILED;
+        if (!gfx::initDebugDraw(gAlloc, gTee->gfxDriver)) {
+            TEE_ERROR("Initializing Editor Draw failed");
+            return false;
         }
 
         // Graphics Utilities
-        if (initGfxUtils(g_core->gfxDriver)) {
-            T_ERROR("Initializing Graphics Utilities failed");
-            return T_ERR_FAILED;
+        if (!gfx::initGfxUtils(gTee->gfxDriver)) {
+            TEE_ERROR("Initializing Graphics Utilities failed");
+            return false;
         }
 
         // ImGui initialize
-        if (T_FAILED(initImGui(IMGUI_VIEWID, g_core->gfxDriver, g_alloc, conf.keymap,
-                               conf.uiIniFilename.cstr(), platform ? platform->nwh : nullptr))) {
-            T_ERROR("Initializing ImGui failed");
-            return T_ERR_FAILED;
+        if (!initImGui(IMGUI_VIEWID, gTee->gfxDriver, gAlloc, conf.keymap,
+                       conf.uiIniFilename.cstr(), platform ? platform->nwh : nullptr)) {
+            TEE_ERROR("Initializing ImGui failed");
+            return false;
         }
 
-        if (T_FAILED(initSpriteSystem(g_core->gfxDriver, g_alloc))) {
-            T_ERROR("Initializing Sprite System failed");
-            return T_ERR_FAILED;
+        if (!gfx::initSpriteSystem(gTee->gfxDriver, gAlloc)) {
+            TEE_ERROR("Initializing Sprite System failed");
+            return false;
         }
-        registerSpriteSheetToResourceLib();
+        gfx::registerSpriteSheetToAssetLib();
+
+        if (!gfx::initMaterialLib(gAlloc, gTee->gfxDriver)) {
+            TEE_ERROR("Initializing material lib failed");
+            return false;
+        }
     }
 
     // Physics2D Driver
     if (!conf.phys2dName.isEmpty()) {
-        r = findPluginByName(conf.phys2dName.cstr(), 0, &pluginHandle, 1, PluginType::Physics2dDriver);
-        if (r > 0) {
-            g_core->phys2dDriver = (PhysDriver2DApi*)initPlugin(pluginHandle, g_alloc);
+        PluginHandle phys2dPlugin = findPlugin(conf.phys2dName.cstr(), PluginType::Physics2dDriver);
+        if (phys2dPlugin.isValid()) {
+            gTee->phys2dDriver = (PhysDriver2D*)initPlugin(phys2dPlugin, gAlloc);
         }
 
-        if (!g_core->phys2dDriver) {
-            T_ERROR("Core init failed: Could not detect Physics driver: %s", conf.phys2dName.cstr());
-            return T_ERR_FAILED;
+        if (!gTee->phys2dDriver) {
+            TEE_ERROR("Core init failed: Could not detect Physics driver: %s", conf.phys2dName.cstr());
+            return false;
         }
 
-        const PluginDesc& desc = getPluginDesc(pluginHandle);
-        BX_BEGINP("Initializing Physics2D Driver: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version),
-                  T_VERSION_MINOR(desc.version));
-        if (T_FAILED(g_core->phys2dDriver->init(g_alloc, BX_ENABLED(termite_DEV) ? PhysFlags2D::EnableDebug : 0,
-                                                NANOVG_VIEWID))) 
-        {
+        const PluginDesc& desc = getPluginDesc(phys2dPlugin);
+        BX_BEGINP("Initializing Physics2D Driver: %s v%d.%d", desc.name, TEE_VERSION_MAJOR(desc.version),
+                  TEE_VERSION_MINOR(desc.version));
+        if (!gTee->phys2dDriver->init(gAlloc, BX_ENABLED(termite_DEV) ? PhysFlags2D::EnableDebug : 0, NANOVG_VIEWID)) {
             BX_END_FATAL();
-            T_ERROR("Core init failed: Could not initialize Physics2D driver");
-            return T_ERR_FAILED;
+            TEE_ERROR("Core init failed: Could not initialize Physics2D driver");
+            return false;
         }
         BX_END_OK();
     }
 
     // Sound device
     if (!conf.soundName.isEmpty()) {
-        r = findPluginByName(conf.soundName.cstr(), 0, &pluginHandle, 1, PluginType::SoundDriver);
-        if (r > 0) {
-            g_core->sndDriver = (SoundDriverApi*)initPlugin(pluginHandle, g_alloc);
+        PluginHandle sndPlugin = findPlugin(conf.soundName.cstr(), PluginType::SimpleSoundDriver);
+        if (sndPlugin.isValid()) {
+            gTee->sndDriver = (SimpleSoundDriver*)initPlugin(sndPlugin, gAlloc);
         }
 
-        if (!g_core->sndDriver) {
-            T_ERROR("Core init failed: Could not detect Sound driver: %s", conf.soundName.cstr());
-            return T_ERR_FAILED;
+        if (!gTee->sndDriver) {
+            TEE_ERROR("Core init failed: Could not detect Sound driver: %s", conf.soundName.cstr());
+            return false;
         }
 
-        const PluginDesc& desc = getPluginDesc(pluginHandle);
-        BX_BEGINP("Initializing Sound Driver: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version), T_VERSION_MINOR(desc.version));
-        if (T_FAILED(g_core->sndDriver->init(conf.audioFreq, conf.audioChannels, conf.audioBufferSize))) {
+        const PluginDesc& desc = getPluginDesc(sndPlugin);
+        BX_BEGINP("Initializing Sound Driver: %s v%d.%d", desc.name, TEE_VERSION_MAJOR(desc.version), TEE_VERSION_MINOR(desc.version));
+        if (!gTee->sndDriver->init(conf.audioFreq, conf.audioChannels, conf.audioBufferSize)) {
             BX_END_FATAL();
-            T_ERROR("Core init failed: Could not initialize Sound driver");
-            return T_ERR_FAILED;
+            TEE_ERROR("Core init failed: Could not initialize Sound driver");
+            return false;
         }
         BX_END_OK();
     }
@@ -612,13 +613,13 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     // Job Dispatcher
     if ((conf.engineFlags & InitEngineFlags::EnableJobDispatcher) == InitEngineFlags::EnableJobDispatcher) {
         BX_BEGINP("Initializing Job Dispatcher");
-        if (initJobDispatcher(g_alloc, conf.maxSmallFibers, conf.smallFiberSize*1024, conf.maxBigFibers, 
+        if (!initJobDispatcher(gAlloc, conf.maxSmallFibers, conf.smallFiberSize*1024, conf.maxBigFibers, 
                               conf.bigFiberSize*1024, 
                               (conf.engineFlags & InitEngineFlags::LockThreadsToCores) == InitEngineFlags::LockThreadsToCores)) 
         {
-            T_ERROR("Core init failed: Job Dispatcher init failed");
+            TEE_ERROR("Core init failed: Job Dispatcher init failed");
             BX_END_FATAL();
-            return T_ERR_FAILED;
+            return false;
         }
         BX_END_OK();
         BX_TRACE("%d Worker threads spawned", getNumWorkerThreads());
@@ -626,37 +627,37 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
 
 	// Component System
 	BX_BEGINP("Initializing Component System");
-	if (T_FAILED(initComponentSystem(g_alloc))) {
-		T_ERROR("Core init failed: Could not initialize Component-System");
+	if (!ecs::init(gAlloc)) {
+		TEE_ERROR("Core init failed: Could not initialize Component-System");
 		BX_END_FATAL();
-		return T_ERR_FAILED;
+		return false;
 	}
 	BX_END_OK();
 
     BX_BEGINP("Initializing Event Dispatcher");
-    if (T_FAILED(initEventDispatcher(g_alloc))) {
-        T_ERROR("Core init fialed: Could not initialize Event Dispatcher");
+    if (!initEventDispatcher(gAlloc)) {
+        TEE_ERROR("Core init fialed: Could not initialize Event Dispatcher");
         BX_END_FATAL();
-        return T_ERR_FAILED;
+        return false;
     }
     BX_END_OK();
 
 #ifdef termite_SDL2
     BX_BEGINP("Initializing SDL2 utils");
-    if (T_FAILED(initSdlUtils(g_alloc))) {
-        T_ERROR("Core init failed: Could not initialize SDL2 utils");
+    if (!sdl::init(gAlloc)) {
+        TEE_ERROR("Core init failed: Could not initialize SDL2 utils");
         BX_END_FATAL();
-        return T_ERR_FAILED;
+        return false;
     }
     BX_END_OK();
 #endif
 
 #if termite_DEV
     BX_BEGINP("Initializing Command System");
-    if (T_FAILED(initCommandSystem(conf.cmdHistorySize, g_alloc))) {
-        T_ERROR("Core init failed: Could not initialize Command System");
+    if (!cmd::init(conf.cmdHistorySize, gAlloc)) {
+        TEE_ERROR("Core init failed: Could not initialize Command System");
         BX_END_FATAL();
-        return T_ERR_FAILED;
+        return false;
     }
     BX_END_OK();
 #endif
@@ -668,48 +669,48 @@ result_t termite::initialize(const Config& conf, UpdateCallback updateFn, const 
     rsettings->free = remoteryFreeCallback;
     rsettings->realloc = remoteryReallocCallback;
 #  if termite_DEV
-    g_core->consoleCmds.create(64, 64, g_alloc);
+    gTee->consoleCmds.create(64, 64, gAlloc);
     rsettings->input_handler = remoteryInputHandlerCallback;
 #endif
 
-    if (rmt_CreateGlobalInstance(&g_core->rmt) != RMT_ERROR_NONE) {
+    if (rmt_CreateGlobalInstance(&gTee->rmt) != RMT_ERROR_NONE) {
         BX_END_NONFATAL();
     }
     BX_END_OK();
 #endif
 
-    registerLangToResourceLib();
+    lang::registerToAssetLib();
 
-    g_core->init = true;
-    return 0;
+    gTee->init = true;
+    return true;
 }
 
-void termite::shutdown(ShutdownCallback callback, void* userData)
+void tee::shutdown(ShutdownCallback callback, void* userData)
 {
-    if (!g_core) {
+    if (!gTee) {
         assert(false);
         return;
     }
 
 #if RMT_ENABLED
-    if (g_core->rmt)
-        rmt_DestroyGlobalInstance(g_core->rmt);
-    for (int i = 0; i < g_core->consoleCmds.getCount(); ++i) {
-        ConsoleCommand* cmd = g_core->consoleCmds.itemPtr(i);
+    if (gTee->rmt)
+        rmt_DestroyGlobalInstance(gTee->rmt);
+    for (int i = 0; i < gTee->consoleCmds.getCount(); ++i) {
+        ConsoleCommand* cmd = gTee->consoleCmds.itemPtr(i);
         cmd->~ConsoleCommand();
     }
-    g_core->consoleCmds.destroy();
+    gTee->consoleCmds.destroy();
 #endif
 
 #if termite_DEV
     BX_BEGINP("Shutting down Command System");
-    shutdownCommandSystem();
+    cmd::shutdown();
     BX_END_OK();
 #endif
 
 #ifdef termite_SDL2
     BX_BEGINP("Shutting down SDL2 utils");
-    shutdownSdlUnits();
+    sdl::shutdown();
     BX_END_OK();
 #endif
 
@@ -718,54 +719,55 @@ void termite::shutdown(ShutdownCallback callback, void* userData)
     BX_END_OK();
 
 	BX_BEGINP("Shutting down Component System");
-	shutdownComponentSystem();
+	ecs::shutdown();
 	BX_END_OK();
 
 	BX_BEGINP("Shutting down Job Dispatcher");
     shutdownJobDispatcher();
 	BX_END_OK();
 
-    if (g_core->phys2dDriver) {
+    if (gTee->phys2dDriver) {
         BX_BEGINP("Shutting down Physics2D Driver");
-        g_core->phys2dDriver->shutdown();
-        g_core->phys2dDriver = nullptr;
+        gTee->phys2dDriver->shutdown();
+        gTee->phys2dDriver = nullptr;
         BX_END_OK();
     }
 
     BX_BEGINP("Shutting down Graphics Subsystems");
-    shutdownSpriteSystem();
+    gfx::shutdownMaterialLib();
+    gfx::shutdownSpriteSystem();
 	shutdownImGui();
-    shutdownDebugDraw();
-    shutdownVectorGfx();
-    shutdownFontSystem();
-    shutdownModelLoader();
-    shutdownTextureLoader();
-    shutdownGfxUtils();
+    gfx::shutdownDebugDraw();
+    gfx::shutdownDebugDraw2D();
+    gfx::shutdownFontSystem();
+    gfx::shutdownModelLoader();
+    gfx::shutdownTextureLoader();
+    gfx::shutdownGfxUtils();
     BX_END_OK();
 
-    if (g_core->renderer) {
+    if (gTee->renderer) {
         BX_BEGINP("Shutting down Renderer");
-        g_core->renderer->shutdown();
-        g_core->renderer = nullptr;
+        gTee->renderer->shutdown();
+        gTee->renderer = nullptr;
         BX_END_OK();
     }
 
-    if (g_core->gfxDriver) {
+    if (gTee->gfxDriver) {
         BX_BEGINP("Shutting down Graphics Driver");
-        g_core->gfxDriver->shutdown();
-        g_core->gfxDriver = nullptr;
+        gTee->gfxDriver->shutdown();
+        gTee->gfxDriver = nullptr;
         BX_END_OK();
         dumpGfxLog();
     }
 
-    if (g_core->sndDriver) {
+    if (gTee->sndDriver) {
         BX_BEGINP("Shutting down Sound Driver");
-        g_core->sndDriver->shutdown();
-        g_core->sndDriver = nullptr;
+        gTee->sndDriver->shutdown();
+        gTee->sndDriver = nullptr;
         BX_END_OK();
     }
 
-    shutdownResourceLib();
+    asset::shutdown();
     
     // User Shutdown happens before IO and memory stuff
     // In order for user to clean-up any memory or save stuff
@@ -773,11 +775,11 @@ void termite::shutdown(ShutdownCallback callback, void* userData)
         callback(userData);
     }
 
-    if (g_core->ioDriver) {
+    if (gTee->ioDriver) {
         BX_BEGINP("Shutting down IO Driver");
-        g_core->ioDriver->blocking->shutdown();
-        g_core->ioDriver->async->shutdown();
-        g_core->ioDriver = nullptr;
+        gTee->ioDriver->blocking->shutdown();
+        gTee->ioDriver->async->shutdown();
+        gTee->ioDriver = nullptr;
         BX_END_OK();
     }
 
@@ -785,25 +787,25 @@ void termite::shutdown(ShutdownCallback callback, void* userData)
     shutdownPluginSystem();
     BX_END_OK();
 
-    if (g_core->gfxLogCache) {
-        BX_FREE(g_alloc, g_core->gfxLogCache);
-        g_core->gfxLogCache = nullptr;
-        g_core->numGfxLogCache = 0;
+    if (gTee->gfxLogCache) {
+        BX_FREE(gAlloc, gTee->gfxLogCache);
+        gTee->gfxLogCache = nullptr;
+        gTee->numGfxLogCache = 0;
     }
 
     BX_BEGINP("Destroying Memory pools");
-    g_core->memPool.destroy();
+    gTee->memPool.destroy();
     shutdownMemoryPool();
     BX_END_OK();
 
-    if (g_core->randomPoolFloat)
-        BX_FREE(g_alloc, g_core->randomPoolFloat);
-    if (g_core->randomPoolInt)
-        BX_FREE(g_alloc, g_core->randomPoolInt);
+    if (gTee->randomPoolFloat)
+        BX_FREE(gAlloc, gTee->randomPoolFloat);
+    if (gTee->randomPoolInt)
+        BX_FREE(gAlloc, gTee->randomPoolInt);
 
-    shutdownErrorReport();
-    BX_DELETE(g_alloc, g_core);
-    g_core = nullptr;
+    err::shutdown();
+    BX_DELETE(gAlloc, gTee);
+    gTee = nullptr;
 
 #ifdef _DEBUG
     stb_leakcheck_dumpmem();
@@ -820,51 +822,51 @@ static double calcAvgFrameTime(const FrameData& fd)
     return sum;
 }
 
-void termite::doFrame()
+void tee::doFrame()
 {
     rmt_BeginCPUSample(DoFrame, 0);
-    g_core->tempAlloc.free();
+    gTee->tempAlloc.free();
 
-    FrameData& fd = g_core->frameData;
+    FrameData& fd = gTee->frameData;
     if (fd.frame == 0)
         fd.lastFrameTimePt = TClock::now();
 
     TClockTimePt frameTimePt = TClock::now();
     std::chrono::duration<double> dt_fp = frameTimePt - fd.lastFrameTimePt;
-    double dt = g_core->timeMultiplier * dt_fp.count();
+    double dt = gTee->timeMultiplier * dt_fp.count();
     float fdt = float(dt);
 
-    if (g_core->gfxDriver) {
+    if (gTee->gfxDriver) {
         ImGui::GetIO().DeltaTime = float(dt_fp.count());
         ImGui::NewFrame();
         ImGuizmo::BeginFrame();
     }
 
     rmt_BeginCPUSample(Game_Update, 0);
-    if (g_core->updateFn)
-        g_core->updateFn(fdt);
+    if (gTee->updateFn)
+        gTee->updateFn(fdt);
     rmt_EndCPUSample(); // Game_Update
     
     runEventDispatcher(fdt);
 
     rmt_BeginCPUSample(ImGui_Render, 0);
-    if (g_core->gfxDriver) {
+    if (gTee->gfxDriver) {
         ImGui::Render();
         ImGui::GetIO().MouseWheel = 0;
     }
     rmt_EndCPUSample(); // ImGuiRender
 
-    if (g_core->renderer)
-        g_core->renderer->render(nullptr);
+    if (gTee->renderer)
+        gTee->renderer->render(nullptr);
 
     rmt_BeginCPUSample(Async_Loop, 0);
-    if (g_core->ioDriver->async)
-        g_core->ioDriver->async->runAsyncLoop();
+    if (gTee->ioDriver->async)
+        gTee->ioDriver->async->runAsyncLoop();
     rmt_EndCPUSample(); // Async_Loop
 
     rmt_BeginCPUSample(Gfx_DrawFrame, 0);
-    if (g_core->gfxDriver)
-        g_core->gfxDriver->frame();
+    if (gTee->gfxDriver)
+        gTee->gfxDriver->frame();
     rmt_EndCPUSample(); // Gfx_DrawFrame
 
     fd.frame++;
@@ -882,70 +884,70 @@ void termite::doFrame()
     rmt_EndCPUSample(); // DoFrame
 }
 
-void termite::pause()
+void tee::pause()
 {
-    g_core->timeMultiplier = 0;
+    gTee->timeMultiplier = 0;
 }
 
-void termite::resume()
+void tee::resume()
 {
-    g_core->timeMultiplier = 1.0;
-    g_core->frameData.lastFrameTimePt = TClock::now();
+    gTee->timeMultiplier = 1.0;
+    gTee->frameData.lastFrameTimePt = TClock::now();
 }
 
-bool termite::isPaused()
+bool tee::isPaused()
 {
-    return g_core->timeMultiplier == 0;
+    return gTee->timeMultiplier == 0;
 }
 
-void termite::resetTempAlloc()
+void tee::resetTempAlloc()
 {
-    g_core->tempAlloc.free();
+    gTee->tempAlloc.free();
 }
 
-void termite::resetBackbuffer(uint16_t width, uint16_t height)
+void tee::resetBackbuffer(uint16_t width, uint16_t height)
 {
-    if (g_core->gfxDriver)
-        g_core->gfxDriver->reset(width, height, g_core->conf.gfxDriverFlags);
-    g_core->conf.gfxWidth = width;
-    g_core->conf.gfxHeight = height;
+    if (gTee->gfxDriver)
+        gTee->gfxDriver->reset(width, height, gTee->conf.gfxDriverFlags);
+    gTee->conf.gfxWidth = width;
+    gTee->conf.gfxHeight = height;
 
     ImGuiIO& io = ImGui::GetIO();
     io.DisplaySize = ImVec2(float(width), float(height));
 }
 
-double termite::getFrameTime()
+double tee::getFrameTime()
 {
-    return g_core->frameData.frameTime;
+    return gTee->frameData.frameTime;
 }
 
-double termite::getElapsedTime()
+double tee::getElapsedTime()
 {
-    return g_core->frameData.elapsedTime;
+    return gTee->frameData.elapsedTime;
 }
 
-double termite::getFps()
+double tee::getFps()
 {
-    return g_core->frameData.fps;
+    return gTee->frameData.fps;
 }
 
-double termite::getSmoothFrameTime()
+double tee::getSmoothFrameTime()
 {
-    return g_core->frameData.avgFrameTime;
+    return gTee->frameData.avgFrameTime;
 }
 
-uint64_t termite::getFrameIndex()
+uint64_t tee::getFrameIndex()
 {
-    return g_core->frameData.frame;
+    return gTee->frameData.frame;
 }
 
-termite::MemoryBlock* termite::createMemoryBlock(uint32_t size, bx::AllocatorI* alloc)
+tee::MemoryBlock* tee::createMemoryBlock(uint32_t size, bx::AllocatorI* alloc)
 {
-    g_core->memPoolLock.lock();
-    HeapMemoryImpl* mem = g_core->memPool.newInstance();
-    g_core->memPoolLock.unlock();
+    gTee->memPoolLock.lock();
+    HeapMemoryImpl* mem = gTee->memPool.newInstance();
+    gTee->memPoolLock.unlock();
     if (!alloc)
-        alloc = g_alloc;
+        alloc = gAlloc;
     mem->m.data = (uint8_t*)BX_ALLOC(alloc, size);
 
     if (!mem->m.data)
@@ -953,27 +955,27 @@ termite::MemoryBlock* termite::createMemoryBlock(uint32_t size, bx::AllocatorI* 
     mem->m.size = size;
     mem->alloc = alloc;
 
-    return (termite::MemoryBlock*)mem;
+    return (tee::MemoryBlock*)mem;
 }
 
-termite::MemoryBlock* termite::refMemoryBlockPtr(const void* data, uint32_t size)
+tee::MemoryBlock* tee::refMemoryBlockPtr(const void* data, uint32_t size)
 {
-    g_core->memPoolLock.lock();
-    HeapMemoryImpl* mem = g_core->memPool.newInstance();
-    g_core->memPoolLock.unlock();
+    gTee->memPoolLock.lock();
+    HeapMemoryImpl* mem = gTee->memPool.newInstance();
+    gTee->memPoolLock.unlock();
     mem->m.data = (uint8_t*)const_cast<void*>(data);
     mem->m.size = size;
 
     return (MemoryBlock*)mem;
 }
 
-termite::MemoryBlock* termite::copyMemoryBlock(const void* data, uint32_t size, bx::AllocatorI* alloc)
+tee::MemoryBlock* tee::copyMemoryBlock(const void* data, uint32_t size, bx::AllocatorI* alloc)
 {
-    g_core->memPoolLock.lock();
-    HeapMemoryImpl* mem = g_core->memPool.newInstance();
-    g_core->memPoolLock.unlock();
+    gTee->memPoolLock.lock();
+    HeapMemoryImpl* mem = gTee->memPool.newInstance();
+    gTee->memPoolLock.unlock();
     if (!alloc)
-        alloc = g_alloc;
+        alloc = gAlloc;
     mem->m.data = (uint8_t*)BX_ALLOC(alloc, size);
     if (!mem->m.data)
         return nullptr;
@@ -984,14 +986,14 @@ termite::MemoryBlock* termite::copyMemoryBlock(const void* data, uint32_t size, 
     return (MemoryBlock*)mem;
 }
 
-termite::MemoryBlock* termite::refMemoryBlock(termite::MemoryBlock* mem)
+tee::MemoryBlock* tee::refMemoryBlock(tee::MemoryBlock* mem)
 {
     HeapMemoryImpl* m = (HeapMemoryImpl*)mem;
     bx::atomicFetchAndAdd(&m->refcount, 1);
     return mem;
 }
 
-void termite::releaseMemoryBlock(termite::MemoryBlock* mem)
+void tee::releaseMemoryBlock(tee::MemoryBlock* mem)
 {
     HeapMemoryImpl* m = (HeapMemoryImpl*)mem;
     if (bx::atomicDec(&m->refcount) == 0) {
@@ -1001,12 +1003,12 @@ void termite::releaseMemoryBlock(termite::MemoryBlock* mem)
             m->m.size = 0;
         }
 
-        bx::LockScope(g_core->memPoolLock);
-        g_core->memPool.deleteInstance(m);
+        bx::LockScope(gTee->memPoolLock);
+        gTee->memPool.deleteInstance(m);
     }
 }
 
-MemoryBlock* termite::readTextFile(const char* absFilepath)
+MemoryBlock* tee::readTextFile(const char* absFilepath)
 {
     bx::FileReader file;
     bx::Error err;
@@ -1014,7 +1016,7 @@ MemoryBlock* termite::readTextFile(const char* absFilepath)
         return nullptr;
     uint32_t size = (uint32_t)file.seek(0, bx::Whence::End);
 
-    MemoryBlock* mem = createMemoryBlock(size + 1, g_alloc);
+    MemoryBlock* mem = createMemoryBlock(size + 1, gAlloc);
     if (!mem) {
         file.close();
         return nullptr;
@@ -1028,7 +1030,7 @@ MemoryBlock* termite::readTextFile(const char* absFilepath)
     return mem;
 }
 
-MemoryBlock* termite::readBinaryFile(const char* absFilepath)
+MemoryBlock* tee::readBinaryFile(const char* absFilepath)
 {
     bx::FileReader file;
     bx::Error err;
@@ -1040,7 +1042,7 @@ MemoryBlock* termite::readBinaryFile(const char* absFilepath)
         return nullptr;
     }
 
-    MemoryBlock* mem = createMemoryBlock(size, g_alloc);
+    MemoryBlock* mem = createMemoryBlock(size, gAlloc);
     if (!mem) {
         file.close();
         return nullptr;
@@ -1053,7 +1055,7 @@ MemoryBlock* termite::readBinaryFile(const char* absFilepath)
     return mem;
 }
 
-bool termite::saveBinaryFile(const char* absFilepath, const MemoryBlock* mem)
+bool tee::saveBinaryFile(const char* absFilepath, const MemoryBlock* mem)
 {
     bx::FileWriter file;
     bx::Error err;
@@ -1066,7 +1068,7 @@ bool termite::saveBinaryFile(const char* absFilepath, const MemoryBlock* mem)
     return wb == mem->size ? true : false;
 }
 
-MemoryBlock* termite::encryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
+MemoryBlock* tee::encryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
 {
     assert(mem);
     if (key == nullptr)
@@ -1074,7 +1076,7 @@ MemoryBlock* termite::encryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI
     if (iv == nullptr)
         iv = kAESIv;
     if (alloc == nullptr)
-        alloc = g_alloc;
+        alloc = gAlloc;
 
     EncodeHeader header;
     header.sign = T_ENC_SIGN;
@@ -1105,7 +1107,7 @@ MemoryBlock* termite::encryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI
     return encMem;
 }
 
-MemoryBlock* termite::decryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
+MemoryBlock* tee::decryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
 {
     assert(mem);
     if (key == nullptr)
@@ -1113,7 +1115,7 @@ MemoryBlock* termite::decryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI
     if (iv == nullptr)
         iv = kAESIv;
     if (alloc == nullptr)
-        alloc = g_alloc;
+        alloc = gAlloc;
 
     // AES Decode
     const EncodeHeader header = *((const EncodeHeader*)mem->data);
@@ -1141,7 +1143,7 @@ MemoryBlock* termite::decryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI
     return rmem;
 }
 
-void termite::cipherXOR(uint8_t* outputBuff, const uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize)
+void tee::cipherXOR(uint8_t* outputBuff, const uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize)
 {
     assert(buffSize > 0);
     assert(keySize > 0);
@@ -1150,54 +1152,54 @@ void termite::cipherXOR(uint8_t* outputBuff, const uint8_t* inputBuff, size_t bu
     }
 }
 
-void termite::restartRandom()
+void tee::restartRandom()
 {
     std::uniform_int_distribution<int> idist(0, INT_MAX);
-    int* randomInt = g_core->randomPoolInt;
+    int* randomInt = gTee->randomPoolInt;
     for (int i = 0; i < RANDOM_NUMBER_POOL; i++) {
-        randomInt[i] = idist(g_core->randEngine);
+        randomInt[i] = idist(gTee->randEngine);
     }
 
     std::uniform_real_distribution<float> fdist(0, 1.0f);
-    float* randomFloat = g_core->randomPoolFloat;
+    float* randomFloat = gTee->randomPoolFloat;
     for (int i = 0; i < RANDOM_NUMBER_POOL; i++) {
-        randomFloat[i] = fdist(g_core->randEngine);
+        randomFloat[i] = fdist(gTee->randEngine);
     }
 
-    g_core->randomFloatOffset = g_core->randomIntOffset = 0;
+    gTee->randomFloatOffset = gTee->randomIntOffset = 0;
 }
 
-float termite::getRandomFloatUniform(float a, float b)
+float tee::getRandomFloatUniform(float a, float b)
 {
     assert(a <= b);
-    int off = g_core->randomFloatOffset;
-    float r = (g_core->randomPoolFloat[off]*(b - a)) + a;
-    bx::atomicExchange<int32_t>(&g_core->randomFloatOffset, (off + 1) % RANDOM_NUMBER_POOL);
+    int off = gTee->randomFloatOffset;
+    float r = (gTee->randomPoolFloat[off]*(b - a)) + a;
+    bx::atomicExchange<int32_t>(&gTee->randomFloatOffset, (off + 1) % RANDOM_NUMBER_POOL);
     return r;
 }
 
-int termite::getRandomIntUniform(int a, int b)
+int tee::getRandomIntUniform(int a, int b)
 {
     assert(a <= b);
-    int off = g_core->randomIntOffset;
-    int r = (g_core->randomPoolInt[off] % (b - a + 1)) + a;
-    bx::atomicExchange<int32_t>(&g_core->randomIntOffset, (off + 1) % RANDOM_NUMBER_POOL);
+    int off = gTee->randomIntOffset;
+    int r = (gTee->randomPoolInt[off] % (b - a + 1)) + a;
+    bx::atomicExchange<int32_t>(&gTee->randomIntOffset, (off + 1) % RANDOM_NUMBER_POOL);
     return r;
 }
 
-float termite::getRandomFloatNormal(float mean, float sigma)
+float tee::getRandomFloatNormal(float mean, float sigma)
 {
     std::normal_distribution<float> dist(mean, sigma);
-    return dist(g_core->randEngine);
+    return dist(gTee->randEngine);
 }
 
-void termite::inputSendChars(const char* chars)
+void tee::inputSendChars(const char* chars)
 {
 	ImGuiIO& io = ImGui::GetIO();
     io.AddInputCharactersUTF8(chars);
 }
 
-void termite::inputSendKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl)
+void tee::inputSendKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl)
 {
 	ImGuiIO& io = ImGui::GetIO();
 	memcpy(io.KeysDown, keysDown, 512*sizeof(bool));
@@ -1206,7 +1208,7 @@ void termite::inputSendKeys(const bool keysDown[512], bool shift, bool alt, bool
 	io.KeyCtrl = ctrl;
 }
 
-void termite::inputSendMouse(float mousePos[2], int mouseButtons[3], float mouseWheel)
+void tee::inputSendMouse(float mousePos[2], int mouseButtons[3], float mouseWheel)
 {
 	ImGuiIO& io = ImGui::GetIO();
 	io.MousePos = ImVec2(mousePos[0], mousePos[1]);
@@ -1218,224 +1220,224 @@ void termite::inputSendMouse(float mousePos[2], int mouseButtons[3], float mouse
 	io.MouseWheel += mouseWheel;
 }
 
-GfxDriverApi* termite::getGfxDriver()
+GfxDriver* tee::getGfxDriver()
 {
-    return g_core->gfxDriver;
+    return gTee->gfxDriver;
 }
 
-IoDriverApi* termite::getBlockingIoDriver() T_THREAD_SAFE
+IoDriver* tee::getBlockingIoDriver() TEE_THREAD_SAFE
 {
-    return g_core->ioDriver->blocking;
+    return gTee->ioDriver->blocking;
 }
 
-IoDriverApi* termite::getAsyncIoDriver() T_THREAD_SAFE
+IoDriver* tee::getAsyncIoDriver() TEE_THREAD_SAFE
 {
-    return g_core->ioDriver->async;
+    return gTee->ioDriver->async;
 }
 
-RendererApi* termite::getRenderer() T_THREAD_SAFE
+RendererApi* tee::getRenderer() TEE_THREAD_SAFE
 {
-    return g_core->renderer;
+    return gTee->renderer;
 }
 
-SoundDriverApi* termite::getSoundDriver() T_THREAD_SAFE
+SimpleSoundDriver* tee::getSoundDriver() TEE_THREAD_SAFE
 {
-    return g_core->sndDriver;
+    return gTee->sndDriver;
 }
 
-PhysDriver2DApi* termite::getPhys2dDriver() T_THREAD_SAFE
+PhysDriver2D* tee::getPhys2dDriver() TEE_THREAD_SAFE
 {
-    return g_core->phys2dDriver;
+    return gTee->phys2dDriver;
 }
 
-uint32_t termite::getEngineVersion() T_THREAD_SAFE
+uint32_t tee::getEngineVersion() TEE_THREAD_SAFE
 {
-    return T_MAKE_VERSION(0, 1);
+    return TEE_MAKE_VERSION(0, 1);
 }
 
-bx::AllocatorI* termite::getHeapAlloc() T_THREAD_SAFE
+bx::AllocatorI* tee::getHeapAlloc() TEE_THREAD_SAFE
 {
-    return g_alloc;
+    return gAlloc;
 }
 
-bx::AllocatorI* termite::getTempAlloc() T_THREAD_SAFE
+bx::AllocatorI* tee::getTempAlloc() TEE_THREAD_SAFE
 {
-    return &g_core->tempAlloc;
+    return &gTee->tempAlloc;
 }
 
-const Config& termite::getConfig() T_THREAD_SAFE
+const Config& tee::getConfig() TEE_THREAD_SAFE
 {
-    return g_core->conf;
+    return gTee->conf;
 }
 
-const char* termite::getCacheDir() T_THREAD_SAFE
+const char* tee::getCacheDir() TEE_THREAD_SAFE
 {
-    return g_cacheDir.cstr();
+    return gCacheDir.cstr();
 }
 
-const char* termite::getDataDir() T_THREAD_SAFE
+const char* tee::getDataDir() TEE_THREAD_SAFE
 {
-    return g_dataDir.cstr();
+    return gDataDir.cstr();
 }
 
-void termite::dumpGfxLog() T_THREAD_SAFE
+void tee::dumpGfxLog() TEE_THREAD_SAFE
 {
-    if (g_core->gfxLogCache) {
-        for (int i = 0, c = g_core->numGfxLogCache; i < c; i++) {
-            const LogCache& l = g_core->gfxLogCache[i];
+    if (gTee->gfxLogCache) {
+        for (int i = 0, c = gTee->numGfxLogCache; i < c; i++) {
+            const LogCache& l = gTee->gfxLogCache[i];
             bx::logPrint(__FILE__, __LINE__, l.type, l.text);
         }
 
-        BX_FREE(g_alloc, g_core->gfxLogCache);
-        g_core->gfxLogCache = nullptr;
-        g_core->numGfxLogCache = 0;
+        BX_FREE(gAlloc, gTee->gfxLogCache);
+        gTee->gfxLogCache = nullptr;
+        gTee->numGfxLogCache = 0;
     }
 }
 
-bool termite::needGfxReset() T_THREAD_SAFE
+bool tee::needGfxReset() TEE_THREAD_SAFE
 {
-    return g_core->gfxReset;
+    return gTee->gfxReset;
 }
 
-void termite::shutdownGraphics()
+void tee::shutdownGraphics()
 {
     // Unload all graphics resources
-    unloadAllResources("texture");
+    asset::unloadAssets("texture");
 
     // Unload subsystems
-    shutdownSpriteSystemGraphics();
+    gfx::shutdownSpriteSystemGraphics();
     shutdownImGui();
-    shutdownDebugDraw();
-    shutdownVectorGfx();
-    shutdownFontSystemGraphics();
-    shutdownModelLoader();
-    shutdownTextureLoader();
-    shutdownGfxUtils();
+    gfx::shutdownDebugDraw();
+    gfx::shutdownDebugDraw2D();
+    gfx::shutdownFontSystemGraphics();
+    gfx::shutdownModelLoader();
+    gfx::shutdownTextureLoader();
+    gfx::shutdownGfxUtils();
+    gfx::destroyMaterialUniforms();
 
-    if (g_core->phys2dDriver) {
-        g_core->phys2dDriver->shutdownGraphicsObjects();
+    if (gTee->phys2dDriver) {
+        gTee->phys2dDriver->shutdownGraphicsObjects();
     }
 
     // Shutdown driver
-    if (g_core->gfxDriver) {
-        g_core->gfxDriver->shutdown();
-        g_core->gfxDriver = nullptr;
+    if (gTee->gfxDriver) {
+        gTee->gfxDriver->shutdown();
+        gTee->gfxDriver = nullptr;
         dumpGfxLog();
     }
 }
 
-bool termite::resetGraphics(const GfxPlatformData* platform)
+bool tee::resetGraphics(const GfxPlatformData* platform)
 {
-    int r;
-    PluginHandle pluginHandle;
-    const Config& conf = g_core->conf;
+    const Config& conf = gTee->conf;
 
-    r = findPluginByName(conf.gfxName.cstr(), 0, &pluginHandle, 1, PluginType::GraphicsDriver);
-    if (r > 0) {
-        g_core->gfxDriver = (GfxDriverApi*)initPlugin(pluginHandle, g_alloc);
+    PluginHandle gfxPlugin = findPlugin(conf.gfxName.cstr(), PluginType::GraphicsDriver);
+    if (gfxPlugin.isValid()) {
+        gTee->gfxDriver = (GfxDriver*)initPlugin(gfxPlugin, gAlloc);
     }
 
-    if (!g_core->gfxDriver) {
-        T_ERROR("Core init failed: Could not detect Graphics driver: %s", conf.gfxName.cstr());
+    if (!gTee->gfxDriver) {
+        TEE_ERROR("Core init failed: Could not detect Graphics driver: %s", conf.gfxName.cstr());
         return false;
     }
 
-    const PluginDesc& desc = getPluginDesc(pluginHandle);
-    BX_BEGINP("Initializing Graphics Driver: %s v%d.%d", desc.name, T_VERSION_MAJOR(desc.version),
-              T_VERSION_MINOR(desc.version));
+    const PluginDesc& desc = getPluginDesc(gfxPlugin);
+    BX_BEGINP("Initializing Graphics Driver: %s v%d.%d", desc.name, TEE_VERSION_MAJOR(desc.version),
+              TEE_VERSION_MINOR(desc.version));
     if (platform)
-        g_core->gfxDriver->setPlatformData(*platform);
-    if (T_FAILED(g_core->gfxDriver->init(conf.gfxDeviceId, &g_core->gfxDriverEvents, g_alloc))) {
+        gTee->gfxDriver->setPlatformData(*platform);
+    if (!gTee->gfxDriver->init(conf.gfxDeviceId, &gTee->gfxDriverEvents, gAlloc)) {
         BX_END_FATAL();
         dumpGfxLog();
-        T_ERROR("Core init failed: Could not initialize Graphics driver");
+        TEE_ERROR("Core init failed: Could not initialize Graphics driver");
         return false;
     }
     BX_END_OK();
     dumpGfxLog();
 
     // Initialize Renderer with Gfx Driver
-    if (g_core->renderer) {
+    if (gTee->renderer) {
         BX_BEGINP("Initializing Renderer");
-        if (T_FAILED(g_core->renderer->init(g_alloc, g_core->gfxDriver))) {
+        if (!gTee->renderer->init(gAlloc, gTee->gfxDriver)) {
             BX_END_FATAL();
-            T_ERROR("Core init failed: Could not initialize Renderer");
+            TEE_ERROR("Core init failed: Could not initialize Renderer");
             return false;
         }
         BX_END_OK();
     }
 
     // Init and Register graphics resource loaders
-    initTextureLoader(g_core->gfxDriver, g_alloc);
-    registerTextureToResourceLib();
+    gfx::initTextureLoader(gTee->gfxDriver, gAlloc);
+    gfx::registerTextureToAssetLib();
 
-    initModelLoader(g_core->gfxDriver, g_alloc);
-    registerModelToResourceLib();
+    gfx::initModelLoader(gTee->gfxDriver, gAlloc);
+    gfx::registerModelToAssetLib();
 
-    initFontSystemGraphics();
+    gfx::initFontSystemGraphics();
 
     // VectorGraphics
-    if (initVectorGfx(g_alloc, g_core->gfxDriver)) {
-        T_ERROR("Initializing Vector Graphics failed");
+    if (!gfx::initDebugDraw2D(gAlloc, gTee->gfxDriver)) {
+        TEE_ERROR("Initializing Vector Graphics failed");
         return false;
     }
 
     // Debug graphics
-    if (initDebugDraw(g_alloc, g_core->gfxDriver)) {
-        T_ERROR("Initializing Editor Draw failed");
+    if (!gfx::initDebugDraw(gAlloc, gTee->gfxDriver)) {
+        TEE_ERROR("Initializing Editor Draw failed");
         return false;
     }
 
     // Graphics Utilities
-    if (initGfxUtils(g_core->gfxDriver)) {
-        T_ERROR("Initializing Graphics Utilities failed");
+    if (!gfx::initGfxUtils(gTee->gfxDriver)) {
+        TEE_ERROR("Initializing Graphics Utilities failed");
         return false;
     }
 
     // ImGui initialize
-    if (T_FAILED(initImGui(IMGUI_VIEWID, g_core->gfxDriver, g_alloc, conf.keymap,
-                           conf.uiIniFilename.cstr(), platform ? platform->nwh : nullptr))) {
-        T_ERROR("Initializing ImGui failed");
+    if (!initImGui(IMGUI_VIEWID, gTee->gfxDriver, gAlloc, conf.keymap, conf.uiIniFilename.cstr(), 
+                   platform ? platform->nwh : nullptr)) 
+    {
+        TEE_ERROR("Initializing ImGui failed");
         return false;
     }
 
-    if (!initSpriteSystemGraphics(g_core->gfxDriver)) {
-        T_ERROR("Initializing Sprite System failed");
+    if (!gfx::initSpriteSystemGraphics(gTee->gfxDriver)) {
+        TEE_ERROR("Initializing Sprite System failed");
         return false;
     }
 
-    if (g_core->phys2dDriver) {
-        g_core->phys2dDriver->initGraphicsObjects();
+    if (gTee->phys2dDriver) {
+        gTee->phys2dDriver->initGraphicsObjects();
+    }
+
+    if (!gfx::createMaterialUniforms(gTee->gfxDriver)) {
+        TEE_ERROR("Initializing material uniforms failed");
+        return false;
     }
 
     // Reload resources
-    reloadResourceType("texture");
+    asset::reloadAssets("texture");
 
-    g_core->gfxReset = false;
+    gTee->gfxReset = false;
     return true;
 }
 
-void termite::registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback)
+void tee::registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback)
 {
 #if termite_DEV && RMT_ENABLED
-    assert(g_core);
-    ConsoleCommand* cmd = new(g_core->consoleCmds.push()) ConsoleCommand;
+    assert(gTee);
+    ConsoleCommand* cmd = new(gTee->consoleCmds.push()) ConsoleCommand;
     cmd->cmdHash = tinystl::hash_string(name, strlen(name));
     cmd->callback = callback;
 #endif
 }
 
-const HardwareStats& termite::getHardwareStats()
+const HardwareStats& tee::getHardwareStats()
 {
     // update memory used
-    g_core->hwStats.processMemUsed = bx::getProcessMemoryUsed();
+    gTee->hwStats.processMemUsed = bx::getProcessMemoryUsed();
 
-    return g_core->hwStats;
-}
-
-void termite::setPointerCheck(void* ptr)
-{
-    mi_ptr_check = ptr;
+    return gTee->hwStats;
 }
 
 void GfxDriverEvents::onFatal(GfxFatalType::Enum type, const char* str)
@@ -1444,11 +1446,11 @@ void GfxDriverEvents::onFatal(GfxFatalType::Enum type, const char* str)
     bx::strCopy(strTrimed, sizeof(strTrimed), str);
     strTrimed[strlen(strTrimed) - 1] = 0;
 
-    if (g_core->numGfxLogCache < 1000) {
+    if (gTee->numGfxLogCache < 1000) {
         m_lock.lock();
-        g_core->gfxLogCache = (LogCache*)BX_REALLOC(g_alloc, g_core->gfxLogCache, sizeof(LogCache) * (++g_core->numGfxLogCache));
-        g_core->gfxLogCache[g_core->numGfxLogCache-1].type = bx::LogType::Fatal;
-        strcpy(g_core->gfxLogCache[g_core->numGfxLogCache-1].text, strTrimed);
+        gTee->gfxLogCache = (LogCache*)BX_REALLOC(gAlloc, gTee->gfxLogCache, sizeof(LogCache) * (++gTee->numGfxLogCache));
+        gTee->gfxLogCache[gTee->numGfxLogCache-1].type = bx::LogType::Fatal;
+        strcpy(gTee->gfxLogCache[gTee->numGfxLogCache-1].text, strTrimed);
         m_lock.unlock();
     }
 }
@@ -1458,11 +1460,11 @@ void GfxDriverEvents::onTraceVargs(const char* filepath, int line, const char* f
     char text[LOG_STRING_SIZE];
     vsnprintf(text, sizeof(text), format, argList);
     text[strlen(text) - 1] = 0;
-    if (g_core->numGfxLogCache < 1000) {
+    if (gTee->numGfxLogCache < 1000) {
         m_lock.lock();
-        g_core->gfxLogCache = (LogCache*)BX_REALLOC(g_alloc, g_core->gfxLogCache, sizeof(LogCache) * (++g_core->numGfxLogCache));
-        g_core->gfxLogCache[g_core->numGfxLogCache-1].type = bx::LogType::Verbose;
-        strcpy(g_core->gfxLogCache[g_core->numGfxLogCache-1].text, text);
+        gTee->gfxLogCache = (LogCache*)BX_REALLOC(gAlloc, gTee->gfxLogCache, sizeof(LogCache) * (++gTee->numGfxLogCache));
+        gTee->gfxLogCache[gTee->numGfxLogCache-1].type = bx::LogType::Verbose;
+        strcpy(gTee->gfxLogCache[gTee->numGfxLogCache-1].text, text);
         m_lock.unlock();
     }
 

@@ -6,9 +6,9 @@
 #include "bxx/json.h"
 #include "bxx/logger.h"
 
-static bx::DefaultAllocator g_alloc;
+static bx::DefaultAllocator gAlloc;
 
-void termite::LogFormatProxy::fatal(const char* fmt, ...)
+void tee::LogFormatProxy::fatal(const char* fmt, ...)
 {
     char text[4096];
 
@@ -20,15 +20,15 @@ void termite::LogFormatProxy::fatal(const char* fmt, ...)
     switch (m_options) {
     case LogProxyOptions::Json:
     {
-        bx::JsonNodeAllocator alloc(&g_alloc);
+        bx::JsonNodeAllocator alloc(&gAlloc);
         bx::JsonNode* jroot = bx::createJsonNode(&alloc, nullptr, bx::JsonType::Object);
         bx::JsonNode* jerr = bx::createJsonNode(&alloc, "fatal")->setString(text);
         jroot->addChild(jerr);
-        char* jsonText = bx::makeJson(jroot, &g_alloc, true);
+        char* jsonText = bx::makeJson(jroot, &gAlloc, true);
         jroot->destroy();
         if (jsonText) {
             bx::logPrint(__FILE__, __LINE__, bx::LogType::Fatal, jsonText);
-            BX_FREE(&g_alloc, jsonText);
+            BX_FREE(&gAlloc, jsonText);
         }
         break;
     }
@@ -41,7 +41,7 @@ void termite::LogFormatProxy::fatal(const char* fmt, ...)
     }
 }
 
-void termite::LogFormatProxy::warn(const char* fmt, ...)
+void tee::LogFormatProxy::warn(const char* fmt, ...)
 {
     char text[4096];
 
@@ -53,15 +53,15 @@ void termite::LogFormatProxy::warn(const char* fmt, ...)
     switch (m_options) {
     case LogProxyOptions::Json:
     {
-        bx::JsonNodeAllocator alloc(&g_alloc);
+        bx::JsonNodeAllocator alloc(&gAlloc);
         bx::JsonNode* jroot = bx::createJsonNode(&alloc);
         bx::JsonNode* jerr = bx::createJsonNode(&alloc, "warning")->setString(text);
         jroot->addChild(jerr);
-        char* jsonText = bx::makeJson(jroot, &g_alloc, true);
+        char* jsonText = bx::makeJson(jroot, &gAlloc, true);
         jroot->destroy();
         if (jsonText) {
             bx::logPrint(__FILE__, __LINE__, bx::LogType::Warning, jsonText);
-            BX_FREE(&g_alloc, jsonText);
+            BX_FREE(&gAlloc, jsonText);
         }
         break;
     }
@@ -74,7 +74,7 @@ void termite::LogFormatProxy::warn(const char* fmt, ...)
     }
 }
 
-void termite::LogFormatProxy::text(const char* fmt, ...)
+void tee::LogFormatProxy::text(const char* fmt, ...)
 {
     char text[4096];
 
@@ -86,15 +86,15 @@ void termite::LogFormatProxy::text(const char* fmt, ...)
     switch (m_options) {
     case LogProxyOptions::Json:
     {
-        bx::JsonNodeAllocator alloc(&g_alloc);
+        bx::JsonNodeAllocator alloc(&gAlloc);
         bx::JsonNode* jroot = bx::createJsonNode(&alloc);
         bx::JsonNode* jerr = bx::createJsonNode(&alloc, "text")->setString(text);
         jroot->addChild(jerr);
-        char* jsonText = bx::makeJson(jroot, &g_alloc, true);
+        char* jsonText = bx::makeJson(jroot, &gAlloc, true);
         jroot->destroy();
         if (jsonText) {
             bx::logPrint(__FILE__, __LINE__, bx::LogType::Text, jsonText);
-            BX_FREE(&g_alloc, jsonText);
+            BX_FREE(&gAlloc, jsonText);
         }
         break;
     }

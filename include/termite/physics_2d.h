@@ -1,12 +1,12 @@
 #pragma once
 
 #include "bx/bx.h"
-#include "vec_math.h"
+#include "math.h"
 
-namespace termite
+namespace tee
 {   
     struct Camera2D;
-    struct GfxDriverApi;
+    struct GfxDriver;
     struct PhysScene2D;
     struct PhysShape2D;
     struct PhysBody2D;
@@ -37,7 +37,7 @@ namespace termite
         vec2_t gravity;
         float timestep;
 
-        PhysSceneDef2D(const vec2_t _gravity = vec2f(0, -9.8f), float _timestep = 1.0f/60.0f) :
+        PhysSceneDef2D(const vec2_t _gravity = vec2(0, -9.8f), float _timestep = 1.0f/60.0f) :
             gravity(_gravity),
             timestep(_timestep)
         {
@@ -182,8 +182,8 @@ namespace termite
         float gravityScale;
 
         PhysBodyDef2D(PhysBodyType2D::Enum _type = PhysBodyType2D::Static, 
-                      const vec2_t& _pos = vec2f(0, 0), float _angle = 0,
-                      const vec2_t& _linearVel = vec2f(0, 0), float _angularVel = 0,
+                      const vec2_t& _pos = vec2(0, 0), float _angle = 0,
+                      const vec2_t& _linearVel = vec2(0, 0), float _angularVel = 0,
                       float _linearDamping = 0, float _angularDamping = 0,
                       uint32_t _flags = PhysBodyFlags2D::AllowSleep | PhysBodyFlags2D::IsAwake | PhysBodyFlags2D::IsActive, 
                       void* _userData = nullptr,
@@ -294,13 +294,13 @@ namespace termite
         PhysParticleFlags2D::Bits flags;
         vec2_t position;
         vec2_t velocity;
-        color_t color;
+        ucolor_t color;
         float lifetime;
         void* userData;
         PhysParticleGroup2D* group;
 
-        PhysParticleDef2D(PhysParticleFlags2D::Bits _flags = 0, const vec2_t& _pos = vec2f(0, 0),
-                          const vec2_t& _velocity = vec2f(0, 0), color_t _color = color1n(0), float _lifetime = 0,
+        PhysParticleDef2D(PhysParticleFlags2D::Bits _flags = 0, const vec2_t& _pos = vec2(0, 0),
+                          const vec2_t& _velocity = vec2(0, 0), ucolor_t _color = ucolor(0), float _lifetime = 0,
                           void* _userData = nullptr, PhysParticleGroup2D* _group = nullptr) :
             flags(_flags),
             position(_pos),
@@ -321,14 +321,14 @@ namespace termite
         float angle;
         vec2_t linearVelocity;
         float angularVelocity;
-        color_t color;
+        ucolor_t color;
         float strength; /// The strength of cohesion among the particles in a group with flag, b2_elasticParticle or b2_springParticle.
         float lifetime; /// Lifetime of the particle group in seconds.  A value <= 0.0f indicates a particle group with infinite lifetime.
         void* userData;
 
         PhysParticleGroupDef2D(PhysParticleFlags2D::Bits _particleFlags = 0, PhysParticleGroupFlags2D::Bits _flags = 0, 
-                               const vec2_t& _pos = vec2f(0, 0), float _angle = 0,
-                               const vec2_t& _linearVel = vec2f(0, 0), float _angularVel = 0,
+                               const vec2_t& _pos = vec2(0, 0), float _angle = 0,
+                               const vec2_t& _linearVel = vec2(0, 0), float _angularVel = 0,
                                void* _userData = nullptr) :
             particleFlags(_particleFlags),
             flags(_flags),
@@ -370,9 +370,9 @@ namespace termite
     /// @return Return false if you want to stop the query
     typedef bool(*PhysQueryShapeCallback2D)(PhysShape2D* shape, void* userData);
 
-    struct PhysDriver2DApi
+    struct PhysDriver2D
     {
-        result_t (*init)(bx::AllocatorI* alloc, PhysFlags2D::Bits flags/*=0*/, uint8_t debugViewId/*=255*/);
+        bool (*init)(bx::AllocatorI* alloc, PhysFlags2D::Bits flags/*=0*/, uint8_t debugViewId/*=255*/);
         void (*shutdown)();
 
         bool (*initGraphicsObjects)();
@@ -385,7 +385,7 @@ namespace termite
         // Returns blending coeff for interpolating between frames
         // State = currentState * alpha + prevState * (1 - alpha)
         void (*stepScene)(PhysScene2D* scene, float dt);   
-        void (*debugScene)(PhysScene2D* scene, const recti_t viewport, const Camera2D& cam, 
+        void (*debugScene)(PhysScene2D* scene, const irect_t viewport, const Camera2D& cam, 
                            PhysDebugFlags2D::Bits flags/* = PhysDebugFlags2D::All*/);
 
         PhysBody2D* (*createBody)(PhysScene2D* scene, const PhysBodyDef2D& bodyDef);
@@ -560,7 +560,7 @@ namespace termite
 
         int (*getEmitterPositionBuffer)(PhysParticleEmitter2D* emitter, vec2_t* poss, int maxItems);
         int (*getEmitterVelocityBuffer)(PhysParticleEmitter2D* emitter, vec2_t* vels, int maxItems);
-        int (*getEmitterColorBuffer)(PhysParticleEmitter2D* emitter, color_t* colors, int maxItems);
+        int (*getEmitterColorBuffer)(PhysParticleEmitter2D* emitter, ucolor_t* colors, int maxItems);
                 
         // Callbacks
         void (*setJointDestroyCallback)(PhysJoint2D* joint, PhysJointDestroyCallback2D callback);
@@ -578,4 +578,4 @@ namespace termite
         void (*setBeginParticleContactCallback)(PhysParticleEmitter2D* emitter, PhysParticleContactCallback2D callback);
         void (*setEndParticleContactCallback)(PhysParticleEmitter2D* emitter, PhysParticleContactCallback2D callback);
     };
-} // namespace termite
+} // namespace tee

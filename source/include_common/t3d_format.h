@@ -7,7 +7,7 @@
 
 #pragma pack(push, 1)
 
-namespace termite
+namespace tee
 {
     struct t3dVertexAttrib
     {
@@ -159,4 +159,4 @@ namespace termite
 
 #pragma pack(pop)
 
-} // namespace termite
+} // namespace tee

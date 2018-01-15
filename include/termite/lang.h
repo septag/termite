@@ -2,14 +2,12 @@
 
 #include "bx/bx.h"
 
-#include "resource_lib.h"
-
-namespace termite
+namespace tee
 {
     struct Lang;
 
-    TERMITE_API const char* getText(Lang* lang, const char* strId);
-
-    void registerLangToResourceLib();    
+    namespace lang {
+        TEE_API const char* getText(Lang* lang, const char* strId);
+    }
 }
 

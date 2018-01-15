@@ -17,24 +17,24 @@
 #include "gfx_driver.h"
 #include "gfx_utils.h"
 
-#define T_IMGUI_API
+#define TEE_IMGUI_API
 #include "plugin_api.h"
 
-#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_in_color.fso)
-#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_in_color.vso)
-#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_out_color.fso)
-#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_out_color.vso)
-#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_in_alpha.fso)
-#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_in_alpha.vso)
-#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_out_alpha.fso)
-#include T_MAKE_SHADER_PATH(shaders_h, effect_fade_out_alpha.vso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, effect_fade_in_color.fso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, effect_fade_in_color.vso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, effect_fade_out_color.fso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, effect_fade_out_color.vso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, effect_fade_in_alpha.fso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, effect_fade_in_alpha.vso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, effect_fade_out_alpha.fso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, effect_fade_out_alpha.vso)
 
-using namespace termite;
+using namespace tee;
 
 #define MAX_ACTIVE_SCENES 4
 #define MAX_ACTIVE_LINKS 4
 
-namespace termite
+namespace tee
 {
     struct SceneTransitionEffect
     {
@@ -60,10 +60,11 @@ namespace termite
         char name[32];
         uint8_t order;
         SceneCallbacksI* callbacks;
+        SceneCallbacksDelayI* delayCallbacks;
         uint32_t tag;
         SceneFlag::Bits flags;
-        LoadingScheme loadScheme;
-        LoaderGroupHandle loaderGroup;
+        IncrLoadingScheme loadScheme;
+        IncrLoaderGroupHandle loaderGroup;
         void* userData;
         bx::List<Scene*>::Node lnode;
 
@@ -80,6 +81,7 @@ namespace termite
             drawOnEffectFb(false)
         {
             name[0] = 0;
+            delayCallbacks = nullptr;
         }
     };
 
@@ -122,7 +124,7 @@ namespace termite
         bx::Pool<Scene> scenePool;
         bx::Array<SceneTransitionEffect> effects;
         bx::HandlePool linkPool;
-        CProgressiveLoader loader;
+        CIncrLoader loader;
         uint8_t viewId;
         uint8_t viewIdOffset;
 
@@ -150,7 +152,7 @@ namespace termite
         }
     };
 
-}   // namespace termite
+}   // namespace tee
 
 class FadeEffect : public SceneTransitionEffectCallbacksI
 {
@@ -166,8 +168,8 @@ public:
 
 private:
     Mode m_mode;
-    FadeEffectParams m_params;
-    GfxDriverApi* m_driver;
+    SceneFadeEffectParams m_params;
+    GfxDriver* m_driver;
     ProgramHandle m_prog;
     UniformHandle m_ufadeColor;
     UniformHandle m_umixValue;
@@ -244,20 +246,20 @@ public:
         m_finished = false;
     }
 
-    void render(float dt, uint8_t viewId, FrameBufferHandle renderFb, TextureHandle sourceTex, const vec2i_t& renderSize) override
+    void render(float dt, uint8_t viewId, FrameBufferHandle renderFb, TextureHandle sourceTex, const ivec2_t& renderSize) override
     {
         m_elapsedTm += dt;
         float normTm = bx::min(1.0f, m_elapsedTm / m_params.duration);
-        vec4_t mixValue = vec4f(bx::fbias(normTm, m_params.biasFactor), 0, 0, 0);
+        vec4_t mixValue = vec4(bx::fbias(normTm, m_params.biasFactor), 0, 0, 0);
         uint64_t extraState = (m_mode != FadeEffect::FadeOutAlpha && m_mode != FadeEffect::FadeInAlpha) ? 0 : 
-            gfxStateBlendAlpha();
+            gfx::stateBlendAlpha();
         m_driver->setViewFrameBuffer(viewId, renderFb);
         m_driver->setViewRect(viewId, 0, 0, renderSize.x, renderSize.y);
         m_driver->setState(GfxState::RGBWrite | GfxState::AlphaWrite | extraState, 0);
         m_driver->setTexture(0, m_utexture, sourceTex, TextureFlag::FromTexture);
         m_driver->setUniform(m_ufadeColor, m_params.fadeColor.f, 1);
         m_driver->setUniform(m_umixValue, mixValue.f, 1);
-        drawFullscreenQuad(viewId, m_prog);
+        gfx::drawFullscreenQuad(viewId, m_prog);
 
         m_finished = bx::fequal(normTm, 1.0f, 0.00001f);
     }
@@ -278,7 +280,7 @@ static FadeEffect g_fadeOutColor(FadeEffect::FadeOutColor);
 static FadeEffect g_fadeInAlpha(FadeEffect::FadeInAlpha);
 static FadeEffect g_fadeOutAlpha(FadeEffect::FadeOutAlpha);
 
-SceneManager* termite::createSceneManager(bx::AllocatorI* alloc)
+SceneManager* tee::createSceneManager(bx::AllocatorI* alloc)
 {
     SceneManager* mgr = BX_NEW(alloc, SceneManager)(alloc);
     if (!mgr)
@@ -295,15 +297,15 @@ SceneManager* termite::createSceneManager(bx::AllocatorI* alloc)
     }
 
     // Register default effects
-    registerSceneTransitionEffect(mgr, "FadeIn", &g_fadeInColor, sizeof(FadeEffectParams));
-    registerSceneTransitionEffect(mgr, "FadeOut", &g_fadeOutColor, sizeof(FadeEffectParams));
-    registerSceneTransitionEffect(mgr, "FadeInAlpha", &g_fadeInAlpha, sizeof(FadeEffectParams));
-    registerSceneTransitionEffect(mgr, "FadeOutAlpha", &g_fadeOutAlpha, sizeof(FadeEffectParams));
+    registerSceneTransitionEffect(mgr, "FadeIn", &g_fadeInColor, sizeof(SceneFadeEffectParams));
+    registerSceneTransitionEffect(mgr, "FadeOut", &g_fadeOutColor, sizeof(SceneFadeEffectParams));
+    registerSceneTransitionEffect(mgr, "FadeInAlpha", &g_fadeInAlpha, sizeof(SceneFadeEffectParams));
+    registerSceneTransitionEffect(mgr, "FadeOutAlpha", &g_fadeOutAlpha, sizeof(SceneFadeEffectParams));
 
     return mgr;
 }
 
-void termite::destroySceneManager(SceneManager* smgr)
+void tee::destroySceneManager(SceneManager* smgr)
 {
     assert(smgr);
 
@@ -322,7 +324,7 @@ void termite::destroySceneManager(SceneManager* smgr)
     BX_DELETE(smgr->alloc, smgr);
 }
 
-void termite::destroySceneManagerGraphics(SceneManager* smgr)
+void tee::destroySceneManagerGraphics(SceneManager* smgr)
 {
     // destroy all effects
     for (int i = 0, c = smgr->effects.getCount(); i < c; i++)
@@ -332,9 +334,9 @@ void termite::destroySceneManagerGraphics(SceneManager* smgr)
     smgr->mainFb.reset();
 }
 
-bool termite::resetSceneManagerGraphics(SceneManager* smgr, FrameBufferHandle mainFb, FrameBufferHandle effectFb)
+bool tee::resetSceneManagerGraphics(SceneManager* smgr, FrameBufferHandle mainFb, FrameBufferHandle effectFb)
 {
-    GfxDriverApi* gDriver = getGfxDriver();
+    GfxDriver* gDriver = getGfxDriver();
 
     smgr->mainFb = mainFb;
     smgr->mainTex = gDriver->getFrameBufferTexture(mainFb, 0);
@@ -453,9 +455,9 @@ static SceneLinkHandle findLink(SceneManager* mgr, std::function<bool(const Scen
     return SceneLinkHandle();
 }
 
-Scene* termite::createScene(SceneManager* mgr, const char* name, SceneCallbacksI* callbacks, 
-                            uint32_t tag /*= 0*/, SceneFlag::Bits flags /*= 0*/, const LoadingScheme& loadScheme /*= LoadingScheme()*/, 
-                            void* userData /*= nullptr*/, uint8_t order /*= 0*/)
+Scene* tee::createScene(SceneManager* mgr, const char* name, SceneCallbacksI* callbacks, 
+                        uint32_t tag /*= 0*/, SceneFlag::Bits flags /*= 0*/, const IncrLoadingScheme& loadScheme /*= LoadingScheme()*/, 
+                        void* userData /*= nullptr*/, uint8_t order /*= 0*/)
 {
     assert(mgr);
 
@@ -478,7 +480,7 @@ Scene* termite::createScene(SceneManager* mgr, const char* name, SceneCallbacksI
     return scene;
 }
 
-static void addActiveScene(SceneManager* mgr, Scene* scene)
+static bool addActiveScene(SceneManager* mgr, Scene* scene)
 {
     assert(scene->state == Scene::Ready);
 
@@ -494,6 +496,9 @@ static void addActiveScene(SceneManager* mgr, Scene* scene)
         mgr->activeScenes[mgr->numActiveScenes++] = scene;
         std::sort(mgr->activeScenes, mgr->activeScenes + mgr->numActiveScenes,
                   [](const Scene* sA, const Scene* sB)->bool { return sA->order < sB->order; });
+        return true;
+    } else {
+        return false;
     }
 }
 
@@ -519,7 +524,7 @@ static bool removeActiveScene(SceneManager* mgr, Scene* scene)
 }
 
 
-void termite::destroyScene(SceneManager* mgr, Scene* scene)
+void tee::destroyScene(SceneManager* mgr, Scene* scene)
 {
     assert(mgr);
     assert(scene);
@@ -553,14 +558,24 @@ void termite::destroyScene(SceneManager* mgr, Scene* scene)
     } while (linkHandle.isValid());
 }
 
-void* termite::getSceneUserData(Scene* scene)
+void* tee::getSceneUserData(Scene* scene)
 {
     return scene->userData;
 }
 
-const char* termite::getSceneName(Scene* scene)
+const char* tee::getSceneName(Scene* scene)
 {
     return scene->name;
+}
+
+uint32_t tee::getSceneTag(Scene* scene)
+{
+    return scene->tag;
+}
+
+void tee::setSceneDelayCallbacks(Scene* scene, SceneCallbacksDelayI* delayCallbacks)
+{
+    scene->delayCallbacks = delayCallbacks;
 }
 
 static void pushActiveLink(SceneManager* mgr, SceneLinkHandle handle)
@@ -601,7 +616,7 @@ static SceneTransitionEffect* findEffect(SceneManager* mgr, const char* name)
     return nullptr;
 }
 
-bool termite::registerSceneTransitionEffect(SceneManager* mgr, const char* name, SceneTransitionEffectCallbacksI* callbacks,
+bool tee::registerSceneTransitionEffect(SceneManager* mgr, const char* name, SceneTransitionEffectCallbacksI* callbacks,
                                             uint32_t paramSize)
 {
     size_t nameHash = tinystl::hash_string(name, strlen(name));
@@ -620,7 +635,7 @@ bool termite::registerSceneTransitionEffect(SceneManager* mgr, const char* name,
     return callbacks->create();
 }
 
-SceneLinkHandle termite::linkScene(SceneManager* mgr, Scene* sceneA, Scene* sceneB, const SceneLinkDef& def /*= SceneLinkDef()*/)
+SceneLinkHandle tee::linkScene(SceneManager* mgr, Scene* sceneA, Scene* sceneB, const SceneLinkDef& def /*= SceneLinkDef()*/)
 {
     assert(sceneA);
 
@@ -646,20 +661,20 @@ SceneLinkHandle termite::linkScene(SceneManager* mgr, Scene* sceneA, Scene* scen
     return handle;
 }
 
-void termite::removeSceneLink(SceneManager* mgr, SceneLinkHandle handle)
+void tee::removeSceneLink(SceneManager* mgr, SceneLinkHandle handle)
 {
     for (int i = 0, c = mgr->numActiveLinks; i < c; i++) {
         if (handle != mgr->activeLinks[i])
             continue;
 
-        assert(0);  // Link that should be deleted should not be active
+        BX_ASSERT(false, "Link that should be deleted should not be an active link");
         return;
     }
 
     mgr->linkPool.freeHandle(handle);
 }
 
-void termite::triggerSceneLink(SceneManager* mgr, SceneLinkHandle handle)
+void tee::triggerSceneLink(SceneManager* mgr, SceneLinkHandle handle)
 {
     SceneLink* link = mgr->linkPool.getHandleData<SceneLink>(0, handle);
 
@@ -673,13 +688,13 @@ void termite::triggerSceneLink(SceneManager* mgr, SceneLinkHandle handle)
     }
 }
 
-void termite::changeSceneLink(SceneManager* mgr, SceneLinkHandle handle, Scene* sceneB)
+void tee::changeSceneLink(SceneManager* mgr, SceneLinkHandle handle, Scene* sceneB)
 {
     SceneLink* link = mgr->linkPool.getHandleData<SceneLink>(0, handle);
     link->sceneB = sceneB;
 }
 
-Scene* termite::findScene(SceneManager* mgr, const char* name, FindSceneMode::Enum mode /*= 0*/)
+Scene* tee::findScene(SceneManager* mgr, const char* name, FindSceneMode::Enum mode /*= 0*/)
 {
     switch (mode) {
     case FindSceneMode::Active:
@@ -706,7 +721,7 @@ Scene* termite::findScene(SceneManager* mgr, const char* name, FindSceneMode::En
     return nullptr;
 }
 
-int termite::findSceneByTag(SceneManager* mgr, Scene** pScenes, int maxScenes, uint32_t tag, FindSceneMode::Enum mode /*= 0*/)
+int tee::findSceneByTag(SceneManager* mgr, Scene** pScenes, int maxScenes, uint32_t tag, FindSceneMode::Enum mode /*= 0*/)
 {
     int count = 0;
     switch (mode) {
@@ -734,7 +749,7 @@ int termite::findSceneByTag(SceneManager* mgr, Scene** pScenes, int maxScenes, u
     return count;
 }
 
-static void updateLink(SceneManager* mgr, SceneLink* link, float dt, const vec2i_t& renderSize)
+static void updateLink(SceneManager* mgr, SceneLink* link, float dt, const ivec2_t& renderSize)
 {
     switch (link->state) {
     case SceneLink::InA:
@@ -752,6 +767,7 @@ static void updateLink(SceneManager* mgr, SceneLink* link, float dt, const vec2i
             } else {
                 link->effectA->callbacks->render(dt, mgr->viewId, mgr->mainFb, mgr->effectTex, renderSize);
             }
+
 
             if (link->effectA->callbacks->isDone()) {
                 link->effectA->callbacks->end();
@@ -779,8 +795,11 @@ static void updateLink(SceneManager* mgr, SceneLink* link, float dt, const vec2i
 
     case SceneLink::InLoad:
         // add 'loading' scene to active scenes
-        if (link->loadScene)
-            addActiveScene(mgr, link->loadScene);
+        if (link->loadScene) {
+            if (addActiveScene(mgr, link->loadScene)) {
+                link->loadScene->callbacks->onEnter(link->loadScene, link->sceneA);
+            }
+        }
 
         if (link->sceneB->state == Scene::Ready) {
             // sceneB is ready, decide what should we do with sceneA
@@ -795,14 +814,24 @@ static void updateLink(SceneManager* mgr, SceneLink* link, float dt, const vec2i
                     updateScene(mgr, link->sceneA, dt); // update until Dead/Maybe InLimbo
             }
 
+
+            bool isDelayed = false;
+            if (link->loadScene && link->loadScene->delayCallbacks) {
+                isDelayed = link->loadScene->delayCallbacks->delayNextScene();
+            }
+
             // sceneB is ready, proceed to next step
             if ((link->sceneB->flags & SceneFlag::Overlay) || 
                 (link->sceneA->flags & SceneFlag::CacheAlways) ||
-                link->sceneA->state == Scene::Dead) 
+                link->sceneA->state == Scene::Dead &&
+                !isDelayed) 
             {
                 link->state = SceneLink::InB;
-                if (link->loadScene)
-                    removeActiveScene(mgr, link->loadScene);
+                if (link->loadScene) {
+                    if (removeActiveScene(mgr, link->loadScene)) {
+                        link->loadScene->callbacks->onExit(link->loadScene, link->sceneB);
+                    }
+                }
                 addActiveScene(mgr, link->sceneB);
                 link->sceneB->callbacks->onEnter(link->sceneB, link->sceneA);
                 updateLink(mgr, link, dt, renderSize);
@@ -848,8 +877,8 @@ static void updateLink(SceneManager* mgr, SceneLink* link, float dt, const vec2i
     }
 }
 
-void termite::updateSceneManager(SceneManager* mgr, float dt, uint8_t* viewId,
-                                 const vec2i_t renderSize, FrameBufferHandle* pRenderFb, TextureHandle* pRenderTex)
+void tee::updateSceneManager(SceneManager* mgr, float dt, uint8_t* viewId, const ivec2_t renderSize, 
+                             FrameBufferHandle* pRenderFb, TextureHandle* pRenderTex)
 {
     assert(viewId);
     mgr->viewId = *viewId;
@@ -874,10 +903,10 @@ void termite::updateSceneManager(SceneManager* mgr, float dt, uint8_t* viewId,
         *pRenderTex = mgr->finalTex;
 }
 
-void termite::startSceneManager(SceneManager* mgr, Scene* entryScene, FrameBufferHandle mainFb, FrameBufferHandle effectFb)
+void tee::startSceneManager(SceneManager* mgr, Scene* entryScene, FrameBufferHandle mainFb, FrameBufferHandle effectFb)
 {
     assert(entryScene);
-    GfxDriverApi* gDriver = getGfxDriver();
+    GfxDriver* gDriver = getGfxDriver();
 
     mgr->numActiveScenes = 0;
     mgr->numActiveLinks = 0;
@@ -894,12 +923,12 @@ void termite::startSceneManager(SceneManager* mgr, Scene* entryScene, FrameBuffe
     addActiveScene(mgr, entryScene);
 }
 
-void termite::debugSceneManager(SceneManager* mgr)
+void tee::debugSceneManager(SceneManager* mgr)
 {
     static bool opened = false;
     static int curActiveScene = -1;
 
-    ImGuiApi_v0* imgui = (ImGuiApi_v0*)getEngineApi(ApiId::ImGui, 0);
+    ImGuiApi* imgui = (ImGuiApi*)getEngineApi(ApiId::ImGui, 0);
     if (imgui->begin("SceneManager", &opened, 0)) {
         const char* scenes[MAX_ACTIVE_SCENES];
         for (int i = 0, c = mgr->numActiveScenes; i < c; i++)

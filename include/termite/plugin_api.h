@@ -2,12 +2,12 @@
 
 #ifdef termite_SHARED_LIB
 #   if BX_COMPILER_MSVC
-#       define T_PLUGIN_EXPORT extern "C" __declspec(dllexport) 
+#       define TEE_PLUGIN_EXPORT extern "C" __declspec(dllexport) 
 #   else
-#       define T_PLUGIN_EXPORT extern "C" __attribute__ ((visibility("default")))
+#       define TEE_PLUGIN_EXPORT extern "C" __attribute__ ((visibility("default")))
 #   endif
 #else
-#   define T_PLUGIN_EXPORT extern "C" 
+#   define TEE_PLUGIN_EXPORT extern "C" 
 #endif
 
 #define BX_TRACE_API(_Api, _Fmt, ...) _Api->logPrintf(__FILE__, __LINE__, bx::LogType::Text, _Fmt, ##__VA_ARGS__)
@@ -19,23 +19,23 @@
 #define BX_END_FATAL_API(_Api) _Api->logEndProgress(bx::LogProgressResult::Fatal)
 #define BX_END_NONFATAL_API(_Api) _Api->logEndProgress(bx::LogProgressResult::NonFatal)
 
-#define T_ERROR_API(_Api, _Fmt, ...) _Api->reportErrorf(__FILE__, __LINE__, _Fmt, ##__VA_ARGS__)
+#define TEE_ERROR_API(_Api, _Fmt, ...) _Api->reportErrorf(__FILE__, __LINE__, _Fmt, ##__VA_ARGS__)
 
 #if RMT_ENABLED
-#  define T_PROFILE_BEGIN(_Api, name, flags)        \
+#  define TEE_PROFILE_BEGIN(_Api, name, flags)        \
     {                                               \
         static uint32_t rmt_sample_hash_##name = 0;   \
         _Api->beginCPUSample(#name, flags, &rmt_sample_hash_##name);    \
     }
-#  define T_PROFILE_END(_Api)   _Api->endCPUSample();
-#  define T_PROFILE_BEGIN_STR(_Api, name, flags) _Api->beginCPUSample(name, flags, nullptr);
+#  define TEE_PROFILE_END(_Api)   _Api->endCPUSample();
+#  define TEE_PROFILE_BEGIN_STR(_Api, name, flags) _Api->beginCPUSample(name, flags, nullptr);
 #else
-#  define T_PROFILE_BEGIN(_Api, name, flags)
-#  define T_PROFILE_END(_Api)
-#  define T_PROFILE_BEGIN_STR(_Api, name, flags)
+#  define TEE_PROFILE_BEGIN(_Api, name, flags)
+#  define TEE_PROFILE_END(_Api)
+#  define TEE_PROFILE_BEGIN_STR(_Api, name, flags)
 #endif
 
-namespace termite
+namespace tee
 {
     struct ApiId
     {
@@ -46,7 +46,8 @@ namespace termite
             Gfx,
             ImGui,
             Camera,
-            Component
+            Component,
+            Asset
         };
 
         typedef uint16_t Type;
@@ -65,7 +66,8 @@ namespace termite
             IoDriver,
             Renderer,
             Physics2dDriver,
-            SoundDriver
+            SimpleSoundDriver,
+            Loader
         };
     };
 
@@ -77,24 +79,23 @@ namespace termite
         PluginType::Enum type;
     };
 
-    struct PluginApi_v0
+    struct PluginApi
     {
         void* (*init)(bx::AllocatorI* alloc, GetApiFunc getApi);
         void (*shutdown)();
         PluginDesc* (*getDesc)();
     };
 
-    TERMITE_API void* getEngineApi(uint16_t apiId, uint32_t version);
-}   // namespace termite
+    TEE_API void* getEngineApi(uint16_t apiId, uint32_t version);
+}   // namespace tee
 
-#ifdef T_CORE_API
-#include "core.h"
+#ifdef TEE_CORE_API
+#include "tee.h"
 #include "bxx/logger.h"
-#include "resource_lib.h"
 #include "job_dispatcher.h"
 
-namespace termite {
-    struct CoreApi_v0
+namespace tee {
+    struct CoreApi
     {
         MemoryBlock* (*createMemoryBlock)(uint32_t size, bx::AllocatorI* alloc);
         MemoryBlock* (*refMemoryBlockPtr)(const void* data, uint32_t size);
@@ -114,63 +115,78 @@ namespace termite {
         const Config& (*getConfig)();
         uint32_t(*getEngineVersion)();
         bx::AllocatorI* (*getTempAlloc)();
-        GfxDriverApi* (*getGfxDriver)();
-        IoDriverApi* (*getBlockingIoDriver)();
-        IoDriverApi* (*getAsyncIoDriver)();
-        PhysDriver2DApi* (*getPhys2dDriver)();
+        GfxDriver* (*getGfxDriver)();
+        IoDriver* (*getBlockingIoDriver)();
+        IoDriver* (*getAsyncIoDriver)();
+        PhysDriver2D* (*getPhys2dDriver)();
 
         void(*beginCPUSample)(const char* name, uint32_t flags, uint32_t* hashCache);
         void(*endCPUSample)();
 
-        ResourceTypeHandle(*registerResourceType)(const char* name, ResourceCallbacksI* callbacks,
-                                                  int userParamsSize /*= 0*/, uintptr_t failObj /*= 0*/,
-                                                  uintptr_t asyncProgressObj /*= 0*/);
-
         // Job API
-        JobHandle (*dispatchSmallJobs)(const JobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE;
-        JobHandle (*dispatchBigJobs)(const JobDesc* jobs, uint16_t numJobs) T_THREAD_SAFE;
+        JobHandle (*dispatchSmallJobs)(const JobDesc* jobs, uint16_t numJobs) TEE_THREAD_SAFE;
+        JobHandle (*dispatchBigJobs)(const JobDesc* jobs, uint16_t numJobs) TEE_THREAD_SAFE;
 
-        void (*waitAndDeleteJob)(JobHandle handle) T_THREAD_SAFE;
-        bool (*isJobDone)(JobHandle handle) T_THREAD_SAFE;
-        void (*deleteJob)(JobHandle handle) T_THREAD_SAFE;
+        void (*waitAndDeleteJob)(JobHandle handle) TEE_THREAD_SAFE;
+        bool (*isJobDone)(JobHandle handle) TEE_THREAD_SAFE;
+        void (*deleteJob)(JobHandle handle) TEE_THREAD_SAFE;
     };
 }
 #endif
 
-#ifdef T_GFX_API
-#include "vec_math.h"
-#include "gfx_defines.h"
-namespace termite {
-    struct IoDriverApi;
+#ifdef TEE_ASSET_API
+#include "assetlib.h"
+namespace tee {
+    struct AssetApi
+    {
+        AssetTypeHandle(*registerType)(const char* name, AssetLibCallbacksI* callbacks,
+                                       int userParamsSize /*= 0*/, uintptr_t failObj /*= 0*/,
+                                       uintptr_t asyncProgressObj /*= 0*/);
+        AssetHandle (*load)(const char* name, const char* uri,
+                            const void* userParams, AssetFlags::Bits flags/* = AssetFlags::None*/,
+                            bx::AllocatorI* objAlloc/* = nullptr*/);
+        AssetHandle (*loadMem)(const char* name, const char* uri, const MemoryBlock* mem,
+                               const void* userParams, AssetFlags::Bits flags/* = AssetFlags::None*/,
+                               bx::AllocatorI* objAlloc/* = nullptr*/);
+        void (*unload)(AssetHandle handle);
+    };
+}
+#endif
 
-    struct GfxApi_v0
+#ifdef TEE_GFX_API
+#include "tmath.h"
+#include "gfx_defines.h"
+namespace tee {
+    struct IoDriver;
+
+    struct GfxApi
     {
         void(*calcGaussKernel)(vec4_t* kernel, int kernelSize, float stdDev, float intensity);
-        ProgramHandle(*loadShaderProgram)(GfxDriverApi* gfxDriver, IoDriverApi* ioDriver, const char* vsFilepath,
+        ProgramHandle(*loadShaderProgram)(GfxDriver* gfxDriver, IoDriver* ioDriver, const char* vsFilepath,
 										  const char* fsFilepath);
         void(*drawFullscreenQuad)(uint8_t viewId, ProgramHandle prog);
 
-        VertexDecl* (*vdeclBegin)(VertexDecl* vdecl, RendererType::Enum _type);
-        void(*vdeclEnd)(VertexDecl* vdecl);
-        VertexDecl* (*vdeclAdd)(VertexDecl* vdecl, VertexAttrib::Enum _attrib, uint8_t _num, VertexAttribType::Enum _type, 
+        VertexDecl* (*beginDecl)(VertexDecl* vdecl, RendererType::Enum _type);
+        void(*endDecl)(VertexDecl* vdecl);
+        VertexDecl* (*addAttrib)(VertexDecl* vdecl, VertexAttrib::Enum _attrib, uint8_t _num, VertexAttribType::Enum _type, 
                                 bool _normalized, bool _asInt);
-        VertexDecl* (*vdeclSkip)(VertexDecl* vdecl, uint8_t _numBytes);
-        void(*vdeclDecode)(VertexDecl* vdecl, VertexAttrib::Enum _attrib, uint8_t* _num, VertexAttribType::Enum* _type,
+        VertexDecl* (*skipAttrib)(VertexDecl* vdecl, uint8_t _numBytes);
+        void(*decodeAttrib)(VertexDecl* vdecl, VertexAttrib::Enum _attrib, uint8_t* _num, VertexAttribType::Enum* _type,
                            bool* _normalized, bool* _asInt);
-        bool(*vdeclHas)(VertexDecl* vdecl, VertexAttrib::Enum _attrib);
-        uint32_t(*vdeclGetSize)(VertexDecl* vdecl, uint32_t _num);
+        bool(*hasAttrib)(VertexDecl* vdecl, VertexAttrib::Enum _attrib);
+        uint32_t(*getDeclSize)(const VertexDecl* vdecl, uint32_t _num);
     };
 }
 #endif
 
-#ifdef T_IMGUI_API
+#ifdef TEE_IMGUI_API
 #include "imgui/imgui.h"
 #include "ImGuizmo/ImGuizmo.h"
 #include "imgui_custom_controls.h"
 
-namespace termite
+namespace tee
 {
-	struct ImGuiApi_v0
+	struct ImGuiApi
 	{
 		// Window
 		bool (*begin)(const char* name, bool* p_opened/* = NULL*/, ImGuiWindowFlags flags/* = 0*/);      // see .cpp for details. return false when window is collapsed, so you can early out in your code. 'bool* p_opened' creates a widget on the upper-right to close the window (which sets your bool to false).
@@ -434,73 +450,73 @@ namespace termite
 
         // Customs
         void (*bezierEditor)(ImGuiBezierEd* bezier, const char* strId, const ImVec2& size, bool lockEnds, bool showText, bool showMirrorY);
-        void (*fishLayout)(ImGuiFishLayout* layout, const char* strId, const ImVec2& size);
+        void (*fishLayout)(ImGuiGridSelect* layout, const char* strId, const ImVec2& size);
         bool (*gaunt)(const char* strId, ImVec2* values, int numValues, int* changeIdx, const ImVec2& size);
 	};
 }
 #endif
 
-#ifdef T_COMPONENT_API
-#include "component_system.h"
+#ifdef TEE_ECS_API
+#include "ecs.h"
 
-namespace termite
+namespace tee
 {
-	struct ComponentApi_v0
+	struct EcsApi
 	{
 		EntityManager* (*createEntityManager)(bx::AllocatorI* alloc, int bufferSize/* = 0*/);
 		void (*destroyEntityManager)(EntityManager* emgr);
 
-		Entity (*createEntity)(EntityManager* emgr);
-		void (*destroyEntity)(EntityManager* emgr, Entity ent);
-		bool (*isEntityAlive)(EntityManager* emgr, Entity ent);
+		Entity (*create)(EntityManager* emgr);
+		void (*destroy)(EntityManager* emgr, Entity ent);
+		bool (*isAlive)(EntityManager* emgr, Entity ent);
 
-		ComponentTypeHandle (*registerComponentType)(const char* name,
+		ComponentTypeHandle (*registerComponent)(const char* name,
 													 const ComponentCallbacks* callbacks, ComponentFlag::Bits flags,
 													 uint32_t dataSize, uint16_t poolSize, uint16_t growSize,
                                                      bx::AllocatorI* alloc);
 		ComponentHandle (*createComponent)(EntityManager* emgr, Entity ent, ComponentTypeHandle handle, ComponentGroupHandle group);
 		void (*destroyComponent)(EntityManager* emgr, Entity ent, ComponentHandle handle);
 
-		ComponentTypeHandle (*findComponentTypeByName)(const char* name);
-		ComponentTypeHandle (*findComponentTypeByNameHash)(size_t hashName);
-		ComponentHandle (*getComponent)(ComponentTypeHandle handle, Entity ent);
-		void* (*getComponentData)(ComponentHandle handle);
-		void (*garbageCollectComponents)(EntityManager* emgr);
+		ComponentTypeHandle (*findType)(const char* name);
+		ComponentTypeHandle (*findTypeByHash)(size_t hashName);
+		ComponentHandle (*get)(ComponentTypeHandle handle, Entity ent);
+		void* (*getData)(ComponentHandle handle);
+		void (*garbageCollect)(EntityManager* emgr);
 
-        void (*runComponentGroup)(ComponentUpdateStage::Enum stage, ComponentGroupHandle groupHandle, float dt);
-        ComponentGroupHandle (*createComponentGroup)(bx::AllocatorI* alloc, uint16_t poolSize);
-        void (*destroyComponentGroup)(ComponentGroupHandle handle);
+        void (*updateGroup)(ComponentUpdateStage::Enum stage, ComponentGroupHandle groupHandle, float dt);
+        ComponentGroupHandle (*createGroup)(bx::AllocatorI* alloc, uint16_t poolSize);
+        void (*destroyGroup)(ComponentGroupHandle handle);
 	};
-} // namespace termite
+} // namespace tee
 #endif
 
-#ifdef T_CAMERA_API
+#ifdef TEE_MATH_API
 #include "camera.h"
-namespace termite
+namespace tee
 {
-    struct CameraApi_v0
+    struct MathApi
     {
         void(*camInit)(Camera* cam, float fov/* = 60.0f*/, float fnear/* = 0.1f*/, float ffar/* = 100.0f*/);
         void(*camLookAt)(Camera* cam, const vec3_t pos, const vec3_t lookat);
         void(*camCalcFrustumCorners)(const Camera* cam, vec3_t result[8], float aspectRatio,
                                      float nearOverride/* = 0*/, float farOverride/* = 0*/);
-        void(*camCalcFrustumPlanes)(plane_t result[CameraPlane::Count], const mtx4x4_t& viewProjMtx);
+        void(*camCalcFrustumPlanes)(plane_t result[CameraPlane::Count], const mat4_t& viewProjMtx);
         void(*camPitch)(Camera* cam, float pitch);
         void(*camYaw)(Camera* cam, float yaw);
         void(*camPitchYaw)(Camera* cam, float pitch, float yaw);
         void(*camRoll)(Camera* cam, float roll);
         void(*camForward)(Camera* cam, float fwd);
         void(*camStrafe)(Camera* cam, float strafe);
-        mtx4x4_t(*camViewMtx)(const Camera* cam);
-        mtx4x4_t(*camProjMtx)(const Camera* cam, float aspectRatio);
+        mat4_t(*camViewMtx)(const Camera* cam);
+        mat4_t(*camProjMtx)(const Camera* cam, float aspectRatio);
 
         // Camera2D
         void(*cam2dInit)(Camera2D* cam, float refWidth, float refHeight,
                          DisplayPolicy::Enum policy, float zoom/* = 1.0f*/, const vec2_t pos/* = vec2_t(0, 0)*/);
         void(*cam2dPan)(Camera2D* cam, vec2_t pan);
         void(*cam2dZoom)(Camera2D* cam, float zoom);
-        mtx4x4_t(*cam2dViewMtx)(const Camera2D& cam);
-        mtx4x4_t(*cam2dProjMtx)(const Camera2D& cam);
+        mat4_t(*cam2dViewMtx)(const Camera2D& cam);
+        mat4_t(*cam2dProjMtx)(const Camera2D& cam);
         rect_t(*cam2dGetRect)(const Camera2D& cam);
     };
 }

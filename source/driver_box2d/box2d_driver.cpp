@@ -1,4 +1,4 @@
-#include "termite/core.h"
+#include "termite/tee.h"
 
 #include "termite/physics_2d.h"
 #include "termite/camera.h"
@@ -12,12 +12,12 @@
 
 #include <assert.h>
 
-#define T_CORE_API
-#define T_GFX_API
-#define T_CAMERA_API
+#define TEE_CORE_API
+#define TEE_GFX_API
+#define TEE_MATH_API
 #include "termite/plugin_api.h"
 
-using namespace termite;
+using namespace tee;
 
 // conversion functions
 inline b2Vec2 b2vec2(const vec2_t& v)
@@ -27,7 +27,7 @@ inline b2Vec2 b2vec2(const vec2_t& v)
 
 inline vec2_t tvec2(const b2Vec2& v)
 {
-    return vec2f(v.x, v.y);
+    return vec2(v.x, v.y);
 }
 
 class PhysDebugDraw : public b2Draw
@@ -44,7 +44,7 @@ public:
     {
     }
 
-    void beginDraw(NVGcontext* nvg, const Camera2D& cam, const recti_t& viewport);
+    void beginDraw(NVGcontext* nvg, const Camera2D& cam, const irect_t& viewport);
     void endDraw();
     bool intersectVerts(const b2Vec2* verts, int vertexCount) const;
     
@@ -91,7 +91,7 @@ public:
     void SayGoodbye(b2ParticleSystem* particleSystem, int32 index) override;
 };
 
-namespace termite
+namespace tee
 {
     struct PhysScene2D
     {
@@ -199,7 +199,7 @@ namespace termite
         {}
     };
     */
-} // namespace termite
+} // namespace tee
 
 
 
@@ -225,16 +225,16 @@ struct Box2dDriver
     }
 };
 
-static Box2dDriver g_box2d;
-static CoreApi_v0* g_coreApi = nullptr;
-static GfxApi_v0* g_gfxApi = nullptr;
-static CameraApi_v0* g_camApi = nullptr;
+static Box2dDriver gBox2d;
+static CoreApi* gTee = nullptr;
+static GfxApi* gGfx = nullptr;
+static MathApi* gMath = nullptr;
 
 static bool initBox2dGraphicsObjects()
 {
-    if ((g_box2d.initFlags & PhysFlags2D::EnableDebug) && g_coreApi->getGfxDriver()) {
-        g_box2d.nvg = nvgCreate(0, g_box2d.debugViewId, g_coreApi->getGfxDriver(), g_gfxApi, g_box2d.alloc);
-        if (!g_box2d.nvg)
+    if ((gBox2d.initFlags & PhysFlags2D::EnableDebug) && gTee->getGfxDriver()) {
+        gBox2d.nvg = nvgCreate(0, gBox2d.debugViewId, gTee->getGfxDriver(), gGfx, gBox2d.alloc);
+        if (!gBox2d.nvg)
             return false;
     }
 
@@ -243,72 +243,72 @@ static bool initBox2dGraphicsObjects()
 
 static void shutdownBox2dGraphicsObjects()
 {
-    if (g_box2d.nvg) {
-        nvgDelete(g_box2d.nvg);
-        g_box2d.nvg = nullptr;
+    if (gBox2d.nvg) {
+        nvgDelete(gBox2d.nvg);
+        gBox2d.nvg = nullptr;
     }
 }
 
 static void* b2AllocCallback(int32 size, void* callbackData)
 {
-    assert(g_box2d.alloc);
-    return BX_ALLOC(g_box2d.alloc, size);
+    assert(gBox2d.alloc);
+    return BX_ALLOC(gBox2d.alloc, size);
 }
 
 static void b2FreeCallback(void* mem, void* callbackData)
 {
-    assert(g_box2d.alloc);
-    BX_FREE(g_box2d.alloc, mem);
+    assert(gBox2d.alloc);
+    BX_FREE(gBox2d.alloc, mem);
 }
 
 
-static result_t initBox2d(bx::AllocatorI* alloc, PhysFlags2D::Bits flags, uint8_t debugViewId)
+static bool initBox2d(bx::AllocatorI* alloc, PhysFlags2D::Bits flags, uint8_t debugViewId)
 {
-    if (!g_box2d.scenePool.create(6, alloc) ||
-        !g_box2d.bodyPool.create(200, alloc) ||
-        !g_box2d.shapePool.create(200, alloc) ||
-        !g_box2d.jointPool.create(100, alloc) ||
-        !g_box2d.emitterPool.create(30, alloc))
+    if (!gBox2d.scenePool.create(6, alloc) ||
+        !gBox2d.bodyPool.create(200, alloc) ||
+        !gBox2d.shapePool.create(200, alloc) ||
+        !gBox2d.jointPool.create(100, alloc) ||
+        !gBox2d.emitterPool.create(30, alloc))
     {
-        return T_ERR_OUTOFMEM;
+        return false;
     }
 
-    if (!g_box2d.emitterTable.create(30, alloc))
-        return T_ERR_OUTOFMEM;
+    if (!gBox2d.emitterTable.create(30, alloc))
+        return false;
 
-    if ((flags & PhysFlags2D::EnableDebug) && g_coreApi->getGfxDriver()) {
-        g_box2d.nvg = nvgCreate(0, debugViewId, g_coreApi->getGfxDriver(), g_gfxApi, alloc);
-        if (!g_box2d.nvg) {
-            BX_WARN_API(g_coreApi, "Initializing NanoVg for Debugging Physics failed");
+    if ((flags & PhysFlags2D::EnableDebug) && gTee->getGfxDriver()) {
+        gBox2d.nvg = nvgCreate(0, debugViewId, gTee->getGfxDriver(), gGfx, alloc);
+        if (!gBox2d.nvg) {
+            BX_WARN_API(gTee, "Initializing NanoVg for Debugging Physics failed");
         }
         debugViewId = debugViewId;
     }
 
-    g_box2d.alloc = alloc;
-    g_box2d.initFlags = flags;
+    gBox2d.alloc = alloc;
+    gBox2d.initFlags = flags;
 
     b2SetAllocFreeCallbacks(b2AllocCallback, b2FreeCallback, nullptr);
 
-    return 0;
+    return true;
 }
 
 static void shutdownBox2d()
 {
     shutdownBox2dGraphicsObjects();
 
-    g_box2d.emitterTable.destroy();
+    gBox2d.emitterTable.destroy();
 //    g_box2d.pgroupPool.destroy();
-    g_box2d.emitterPool.destroy();
-    g_box2d.jointPool.destroy();
-    g_box2d.shapePool.destroy();
-    g_box2d.bodyPool.destroy();
-    g_box2d.scenePool.destroy();
-    g_box2d.alloc = nullptr;
+    gBox2d.emitterPool.destroy();
+    gBox2d.jointPool.destroy();
+    gBox2d.shapePool.destroy();
+    gBox2d.bodyPool.destroy();
+    gBox2d.scenePool.destroy();
+    gBox2d.alloc = nullptr;
 }
 
 static PhysScene2D* createSceneBox2d(const PhysSceneDef2D& worldDef)
 {
-    PhysScene2D* scene = g_box2d.scenePool.newInstance<const PhysSceneDef2D&>(worldDef);
+    PhysScene2D* scene = gBox2d.scenePool.newInstance<const PhysSceneDef2D&>(worldDef);
     if (!scene)
         return nullptr;
     scene->w.SetContactFilter(&scene->contactFilter);
@@ -319,23 +319,23 @@ static PhysScene2D* createSceneBox2d(const PhysSceneDef2D& worldDef)
 
 static void destroySceneBox2d(PhysScene2D* scene)
 {
-    g_box2d.scenePool.deleteInstance(scene);
+    gBox2d.scenePool.deleteInstance(scene);
 }
 
 static void stepSceneBox2d(PhysScene2D* scene, float dt)
 {
-    scene->w.Step(dt, 9, 4, 2);
+    scene->w.Step(dt, 10, 4, 2);
 }
 
-static void debugSceneBox2d(PhysScene2D* scene, const recti_t viewport, const Camera2D& cam,
+static void debugSceneBox2d(PhysScene2D* scene, const irect_t viewport, const Camera2D& cam,
                             PhysDebugFlags2D::Bits flags)
  {
     assert(scene);
 
-    if (g_box2d.nvg) {
+    if (gBox2d.nvg) {
         scene->debugDraw.SetFlags(flags);
         scene->w.SetDebugDraw(&scene->debugDraw);
-        scene->debugDraw.beginDraw(g_box2d.nvg, cam, viewport);
+        scene->debugDraw.beginDraw(gBox2d.nvg, cam, viewport);
         scene->w.DrawDebugData();
         scene->debugDraw.endDraw();
     }
@@ -347,7 +347,7 @@ static PhysBody2D* createBodyBox2d(PhysScene2D* scene, const PhysBodyDef2D& body
     static_assert(PhysBodyType2D::Dynamic == b2_dynamicBody, "BodyType mismatch");
     static_assert(PhysBodyType2D::Kinematic == b2_kinematicBody, "BodyType mismatch");
 
-    PhysBody2D* pbody = g_box2d.bodyPool.newInstance<>();
+    PhysBody2D* pbody = gBox2d.bodyPool.newInstance<>();
     if (!pbody)
         return nullptr;
     pbody->ownerScene = scene;
@@ -369,7 +369,7 @@ static PhysBody2D* createBodyBox2d(PhysScene2D* scene, const PhysBodyDef2D& body
 
     b2Body* bbody = scene->w.CreateBody(&bdef);
     if (!bbody) {
-        g_box2d.bodyPool.deleteInstance(pbody);
+        gBox2d.bodyPool.deleteInstance(pbody);
         return nullptr;
     }
 
@@ -385,12 +385,12 @@ static void destroyBodyBox2d(PhysBody2D* body)
     
     body->ownerScene->w.DestroyBody(body->b);
     body->b = nullptr;
-    g_box2d.bodyPool.deleteInstance(body);
+    gBox2d.bodyPool.deleteInstance(body);
 }
 
 static PhysShape2D* createBoxShapeBox2d(PhysBody2D* body, const vec2_t& halfSize, const PhysShapeDef2D& shapeDef)
 {
-    PhysShape2D* shape = g_box2d.shapePool.newInstance<>();
+    PhysShape2D* shape = gBox2d.shapePool.newInstance<>();
     if (!shape)
         return nullptr;
     b2PolygonShape box;
@@ -410,7 +410,7 @@ static PhysShape2D* createBoxShapeBox2d(PhysBody2D* body, const vec2_t& halfSize
     shape->ownerBody = body;
     shape->fixture = body->b->CreateFixture(&fdef);
     if (!shape->fixture) {
-        g_box2d.shapePool.deleteInstance(shape);
+        gBox2d.shapePool.deleteInstance(shape);
         return nullptr;
     }
     shape->userData = shapeDef.userData;
@@ -420,7 +420,7 @@ static PhysShape2D* createBoxShapeBox2d(PhysBody2D* body, const vec2_t& halfSize
 static PhysShape2D* createArbitaryBoxShapeBox2d(PhysBody2D* body, const vec2_t& halfSize, const vec2_t& pos, float angle,
                                                 const PhysShapeDef2D& shapeDef)
 {
-    PhysShape2D* shape = g_box2d.shapePool.newInstance<>();
+    PhysShape2D* shape = gBox2d.shapePool.newInstance<>();
     if (!shape)
         return nullptr;
     b2PolygonShape box;
@@ -440,7 +440,7 @@ static PhysShape2D* createArbitaryBoxShapeBox2d(PhysBody2D* body, const vec2_t& 
     shape->ownerBody = body;
     shape->fixture = body->b->CreateFixture(&fdef);
     if (!shape->fixture) {
-        g_box2d.shapePool.deleteInstance(shape);
+        gBox2d.shapePool.deleteInstance(shape);
         return nullptr;
     }
     shape->userData = shapeDef.userData;
@@ -449,7 +449,7 @@ static PhysShape2D* createArbitaryBoxShapeBox2d(PhysBody2D* body, const vec2_t& 
 
 static PhysShape2D* createPolyShapeBox2d(PhysBody2D* body, const vec2_t* verts, int numVerts, const PhysShapeDef2D& shapeDef)
 {
-    PhysShape2D* shape = g_box2d.shapePool.newInstance<>();
+    PhysShape2D* shape = gBox2d.shapePool.newInstance<>();
     if (!shape)
         return nullptr;
     b2PolygonShape poly;
@@ -474,7 +474,7 @@ static PhysShape2D* createPolyShapeBox2d(PhysBody2D* body, const vec2_t* verts, 
     shape->ownerBody = body;
     shape->fixture = body->b->CreateFixture(&fdef);
     if (!shape->fixture) {
-        g_box2d.shapePool.deleteInstance(shape);
+        gBox2d.shapePool.deleteInstance(shape);
         return nullptr;
     }
     shape->userData = shapeDef.userData;
@@ -484,7 +484,7 @@ static PhysShape2D* createPolyShapeBox2d(PhysBody2D* body, const vec2_t* verts, 
 
 static PhysShape2D* createCircleShapeBox2d(PhysBody2D* body, const vec2_t& pos, float radius, const PhysShapeDef2D& shapeDef)
 {
-    PhysShape2D* shape = g_box2d.shapePool.newInstance<>();
+    PhysShape2D* shape = gBox2d.shapePool.newInstance<>();
     if (!shape)
         return nullptr;
     b2CircleShape circle;
@@ -505,7 +505,7 @@ static PhysShape2D* createCircleShapeBox2d(PhysBody2D* body, const vec2_t& pos, 
     shape->ownerBody = body;
     shape->fixture = body->b->CreateFixture(&fdef);
     if (!shape->fixture) {
-        g_box2d.shapePool.deleteInstance(shape);
+        gBox2d.shapePool.deleteInstance(shape);
         return nullptr;
     }
     shape->userData = shapeDef.userData;
@@ -517,7 +517,7 @@ static PhysDistanceJoint2D* createDistanceJointBox2d(PhysScene2D* scene, PhysBod
                                                      float length, float frequencyHz/* = 0*/, float dampingRatio/* = 0.7f*/,
                                                      bool collide/* = false*/, void* userData/* = nullptr*/)
 {
-    PhysJoint2D* joint = g_box2d.jointPool.newInstance<>();
+    PhysJoint2D* joint = gBox2d.jointPool.newInstance<>();
 
     b2DistanceJointDef def;
     def.bodyA = bodyA->b;
@@ -532,7 +532,7 @@ static PhysDistanceJoint2D* createDistanceJointBox2d(PhysScene2D* scene, PhysBod
 
     joint->j = scene->w.CreateJoint(&def);
     if (!joint->j) {
-        g_box2d.jointPool.deleteInstance(joint);
+        gBox2d.jointPool.deleteInstance(joint);
         return nullptr;
     }
     joint->userData = userData;
@@ -543,7 +543,7 @@ static PhysDistanceJoint2D* createDistanceJointBox2d(PhysScene2D* scene, PhysBod
 static PhysWeldJoint2D* createWeldJointBox2d(PhysScene2D* scene, PhysBody2D* bodyA, PhysBody2D* bodyB, const vec2_t& worldPt,
                                         float dampingRatio, float frequencyHz, void* userData)
 {
-    PhysJoint2D* joint = g_box2d.jointPool.newInstance<>();
+    PhysJoint2D* joint = gBox2d.jointPool.newInstance<>();
     b2WeldJointDef def;
     def.Initialize(bodyA->b, bodyB->b, b2vec2(worldPt));
     def.dampingRatio = dampingRatio;
@@ -553,7 +553,7 @@ static PhysWeldJoint2D* createWeldJointBox2d(PhysScene2D* scene, PhysBody2D* bod
     
     joint->j = scene->w.CreateJoint(&def);
     if (!joint->j) {
-        g_box2d.jointPool.deleteInstance(joint);
+        gBox2d.jointPool.deleteInstance(joint);
         return nullptr;
     }
     joint->userData = userData;
@@ -566,7 +566,7 @@ PhysWeldJoint2D* createWeldJoint2PtsBox2d(PhysScene2D* scene, PhysBody2D* bodyA,
                                           const vec2_t& anchorA, const vec2_t& anchorB,
                                           float dampingRatio/* = 0*/, float frequencyHz/* = 0*/, void* userData/* = nullptr*/)
 {
-    PhysJoint2D* joint = g_box2d.jointPool.newInstance<>();
+    PhysJoint2D* joint = gBox2d.jointPool.newInstance<>();
     b2WeldJointDef def;
     def.bodyA = bodyA->b;
     def.bodyB = bodyB->b;
@@ -580,7 +580,7 @@ PhysWeldJoint2D* createWeldJoint2PtsBox2d(PhysScene2D* scene, PhysBody2D* bodyA,
 
     joint->j = scene->w.CreateJoint(&def);
     if (!joint->j) {
-        g_box2d.jointPool.deleteInstance(joint);
+        gBox2d.jointPool.deleteInstance(joint);
         return nullptr;
     }
     joint->userData = userData;
@@ -592,13 +592,13 @@ static PhysMouseJoint2D* createMouseJointBox2d(PhysScene2D* scene, PhysBody2D* b
                                                float maxForce/* = 0*/, float frequencyHz/* = 5.0f*/, float dampingRatio/* = 0.7f*/,
                                                bool collide/* = false*/, void* userData/* = nullptr*/)
 {
-    PhysJoint2D* joint = g_box2d.jointPool.newInstance<>();
+    PhysJoint2D* joint = gBox2d.jointPool.newInstance<>();
     b2MouseJointDef def;
     def.userData = joint;
 
     joint->j = scene->w.CreateJoint(&def);
     if (!joint->j) {
-        g_box2d.jointPool.deleteInstance(joint);
+        gBox2d.jointPool.deleteInstance(joint);
         return nullptr;
     }
     joint->userData = userData;
@@ -653,9 +653,9 @@ void ContactListenerBox2d::BeginContact(b2Contact* contact)
 
 void ContactListenerBox2d::BeginContact(b2ParticleSystem* particleSystem, b2ParticleBodyContact* particleBodyContact)
 {
-    int index = g_box2d.emitterTable.find(uintptr_t(particleSystem));
+    int index = gBox2d.emitterTable.find(uintptr_t(particleSystem));
     if (index != -1) {
-        PhysParticleEmitter2D* emitter = g_box2d.emitterTable.getValue(index);
+        PhysParticleEmitter2D* emitter = gBox2d.emitterTable.getValue(index);
         if (emitter->shapeBeginContactFn) {
             emitter->shapeBeginContactFn(emitter, particleBodyContact->index,
                 (PhysShape2D*)particleBodyContact->fixture->GetUserData(),
@@ -666,9 +666,9 @@ void ContactListenerBox2d::BeginContact(b2ParticleSystem* particleSystem, b2Part
 
 void ContactListenerBox2d::BeginContact(b2ParticleSystem* particleSystem, b2ParticleContact* particleContact)
 {
-    int index = g_box2d.emitterTable.find(uintptr_t(particleSystem));
+    int index = gBox2d.emitterTable.find(uintptr_t(particleSystem));
     if (index != -1) {
-        PhysParticleEmitter2D* emitter = g_box2d.emitterTable.getValue(index);
+        PhysParticleEmitter2D* emitter = gBox2d.emitterTable.getValue(index);
         if (emitter->particleBeginContactFn) {
             emitter->particleBeginContactFn(emitter, particleContact->GetIndexA(), particleContact->GetIndexB(),
                                             tvec2(particleContact->GetNormal()), particleContact->GetWeight());
@@ -692,22 +692,22 @@ void ContactListenerBox2d::EndContact(b2Contact* contact)
 
 void ContactListenerBox2d::EndContact(b2Fixture* fixture, b2ParticleSystem* particleSystem, int32 index)
 {
-    int r = g_box2d.emitterTable.find(uintptr_t(particleSystem));
+    int r = gBox2d.emitterTable.find(uintptr_t(particleSystem));
     if (r != -1) {
-        PhysParticleEmitter2D* emitter = g_box2d.emitterTable.getValue(r);
+        PhysParticleEmitter2D* emitter = gBox2d.emitterTable.getValue(r);
         if (emitter->shapeEndContactFn) {
-            emitter->shapeEndContactFn(emitter, index, (PhysShape2D*)fixture->GetUserData(), vec2f(0, 0), 0);
+            emitter->shapeEndContactFn(emitter, index, (PhysShape2D*)fixture->GetUserData(), vec2(0, 0), 0);
         }
     }
 }
 
 void ContactListenerBox2d::EndContact(b2ParticleSystem* particleSystem, int32 indexA, int32 indexB)
 {
-    int r = g_box2d.emitterTable.find(uintptr_t(particleSystem));
+    int r = gBox2d.emitterTable.find(uintptr_t(particleSystem));
     if (r != -1) {
-        PhysParticleEmitter2D* emitter = g_box2d.emitterTable.getValue(r);
+        PhysParticleEmitter2D* emitter = gBox2d.emitterTable.getValue(r);
         if (emitter->particleEndContactFn) {
-            emitter->particleEndContactFn(emitter, indexA, indexB, vec2f(0, 0), 0);
+            emitter->particleEndContactFn(emitter, indexA, indexB, vec2(0, 0), 0);
         }
     }
 }
@@ -732,9 +732,9 @@ bool ContactFilterBox2d::ShouldCollide(b2Fixture* fixtureA, b2Fixture* fixtureB)
 
 bool ContactFilterBox2d::ShouldCollide(b2Fixture* fixture, b2ParticleSystem* particleSystem, int32 particleIndex)
 {
-    int index = g_box2d.emitterTable.find(uintptr_t(particleSystem));
+    int index = gBox2d.emitterTable.find(uintptr_t(particleSystem));
     if (index != -1) {
-        PhysParticleEmitter2D* emitter = g_box2d.emitterTable.getValue(index);
+        PhysParticleEmitter2D* emitter = gBox2d.emitterTable.getValue(index);
         if (emitter->shapeContactFilterFn) {
             return emitter->shapeContactFilterFn(emitter, particleIndex, (PhysShape2D*)fixture->GetUserData());
         }
@@ -745,9 +745,9 @@ bool ContactFilterBox2d::ShouldCollide(b2Fixture* fixture, b2ParticleSystem* par
 
 bool ContactFilterBox2d::ShouldCollide(b2ParticleSystem* particleSystem, int32 particleIndexA, int32 particleIndexB)
 {
-    int index = g_box2d.emitterTable.find(uintptr_t(particleSystem));
+    int index = gBox2d.emitterTable.find(uintptr_t(particleSystem));
     if (index != -1) {
-        PhysParticleEmitter2D* emitter = g_box2d.emitterTable.getValue(index);
+        PhysParticleEmitter2D* emitter = gBox2d.emitterTable.getValue(index);
         if (emitter->particleContactFilterFn) {
             emitter->particleContactFilterFn(emitter, particleIndexA, particleIndexB);
         }
@@ -761,7 +761,7 @@ void DestructionListenerBox2d::SayGoodbye(b2Joint* joint)
     PhysJoint2D* pj = (PhysJoint2D*)joint->GetUserData();
     if (pj->destroyFn)
         pj->destroyFn(pj);
-    g_box2d.jointPool.deleteInstance(pj);
+    gBox2d.jointPool.deleteInstance(pj);
 }
 
 void DestructionListenerBox2d::SayGoodbye(b2Fixture* fixture)
@@ -769,14 +769,14 @@ void DestructionListenerBox2d::SayGoodbye(b2Fixture* fixture)
     PhysShape2D* shape = (PhysShape2D*)fixture->GetUserData();
     if (shape->destroyFn)
         shape->destroyFn(shape);
-    g_box2d.shapePool.deleteInstance(shape);
+    gBox2d.shapePool.deleteInstance(shape);
 }
 
 void DestructionListenerBox2d::SayGoodbye(b2ParticleSystem* particleSystem, int32 index)
 {
-    int r = g_box2d.emitterTable.find(uintptr_t(particleSystem));
+    int r = gBox2d.emitterTable.find(uintptr_t(particleSystem));
     if (r != -1) {
-        PhysParticleEmitter2D* emitter = g_box2d.emitterTable.getValue(r);
+        PhysParticleEmitter2D* emitter = gBox2d.emitterTable.getValue(r);
         if (emitter->destroyFn)
             emitter->destroyFn(emitter, index);
     }
@@ -830,8 +830,8 @@ static void box2dQueryShapeCircle(PhysScene2D* scene, float radius, const vec2_t
 
     QueryCircleCallback b2callback(callback, userData);
     b2AABB aabb;
-    aabb.lowerBound = b2vec2(pos - vec2f(radius, radius));
-    aabb.upperBound = b2vec2(pos + vec2f(radius, radius));
+    aabb.lowerBound = b2vec2(pos - vec2(radius, radius));
+    aabb.upperBound = b2vec2(pos + vec2(radius, radius));
 
     scene->w.QueryAABB(&b2callback, aabb);
 }
@@ -891,15 +891,15 @@ static PhysParticleEmitter2D* box2dCreateParticleEmitter(PhysScene2D* scene, con
     b2def.destroyByAge = (def.flags & PhysEmitterFlags2D::DestroyByAge) ? true : false;
     b2def.lifetimeGranularity = 1.0f / 60.0f;
 
-    PhysParticleEmitter2D* emitter = g_box2d.emitterPool.newInstance<>();
+    PhysParticleEmitter2D* emitter = gBox2d.emitterPool.newInstance<>();
     emitter->p = scene->w.CreateParticleSystem(&b2def);
     if (!emitter->p) {
-        g_box2d.emitterPool.deleteInstance(emitter);
+        gBox2d.emitterPool.deleteInstance(emitter);
         return nullptr;
     }
 
     emitter->userData = def.userData;
-    g_box2d.emitterTable.add(uintptr_t(emitter->p), emitter);
+    gBox2d.emitterTable.add(uintptr_t(emitter->p), emitter);
     return emitter;    
 }
 
@@ -909,10 +909,10 @@ static void box2dDestroyParticleEmitter(PhysScene2D* scene, PhysParticleEmitter2
 
     scene->w.DestroyParticleSystem(emitter->p);
     
-    int r = g_box2d.emitterTable.find(uintptr_t(emitter->p));
+    int r = gBox2d.emitterTable.find(uintptr_t(emitter->p));
     if (r != -1)
-        g_box2d.emitterTable.remove(r);
-    g_box2d.emitterPool.deleteInstance(emitter);
+        gBox2d.emitterTable.remove(r);
+    gBox2d.emitterPool.deleteInstance(emitter);
 }
 
 static void* box2dGetParticleEmitterUserData(PhysParticleEmitter2D* emitter)
@@ -999,11 +999,11 @@ static int box2dGetEmitterVelocityBuffer(PhysParticleEmitter2D* emitter, vec2_t*
     return count;
 }
 
-static int box2dGetEmitterColorBuffer(PhysParticleEmitter2D* emitter, color_t* colors, int maxItems)
+static int box2dGetEmitterColorBuffer(PhysParticleEmitter2D* emitter, ucolor_t* colors, int maxItems)
 {
     assert(emitter);
     int count = std::min<int>(emitter->p->GetParticleCount(), maxItems);
-    memcpy(colors, emitter->p->GetColorBuffer(), count*sizeof(color_t));
+    memcpy(colors, emitter->p->GetColorBuffer(), count*sizeof(ucolor_t));
     return count;
 }
 
@@ -1060,7 +1060,7 @@ static uint32_t box2dGetParticleGroupFlags(PhysParticleGroup2D* group)
     return ((b2ParticleGroup*)group)->GetGroupFlags();
 }
 
-void PhysDebugDraw::beginDraw(NVGcontext* nvg, const Camera2D& cam, const recti_t& viewport)
+void PhysDebugDraw::beginDraw(NVGcontext* nvg, const Camera2D& cam, const irect_t& viewport)
 {
     assert(nvg);
     m_nvg = nvg;
@@ -1085,7 +1085,7 @@ void PhysDebugDraw::beginDraw(NVGcontext* nvg, const Camera2D& cam, const recti_
     nvgGlobalAlpha(nvg, 0.8f);
 
     m_strokeScale = 2.0f / scale;
-    m_viewRect = g_camApi->cam2dGetRect(cam);
+    m_viewRect = gMath->cam2dGetRect(cam);
 }
 
 void PhysDebugDraw::endDraw()
@@ -1098,7 +1098,7 @@ bool PhysDebugDraw::intersectVerts(const b2Vec2* verts, int vertexCount) const
 {
     rect_t rc = m_viewRect;
     for (int i = 0; i < vertexCount; i++) {
-        if (rectTestPoint(rc, tvec2(verts[i])))
+        if (tmath::rectTestPoint(rc, tvec2(verts[i])))
             return true;
     }
 
@@ -1143,7 +1143,7 @@ void PhysDebugDraw::DrawSolidPolygon(const b2Vec2* vertices, int32 vertexCount, 
 
 void PhysDebugDraw::DrawCircle(const b2Vec2& center, float32 radius, const b2Color& color)
 {
-    if (!rectTestCircle(m_viewRect, tvec2(center), radius))
+    if (!tmath::rectTestCircle(m_viewRect, tvec2(center), radius))
         return;
 
     NVGcontext* vg = m_nvg;
@@ -1156,7 +1156,7 @@ void PhysDebugDraw::DrawCircle(const b2Vec2& center, float32 radius, const b2Col
 
 void PhysDebugDraw::DrawSolidCircle(const b2Vec2& center, float32 radius, const b2Vec2& axis, const b2Color& color)
 {
-    if (!rectTestCircle(m_viewRect, tvec2(center), radius))
+    if (!tmath::rectTestCircle(m_viewRect, tvec2(center), radius))
         return;
 
     NVGcontext* vg = m_nvg;
@@ -1172,9 +1172,9 @@ void PhysDebugDraw::DrawParticles(const b2Vec2 *centers, float32 radius, const b
     // Make a rect from particles
     rect_t particlesRect;
     for (int i = 0; i < count; i++) {
-        rectPushPoint(&particlesRect, tvec2(centers[i]));
+        tmath::rectPushPoint(&particlesRect, tvec2(centers[i]));
     }
-    if (!rectTestRect(m_viewRect, particlesRect))
+    if (!tmath::rectTestRect(m_viewRect, particlesRect))
         return;
 
     NVGcontext* vg = m_nvg;
@@ -1188,7 +1188,7 @@ void PhysDebugDraw::DrawParticles(const b2Vec2 *centers, float32 radius, const b
 
 void PhysDebugDraw::DrawSegment(const b2Vec2& p1, const b2Vec2& p2, const b2Color& color)
 {
-    if (!rectTestPoint(m_viewRect, tvec2(p1)) && !rectTestPoint(m_viewRect, tvec2(p2)))
+    if (!tmath::rectTestPoint(m_viewRect, tvec2(p1)) && !tmath::rectTestPoint(m_viewRect, tvec2(p2)))
         return;
 
     NVGcontext* vg = m_nvg;
@@ -1202,7 +1202,7 @@ void PhysDebugDraw::DrawSegment(const b2Vec2& p1, const b2Vec2& p2, const b2Colo
 
 void PhysDebugDraw::DrawTransform(const b2Transform& xf)
 {
-    if (!rectTestPoint(m_viewRect, tvec2(xf.p)))
+    if (!tmath::rectTestPoint(m_viewRect, tvec2(xf.p)))
         return;
 
     NVGcontext* vg = m_nvg;
@@ -1226,18 +1226,18 @@ PluginDesc* getBox2dDriverDesc()
     strcpy(desc.name, "Box2D");
     strcpy(desc.description, "Box2D Physics Driver");
     desc.type = PluginType::Physics2dDriver;
-    desc.version = T_MAKE_VERSION(1, 0);
+    desc.version = TEE_MAKE_VERSION(1, 0);
     return &desc;
 }
 
 void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 {
-    static PhysDriver2DApi api;
+    static PhysDriver2D api;
     bx::memSet(&api, 0x00, sizeof(api));
 
-    g_coreApi = (CoreApi_v0*)getApi(ApiId::Core, 0);
-    g_gfxApi = (GfxApi_v0*)getApi(ApiId::Gfx, 0);
-    g_camApi = (CameraApi_v0*)getApi(ApiId::Camera, 0);
+    gTee = (CoreApi*)getApi(ApiId::Core, 0);
+    gGfx = (GfxApi*)getApi(ApiId::Gfx, 0);
+    gMath = (MathApi*)getApi(ApiId::Camera, 0);
 
     api.init = initBox2d;
     api.shutdown = shutdownBox2d;
@@ -1398,9 +1398,9 @@ void shutdownBox2dDriver()
 }
 
 #ifdef termite_SHARED_LIB
-T_PLUGIN_EXPORT void* termiteGetPluginApi(uint16_t apiId, uint32_t version)
+TEE_PLUGIN_EXPORT void* termiteGetPluginApi(uint16_t apiId, uint32_t version)
 {
-    static PluginApi_v0 v0;
+    static PluginApi v0;
 
     if (version == 0) {
         v0.init = initBox2dDriver;

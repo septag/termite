@@ -18,7 +18,7 @@ static const uint8_t kAESKey[] = {0x32, 0xBF, 0xE7, 0x76, 0x41, 0x21, 0xF6, 0xA5
 static const uint8_t kAESIv[] = {0x0A, 0x2D, 0x76, 0x63, 0x9F, 0x28, 0x10, 0xCD, 0x24, 0x22, 0x26, 0x68, 0xC1, 0x5A, 0x82, 0x5A};
 
 #define T_ENC_SIGN 0x54454e43        // "TENC"
-#define T_ENC_VERSION T_MAKE_VERSION(1, 0)       
+#define T_ENC_VERSION TEE_MAKE_VERSION(1, 0)       
 
 // Encode file header
 // Same as termite version (core.cpp)
@@ -36,11 +36,11 @@ struct EncodeHeader
 #ifdef _DEBUG
 #define STB_LEAKCHECK_IMPLEMENTATION
 #include "bxx/leakcheck_allocator.h"
-static bx::LeakCheckAllocator g_allocStub;
+static bx::LeakCheckAllocator gAllocStub;
 #else
-static bx::DefaultAllocator g_allocStub;
+static bx::DefaultAllocator gAllocStub;
 #endif
-static bx::AllocatorI* g_alloc = &g_allocStub;
+static bx::AllocatorI* gAlloc = &gAllocStub;
 
 static int char2int(char input)
 {
@@ -102,7 +102,7 @@ int main(int argc, char* argv[])
     }
 
     int32_t size = int32_t(finfo.m_size);
-    void* mem = BX_ALLOC(g_alloc, size);
+    void* mem = BX_ALLOC(gAlloc, size);
     if (!mem) {
         printf("Out of memory, requested size: %ull\n", size);
         file.close();
@@ -118,21 +118,21 @@ int main(int argc, char* argv[])
 
     // Compress LZ4
     int maxSize = BX_ALIGN_16(LZ4_compressBound(size));
-    void* compressedBuff = BX_ALLOC(g_alloc, maxSize);
+    void* compressedBuff = BX_ALLOC(gAlloc, maxSize);
     if (!compressedBuff) {
         printf("Out of memory, requested size: %ull\n", maxSize);
-        BX_FREE(g_alloc, mem);
+        BX_FREE(gAlloc, mem);
         return -1;
     }
     int compressSize = LZ4_compress_default((const char*)mem, (char*)compressedBuff, size, maxSize);
-    BX_FREE(g_alloc, mem);
+    BX_FREE(gAlloc, mem);
     int alignedCompressSize = BX_ALIGN_16(compressSize);
     assert(alignedCompressSize <= maxSize);
     bx::memSet((uint8_t*)compressedBuff + compressSize, 0x00, alignedCompressSize - compressSize);
 
     // AES Encode
     int encSize = int(alignedCompressSize + sizeof(header));
-    void* encMem = BX_ALLOC(g_alloc, encSize);
+    void* encMem = BX_ALLOC(gAlloc, encSize);
     if (encMem) {
         AES_CBC_encrypt_buffer((uint8_t*)encMem + sizeof(header), (uint8_t*)compressedBuff, alignedCompressSize, key, iv);
 
@@ -142,7 +142,7 @@ int main(int argc, char* argv[])
         *((EncodeHeader*)encMem) = header;
     }
 
-    BX_FREE(g_alloc, compressedBuff);
+    BX_FREE(gAlloc, compressedBuff);
     
     // Write encMem to output file
     bx::FileWriter outFile;
@@ -152,7 +152,7 @@ int main(int argc, char* argv[])
 
     outFile.write(encMem, encSize, &err);
     outFile.close();
-    BX_FREE(g_alloc, encMem);
+    BX_FREE(gAlloc, encMem);
 
     printf("Encrypted file written to: %s (%.1fkb -> %.1fkb)\n", outputFilepath, float(size)/1024.0f, float(encSize)/1024.0f);
 

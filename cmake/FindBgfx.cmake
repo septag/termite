@@ -25,13 +25,7 @@ find_path(BGFX_INCLUDE_DIR
 set(BIMG_INCLUDE_DIR ${BGFX_INCLUDE_DIR})
 
 if (ANDROID)
-    if (ANDROID_ABI MATCHES "armeabi-v7a")
-        set(BGFX_LIB_DIR_SUB "/armeabi-v7a")
-    elseif (ANDROID_ABI MATCHES "armeabi")
-        set(BGFX_LIB_DIR_SUB "/armeabi")
-    elseif (ANDROID_ABI MATCHES "x86")
-        set(BGFX_LIB_DIR_SUB "/x86")
-    endif()
+    set(BGFX_LIB_DIR_SUB "/${ANDROID_ABI}")
 endif()
 
 find_library(BGFX_LIBRARY_RELEASE bgfxRelease PATHS ${BGFX_ROOT_DIR}/lib${BGFX_LIB_DIR_SUB} ${FIND_EXTRA_FLAG})
