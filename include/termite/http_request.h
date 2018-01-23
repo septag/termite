@@ -24,21 +24,32 @@ namespace tee
     };
 
     // Http response callback. Gets called in the caller thread
-    typedef std::function<void(int code, const char* body, const HttpHeaderField* headers, int numHeaders)> HttpResponseCallback;
+    typedef void (*HttpResponseCallback)(int code, const char* body, const HttpHeaderField* headers, int numHeaders, 
+                                         void* userData);
 
     // Connection callback is used for advanced requests , which you should include "restclient-cpp/connection.h" and use the methods
     // This function is called within async worker thread, so the user should only use 'conn' methods and work on userData in a thread-safe manner
     // User should return conn response back to async worker thread that will be reported in HttpResponseCallback
-    typedef std::function<const RestClient::Response&(RestClient::Connection* conn)> HttpConnectionCallback;
+    // Example: conn->SetCertFile, conn->Set...., return conn->get(..);
+    typedef const RestClient::Response& (*HttpConnectionCallback)(RestClient::Connection* conn, void* userData);
 
     namespace http {
-        TEE_API void get(const char* url, HttpResponseCallback responseFn);
-        TEE_API void post(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn);
-        TEE_API void put(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn);
-        TEE_API void del(const char* url, HttpResponseCallback responseFn);
-        TEE_API void head(const char* url, HttpResponseCallback responseFn);
+        // Config
+        TEE_API void setCert(const char* filepath, bool insecure = false);
+        TEE_API void setKey(const char* filepath, const char* passphrase = nullptr);
+        TEE_API void setTimeout(int timeoutSecs);
+        TEE_API void setBaseUrl(const char* url);
 
-        TEE_API void request(const char* url, HttpConnectionCallback connFn, HttpResponseCallback responseFn);
+        // 
+        TEE_API void get(const char* url, HttpResponseCallback responseFn, void* userData = nullptr);
+        TEE_API void post(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn, 
+                          void* userData = nullptr);
+        TEE_API void put(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn, 
+                         void* userData = nullptr);
+        TEE_API void del(const char* url, HttpResponseCallback responseFn, void* userData = nullptr);
+        TEE_API void head(const char* url, HttpResponseCallback responseFn, void* userData = nullptr);
+
+        TEE_API void request(const char* url, HttpConnectionCallback connFn, HttpResponseCallback responseFn, void* userData = nullptr);
     }
 }
 

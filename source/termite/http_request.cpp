@@ -18,6 +18,7 @@ namespace tee {
     struct HttpRequestMethod
     {
         enum Enum {
+            Unknown = 0,
             GET,
             POST,
             PUT,
@@ -28,28 +29,29 @@ namespace tee {
 
     struct HttpRequest
     {
+        bx::AllocatorI* alloc;
+
         HttpRequestMethod::Enum method;
         HttpResponseCallback responseFn;
 
-        char* url;
-        char* contentType;
-        char* data;
-
-        HttpConnectionCallback* connFn;     // For advanced, or else this is nullptr
+        HttpConnectionCallback connFn;     // For advanced mode (request), or else this is nullptr
         bx::Queue<HttpRequest*>::Node qnode;
 
+        char url[256];
+        char contentType[32];
+        char* data;                        // For PUT/POST methods
+        void* userData;
+
         HttpRequest() :
-            method(HttpRequestMethod::GET),
+            method(HttpRequestMethod::Unknown),
+            responseFn(nullptr),
             connFn(nullptr),
-            qnode(this)
+            qnode(this),
+            data(nullptr),
+            userData(nullptr)
         {
             url[0] = 0;
-        }
-
-        ~HttpRequest()
-        {
-            if (connFn)
-                connFn->~HttpConnectionCallback();
+            contentType[0] = 0;
         }
     };
 
@@ -58,9 +60,12 @@ namespace tee {
         RestClient::Response r;
         HttpResponseCallback responseFn;
         bx::Queue<HttpResponse*>::Node qnode;
+        void* userData;
 
         HttpResponse() :
-            qnode(this)
+            qnode(this),
+            userData(nullptr),
+            responseFn(nullptr)
         {
         }
     };
@@ -77,14 +82,23 @@ namespace tee {
         bx::Semaphore sem;
 
         RestClient::Connection* conn;
-        size_t connUrlHash;
+
+        int timeout;
+        bx::Path certFilepath;
+        bx::Path keyFilepath;
+        bx::String32 passphrase;
+        char baseUrl[256];
+        bool insecureCert;
+        uint8_t padding[3];
 
         HttpRequestContext(bx::AllocatorI* _alloc) :
             alloc(_alloc),
             quit(0),
             conn(nullptr),
-            connUrlHash(0)
+            timeout(5),
+            insecureCert(true)
         {
+            baseUrl[0] = 0;
         }
     };
 
@@ -113,44 +127,61 @@ namespace tee {
             if (!res)
                 continue;
 
-            if (!req->connFn) {
+            // Create connection object
+            size_t connUrlHash = tinystl::hash_string(req->url, strlen(req->url));
+            RestClient::Connection* conn = BX_NEW(gHttp->alloc, RestClient::Connection)(gHttp->baseUrl);
+            BX_ASSERT(conn, "");
+
+            if (!gHttp->certFilepath.isEmpty()) {
+                conn->SetCertPath(gHttp->certFilepath.cstr());
+                conn->SetCertType("PEM");
+            }
+
+            if (!gHttp->keyFilepath.isEmpty()) {
+                conn->SetKeyPath(gHttp->keyFilepath.cstr());
+                conn->SetKeyPassword(gHttp->passphrase.cstr());
+            }
+
+            conn->SetTimeout(gHttp->timeout);
+            conn->SetInsecureCert(gHttp->insecureCert);
+
+            if (req->method != HttpRequestMethod::Unknown) {
                 switch (req->method) {
                 case HttpRequestMethod::GET:
-                    res->r = RestClient::get(req->url);
-                    break;
-
-                case HttpRequestMethod::POST:
-                    res->r = RestClient::post(req->url, req->contentType, req->data);
+                    res->r = conn->get(req->url);
                     break;
 
                 case HttpRequestMethod::PUT:
-                    res->r = RestClient::put(req->url, req->contentType, req->data);
+                    conn->AppendHeader("Content-Type", req->contentType);
+                    res->r = conn->put(req->url, req->data ? req->data : "");
+                    break;
+
+                case HttpRequestMethod::POST:
+                    conn->AppendHeader("Content-Type", req->contentType);
+                    res->r = conn->post(req->url, req->data ? req->data : "");
                     break;
 
                 case HttpRequestMethod::DEL:
-                    res->r = RestClient::del(req->url);
+                    res->r = conn->del(req->url);
                     break;
 
                 case HttpRequestMethod::HEAD:
-                    res->r = RestClient::head(req->url);
+                    res->r = conn->head(req->url);
                     break;
                 }
             } else {
-                size_t connUrlHash = tinystl::hash_string(req->url, strlen(req->url));
-                if (connUrlHash != gHttp->connUrlHash) {
-                    if (gHttp->conn)
-                        BX_DELETE(gHttp->alloc, gHttp->conn);
-                    gHttp->conn = BX_NEW(gHttp->alloc, RestClient::Connection)(req->url);
-                } 
-                res->r = (*req->connFn)(gHttp->conn);
+                BX_ASSERT(req->connFn, "Custom request must have HttpConnectionCallback defined");
+                res->r = req->connFn(conn, req->userData);
             }              
 
             res->responseFn = req->responseFn;
+            res->userData = req->userData;
             BX_DELETE(gHttp->alloc, req);
+            BX_DELETE(gHttp->alloc, conn);
 
             bx::MutexScope mtx(gHttp->resMtx);
             gHttp->resQueue.push(&res->qnode);
-        }
+        }   // while NOT quit
 
 
         RestClient::disable();
@@ -178,70 +209,72 @@ namespace tee {
         bx::atomicExchange<int32_t>(&gHttp->quit, 1);
 
         gHttp->sem.post(1);
+
         gHttp->workerThread.shutdown();
 
-        if (gHttp->conn) {
-            BX_DELETE(gHttp->alloc, gHttp->conn);
-        }
         BX_DELETE(gHttp->alloc, gHttp);
         gHttp = nullptr;
     }
 
     void http::update()
     {
+        BX_ASSERT(gHttp, "");
+
         // Fetch all requests and process them
         HttpResponse* res;
         gHttp->resMtx.lock();
-        while (gHttp->resQueue.pop(&res)) {
+        bool queueReady = gHttp->resQueue.pop(&res);
+        gHttp->resMtx.unlock();
+        while (queueReady) {
+            gHttp->resMtx.lock();
+            queueReady = gHttp->resQueue.pop(&res);
             gHttp->resMtx.unlock();
 
-            if (res->r.headers.size() > 0) {
-                int numHeaders = (int)res->r.headers.size();
-                HttpHeaderField* headers = (HttpHeaderField*)alloca(sizeof(HttpHeaderField)*numHeaders);
-                int index = 0;
-                for (std::map<std::string, std::string>::iterator it = res->r.headers.begin(); it != res->r.headers.end(); ++it) {
-                    headers[index].name = it->first.c_str();
-                    headers[index].value = it->second.c_str();
-                    index++;
+            if (res->responseFn) {
+                if (res->r.headers.size() > 0) {
+                    int numHeaders = (int)res->r.headers.size();
+                    HttpHeaderField* headers = (HttpHeaderField*)alloca(sizeof(HttpHeaderField)*numHeaders);
+                    int index = 0;
+                    for (std::map<std::string, std::string>::iterator it = res->r.headers.begin(); it != res->r.headers.end(); ++it) {
+                        headers[index].name = it->first.c_str();
+                        headers[index].value = it->second.c_str();
+                        index++;
+                    }
+                    res->responseFn(res->r.code, res->r.body.c_str(), headers, numHeaders, res->userData);
+                } else {
+                    res->responseFn(res->r.code, res->r.body.c_str(), nullptr, 0, res->userData);
                 }
-                res->responseFn(res->r.code, res->r.body.c_str(), headers, numHeaders);
-            } else {
-                res->responseFn(res->r.code, res->r.body.c_str(), nullptr, 0);
             }
 
             BX_DELETE(gHttp->alloc, res);
-        }
-        gHttp->resMtx.lock();
+        } 
     }
 
-    static void makeNormalRequest(HttpRequestMethod::Enum method, const char* url, const char* contentType, 
-                                  const char* data, HttpResponseCallback responseFn)
+    static void makeRequest(HttpRequestMethod::Enum method, const char* url, const char* contentType, 
+                            const char* data, HttpResponseCallback responseFn,
+                            HttpConnectionCallback connFn, void* userData)
     {
-        size_t urlSz = strlen(url) + 1;
-        size_t contentTypeSz = (method == HttpRequestMethod::POST || method == HttpRequestMethod::PUT) ?
-            strlen(contentType) + 1 : 0;
-        size_t dataSz = (method == HttpRequestMethod::POST || method == HttpRequestMethod::PUT) ?
-            strlen(data) + 1 : 0;
-        size_t totalSz = sizeof(HttpRequest) + urlSz + contentTypeSz + dataSz;
+        size_t dataSz = data ? strlen(data) + 1 : 0;
+        size_t totalSz = sizeof(HttpRequest) + dataSz;
         uint8_t* buff = (uint8_t*)BX_ALLOC(gHttp->alloc, totalSz);
         if (buff) {
-            HttpRequest* req = new(buff) HttpRequest();
+            HttpRequest* req = BX_PLACEMENT_NEW(buff, HttpRequest);
             buff += sizeof(HttpRequest);
-            req->url = (char*)buff;
-            strcpy(req->url, url);
 
-            if (method == HttpRequestMethod::POST || method == HttpRequestMethod::PUT) {
-                buff += urlSz;
-                req->contentType = (char*)buff;
-                buff += contentTypeSz;
-                req->data = (char*)buff;
-
-                strcpy(req->contentType, contentType);
-                strcpy(req->data, data);
-            }
+            bx::strCopy(req->url, sizeof(req->url), url);
 
             req->method = method;
             req->responseFn = responseFn;
+            req->connFn = connFn;
+            req->userData = userData;
+
+            if (contentType)
+                bx::strCopy(req->contentType, sizeof(req->contentType), contentType);
+
+            if (data) {
+                req->data = (char*)buff;
+                bx::memCopy(req->data, data, dataSz);
+            }
 
             bx::MutexScope mtx(gHttp->reqMtx);
             gHttp->reqQueue.push(&req->qnode);
@@ -249,52 +282,57 @@ namespace tee {
         }
     }
 
-    void http::get(const char* url, HttpResponseCallback responseFn)
+    void http::get(const char* url, HttpResponseCallback responseFn, void* userData)
     {
-        makeNormalRequest(HttpRequestMethod::GET, url, nullptr, nullptr, responseFn);
+        makeRequest(HttpRequestMethod::GET, url, nullptr, nullptr, responseFn, nullptr, userData);
     }
 
-    void http::post(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn)
+    void http::post(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn, void* userData)
     {
-        makeNormalRequest(HttpRequestMethod::POST, url, contentType, data, responseFn);
+        makeRequest(HttpRequestMethod::POST, url, contentType, data, responseFn, nullptr, userData);
     }
 
-    void http::put(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn)
+    void http::put(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn, void* userData)
     {
-        makeNormalRequest(HttpRequestMethod::PUT, url, contentType, data, responseFn);
+        makeRequest(HttpRequestMethod::PUT, url, contentType, data, responseFn, nullptr, userData);
     }
 
-    void http::del(const char* url, HttpResponseCallback responseFn)
+    void http::del(const char* url, HttpResponseCallback responseFn, void* userData)
     {
-        makeNormalRequest(HttpRequestMethod::DEL, url, nullptr, nullptr, responseFn);
+        makeRequest(HttpRequestMethod::DEL, url, nullptr, nullptr, responseFn, nullptr, userData);
     }
 
-    void http::head(const char* url, HttpResponseCallback responseFn)
+    void http::head(const char* url, HttpResponseCallback responseFn, void* userData)
     {
-        makeNormalRequest(HttpRequestMethod::HEAD, url, nullptr, nullptr, responseFn);
+        makeRequest(HttpRequestMethod::HEAD, url, nullptr, nullptr, responseFn, nullptr, userData);
     }
 
-    void http::request(const char* url, HttpConnectionCallback connFn, HttpResponseCallback responseFn)
+    void http::request(const char* url, HttpConnectionCallback connFn, HttpResponseCallback responseFn, void* userData)
     {
-        size_t urlSz = strlen(url);
-        size_t totalSz = sizeof(HttpRequest) + urlSz + 1;
-        uint8_t* buff = (uint8_t*)BX_ALLOC(gHttp->alloc, totalSz);
-        if (buff) {
-            HttpRequest* req = new(buff) HttpRequest();
-            buff += sizeof(HttpRequest);
-            req->url = (char*)buff;
-            buff += urlSz + 1;
-            req->connFn = new(buff) HttpConnectionCallback;
+        makeRequest(HttpRequestMethod::Unknown, url, nullptr, nullptr, responseFn, connFn, userData);
+    }
 
-            strcpy(req->url, url);
-            
-            req->responseFn = responseFn;
-            *req->connFn = connFn;
+    void http::setCert(const char* filepath, bool insecure)
+    {
+        gHttp->certFilepath = filepath;
 
-            bx::MutexScope mtx(gHttp->reqMtx);
-            gHttp->reqQueue.push(&req->qnode);
-            gHttp->sem.post();
-        }
+    }
+
+    void http::setKey(const char* filepath, const char* passphrase /*= nullptr*/)
+    {
+        gHttp->keyFilepath = filepath;
+        if (passphrase)
+            gHttp->passphrase = passphrase;
+    }
+
+    void http::setTimeout(int timeoutSecs)
+    {
+        gHttp->timeout = timeoutSecs;
+    }
+
+    void http::setBaseUrl(const char* url)
+    {
+        bx::strCopy(gHttp->baseUrl, sizeof(gHttp->baseUrl), url);
     }
 
 }   // namespace tee

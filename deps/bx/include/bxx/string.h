@@ -217,12 +217,26 @@ namespace bx
     template <int _Size>
     String<_Size>& String<_Size>::replace(char replace_char, char with_char)
     {
-        int i = 0;
-        char c;
-
-        while ((c = this->text[i]) != 0)     {
-            if (c == replace_char)     this->text[i] = with_char;
-            i++;
+        if (with_char != 0) {
+            int i = 0;
+            char c;
+            while ((c = this->text[i]) != 0) {
+                if (c == replace_char) {
+                    this->text[i] = with_char;
+                }
+                i++;
+            }
+        } else {
+            size_t len = strlen(this->text);
+            for (size_t i = 0; i < len;) {
+                if (this->text[i] != replace_char) {
+                    i++;
+                } else {
+                    this->text[i] = this->text[i+1];
+                    len--;
+                }
+            }
+            this->text[len] = 0;
         }
         return *this;
     }

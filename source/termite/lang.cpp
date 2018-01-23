@@ -6,9 +6,7 @@
 #include "bxx/hash_table.h"
 #include "tinystl/hash.h"
 
-#include "rapidjson/error/en.h"
-#include "rapidjson/document.h"
-#include "bxx/rapidjson_allocator.h"
+#include "termite/rapidjson.h"
 
 using namespace rapidjson;
 
@@ -75,17 +73,16 @@ namespace tee
         memcpy(jsonStr, mem->data, mem->size);
         jsonStr[mem->size] = 0;
 
-        BxAllocatorStatic::Alloc = heapAlloc;
-        BxAllocatorStatic jalloc;
-        BxsAllocator jpool(4096, &jalloc);
-        BxsDocument jdoc(&jpool, 1024, &jalloc);
+        json::HeapAllocator jalloc;
+        json::HeapPoolAllocator jpool(4096, &jalloc);
+        json::HeapDocument jdoc(&jpool, 1024, &jalloc);
         if (jdoc.ParseInsitu(jsonStr).HasParseError()) {
             TEE_ERROR("Parse Json Error: %s (Pos: %d)", GetParseError_En(jdoc.GetParseError()), jdoc.GetErrorOffset());
             BX_FREE(heapAlloc, jsonStr);
             return false;
         }
 
-        const BxsValue& jEntries = jdoc.GetArray();
+        const json::hvalue_t& jEntries = jdoc.GetArray();
         if (jEntries.Size() == 0) {
             TEE_ERROR("Language File is empty");
             BX_FREE(heapAlloc, jsonStr);
@@ -104,7 +101,7 @@ namespace tee
 
         for (int i = 0; i < lang->numEntries; i++) {
             LangEntry& entry = lang->entries[i];
-            const BxsValue& jentry = jEntries[i];
+            const json::hvalue_t& jentry = jEntries[i];
             if (jentry.HasMember("Id")) {
                 entry.idHash = tinystl::hash_string(jentry["Id"].GetString(), jentry["Id"].GetStringLength());
             } 

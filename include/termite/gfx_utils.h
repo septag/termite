@@ -38,6 +38,7 @@ namespace tee
                                                   float radius = 1.0f);
         TEE_API TextureHandle getBlurPostProcessTexture(PostProcessBlur* blur);
         TEE_API void destroyBlurPostProcess(PostProcessBlur* blur);
+        TEE_API void resizeBlurPostProcessBuffers(PostProcessBlur* blur, uint16_t width, uint16_t height, float stdDev);
 
         // Vignette/Sepia PostProcess
         TEE_API PostProcessVignetteSepia* createVignetteSepiaPostProcess(bx::AllocatorI* alloc,
@@ -59,6 +60,7 @@ namespace tee
                                                               float softness, float radius, float intensity = 1.0f,
                                                               vec4_t vignetteColor = vec4(0, 0, 0, 0));
         TEE_API void destroyVignetteSepiaPostProcess(PostProcessVignetteSepia* vignette);
+        TEE_API void resizeVignetteSepiaPostProcessBuffers(PostProcessVignetteSepia* vignette, uint16_t width, uint16_t height);
     }
 
 } // namespace tee

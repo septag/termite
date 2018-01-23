@@ -32,6 +32,7 @@
 #include "sound_driver.h"
 #include "lang.h"
 #include "internal.h"
+#include "rapidjson.h"
 
 #ifdef termite_SDL2
 #  include <SDL.h>
@@ -73,13 +74,10 @@
 #define T_ENC_SIGN 0x54454e43        // "TENC"
 #define T_ENC_VERSION TEE_MAKE_VERSION(1, 0)       
 
-#include "bxx/rapidjson_allocator.h"
-
-using namespace tee;
-
 typedef std::chrono::high_resolution_clock TClock;
 typedef std::chrono::high_resolution_clock::time_point TClockTimePt;
 
+namespace tee {
 // default AES encryption keys
 static const uint8_t kAESKey[] = {0x32, 0xBF, 0xE7, 0x76, 0x41, 0x21, 0xF6, 0xA5, 0xEE, 0x70, 0xDC, 0xC8, 0x73, 0xBC, 0x9E, 0x37};
 static const uint8_t kAESIv[] = {0x0A, 0x2D, 0x76, 0x63, 0x9F, 0x28, 0x10, 0xCD, 0x24, 0x22, 0x26, 0x68, 0xC1, 0x5A, 0x82, 0x5A};
@@ -99,7 +97,7 @@ struct FrameData
 
 struct HeapMemoryImpl
 {
-    tee::MemoryBlock m;
+    MemoryBlock m;
     volatile int32_t refcount;
     bx::AllocatorI* alloc;
 
@@ -178,7 +176,6 @@ struct ConsoleCommand
 
 struct Tee
 {
-    HardwareStats hwStats;
     UpdateCallback updateFn;
     Config conf;
     RendererApi* renderer;
@@ -212,7 +209,6 @@ struct Tee
         tempAlloc(TEE_MEMID_TEMP),
         randEngine(randDevice())
     {
-        memset(&hwStats, 0x00, sizeof(hwStats));
         gfxDriver = nullptr;
         phys2dDriver = nullptr;
         sndDriver = nullptr;
@@ -241,15 +237,13 @@ static bx::AllocatorI* gAlloc = &gAllocStub;
 
 static bx::Path gDataDir;
 static bx::Path gCacheDir;
+static HardwareInfo gHwInfo;
 static Tee* gTee = nullptr;
 
-// Define rapidjson static allocator 
-bx::AllocatorI* rapidjson::BxAllocatorStatic::Alloc = gAlloc;
-
 #if BX_PLATFORM_ANDROID
-static JavaVM* g_javaVM = nullptr;
-static jclass g_activityClass = 0;
-static jobject g_activityObj = 0;
+static JavaVM* gJavaVM = nullptr;
+static jclass gActivityClass = 0;
+static jobject gActivityObj = 0;
 
 extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteInitEngineVars(JNIEnv* env, jclass cls, 
                                                                                        jobject obj, jstring dataDir, 
@@ -257,9 +251,9 @@ extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteInitEngi
 {
     BX_UNUSED(cls);
 
-    env->GetJavaVM(&g_javaVM);
-    g_activityClass = (jclass)env->NewGlobalRef(env->GetObjectClass(obj));
-    g_activityObj = env->NewGlobalRef(obj);
+    env->GetJavaVM(&gJavaVM);
+    gActivityClass = (jclass)env->NewGlobalRef(env->GetObjectClass(obj));
+    gActivityObj = env->NewGlobalRef(obj);
     
     const char* str = env->GetStringUTFChars(dataDir, nullptr);
     bx::strCopy(gDataDir.getBuffer(), sizeof(gDataDir), str);
@@ -277,18 +271,43 @@ extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteSetGraph
         gTee->gfxReset = true;
 }
 
-JavaMethod tee::androidFindMethod(const char* methodName, const char* methodSig, const char* classPath,
+extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteSetDeviceInfo(JNIEnv* env, jclass cls,
+                                                                                      jstring brand, jstring model, jstring uniqueId,
+                                                                                      jlong totalMem, jlong availMem, jlong thresholdMem,
+                                                                                      jint apiVersion)
+{
+    BX_UNUSED(cls);
+    
+    HardwareInfo& hwInfo = gHwInfo;
+
+    const char* strBrand = env->GetStringUTFChars(brand, nullptr);
+    bx::strCopy(hwInfo.brand, sizeof(hwInfo.brand), strBrand);
+    env->ReleaseStringUTFChars(brand, strBrand);
+
+    const char* strModel = env->GetStringUTFChars(model, nullptr);
+    bx::strCopy(hwInfo.model, sizeof(hwInfo.model), strModel);
+    env->ReleaseStringUTFChars(model, strModel);
+
+    const char* strUniqueId = env->GetStringUTFChars(uniqueId, nullptr);
+    bx::strCopy(hwInfo.uniqueId, sizeof(hwInfo.uniqueId), strUniqueId);
+    env->ReleaseStringUTFChars(uniqueId, strUniqueId);
+
+    hwInfo.totalMem = totalMem;
+    hwInfo.apiVersion = apiVersion;
+}
+
+JavaMethod androidFindMethod(const char* methodName, const char* methodSig, const char* classPath,
                                       JavaMethodType::Enum type)
 {
-    assert(g_javaVM);
+    assert(gJavaVM);
 
     JavaMethod m;
     bx::memSet(&m, 0x00, sizeof(m));
 
     if (type == JavaMethodType::Method) {
-        g_javaVM->AttachCurrentThread(&m.env, nullptr);
+        gJavaVM->AttachCurrentThread(&m.env, nullptr);
     } else if (type == JavaMethodType::StaticMethod) {
-        g_javaVM->GetEnv((void**)&m.env, JNI_VERSION_1_6);
+        gJavaVM->GetEnv((void**)&m.env, JNI_VERSION_1_6);
     }
 
     if (m.env == nullptr) {
@@ -297,8 +316,8 @@ JavaMethod tee::androidFindMethod(const char* methodName, const char* methodSig,
     }
 
     if (classPath == nullptr) {
-        m.cls = g_activityClass;
-        m.obj = g_activityObj;
+        m.cls = gActivityClass;
+        m.obj = gActivityObj;
     } else {
         m.cls = m.env->FindClass(classPath);
         if (m.cls == 0) {
@@ -368,7 +387,7 @@ static void remoteryInputHandlerCallback(const char* text, void* context)
     }
 }
 
-bool tee::init(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* platform)
+bool init(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* platform)
 {
     if (gTee) {
         assert(false);
@@ -376,6 +395,7 @@ bool tee::init(const Config& conf, UpdateCallback updateFn, const GfxPlatformDat
     }
 
     bx::enableLogToFileHandle(stdout, stderr);
+    json::HeapAllocator::SetAlloc(gAlloc);
 
     gTee = BX_NEW(gAlloc, Tee);
     if (!gTee)
@@ -384,8 +404,8 @@ bool tee::init(const Config& conf, UpdateCallback updateFn, const GfxPlatformDat
     memcpy(&gTee->conf, &conf, sizeof(gTee->conf));
 
     // Hardware stats
-    gTee->hwStats.numCores = std::thread::hardware_concurrency();
-    gTee->hwStats.processMemUsed = bx::getProcessMemoryUsed();
+    // Same on all platforms
+    gHwInfo.numCores = std::thread::hardware_concurrency();
 
     gTee->updateFn = updateFn;
 
@@ -679,20 +699,37 @@ bool tee::init(const Config& conf, UpdateCallback updateFn, const GfxPlatformDat
     BX_END_OK();
 #endif
 
+#ifdef termite_CURL
+    BX_BEGINP("Initializing Http Client");
+    if (!http::init(gAlloc)) {
+        TEE_ERROR("Core init failed: Could not initialize SDL2 utils");
+        BX_END_FATAL();
+        return false;
+    }
+    BX_END_OK();
+#endif
+
     lang::registerToAssetLib();
 
     gTee->init = true;
     return true;
 }
 
-void tee::shutdown(ShutdownCallback callback, void* userData)
+void shutdown(ShutdownCallback callback, void* userData)
 {
     if (!gTee) {
         assert(false);
         return;
     }
 
+#if termite_CURL
+    BX_BEGINP("Shutting down Http Client");
+    http::shutdown();
+    BX_END_OK();
+#endif
+
 #if RMT_ENABLED
+    BX_BEGINP("Shutting down Remotery");
     if (gTee->rmt)
         rmt_DestroyGlobalInstance(gTee->rmt);
     for (int i = 0; i < gTee->consoleCmds.getCount(); ++i) {
@@ -700,6 +737,7 @@ void tee::shutdown(ShutdownCallback callback, void* userData)
         cmd->~ConsoleCommand();
     }
     gTee->consoleCmds.destroy();
+    BX_END_OK();
 #endif
 
 #if termite_DEV
@@ -822,7 +860,7 @@ static double calcAvgFrameTime(const FrameData& fd)
     return sum;
 }
 
-void tee::doFrame()
+void doFrame()
 {
     rmt_BeginCPUSample(DoFrame, 0);
     gTee->tempAlloc.free();
@@ -869,6 +907,10 @@ void tee::doFrame()
         gTee->gfxDriver->frame();
     rmt_EndCPUSample(); // Gfx_DrawFrame
 
+#ifdef termite_CURL
+    http::update();     // Async Request process
+#endif
+
     fd.frame++;
     fd.elapsedTime += dt;
     fd.frameTime = dt;
@@ -884,28 +926,28 @@ void tee::doFrame()
     rmt_EndCPUSample(); // DoFrame
 }
 
-void tee::pause()
+void pause()
 {
     gTee->timeMultiplier = 0;
 }
 
-void tee::resume()
+void resume()
 {
     gTee->timeMultiplier = 1.0;
     gTee->frameData.lastFrameTimePt = TClock::now();
 }
 
-bool tee::isPaused()
+bool isPaused()
 {
     return gTee->timeMultiplier == 0;
 }
 
-void tee::resetTempAlloc()
+void resetTempAlloc()
 {
     gTee->tempAlloc.free();
 }
 
-void tee::resetBackbuffer(uint16_t width, uint16_t height)
+void resetBackbuffer(uint16_t width, uint16_t height)
 {
     if (gTee->gfxDriver)
         gTee->gfxDriver->reset(width, height, gTee->conf.gfxDriverFlags);
@@ -916,32 +958,32 @@ void tee::resetBackbuffer(uint16_t width, uint16_t height)
     io.DisplaySize = ImVec2(float(width), float(height));
 }
 
-double tee::getFrameTime()
+double getFrameTime()
 {
     return gTee->frameData.frameTime;
 }
 
-double tee::getElapsedTime()
+double getElapsedTime()
 {
     return gTee->frameData.elapsedTime;
 }
 
-double tee::getFps()
+double getFps()
 {
     return gTee->frameData.fps;
 }
 
-double tee::getSmoothFrameTime()
+double getSmoothFrameTime()
 {
     return gTee->frameData.avgFrameTime;
 }
 
-uint64_t tee::getFrameIndex()
+uint64_t getFrameIndex()
 {
     return gTee->frameData.frame;
 }
 
-tee::MemoryBlock* tee::createMemoryBlock(uint32_t size, bx::AllocatorI* alloc)
+MemoryBlock* createMemoryBlock(uint32_t size, bx::AllocatorI* alloc)
 {
     gTee->memPoolLock.lock();
     HeapMemoryImpl* mem = gTee->memPool.newInstance();
@@ -955,10 +997,10 @@ tee::MemoryBlock* tee::createMemoryBlock(uint32_t size, bx::AllocatorI* alloc)
     mem->m.size = size;
     mem->alloc = alloc;
 
-    return (tee::MemoryBlock*)mem;
+    return (MemoryBlock*)mem;
 }
 
-tee::MemoryBlock* tee::refMemoryBlockPtr(const void* data, uint32_t size)
+MemoryBlock* refMemoryBlockPtr(const void* data, uint32_t size)
 {
     gTee->memPoolLock.lock();
     HeapMemoryImpl* mem = gTee->memPool.newInstance();
@@ -969,7 +1011,7 @@ tee::MemoryBlock* tee::refMemoryBlockPtr(const void* data, uint32_t size)
     return (MemoryBlock*)mem;
 }
 
-tee::MemoryBlock* tee::copyMemoryBlock(const void* data, uint32_t size, bx::AllocatorI* alloc)
+MemoryBlock* copyMemoryBlock(const void* data, uint32_t size, bx::AllocatorI* alloc)
 {
     gTee->memPoolLock.lock();
     HeapMemoryImpl* mem = gTee->memPool.newInstance();
@@ -986,14 +1028,14 @@ tee::MemoryBlock* tee::copyMemoryBlock(const void* data, uint32_t size, bx::Allo
     return (MemoryBlock*)mem;
 }
 
-tee::MemoryBlock* tee::refMemoryBlock(tee::MemoryBlock* mem)
+MemoryBlock* refMemoryBlock(MemoryBlock* mem)
 {
     HeapMemoryImpl* m = (HeapMemoryImpl*)mem;
     bx::atomicFetchAndAdd(&m->refcount, 1);
     return mem;
 }
 
-void tee::releaseMemoryBlock(tee::MemoryBlock* mem)
+void releaseMemoryBlock(MemoryBlock* mem)
 {
     HeapMemoryImpl* m = (HeapMemoryImpl*)mem;
     if (bx::atomicDec(&m->refcount) == 0) {
@@ -1008,7 +1050,7 @@ void tee::releaseMemoryBlock(tee::MemoryBlock* mem)
     }
 }
 
-MemoryBlock* tee::readTextFile(const char* absFilepath)
+MemoryBlock* readTextFile(const char* absFilepath)
 {
     bx::FileReader file;
     bx::Error err;
@@ -1030,7 +1072,7 @@ MemoryBlock* tee::readTextFile(const char* absFilepath)
     return mem;
 }
 
-MemoryBlock* tee::readBinaryFile(const char* absFilepath)
+MemoryBlock* readBinaryFile(const char* absFilepath)
 {
     bx::FileReader file;
     bx::Error err;
@@ -1055,7 +1097,7 @@ MemoryBlock* tee::readBinaryFile(const char* absFilepath)
     return mem;
 }
 
-bool tee::saveBinaryFile(const char* absFilepath, const MemoryBlock* mem)
+bool saveBinaryFile(const char* absFilepath, const MemoryBlock* mem)
 {
     bx::FileWriter file;
     bx::Error err;
@@ -1068,7 +1110,7 @@ bool tee::saveBinaryFile(const char* absFilepath, const MemoryBlock* mem)
     return wb == mem->size ? true : false;
 }
 
-MemoryBlock* tee::encryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
+MemoryBlock* encryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
 {
     assert(mem);
     if (key == nullptr)
@@ -1107,7 +1149,7 @@ MemoryBlock* tee::encryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* al
     return encMem;
 }
 
-MemoryBlock* tee::decryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
+MemoryBlock* decryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
 {
     assert(mem);
     if (key == nullptr)
@@ -1143,7 +1185,7 @@ MemoryBlock* tee::decryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* al
     return rmem;
 }
 
-void tee::cipherXOR(uint8_t* outputBuff, const uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize)
+void cipherXOR(uint8_t* outputBuff, const uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize)
 {
     assert(buffSize > 0);
     assert(keySize > 0);
@@ -1152,7 +1194,7 @@ void tee::cipherXOR(uint8_t* outputBuff, const uint8_t* inputBuff, size_t buffSi
     }
 }
 
-void tee::restartRandom()
+void restartRandom()
 {
     std::uniform_int_distribution<int> idist(0, INT_MAX);
     int* randomInt = gTee->randomPoolInt;
@@ -1169,7 +1211,7 @@ void tee::restartRandom()
     gTee->randomFloatOffset = gTee->randomIntOffset = 0;
 }
 
-float tee::getRandomFloatUniform(float a, float b)
+float getRandomFloatUniform(float a, float b)
 {
     assert(a <= b);
     int off = gTee->randomFloatOffset;
@@ -1178,7 +1220,7 @@ float tee::getRandomFloatUniform(float a, float b)
     return r;
 }
 
-int tee::getRandomIntUniform(int a, int b)
+int getRandomIntUniform(int a, int b)
 {
     assert(a <= b);
     int off = gTee->randomIntOffset;
@@ -1187,19 +1229,19 @@ int tee::getRandomIntUniform(int a, int b)
     return r;
 }
 
-float tee::getRandomFloatNormal(float mean, float sigma)
+float getRandomFloatNormal(float mean, float sigma)
 {
     std::normal_distribution<float> dist(mean, sigma);
     return dist(gTee->randEngine);
 }
 
-void tee::inputSendChars(const char* chars)
+void inputSendChars(const char* chars)
 {
 	ImGuiIO& io = ImGui::GetIO();
     io.AddInputCharactersUTF8(chars);
 }
 
-void tee::inputSendKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl)
+void inputSendKeys(const bool keysDown[512], bool shift, bool alt, bool ctrl)
 {
 	ImGuiIO& io = ImGui::GetIO();
 	memcpy(io.KeysDown, keysDown, 512*sizeof(bool));
@@ -1208,7 +1250,7 @@ void tee::inputSendKeys(const bool keysDown[512], bool shift, bool alt, bool ctr
 	io.KeyCtrl = ctrl;
 }
 
-void tee::inputSendMouse(float mousePos[2], int mouseButtons[3], float mouseWheel)
+void inputSendMouse(float mousePos[2], int mouseButtons[3], float mouseWheel)
 {
 	ImGuiIO& io = ImGui::GetIO();
 	io.MousePos = ImVec2(mousePos[0], mousePos[1]);
@@ -1220,67 +1262,72 @@ void tee::inputSendMouse(float mousePos[2], int mouseButtons[3], float mouseWhee
 	io.MouseWheel += mouseWheel;
 }
 
-GfxDriver* tee::getGfxDriver()
+GfxDriver* getGfxDriver()
 {
     return gTee->gfxDriver;
 }
 
-IoDriver* tee::getBlockingIoDriver() TEE_THREAD_SAFE
+IoDriver* getBlockingIoDriver() TEE_THREAD_SAFE
 {
     return gTee->ioDriver->blocking;
 }
 
-IoDriver* tee::getAsyncIoDriver() TEE_THREAD_SAFE
+IoDriver* getAsyncIoDriver() TEE_THREAD_SAFE
 {
     return gTee->ioDriver->async;
 }
 
-RendererApi* tee::getRenderer() TEE_THREAD_SAFE
+RendererApi* getRenderer() TEE_THREAD_SAFE
 {
     return gTee->renderer;
 }
 
-SimpleSoundDriver* tee::getSoundDriver() TEE_THREAD_SAFE
+SimpleSoundDriver* getSoundDriver() TEE_THREAD_SAFE
 {
     return gTee->sndDriver;
 }
 
-PhysDriver2D* tee::getPhys2dDriver() TEE_THREAD_SAFE
+PhysDriver2D* getPhys2dDriver() TEE_THREAD_SAFE
 {
     return gTee->phys2dDriver;
 }
 
-uint32_t tee::getEngineVersion() TEE_THREAD_SAFE
+uint32_t getEngineVersion() TEE_THREAD_SAFE
 {
     return TEE_MAKE_VERSION(0, 1);
 }
 
-bx::AllocatorI* tee::getHeapAlloc() TEE_THREAD_SAFE
+bx::AllocatorI* getHeapAlloc() TEE_THREAD_SAFE
 {
     return gAlloc;
 }
 
-bx::AllocatorI* tee::getTempAlloc() TEE_THREAD_SAFE
+bx::AllocatorI* getTempAlloc() TEE_THREAD_SAFE
 {
     return &gTee->tempAlloc;
 }
 
-const Config& tee::getConfig() TEE_THREAD_SAFE
+const Config& getConfig() TEE_THREAD_SAFE
 {
     return gTee->conf;
 }
 
-const char* tee::getCacheDir() TEE_THREAD_SAFE
+Config* getMutableConfig() TEE_THREAD_SAFE
+{
+    return &gTee->conf;
+}
+
+const char* getCacheDir() TEE_THREAD_SAFE
 {
     return gCacheDir.cstr();
 }
 
-const char* tee::getDataDir() TEE_THREAD_SAFE
+const char* getDataDir() TEE_THREAD_SAFE
 {
     return gDataDir.cstr();
 }
 
-void tee::dumpGfxLog() TEE_THREAD_SAFE
+void dumpGfxLog() TEE_THREAD_SAFE
 {
     if (gTee->gfxLogCache) {
         for (int i = 0, c = gTee->numGfxLogCache; i < c; i++) {
@@ -1294,12 +1341,12 @@ void tee::dumpGfxLog() TEE_THREAD_SAFE
     }
 }
 
-bool tee::needGfxReset() TEE_THREAD_SAFE
+bool needGfxReset() TEE_THREAD_SAFE
 {
     return gTee->gfxReset;
 }
 
-void tee::shutdownGraphics()
+void shutdownGraphics()
 {
     // Unload all graphics resources
     asset::unloadAssets("texture");
@@ -1327,7 +1374,7 @@ void tee::shutdownGraphics()
     }
 }
 
-bool tee::resetGraphics(const GfxPlatformData* platform)
+bool resetGraphics(const GfxPlatformData* platform)
 {
     const Config& conf = gTee->conf;
 
@@ -1422,7 +1469,7 @@ bool tee::resetGraphics(const GfxPlatformData* platform)
     return true;
 }
 
-void tee::registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback)
+void registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback)
 {
 #if termite_DEV && RMT_ENABLED
     assert(gTee);
@@ -1432,12 +1479,9 @@ void tee::registerConsoleCommand(const char* name, std::function<void(int, const
 #endif
 }
 
-const HardwareStats& tee::getHardwareStats()
+const HardwareInfo& getHardwareInfo()
 {
-    // update memory used
-    gTee->hwStats.processMemUsed = bx::getProcessMemoryUsed();
-
-    return gTee->hwStats;
+    return gHwInfo;
 }
 
 void GfxDriverEvents::onFatal(GfxFatalType::Enum type, const char* str)
@@ -1470,3 +1514,4 @@ void GfxDriverEvents::onTraceVargs(const char* filepath, int line, const char* f
 
 }
 
+} // namespace tee

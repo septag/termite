@@ -35,6 +35,7 @@ RestClient::Connection::Connection(const std::string& baseUrl)
   this->timeout = 0;
   this->followRedirects = false;
   this->noSignal = false;
+  this->insecure = false;
 }
 
 RestClient::Connection::~Connection() {
@@ -261,6 +262,12 @@ RestClient::Connection::SetProxy(const std::string& uriProxy) {
   }
 }
 
+
+void RestClient::Connection::SetInsecureCert(bool insecure)
+{
+    this->insecure = insecure;
+}
+
 /**
  * @brief helper function to get called from the actual request methods to
  * prepare the curlHandle for transfer with generic options, perform the
@@ -340,9 +347,14 @@ RestClient::Connection::performCurlRequest(const std::string& uri) {
                      this->caInfoFilePath.c_str());
   }
 
+  if (this->insecure) {
+      curl_easy_setopt(this->curlHandle, CURLOPT_SSL_VERIFYPEER, 0);
+      curl_easy_setopt(this->curlHandle, CURLOPT_SSL_VERIFYHOST, 0);
+  }
+
   // set cert file path
   if (!this->certPath.empty()) {
-    curl_easy_setopt(this->curlHandle, CURLOPT_SSLCERT,
+      curl_easy_setopt(this->curlHandle, CURLOPT_SSLCERT,
                      this->certPath.c_str());
   }
 
@@ -380,6 +392,10 @@ RestClient::Connection::performCurlRequest(const std::string& uri) {
       case CURLE_SSL_CERTPROBLEM:
         ret.code = res;
         ret.body = curl_easy_strerror(res);
+        break;
+      case CURLE_COULDNT_RESOLVE_HOST:
+        ret.body = "Could not resolve host";
+        ret.code = -1;
         break;
       default:
         ret.body = "Failed to query.";

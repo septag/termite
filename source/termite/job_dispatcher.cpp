@@ -516,7 +516,7 @@ bool tee::initJobDispatcher(bx::AllocatorI* alloc,
     // Create threads
     uint16_t numCores = numThreads;
     if (numThreads == UINT8_MAX) {
-        numCores = std::min<uint16_t>(getHardwareStats().numCores, UINT8_MAX);
+        numCores = std::min<uint16_t>(getHardwareInfo().numCores, UINT8_MAX);
         numCores = numCores ? (numCores - 1) : 0;   // NumThreads is always one less than number of cores
     }
     numThreads = (uint8_t)std::min<uint16_t>(numCores, numThreads);

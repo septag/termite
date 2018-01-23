@@ -44,11 +44,13 @@ namespace tee
         ProgramHandle prog;
         UniformHandle uBlurKernel;
         UniformHandle uTexture;
+        TextureFormat::Enum fmt;
 
         PostProcessBlur(bx::AllocatorI* _alloc) : alloc(_alloc)
         {
             width = 0;
             height = 0;
+            fmt = TextureFormat::Unknown;
         }
     };
 
@@ -276,7 +278,7 @@ namespace tee
     }
 
     PostProcessBlur* gfx::createBlurPostProcess(bx::AllocatorI* alloc, uint16_t width, uint16_t height, float stdDev,
-                                           TextureFormat::Enum fmt /*= TextureFormat::RGBA8*/)
+                                                TextureFormat::Enum fmt /*= TextureFormat::RGBA8*/)
     {
         PostProcessBlur* blur = BX_NEW(alloc, PostProcessBlur)(alloc);
         if (!blur)
@@ -295,6 +297,7 @@ namespace tee
         calcGaussKernel(blur->kernel, BLUR_KERNEL_SIZE, stdDev, 1.0f);
         blur->width = width;
         blur->height = height;
+        blur->fmt = fmt;
 
         blur->prog = driver->createProgram(
             driver->createShader(driver->makeRef(blur_vso, sizeof(blur_vso), nullptr, nullptr)),
@@ -379,7 +382,30 @@ namespace tee
         BX_DELETE(blur->alloc, blur);
     }
 
-    PostProcessVignetteSepia* gfx::createVignetteSepiaPostProcess(bx::AllocatorI* alloc, uint16_t width, uint16_t height, 
+    void gfx::resizeBlurPostProcessBuffers(PostProcessBlur* blur, uint16_t width, uint16_t height, float stdDev)
+    {
+        assert(blur);
+        GfxDriver* driver = gUtils->driver;
+        if (blur->fbs[0].isValid())
+            driver->destroyFrameBuffer(blur->fbs[0]);
+        if (blur->fbs[1].isValid())
+            driver->destroyFrameBuffer(blur->fbs[1]);
+
+        calcGaussKernel(blur->kernel, BLUR_KERNEL_SIZE, stdDev, 1.0f);
+        blur->width = width;
+        blur->height = height;
+
+        for (int i = 0; i < 2; i++) {
+            blur->fbs[i] = driver->createFrameBuffer(width, height, blur->fmt,
+                                                     TextureFlag::RT |
+                                                     TextureFlag::MagPoint | TextureFlag::MinPoint |
+                                                     TextureFlag::U_Clamp | TextureFlag::V_Clamp);
+            assert(blur->fbs[i].isValid());
+            blur->textures[i] = driver->getFrameBufferTexture(blur->fbs[i], 0);
+        }
+    }
+
+    PostProcessVignetteSepia* gfx::createVignetteSepiaPostProcess(bx::AllocatorI* alloc, uint16_t width, uint16_t height,
                                                              float radius, float softness, 
                                                              float vignetteIntensity, float sepiaIntensity, 
                                                              ucolor_t sepiaColor, ucolor_t vignetteColor)
@@ -490,4 +516,13 @@ namespace tee
             driver->destroyProgram(vignette->prog);
         BX_DELETE(vignette->alloc, vignette);
     }
+     
+    void gfx::resizeVignetteSepiaPostProcessBuffers(PostProcessVignetteSepia* vignette, uint16_t width, uint16_t height)
+    {
+        BX_ASSERT(vignette, "");
+
+        vignette->width = width;
+        vignette->height = height;
+    }
+
 }

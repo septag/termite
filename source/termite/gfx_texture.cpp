@@ -194,6 +194,7 @@ namespace tee {
     static void saveCacheTextureJob(int jobIdx, void* userParam)
     {
         SaveTextureCacheJob* params = (SaveTextureCacheJob*)userParam;
+        BX_ASSERT(params, "");
 
         // Save the file
         const char* cacheDir = getCacheDir();
@@ -202,7 +203,7 @@ namespace tee {
         // Save file as PNG
         uint32_t nameHash = bx::hash<bx::HashCrc32>(params->uri.cstr());
         char dbfilename[256];
-        bx::snprintf(dbfilename, sizeof(dbfilename), "%u.png", nameHash);
+        bx::snprintf(dbfilename, sizeof(dbfilename), "%x.png", nameHash);
         bx::Path dbfilepath(cacheDir);
         dbfilepath.join(dbfilename);
 
@@ -218,7 +219,7 @@ namespace tee {
         bx::Error err;
         char cacheTextureName[128];
         uint32_t nameHash = bx::hash<bx::HashCrc32>(params.uri);
-        bx::snprintf(cacheTextureName, sizeof(cacheTextureName), "%u.png", nameHash);
+        bx::snprintf(cacheTextureName, sizeof(cacheTextureName), "%x.png", nameHash);
         bx::Path cacheTexturePath(cacheDir);
         cacheTexturePath.join(cacheTextureName);
         bx::AllocatorI* alloc = getHeapAlloc();
@@ -252,6 +253,9 @@ namespace tee {
 
     bool gfx::initTextureLoader(GfxDriver* driver, bx::AllocatorI* alloc, int texturePoolSize, bool enableTextureDecodeCache)
     {
+        // TODO: REMOVE THIS line later
+        enableTextureDecodeCache = false;
+
         assert(driver);
         if (gTexLoader) {
             assert(false);
@@ -315,9 +319,13 @@ namespace tee {
             return false;
         }
 
+        const GfxCaps& caps = driver->getCaps();
+        if ((caps.formats[TextureFormat::ETC2] & TextureSupportFlag::Texture2D) &&
+            (caps.formats[TextureFormat::ETC2A] & TextureSupportFlag::Texture2D)) 
+        {
+            gTexLoader->isETC2Supported = true;
+        } 
 
-        gTexLoader->isETC2Supported = driver->isTextureValid(1, false, 1, TextureFormat::ETC2A, 0) &&
-            driver->isTextureValid(1, false, 1, TextureFormat::ETC2, 0);
         if (BX_ENABLED(BX_PLATFORM_ANDROID) || BX_ENABLED(BX_PLATFORM_IOS)) {
             if (!gTexLoader->isETC2Supported) {
                 BX_WARN("ETC2 formated is not supported in this device. Engine will decode and cache ETC2 textures internally, may cause longer load times");
@@ -560,8 +568,7 @@ namespace tee {
             gmem = driver->makeRef(pixels, width*height*numComp, stbCallbackFreeImage, nullptr);
         }
 
-        texture->handle = driver->createTexture2D(width, height, texParams->generateMips, 1, fmt,
-                                                  texParams->flags, gmem);
+        texture->handle = driver->createTexture2D(width, height, texParams->generateMips, 1, fmt, texParams->flags, gmem);
         if (!texture->handle.isValid())
             return false;
 
@@ -659,7 +666,7 @@ namespace tee {
             return false;
         }
 
-        // TODO: verify format compatibility, convert if needed
+        // verify format compatibility, decoded if the device does not support the format
         bool formatIsETC2 = (imgInfo.m_format == bimg::TextureFormat::ETC2) ||
             (imgInfo.m_format == bimg::TextureFormat::ETC2A) ||
             (imgInfo.m_format == bimg::TextureFormat::ETC2A1);
@@ -707,17 +714,11 @@ namespace tee {
                     decoded = decodeETC2(getHeapAlloc(), img->m_data, (TextureFormat::Enum)img->m_format,
                                          img->m_width, img->m_height, &decodedSize);
                 } else {
-                    assert(0);  // not supported
+                    BX_ASSERT(false, "Software Decoding format is not supported");
                 }
 
                 if (decoded) {
-                    texture->handle = driver->createTexture2D(img->m_width, img->m_height, img->m_numMips>1, img->m_numLayers,
-                                                              TextureFormat::RGBA8, texParams->flags,
-                                                              driver->makeRef(decoded, decodedSize, [](void* ptr, void* userData) {
-                        BX_FREE(getHeapAlloc(), ptr);
-                    }, nullptr));
-
-
+                    // First save it in the cache
                     if (gTexLoader->enableTextureDecodeCache) {
                         SaveTextureCacheJob* cacheJob = (SaveTextureCacheJob*)BX_ALLOC(getHeapAlloc(),
                                                                                        sizeof(SaveTextureCacheJob) + decodedSize);
@@ -732,9 +733,19 @@ namespace tee {
                         if (gTexLoader->saveCacheJobHandle)
                             waitAndDeleteJob(gTexLoader->saveCacheJobHandle);
                         gTexLoader->saveCacheJobHandle = dispatchBigJobs(&j, 1);
-                        if (gTexLoader->saveCacheJobHandle)
+
+                        if (gTexLoader->saveCacheJobHandle) {
                             updateTextureCacheItem(bx::hash<bx::HashCrc32>(params.uri), dataHash);
+                        } else {
+                            BX_WARN("SaveCacheJob Error");
+                        }
                     }
+
+                    texture->handle = driver->createTexture2D(img->m_width, img->m_height, img->m_numMips>1, img->m_numLayers,
+                                                              TextureFormat::RGBA8, texParams->flags,
+                                                              driver->makeRef(decoded, decodedSize, [](void* ptr, void* userData) {
+                        BX_FREE(getHeapAlloc(), ptr);
+                    }, nullptr));
                 }
             } else {
                 // Try to open the decoded file from cache

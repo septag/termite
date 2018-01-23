@@ -4,6 +4,7 @@
 #include "tmath.h"
 #include "internal.h"
 #include "gfx_driver.h"
+#include "rapidjson.h"
 
 #include "bx/readerwriter.h"
 #include "bxx/path.h"
@@ -13,10 +14,6 @@
 #include "bxx/logger.h"
 #include "bxx/linear_allocator.h"
 
-#include "rapidjson/error/en.h"
-#include "rapidjson/document.h"
-#include "bxx/rapidjson_allocator.h"
-
 #include TEE_MAKE_SHADER_PATH(shaders_h, sprite.vso)
 #include TEE_MAKE_SHADER_PATH(shaders_h, sprite.fso)
 #include TEE_MAKE_SHADER_PATH(shaders_h, sprite_add.vso)
@@ -25,9 +22,6 @@
 #define MAKE_SPRITE_KEY(_Order, _Texture, _Id) \
     (uint64_t(_Order & kSpriteKeyOrderMask) << kSpriteKeyOrderShift) | (uint64_t(_Texture & kSpriteKeyTextureMask) << kSpriteKeyTextureShift) | uint64_t(_Id & kSpriteKeyIdMask)
 #define SPRITE_KEY_GET_BATCH(_Key) uint32_t((_Key >> kSpriteKeyIdBits) & kSpriteKeyIdMask) & kSpriteKeyTextureMask
-#include <algorithm>
-
-using namespace rapidjson;
 
 namespace tee {
     static const uint64_t kSpriteKeyOrderBits = 8;
@@ -309,7 +303,7 @@ namespace tee {
         if (count > 0) {
             verts = (vec2_t*)BX_ALLOC(alloc, sizeof(vec2_t)*count);
             for (int i = 0; i < count; i++) {
-                getIntArray<_T>(jnode[i], ivert.n, 2);
+                json::getIntArray<_T>(jnode[i], ivert.n, 2);
                 verts[i] = vec2(float(ivert.x), float(ivert.y));
             }
         }
@@ -325,7 +319,7 @@ namespace tee {
         if (count > 0) {
             tris = (uint16_t*)BX_ALLOC(alloc, sizeof(uint16_t)*count*3);
             for (int i = 0; i < count; i++) {
-                getUInt16Array<_T>(jnode[i], tris + 3*i, 3);
+                json::getUInt16Array<_T>(jnode[i], tris + 3*i, 3);
             }
         }
         *numTries = count;
@@ -347,9 +341,9 @@ namespace tee {
         memcpy(jsonStr, mem->data, mem->size);
         jsonStr[mem->size] = 0;
 
-        BxAllocatorNoFree jalloc(tmpAlloc);
-        BxAllocator jpool(4096, &jalloc);
-        BxDocument jdoc(&jpool, 1024, &jalloc);
+        json::StackAllocator jalloc(tmpAlloc);
+        json::StackPoolAllocator jpool(4096, &jalloc);
+        json::StackDocument jdoc(&jpool, 1024, &jalloc);
 
         if (jdoc.ParseInsitu(jsonStr).HasParseError()) {
             TEE_ERROR("Parse Json Error: %s (Pos: %s)", GetParseError_En(jdoc.GetParseError()), jdoc.GetErrorOffset());                 
@@ -361,8 +355,8 @@ namespace tee {
             TEE_ERROR("SpriteSheet Json is Invalid");
             return false;
         }
-        const BxValue& jframes = jdoc["frames"];
-        const BxValue& jmeta = jdoc["meta"];
+        const json::svalue_t& jframes = jdoc["frames"];
+        const json::svalue_t& jmeta = jdoc["meta"];
 
         assert(jframes.IsArray());
         int numFrames = jframes.Size();
@@ -372,7 +366,7 @@ namespace tee {
         // evaluate total vertices, triangles and uvs
         int numTotalVerts = 0, numTotalTris = 0, numTotalUvs = 0;
         for (int i = 0; i < numFrames; i++) {
-            const BxValue& jframe = jframes[i];
+            const json::svalue_t& jframe = jframes[i];
             if (jframe.HasMember("vertices")) {
                 numTotalVerts += jframe["vertices"].Size();
                 if (jframe.HasMember("verticesUV"))
@@ -402,7 +396,7 @@ namespace tee {
         ss->meshes = (SpriteMesh*)BX_ALLOC(&lalloc, numFrames*sizeof(SpriteMesh));
 
         // image width/height
-        const BxValue& jsize = jmeta["size"];
+        const json::svalue_t& jsize = jmeta["size"];
         float imgWidth = float(jsize["w"].GetInt());
         float imgHeight = float(jsize["h"].GetInt());
 
@@ -420,12 +414,12 @@ namespace tee {
 
         for (int i = 0; i < numFrames; i++) {
             SpriteSheetFrame& frame = ss->frames[i];
-            const BxValue& jframe = jframes[i];
+            const json::svalue_t& jframe = jframes[i];
             const char* filename = jframe["filename"].GetString();
             frame.filenameHash = tinystl::hash_string(filename, strlen(filename));
             bool rotated = jframe["rotated"].GetBool();
 
-            const BxValue& jframeFrame = jframe["frame"];
+            const json::svalue_t& jframeFrame = jframe["frame"];
             float frameWidth = float(jframeFrame["w"].GetInt());
             float frameHeight = float(jframeFrame["h"].GetInt());
             if (rotated)
@@ -436,13 +430,13 @@ namespace tee {
                                   frameWidth / imgWidth,
                                   frameHeight / imgHeight);
 
-            const BxValue& jsourceSize = jframe["sourceSize"];
+            const json::svalue_t& jsourceSize = jframe["sourceSize"];
             frame.sourceSize = vec2(float(jsourceSize["w"].GetInt()),
                                      float(jsourceSize["h"].GetInt()));
 
             // Normalize pos/size offsets (0~1)
             // Rotate offset can only be 90 degrees
-            const BxValue& jssFrame = jframe["spriteSourceSize"];
+            const json::svalue_t& jssFrame = jframe["spriteSourceSize"];
             float srcx = float(jssFrame["x"].GetInt());
             float srcy = float(jssFrame["y"].GetInt());
             float srcw = float(jssFrame["w"].GetInt());
@@ -458,9 +452,9 @@ namespace tee {
             }
             frame.pixelRatio = frame.sourceSize.x / frame.sourceSize.y;
 
-            const BxValue& jpivot = jframe["pivot"];
-            const BxValue& jpivotX = jpivot["x"];
-            const BxValue& jpivotY = jpivot["y"];
+            const json::svalue_t& jpivot = jframe["pivot"];
+            const json::svalue_t& jpivotX = jpivot["x"];
+            const json::svalue_t& jpivotY = jpivot["y"];
             float pivotx = jpivotX.IsFloat() ?  jpivotX.GetFloat() : float(jpivotX.GetInt());
             float pivoty = jpivotY.IsFloat() ?  jpivotY.GetFloat() : float(jpivotY.GetInt());
             frame.pivot = vec2(pivotx - 0.5f, -pivoty + 0.5f);     // convert to our coordinates
@@ -472,7 +466,7 @@ namespace tee {
             // Mesh
             if (jframe.HasMember("vertices")) {
                 SpriteMesh& mesh = ss->meshes[i];
-                const BxValue& jverts = jframe["vertices"];
+                const json::svalue_t& jverts = jframe["vertices"];
                 mesh.verts = loadSpriteVerts(jverts, &mesh.numVerts, &lalloc);
             
                 // Convert vertices to (-0.5-0.5) of the sprite frame

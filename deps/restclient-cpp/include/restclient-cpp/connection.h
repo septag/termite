@@ -163,6 +163,8 @@ class Connection {
     // set CURLOPT_PROXY
     void SetProxy(const std::string& uriProxy);
 
+    void SetInsecureCert(bool insecure);
+
     std::string GetUserAgent();
 
     RestClient::Connection::Info GetInfo();
@@ -194,6 +196,7 @@ class Connection {
     int timeout;
     bool followRedirects;
     bool noSignal;
+    bool insecure;
     struct {
       std::string username;
       std::string password;

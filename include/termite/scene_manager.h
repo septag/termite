@@ -92,6 +92,7 @@ namespace tee
         virtual void update(Scene* scene, float dt, uint8_t& viewId, FrameBufferHandle renderFb, bool mustClearFb) = 0;
     };
 
+    // This callback is used mainly in loading scenes, that Next scene should be delayed in order to show tips or something
     class BX_NO_VTABLE SceneCallbacksDelayI
     {
     public:
@@ -146,6 +147,8 @@ namespace tee
     TEE_API void startSceneManager(SceneManager* mgr, Scene* entryScene, 
                                        FrameBufferHandle mainFb, FrameBufferHandle effectFb);
     TEE_API void debugSceneManager(SceneManager* mgr);
+
+    TEE_API bool isInLoadState(SceneManager* mgr);
 
     // "FadeIn"/"FadeOut" Effect Params
     struct SceneFadeEffectParams

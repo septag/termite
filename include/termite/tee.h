@@ -135,10 +135,24 @@ namespace tee
         uint32_t size;
     };
 
-    struct HardwareStats
+    struct HardwareInfo
     {
+        char brand[16];
+        char model[16];
+        char uniqueId[32];
+        uint64_t totalMem;
+        int apiVersion;
         uint16_t numCores;
-        size_t processMemUsed;
+
+        HardwareInfo()
+        {
+            brand[0] = 0;
+            model[0] = 0;
+            uniqueId[0] = 0;
+            totalMem = 0;
+            apiVersion = 0;
+            numCores = 0;
+        }
     };
 
     typedef void(*UpdateCallback)(float dt);
@@ -230,6 +244,7 @@ namespace tee
     TEE_API bx::AllocatorI* getHeapAlloc() TEE_THREAD_SAFE;
     TEE_API bx::AllocatorI* getTempAlloc() TEE_THREAD_SAFE;
     TEE_API const Config& getConfig() TEE_THREAD_SAFE;
+    TEE_API Config* getMutableConfig() TEE_THREAD_SAFE;
     TEE_API const char* getCacheDir() TEE_THREAD_SAFE;
     TEE_API const char* getDataDir() TEE_THREAD_SAFE;
     TEE_API void dumpGfxLog() TEE_THREAD_SAFE;
@@ -241,7 +256,7 @@ namespace tee
     // Remote Console
     TEE_API void registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback);
 
-    TEE_API const HardwareStats& getHardwareStats();
+    TEE_API const HardwareInfo& getHardwareInfo();
 
 #if BX_PLATFORM_ANDROID
     struct JavaMethod
