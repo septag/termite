@@ -123,7 +123,7 @@ namespace tee
         bx::Pool<Scene> scenePool;
         bx::Array<SceneTransitionEffect> effects;
         bx::HandlePool linkPool;
-        CIncrLoader loader;
+        IncrLoader* loader;
         uint8_t viewId;
         uint8_t viewIdOffset;
 
@@ -287,7 +287,7 @@ namespace tee
         if (!mgr->scenePool.create(32, alloc) ||
             !mgr->effects.create(8, 8, alloc) ||
             !mgr->linkPool.create(&linkSize, 1, 32, 64, alloc) ||
-            !mgr->loader.create(alloc)) {
+            !(mgr->loader = asset::createIncrementalLoader(alloc))) {
             destroySceneManager(mgr);
             return nullptr;
         }
@@ -313,7 +313,8 @@ namespace tee
         for (int i = 0, c = smgr->effects.getCount(); i < c; i++)
             smgr->effects[i].callbacks->destroy();
 
-        smgr->loader.destroy();
+        if (smgr->loader)
+            asset::destroyIncrementalLoader(smgr->loader);
         smgr->linkPool.destroy();
         smgr->effects.destroy();
         smgr->scenePool.destroy();
@@ -375,13 +376,13 @@ namespace tee
             // LoadResource proceeds to Create
         case Scene::LoadResource:
             if (!scene->loaderGroup.isValid()) {
-                mgr->loader.beginGroup(scene->loadScheme);
+                asset::beginIncrLoadGroup(mgr->loader, scene->loadScheme);
                 scene->callbacks->loadResources(scene, mgr->loader);
-                scene->loaderGroup = mgr->loader.endGroup();
+                scene->loaderGroup = asset::endIncrLoadGroup(mgr->loader);
             }
 
             // Proceed to next state if loaded
-            if (mgr->loader.checkGroupDone(scene->loaderGroup)) {
+            if (asset::isLoadDone(mgr->loader, scene->loaderGroup, IncrLoaderFlags::DeleteGroup|IncrLoaderFlags::RetryFailed)) {
                 scene->state = Scene::Create;
                 scene->loaderGroup.reset();
                 updateScene(mgr, scene, dt);
@@ -421,12 +422,12 @@ namespace tee
         // UnloadResource proceeds to Dead
         case Scene::UnloadResource:
             if (!scene->loaderGroup.isValid()) {
-                mgr->loader.beginGroup(scene->loadScheme);
+                asset::beginIncrLoadGroup(mgr->loader, scene->loadScheme);
                 scene->callbacks->unloadResources(scene, mgr->loader);
-                scene->loaderGroup = mgr->loader.endGroup();
+                scene->loaderGroup = asset::endIncrLoadGroup(mgr->loader);
             }
 
-            if (mgr->loader.checkGroupDone(scene->loaderGroup)) {
+            if (asset::isLoadDone(mgr->loader, scene->loaderGroup, IncrLoaderFlags::DeleteGroup)) {
                 scene->loaderGroup.reset();
                 scene->state = Scene::Dead;
             }
@@ -442,7 +443,7 @@ namespace tee
         while (scene->state != Scene::Ready) {
             if (getAsyncIoDriver())
                 getAsyncIoDriver()->runAsyncLoop();
-            mgr->loader.step(1.0f);
+            asset::stepIncrLoader(mgr->loader, 1.0f);
             updateScene(mgr, scene, 1.0f, true);
             bx::yield();
         }
@@ -539,7 +540,7 @@ namespace tee
             scene->state = Scene::Destroy;
 
             while (scene->state != Scene::Dead) {
-                mgr->loader.step(1.0f);
+                asset::stepIncrLoader(mgr->loader, 1.0f);
                 updateScene(mgr, scene, 1.0f);
                 bx::yield();
             }
@@ -830,8 +831,7 @@ namespace tee
                 // sceneB is ready, proceed to next step
                 if ((link->sceneB->flags & SceneFlag::Overlay) ||
                     (link->sceneA->flags & SceneFlag::CacheAlways) ||
-                    link->sceneA->state == Scene::Dead &&
-                    !isDelayed) {
+                    (link->sceneA->state == Scene::Dead && !isDelayed)) {
                     link->state = SceneLink::InB;
                     if (link->loadScene) {
                         if (removeActiveScene(mgr, link->loadScene)) {
@@ -891,7 +891,7 @@ namespace tee
         mgr->finalFb = mgr->mainFb;
         mgr->finalTex = mgr->mainTex;
 
-        mgr->loader.step(dt);
+        asset::stepIncrLoader(mgr->loader, dt);
 
         for (int i = 0, c = mgr->numActiveScenes; i < c; i++) {
             updateScene(mgr, mgr->activeScenes[i], dt, true);

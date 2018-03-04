@@ -1,0 +1,14 @@
+$input v_texcoord0
+
+#include <bgfx_shader.sh>
+
+SAMPLER2D(u_texture, 0);
+
+uniform lowp vec4 u_tintColor;   // a = intensity
+
+void main()
+{
+    lowp vec4 color = texture2D(u_texture, v_texcoord0);
+    color.rgb = mix(color.rgb, u_tintColor.rgb, u_tintColor.a);
+    gl_FragColor = color;
+}

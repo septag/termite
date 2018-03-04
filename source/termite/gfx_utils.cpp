@@ -12,6 +12,8 @@
 #include TEE_MAKE_SHADER_PATH(shaders_h, blur.fso)
 #include TEE_MAKE_SHADER_PATH(shaders_h, vignette_sepia.vso)
 #include TEE_MAKE_SHADER_PATH(shaders_h, vignette_sepia.fso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, tint.vso)
+#include TEE_MAKE_SHADER_PATH(shaders_h, tint.fso)
 
 namespace tee
 {
@@ -65,8 +67,8 @@ namespace tee
 
         uint16_t width;
         uint16_t height;
-        float radius;
-        float softness;     // Vignette softness, 0 ~ 0.5
+        float start;    // border = 0.5f
+        float end;      // border = 0.5f
         float vignetteIntensity;
         float sepiaIntensity;   // 0 ~ 1
         vec4_t sepiaColor; 
@@ -75,9 +77,23 @@ namespace tee
         PostProcessVignetteSepia(bx::AllocatorI* _alloc) : alloc(_alloc)
         {
             width = height = 0;
-            radius = 0;
-            softness = 0.45f;   
+            start = 0;
+            end = 0.45f;   
             vignetteColor = vec4(0, 0, 0, 0);
+        }
+    };
+
+    struct PostProcessTint
+    {
+        bx::AllocatorI* alloc;
+        ProgramHandle prog;
+        UniformHandle uTexture;
+        UniformHandle uTintColor;
+        uint16_t width;
+        uint16_t height;
+
+        PostProcessTint(bx::AllocatorI* _alloc) : alloc(_alloc)
+        {
         }
     };
 
@@ -265,7 +281,7 @@ namespace tee
         switch (policy) {
         case DisplayPolicy::FitToHeight:
             h = float(targetHeight);
-            w = bx::min(float(refWidth), h*ratio);
+            w = h*ratio;
             break;
 
         case DisplayPolicy::FitToWidth:
@@ -406,7 +422,7 @@ namespace tee
     }
 
     PostProcessVignetteSepia* gfx::createVignetteSepiaPostProcess(bx::AllocatorI* alloc, uint16_t width, uint16_t height,
-                                                             float radius, float softness, 
+                                                             float start, float end, 
                                                              float vignetteIntensity, float sepiaIntensity, 
                                                              ucolor_t sepiaColor, ucolor_t vignetteColor)
     {
@@ -415,8 +431,8 @@ namespace tee
         PostProcessVignetteSepia* vignette = BX_NEW(alloc, PostProcessVignetteSepia)(alloc);
         vignette->width = width;
         vignette->height = height;
-        vignette->radius = radius;
-        vignette->softness = bx::clamp<float>(softness, 0, 0.5f);
+        vignette->start = start;
+        vignette->end = end;
         vignette->sepiaColor = tmath::ucolorToVec4(sepiaColor);
         vignette->vignetteColor = tmath::ucolorToVec4(vignetteColor);
         vignette->vignetteIntensity = vignetteIntensity;
@@ -441,31 +457,9 @@ namespace tee
     {
         GfxDriver* driver = gUtils->driver;
 
-        vec4_t vigParams = vec4(vignette->radius, vignette->softness, intensity*vignette->vignetteIntensity, 0);
+        vec4_t vigParams = vec4(vignette->start, vignette->end, intensity*vignette->vignetteIntensity, 0);
         vec4_t sepiaParams = vec4(vignette->sepiaColor.x, vignette->sepiaColor.y, vignette->sepiaColor.z, 
-                                   intensity*vignette->sepiaIntensity);
-
-        driver->setViewRect(viewId, 0, 0, vignette->width, vignette->height);
-        driver->setViewFrameBuffer(viewId, targetFb);
-        driver->setState(GfxState::RGBWrite, 0);
-        driver->setTexture(0, vignette->uTexture, sourceTexture, TextureFlag::FromTexture);
-        driver->setUniform(vignette->uVignetteParams, vigParams.f, 1);
-        driver->setUniform(vignette->uSepiaParams, sepiaParams.f, 1);
-        driver->setUniform(vignette->uVignetteColor, vignette->vignetteColor.f, 1);
-
-        gfx::drawFullscreenQuad(viewId, vignette->prog);
-        return driver->getFrameBufferTexture(targetFb, 0);
-    }
-
-    TextureHandle gfx::drawVignetteSepiaPostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId, 
-                                                       FrameBufferHandle targetFb, TextureHandle sourceTexture, 
-                                                       float intensity, float vigIntensity, float vigRadius)
-    {
-        GfxDriver* driver = gUtils->driver;
-
-        vec4_t vigParams = vec4(vigRadius != 0 ? vigRadius : vignette->radius, vignette->softness, intensity*vigIntensity, 0);
-        vec4_t sepiaParams = vec4(vignette->sepiaColor.x, vignette->sepiaColor.y, vignette->sepiaColor.z,
-                                   intensity*vignette->sepiaIntensity);
+                                  intensity*vignette->sepiaIntensity);
 
         driver->setViewRect(viewId, 0, 0, vignette->width, vignette->height);
         driver->setViewFrameBuffer(viewId, targetFb);
@@ -480,12 +474,12 @@ namespace tee
     }
 
     TextureHandle gfx::drawVignettePostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId, FrameBufferHandle targetFb,
-                                                  TextureHandle sourceTexture, float softness, float radius, float intensity,
+                                                  TextureHandle sourceTexture, float start, float end, float intensity,
                                                   vec4_t vignetteColor)
     {
         GfxDriver* driver = gUtils->driver;
 
-        vec4_t vigParams = vec4(radius, softness, intensity, 0);
+        vec4_t vigParams = vec4(start, end, intensity, 0);
         vec4_t sepiaParams = vec4(1.0f, 1.0f, 1.0f, 0);
 
         driver->setViewRect(viewId, 0, 0, vignette->width, vignette->height);
@@ -497,6 +491,58 @@ namespace tee
         driver->setUniform(vignette->uVignetteColor, vignetteColor.f, 1);
         gfx::drawFullscreenQuad(viewId, vignette->prog);
         return driver->getFrameBufferTexture(targetFb, 0);
+    }
+
+    PostProcessTint* gfx::createTintPostPorcess(bx::AllocatorI* alloc, uint16_t width, uint16_t height)
+    {
+        GfxDriver* driver = gUtils->driver;
+        PostProcessTint* tint = BX_NEW(alloc, PostProcessTint)(alloc);
+
+        tint->prog = driver->createProgram(
+            driver->createShader(driver->makeRef(tint_vso, sizeof(tint_vso), nullptr, nullptr)),
+            driver->createShader(driver->makeRef(tint_fso, sizeof(tint_fso), nullptr, nullptr)),
+            true);
+
+        tint->uTexture = driver->createUniform("u_texture", UniformType::Int1, 1);
+        tint->uTintColor = driver->createUniform("u_tintColor", UniformType::Vec4, 1);
+        tint->width = width;
+        tint->height = height;
+
+        return tint;
+    }
+
+    void gfx::destroyTintPostProcess(PostProcessTint* tint)
+    {
+        GfxDriver* driver = gUtils->driver;
+        if (tint->uTexture.isValid())
+            driver->destroyUniform(tint->uTexture);
+        if (tint->uTintColor.isValid())
+            driver->destroyUniform(tint->uTintColor);
+        if (tint->prog.isValid())
+            driver->destroyProgram(tint->prog);
+        BX_DELETE(tint->alloc, tint);
+    }
+
+    TextureHandle gfx::drawTintPostProcess(PostProcessTint* tint, uint8_t viewId, FrameBufferHandle targetFb, 
+                                  TextureHandle sourceTexture, const vec4_t& color, float intensity)
+    {
+        GfxDriver* driver = gUtils->driver;
+
+        vec4_t tintColor = vec4(color.x, color.y, color.z, intensity);
+
+        driver->setViewRect(viewId, 0, 0, tint->width, tint->height);
+        driver->setViewFrameBuffer(viewId, targetFb);
+        driver->setState(GfxState::RGBWrite, 0);
+        driver->setTexture(0, tint->uTexture, sourceTexture, TextureFlag::FromTexture);
+        driver->setUniform(tint->uTintColor, tintColor.f, 1);
+        gfx::drawFullscreenQuad(viewId, tint->prog);
+        return driver->getFrameBufferTexture(targetFb, 0);
+    }
+
+    void gfx::resizeTintPostProcessBuffers(PostProcessTint* tint, uint16_t width, uint16_t height)
+    {
+        tint->width = width;
+        tint->height = height;
     }
 
     void gfx::destroyVignetteSepiaPostProcess(PostProcessVignetteSepia* vignette)

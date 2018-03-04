@@ -322,9 +322,9 @@ static void destroySceneBox2d(PhysScene2D* scene)
     gBox2d.scenePool.deleteInstance(scene);
 }
 
-static void stepSceneBox2d(PhysScene2D* scene, float dt)
+static void stepSceneBox2d(PhysScene2D* scene, float dt, int velIterations, int posIterations)
 {
-    scene->w.Step(dt, 10, 4, 2);
+    scene->w.Step(dt, velIterations, posIterations, 2);
 }
 
 static void debugSceneBox2d(PhysScene2D* scene, const irect_t viewport, const Camera2D& cam,

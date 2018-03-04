@@ -242,6 +242,11 @@ namespace tee {
         accel[2] = gSDL->accel[2];
     }
 
+    bool sdl::isKeyPressed(SDL_Keycode vkey)
+    {
+        return gSDL->keysDown[vkey & ~SDLK_SCANCODE_MASK];
+    }
+
     void sdl::registerShortcutKey(SDL_Keycode vkey, ModifierKey::Bits modKeys, ShortcutKeyCallback callback, void* userData)
     {
         assert(gSDL);

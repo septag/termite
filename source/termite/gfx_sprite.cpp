@@ -16,8 +16,6 @@
 
 #include TEE_MAKE_SHADER_PATH(shaders_h, sprite.vso)
 #include TEE_MAKE_SHADER_PATH(shaders_h, sprite.fso)
-#include TEE_MAKE_SHADER_PATH(shaders_h, sprite_add.vso)
-#include TEE_MAKE_SHADER_PATH(shaders_h, sprite_add.fso)
 
 #define MAKE_SPRITE_KEY(_Order, _Texture, _Id) \
     (uint64_t(_Order & kSpriteKeyOrderMask) << kSpriteKeyOrderShift) | (uint64_t(_Texture & kSpriteKeyTextureMask) << kSpriteKeyTextureShift) | uint64_t(_Id & kSpriteKeyIdMask)
@@ -39,8 +37,9 @@ namespace tee {
         vec2_t pos;
         vec3_t transform1;
         vec3_t transform2;
-        vec3_t coords;      // z = glow
+        vec2_t coords;
         uint32_t color;
+        uint32_t colorAdd;
 
         static void init()
         {
@@ -48,8 +47,9 @@ namespace tee {
             gfx::addAttrib(&Decl, VertexAttrib::Position, 2, VertexAttribType::Float);        // pos
             gfx::addAttrib(&Decl, VertexAttrib::TexCoord0, 3, VertexAttribType::Float);       // transform mat (part 1)
             gfx::addAttrib(&Decl, VertexAttrib::TexCoord1, 3, VertexAttribType::Float);       // transform mat (part 2)
-            gfx::addAttrib(&Decl, VertexAttrib::TexCoord2, 3, VertexAttribType::Float);       // texture coords + glow
+            gfx::addAttrib(&Decl, VertexAttrib::TexCoord2, 2, VertexAttribType::Float);       // texture coords + glow
             gfx::addAttrib(&Decl, VertexAttrib::Color0, 4, VertexAttribType::Uint8, true);    // color
+            gfx::addAttrib(&Decl, VertexAttrib::Color1, 4, VertexAttribType::Uint8, true);    // colorAdd
             gfx::endDecl(&Decl);
         }
 
@@ -183,8 +183,8 @@ namespace tee {
         bool playReverse;
         float playSpeed;
         float resumeSpeed;
-        ucolor_t tint;
-        float glow;
+        ucolor_t color;
+        ucolor_t colorAdd;
         uint8_t order;
 
         SpriteFlag::Bits flip;
@@ -211,11 +211,11 @@ namespace tee {
             endUserData(nullptr),
             triggerEndCallback(false)
         {
-            tint = ucolor(0xffffffff);
+            color = ucolor(0xffffffff);
+            colorAdd = ucolor(0);
             posOffset = vec2(0, 0);
             scale = vec2(1.0f, 1.0f);
             userData = nullptr;
-            glow = 0;
         }
 
         inline const SpriteFrame& getCurFrame() const
@@ -259,7 +259,6 @@ namespace tee {
         GfxDriver* driver;
         bx::AllocatorI* alloc;
         ProgramHandle spriteProg;
-        ProgramHandle spriteAddProg;
         UniformHandle u_texture;
         SpriteSheetLoader loader;
         SpriteSheet* failSheet;
@@ -326,6 +325,25 @@ namespace tee {
         return tris;
     }
 
+    // https://en.wikipedia.org/wiki/Shoelace_formula
+    static void reorderSpriteMeshTriangles(SpriteMesh* mesh)
+    {
+        for (int i = 0, c = mesh->numTris; i < c; i++) {
+            int tidx = i*3;
+
+            const vec2_t& p1 = mesh->verts[mesh->tris[tidx]];
+            const vec2_t& p2 = mesh->verts[mesh->tris[tidx + 1]];
+            const vec2_t& p3 = mesh->verts[mesh->tris[tidx + 2]];
+
+            float area = 0.5f*(p1.x*p2.y + p2.x*p3.y + p3.x*p1.y - p2.x*p1.y - p3.x*p2.y - p1.x*p3.y);
+            //float s = (p2.x - p1.x)*(p2.y + p1.y) + (p3.x - p2.x)*(p3.y + p2.y) + (p1.x - p3.x)*(p1.y + p3.y);
+            // it's CCW, turn it to CW
+            if (area > 0) {
+                bx::xchg(mesh->tris[tidx], mesh->tris[tidx + 2]);
+            }
+        }
+    }
+
     bool SpriteSheetLoader::loadObj(const MemoryBlock* mem, const AssetParams& params, uintptr_t* obj, 
                                     bx::AllocatorI* alloc)
     {
@@ -346,7 +364,7 @@ namespace tee {
         json::StackDocument jdoc(&jpool, 1024, &jalloc);
 
         if (jdoc.ParseInsitu(jsonStr).HasParseError()) {
-            TEE_ERROR("Parse Json Error: %s (Pos: %s)", GetParseError_En(jdoc.GetParseError()), jdoc.GetErrorOffset());                 
+            TEE_ERROR("Parse Json Error: %s (Pos: %d)", GetParseError_En(jdoc.GetParseError()), jdoc.GetErrorOffset());                 
             return false;
         }
         BX_FREE(tmpAlloc, jsonStr);
@@ -469,7 +487,7 @@ namespace tee {
                 const json::svalue_t& jverts = jframe["vertices"];
                 mesh.verts = loadSpriteVerts(jverts, &mesh.numVerts, &lalloc);
             
-                // Convert vertices to (-0.5-0.5) of the sprite frame
+                // Convert vertices to normalized (-0.5~0.5) of the sprite frame
                 for (int i = 0; i < mesh.numVerts; i++) {
                     vec2_t pixelPos = mesh.verts[i];
                     mesh.verts[i] = vec2(pixelPos.x/frame.sourceSize.x - 0.5f, -pixelPos.y/frame.sourceSize.y + 0.5f);
@@ -488,6 +506,8 @@ namespace tee {
 
                 if (jframe.HasMember("triangles"))
                     mesh.tris = loadSpriteTris(jframe["triangles"], &mesh.numTris, &lalloc);
+
+                reorderSpriteMeshTriangles(&mesh);
             } else {
                 rect_t texcoords = frame.frame;
                 vec2_t topLeft = vec2(srcx/frame.sourceSize.x - 0.5f,
@@ -662,13 +682,6 @@ namespace tee {
         if (!gSpriteMgr->spriteProg.isValid())
             return false;
 
-        gSpriteMgr->spriteAddProg = 
-            driver->createProgram(driver->createShader(driver->makeRef(sprite_add_vso, sizeof(sprite_add_vso), nullptr, nullptr)),
-                                  driver->createShader(driver->makeRef(sprite_add_fso, sizeof(sprite_add_fso), nullptr, nullptr)),
-                                  true);
-        if (!gSpriteMgr->spriteAddProg.isValid())
-            return false;
-
         gSpriteMgr->u_texture = driver->createUniform("u_texture", UniformType::Int1, 1);
 
         // Create fail spritesheet
@@ -754,13 +767,6 @@ namespace tee {
         if (!gSpriteMgr->spriteProg.isValid())
             return false;
 
-        gSpriteMgr->spriteAddProg =
-            driver->createProgram(driver->createShader(driver->makeRef(sprite_add_vso, sizeof(sprite_add_vso), nullptr, nullptr)),
-                                  driver->createShader(driver->makeRef(sprite_add_fso, sizeof(sprite_add_fso), nullptr, nullptr)),
-                                  true);
-        if (!gSpriteMgr->spriteAddProg.isValid())
-            return false;
-
         gSpriteMgr->u_texture = driver->createUniform("u_texture", UniformType::Int1, 1);
 
         // Recreate all sprite cache buffers
@@ -785,8 +791,6 @@ namespace tee {
 
         if (gSpriteMgr->spriteProg.isValid())
             driver->destroyProgram(gSpriteMgr->spriteProg);
-        if (gSpriteMgr->spriteAddProg.isValid())
-            driver->destroyProgram(gSpriteMgr->spriteAddProg);
         if (gSpriteMgr->u_texture.isValid())
             driver->destroyUniform(gSpriteMgr->u_texture);
 
@@ -848,7 +852,8 @@ namespace tee {
         assert(name);
         if (ssHandle.isValid()) {
             assert(asset::getState(ssHandle) != AssetState::LoadInProgress);
-        
+            SpriteSheet* ss = asset::getObjPtr<SpriteSheet>(ssHandle);
+
             SpriteFrame* frame = BX_PLACEMENT_NEW(sprite->frames.push(), SpriteFrame);
             if (frame) {
                 frame->ssHandle = ssHandle;
@@ -888,6 +893,7 @@ namespace tee {
                     frame->sizeOffset = vec2(1.0f, 1.0f);
                     frame->rotOffset = 0;
                     frame->pixelRatio = 1.0f;
+                    frame->meshId = 0;
                 }
             }
         }
@@ -1133,19 +1139,19 @@ namespace tee {
             sprite->frames[i].pivot = pivot;
     }
 
-    void sprite::setTint(Sprite* sprite, ucolor_t color)
+    void sprite::setColor(Sprite* sprite, ucolor_t color)
     {
-        sprite->tint = color;
+        sprite->color = color;
     }
 
-    void sprite::setGlow(Sprite* sprite, float glow)
+    void sprite::setColorAdd(Sprite* sprite, ucolor_t color)
     {
-        sprite->glow = glow;
+        sprite->colorAdd = color;
     }
 
-    ucolor_t sprite::getTint(Sprite* sprite)
+    ucolor_t sprite::getColor(Sprite* sprite)
     {
-        return sprite->tint;
+        return sprite->color;
     }
 
     static rect_t getSpriteDrawRectFrame(Sprite* sprite, int index)
@@ -1209,11 +1215,6 @@ namespace tee {
     rect_t sprite::getTexelCoords(Sprite* sprite)
     {
         return sprite->getCurFrame().frame;
-    }
-
-    ProgramHandle sprite::getAddProgram()
-    {
-        return gSpriteMgr->spriteAddProg;
     }
 
     void sprite::setUserData(Sprite* sprite, void* userData)
@@ -1353,8 +1354,8 @@ namespace tee {
 
             vec3_t transform1 = vec3(finalMat.m11, finalMat.m12, finalMat.m21);
             vec3_t transform2 = vec3(finalMat.m22, finalMat.m31, finalMat.m32);
-            uint32_t color = sprite->tint.n;
-            float glow = sprite->glow;
+            uint32_t color = sprite->color.n;
+            uint32_t colorAdd = sprite->colorAdd.n;
 
             // Batch
             uint32_t batchKey = SPRITE_KEY_GET_BATCH(ss.key);
@@ -1378,8 +1379,9 @@ namespace tee {
                     verts[k].pos = mesh.verts[i];
                     verts[k].transform1 = transform1;
                     verts[k].transform2 = transform2;
-                    verts[k].coords = vec3(mesh.uvs[i].x, mesh.uvs[i].y, glow);
+                    verts[k].coords = vec2(mesh.uvs[i].x, mesh.uvs[i].y);
                     verts[k].color = color;
+                    verts[k].colorAdd = colorAdd;
                 }
 
                 for (int i = 0, c = mesh.numTris; i < c; i++) {
@@ -1404,20 +1406,21 @@ namespace tee {
                 SpriteVertex& v2 = verts[vertexIdx + 2];
                 SpriteVertex& v3 = verts[vertexIdx + 3];
                 v0.pos = vec2(-0.5f, 0.5f);
-                v0.coords = vec3(0, 0, glow);
+                v0.coords = vec2(0, 0);
 
                 v1.pos = vec2(0.5f, 0.5f);
-                v1.coords = vec3(1.0f, 0, glow);
+                v1.coords = vec2(1.0f, 0);
 
                 v2.pos = vec2(-0.5f, -0.5f);
-                v2.coords = vec3(0, 1.0f, glow);
+                v2.coords = vec2(0, 1.0f);
 
                 v3.pos = vec2(0.5f, -0.5f);
-                v3.coords = vec3(1.0f, 1.0f, glow);
+                v3.coords = vec2(1.0f, 1.0f);
 
                 v0.transform1 = v1.transform1 = v2.transform1 = v3.transform1 = transform1;
                 v0.transform2 = v1.transform2 = v2.transform2 = v3.transform2 = transform2;
                 v0.color = v1.color = v2.color = v3.color = color;
+                v0.colorAdd = v1.colorAdd = v2.colorAdd = v3.colorAdd = colorAdd;
 
                 indices[indexIdx] = vertexIdx;
                 indices[indexIdx + 1] = vertexIdx + 1;
@@ -1440,8 +1443,10 @@ namespace tee {
         }
 
         // Draw
-        GfxState::Bits state = gfx::stateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::PrimitiveLines;
+        GfxState::Bits state = 
+            gfx::stateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::PrimitiveLines;
         ProgramHandle prog = gSpriteMgr->spriteProg;
+        const vec4_t vglowColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
         for (int i = 0, c = batches.getCount(); i < c; i++) {
             const SpriteDrawBatch batch = batches[i];
             gDriver->setState(state, 0);
@@ -1463,6 +1468,14 @@ namespace tee {
         if (gSpriteMgr->renderMode == SpriteRenderMode::Wireframe)
             return drawSpritesWireframe(viewId, sprites, numSprites, mats);
     #endif
+
+        // Filter out invalid sprites
+        for (int si = 0; si < numSprites; si++) {
+            if (sprites[si]->curFrameIdx < sprites[si]->frames.getCount())
+                continue;
+            bx::xchg(sprites[si], sprites[numSprites-1]);
+            --numSprites;
+        }
 
         if (numSprites <= 0)
             return;
@@ -1548,10 +1561,15 @@ namespace tee {
             vec2_t pos = sprite->posOffset - frame.pivot;
             vec2_t scale = vec2(scalex, scaley) * sprite->scale;
 
-            if (flipX & SpriteFlip::FlipX)
+            bool reorder = false;
+            if (flipX & SpriteFlip::FlipX) {
                 scale.x = -scale.x;
-            if (flipY & SpriteFlip::FlipY)
+                reorder = !reorder;
+            }
+            if (flipY & SpriteFlip::FlipY) {
                 scale.y = -scale.y;
+                reorder = !reorder;
+            }
 
             // Transform (offset x sprite's own matrix)
             // PreMat = TranslateMat * ScaleMat
@@ -1563,9 +1581,9 @@ namespace tee {
             vec3_t transform1 = vec3(finalMat.m11, finalMat.m12, finalMat.m21);
             vec3_t transform2 = vec3(finalMat.m22, finalMat.m31, finalMat.m32);
             uint32_t color;
-            if (!colors)    color = ss.sprite->tint.n;
+            if (!colors)    color = ss.sprite->color.n;
             else            color = colors[ss.index].n;
-            float glow = sprite->glow;
+            uint32_t colorAdd = sprite->colorAdd.n;
 
             // Batch
             uint32_t batchKey = SPRITE_KEY_GET_BATCH(ss.key);
@@ -1578,6 +1596,7 @@ namespace tee {
                 prevKey = batchKey;
             }
         
+            int startIdx = indexIdx;
             // Fill geometry data
             if (frame.ssHandle.isValid()) {
                 SpriteSheet* sheet = asset::getObjPtr<SpriteSheet>(frame.ssHandle);
@@ -1589,8 +1608,9 @@ namespace tee {
                     verts[k].pos = mesh.verts[i];
                     verts[k].transform1 = transform1;
                     verts[k].transform2 = transform2;
-                    verts[k].coords = vec3(mesh.uvs[i].x, mesh.uvs[i].y, glow);
+                    verts[k].coords = vec2(mesh.uvs[i].x, mesh.uvs[i].y);
                     verts[k].color = color;
+                    verts[k].colorAdd = colorAdd;
                 }
 
                 for (int i = 0, c = mesh.numTris; i < c; i++) {
@@ -1612,20 +1632,21 @@ namespace tee {
                 SpriteVertex& v2 = verts[vertexIdx + 2];
                 SpriteVertex& v3 = verts[vertexIdx + 3];
                 v0.pos = vec2(-0.5f, 0.5f);
-                v0.coords = vec3(0, 0, glow);
+                v0.coords = vec2(0, 0);
 
                 v1.pos = vec2(0.5f, 0.5f);
-                v1.coords = vec3(1.0f, 0, glow);
+                v1.coords = vec2(1.0f, 0);
 
                 v2.pos = vec2(-0.5f, -0.5f);
-                v2.coords = vec3(0, 1.0f, glow);
+                v2.coords = vec2(0, 1.0f);
 
                 v3.pos = vec2(0.5f, -0.5f);
-                v3.coords = vec3(1.0f, 1.0f, glow);
+                v3.coords = vec2(1.0f, 1.0f);
 
                 v0.transform1 = v1.transform1 = v2.transform1 = v3.transform1 = transform1;
                 v0.transform2 = v1.transform2 = v2.transform2 = v3.transform2 = transform2;
                 v0.color = v1.color = v2.color = v3.color = color;
+                v0.colorAdd = v1.colorAdd = v2.colorAdd = v3.colorAdd = colorAdd;
 
                 indices[indexIdx] = vertexIdx;
                 indices[indexIdx + 1] = vertexIdx + 1;
@@ -1639,10 +1660,16 @@ namespace tee {
                 curBatch->numVerts += 4;
                 curBatch->numIndices += 6;
             }
+
+            if (reorder) {
+                for (int i = startIdx; i < indexIdx; i+=3) {
+                    bx::xchg(indices[i], indices[i + 2]);
+                }
+            }
         }
 
         // Draw
-        GfxState::Bits state = gfx::stateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite;
+        GfxState::Bits state = gfx::stateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::CullCCW;
         ProgramHandle prog = !progOverride.isValid() ? gSpriteMgr->spriteProg : progOverride;
         for (int i = 0, c = batches.getCount(); i < c; i++) {
             const SpriteDrawBatch batch = batches[i];
@@ -1664,6 +1691,14 @@ namespace tee {
     SpriteCache* sprite::createCache(bx::AllocatorI* alloc, Sprite** sprites, uint16_t numSprites, const mat3_t* mats,
                                      const ucolor_t* colors /*= nullptr*/)
     {
+        // Filter out invalid sprites
+        for (int si = 0; si < numSprites; si++) {
+            if (sprites[si]->curFrameIdx < sprites[si]->frames.getCount())
+                continue;
+            bx::xchg(sprites[si], sprites[numSprites-1]);
+            --numSprites;
+        }
+
         if (numSprites <= 0)
             return nullptr;
         assert(sprites);
@@ -1764,10 +1799,15 @@ namespace tee {
             vec2_t pos = sprite->posOffset - frame.pivot;
             vec2_t scale = vec2(scalex, scaley) * sprite->scale;
 
-            if (flipX & SpriteFlip::FlipX)
+            bool reorder = false;
+            if (flipX & SpriteFlip::FlipX) {
                 scale.x = -scale.x;
-            if (flipY & SpriteFlip::FlipY)
+                reorder = !reorder;
+            }
+            if (flipY & SpriteFlip::FlipY) {
                 scale.y = -scale.y;
+                reorder = !reorder;
+            }
 
             // Transform (offset x sprite's own matrix)
             // PreMat = TranslateMat * ScaleMat
@@ -1779,9 +1819,9 @@ namespace tee {
             vec3_t transform1 = vec3(finalMat.m11, finalMat.m12, finalMat.m21);
             vec3_t transform2 = vec3(finalMat.m22, finalMat.m31, finalMat.m32);
             uint32_t color;
-            if (!colors)    color = ss.sprite->tint.n;
+            if (!colors)    color = ss.sprite->color.n;
             else            color = colors[ss.index].n;
-            float glow = sprite->glow;
+            uint32_t colorAdd = ss.sprite->colorAdd.n;
 
             // Batch
             uint32_t batchKey = SPRITE_KEY_GET_BATCH(ss.key);
@@ -1795,6 +1835,7 @@ namespace tee {
             }
 
             // Fill geometry data
+            int startIdx = indexIdx;
             if (frame.ssHandle.isValid()) {
                 SpriteSheet* sheet = asset::getObjPtr<SpriteSheet>(frame.ssHandle);
                 assert(frame.meshId != -1);
@@ -1805,8 +1846,9 @@ namespace tee {
                     verts[k].pos = mesh.verts[i];
                     verts[k].transform1 = transform1;
                     verts[k].transform2 = transform2;
-                    verts[k].coords = vec3(mesh.uvs[i].x, mesh.uvs[i].y, glow);
+                    verts[k].coords = vec2(mesh.uvs[i].x, mesh.uvs[i].y);
                     verts[k].color = color;
+                    verts[k].colorAdd = colorAdd;
                 }
 
                 for (int i = 0, c = mesh.numTris; i < c; i++) {
@@ -1828,20 +1870,21 @@ namespace tee {
                 SpriteVertex& v2 = verts[vertexIdx + 2];
                 SpriteVertex& v3 = verts[vertexIdx + 3];
                 v0.pos = vec2(-0.5f, 0.5f);
-                v0.coords = vec3(0, 0, glow);
+                v0.coords = vec2(0, 0);
 
                 v1.pos = vec2(0.5f, 0.5f);
-                v1.coords = vec3(1.0f, 0, glow);
+                v1.coords = vec2(1.0f, 0);
 
                 v2.pos = vec2(-0.5f, -0.5f);
-                v2.coords = vec3(0, 1.0f, glow);
+                v2.coords = vec2(0, 1.0f);
 
                 v3.pos = vec2(0.5f, -0.5f);
-                v3.coords = vec3(1.0f, 1.0f, glow);
+                v3.coords = vec2(1.0f, 1.0f);
 
                 v0.transform1 = v1.transform1 = v2.transform1 = v3.transform1 = transform1;
                 v0.transform2 = v1.transform2 = v2.transform2 = v3.transform2 = transform2;
                 v0.color = v1.color = v2.color = v3.color = color;
+                v0.colorAdd = v1.colorAdd = v2.colorAdd = v3.colorAdd = colorAdd;
 
                 indices[indexIdx] = vertexIdx;
                 indices[indexIdx + 1] = vertexIdx + 1;
@@ -1854,6 +1897,12 @@ namespace tee {
                 indexIdx += 6;
                 curBatch->numVerts += 4;
                 curBatch->numIndices += 6;
+            }
+
+            if (reorder) {
+                for (int i = startIdx; i < indexIdx; i += 3) {
+                    bx::xchg(indices[i], indices[i + 2]);
+                }
             }
         }
 
@@ -1881,7 +1930,7 @@ namespace tee {
         GfxDriver* gDriver = getGfxDriver();
         SpriteCache* sc = spriteCache;
 
-        GfxState::Bits state = gfx::stateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite;
+        GfxState::Bits state = gfx::stateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::CullCCW;
         ProgramHandle prog = !progOverride.isValid() ? gSpriteMgr->spriteProg : progOverride;
         for (int i = 0, c = sc->numBatches; i < c; i++) {
             const SpriteDrawBatch batch = sc->batches[i];
@@ -1890,7 +1939,6 @@ namespace tee {
             gDriver->setIndexBuffer(sc->ib, batch.startIdx, batch.numIndices);
             if (batch.texHandle.isValid())
                 gDriver->setTexture(0, gSpriteMgr->u_texture, asset::getObjPtr<Texture>(batch.texHandle)->handle, TextureFlag::FromTexture);
-
             if (stateCallback) {
                 stateCallback(gDriver, stateUserData);
             }

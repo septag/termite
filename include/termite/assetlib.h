@@ -31,7 +31,8 @@ namespace tee
         enum Enum
         {
             None = 0x00,
-            Reload = 0x01
+            Reload = 0x01,
+            ForceBlockLoad = 0x02
         };
 
         typedef uint8_t Bits;
@@ -92,6 +93,7 @@ namespace tee
         TEE_API uint32_t getRefCount(AssetHandle handle);
         TEE_API void reloadAssets(const char* name);
         TEE_API void unloadAssets(const char* name);
+        TEE_API bool checkAssetsLoaded(const char* name);
 
         // Recommended: pass 'ext' and 'extReplacement' as lower-case
         // Pass extReplacement = nullptr to remove the override

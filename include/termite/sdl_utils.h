@@ -26,6 +26,7 @@ namespace tee
         TEE_API bool handleEvent(SDL_Event* ev, bool wait = false);
         TEE_API void mapImGuiKeys(Config* conf);
         TEE_API void getAccelState(float* accel);
+        TEE_API bool isKeyPressed(SDL_Keycode vkey);
 
         // Register shortcut keys, mostly for tools and editors
         // vkey: SDLK_xxx 

@@ -107,7 +107,7 @@ namespace tee {
         ModelInstanceImpl* inst = (ModelInstanceImpl*)BX_ALLOC(&lalloc, sizeof(ModelInstanceImpl));
         if (!inst)
             return nullptr;
-        memset(inst, 0x00, sizeof(ModelInstanceImpl));
+        bx::memSet(inst, 0x00, sizeof(ModelInstanceImpl));
 
         inst->alloc = alloc;
         inst->buff = buff;

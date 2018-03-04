@@ -19,7 +19,8 @@ namespace tee {
     struct MaterialTexture
     {
         TextureFlag::Bits flags;
-        AssetHandle texHandle;
+        AssetHandle aHandle;
+        TextureHandle tHandle;
         uint8_t stage;
     };
 
@@ -132,7 +133,7 @@ namespace tee {
             return handle;
 
         Material* mtl = lib->mtls.getHandleData<Material>(0, handle);
-        memset(mtl, 0x00, sizeof(Material));
+        bx::memSet(mtl, 0x00, sizeof(Material));
         mtl->mtlLib = lib;
         mtl->alloc = alloc;
         mtl->prog = prog;
@@ -185,11 +186,18 @@ namespace tee {
         // Set initial values
         uint8_t stageId = 0;
         for (int i = 0; i < decl.count; i++) {
-            if (decl.initValues[i]) {
-                if (decl.types[i] == UniformType::Vec4)
+            switch (decl.initTypes[i]) {
+                case MaterialDecl::InitTypeNone:
+                    break;
+                case MaterialDecl::InitTypeVector:
                     gfx::setMtlValue(handle, decl.names[i], decl.initData[i].v);
-                else if (decl.types[i] == UniformType::Int1)
+                    break;
+                case MaterialDecl::InitTypeTextureHandle:
+                    gfx::setMtlTexture(handle, decl.names[i], stageId++, decl.initData[i].th);
+                    break;
+                case MaterialDecl::InitTypeTextureResource:
                     gfx::setMtlTexture(handle, decl.names[i], stageId++, decl.initData[i].t);
+                    break;
             }
         }
 
@@ -249,14 +257,16 @@ namespace tee {
         // Apply all uniform values
         GfxDriver* gDriver = lib->driver;
         for (int i = 0, c = mtl->numValues; i < c; i++) {
-            if (lib->uniforms[i].type != UniformType::Int1) {
-                gDriver->setUniform(lib->uniforms[mtl->uniformIds[i]].handle,
+            const MaterialUniform& mtluniform = lib->uniforms[mtl->uniformIds[i]];
+            if (mtluniform.type != UniformType::Int1) {
+                gDriver->setUniform(mtluniform.handle,
                                     mtl->data + mtl->offsets[i],
                                     lib->uniforms[i].num);
             } else {
                 MaterialTexture* mt = (MaterialTexture*)(mtl->data + mtl->offsets[i]);
-                gDriver->setTexture(mt->stage, lib->uniforms[mtl->uniformIds[i]].handle, 
-                                    asset::getObjPtr<Texture>(mt->texHandle)->handle, mt->flags);
+                gDriver->setTexture(mt->stage, mtluniform.handle,
+                                    mt->aHandle.isValid() ? asset::getObjPtr<Texture>(mt->aHandle)->handle : mt->tHandle, 
+                                    mt->flags);
             }                                    
         }
     }
@@ -366,7 +376,26 @@ namespace tee {
             BX_ASSERT(lib->uniforms[mtl->uniformIds[index]].type == UniformType::Int1, "Type is invalid");
 
             MaterialTexture* mt = (MaterialTexture*)(mtl->data + mtl->offsets[index]);
-            mt->texHandle = texHandle;
+            mt->aHandle = texHandle;
+            mt->tHandle.reset();
+            mt->stage = stage;
+            mt->flags = flags;
+        }
+    }
+
+    void gfx::setMtlTexture(MaterialHandle handle, const char* name, uint8_t stage, TextureHandle texHandle,
+                            TextureFlag::Bits flags)
+    {
+        MaterialLib* lib = gMtlLib;
+        Material* mtl = lib->mtls.getHandleData<Material>(0, handle);
+
+        int index = findMtlValue(mtl, name);
+        if (index != -1) {
+            BX_ASSERT(lib->uniforms[mtl->uniformIds[index]].type == UniformType::Int1, "Type is invalid");
+
+            MaterialTexture* mt = (MaterialTexture*)(mtl->data + mtl->offsets[index]);
+            mt->aHandle.reset();
+            mt->tHandle = texHandle;
             mt->stage = stage;
             mt->flags = flags;
         }

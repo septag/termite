@@ -266,7 +266,7 @@ Fiber* FiberPool::newFiber(JobCallback callbackFn, void* userData, uint16_t inde
 {
     bx::LockScope lk(m_lock);
     if (m_index > 0) {
-        Fiber* fiber = new(m_ptrs[--m_index]) Fiber();
+        Fiber* fiber = BX_PLACEMENT_NEW(m_ptrs[--m_index], Fiber);
         fiber->ownerThread = 0;
         fiber->context = make_fcontext(m_stacks[fiber->stackIndex].sptr, m_stacks[fiber->stackIndex].ssize, fiberCallback);
         fiber->callback = callbackFn;

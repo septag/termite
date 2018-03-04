@@ -8,6 +8,12 @@
 // Only accessed by engine internals
 namespace tee {
     struct GfxDriver;
+    struct HardwareInfo;
+
+    void platformSetVars(const char* dataDir, const char* cacheDir, const char* version);
+    void platformSetHwInfo(const HardwareInfo& hwinfo);
+    void platformSetGfxReset(bool gfxReset);
+    void platformSetHardwareKey(bool hasHardwareKey);
 
     bool initJobDispatcher(bx::AllocatorI* alloc,
                            uint16_t maxSmallFibers = 0, uint32_t smallFiberStackSize = 0,
@@ -19,7 +25,7 @@ namespace tee {
     void shutdownPluginSystem();
 
     namespace asset {
-        bool init(AssetLibInitFlags::Bits flags, IoDriver* driver, bx::AllocatorI* alloc);
+        bool init(AssetLibInitFlags::Bits flags, IoDriver* driver, bx::AllocatorI* alloc, IoDriver* blockingDriver = nullptr);
         void shutdown();
     }
 

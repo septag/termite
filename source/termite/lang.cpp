@@ -26,6 +26,7 @@ namespace tee
     struct LangEntry
     {
         size_t idHash;
+        float scale;
         char text[256];
     };
 
@@ -45,12 +46,15 @@ namespace tee
 
     static LangLoader gLangLoader;
 
-    const char* lang::getText(Lang* lang, const char* strId)
+    const char* lang::getText(Lang* lang, const char* strId, float* pScale)
     {
         if (lang) {
             int index = lang->idTable.find(tinystl::hash_string(strId, strlen(strId)));
-            if (index != -1)
+            if (index != -1) {
+                if (pScale)
+                    *pScale = lang->entries[lang->idTable[index]].scale;
                 return lang->entries[lang->idTable[index]].text;
+            }
         } 
         return "";
     }
@@ -106,8 +110,13 @@ namespace tee
                 entry.idHash = tinystl::hash_string(jentry["Id"].GetString(), jentry["Id"].GetStringLength());
             } 
             if (jentry.HasMember("Value")) {
-                memcpy(entry.text, jentry["Value"].GetString(), 
-                       std::min<size_t>(sizeof(entry.text), jentry["Value"].GetStringLength()+1));
+                bx::memCopy(entry.text, jentry["Value"].GetString(), 
+                            std::min<size_t>(sizeof(entry.text), jentry["Value"].GetStringLength()+1));
+            }
+            if (jentry.HasMember("Scale")) {
+                entry.scale = jentry["Scale"].GetFloat();
+            } else {
+                entry.scale = 1.0f;
             }
             lang->idTable.add(entry.idHash, i);
         }

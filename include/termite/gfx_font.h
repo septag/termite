@@ -74,7 +74,8 @@ namespace tee
             RightToLeft = 0x8,
             LeftToRight = 0x10,
             Narrow = 0x20,
-            Multiline = 0x40
+            Multiline = 0x40,
+            Dim = 0x80
         };
 
         typedef uint8_t Bits;
@@ -89,6 +90,7 @@ namespace tee
         TEE_API int findFontCharGlyph(Font* font, uint16_t chId);
         TEE_API const FontGlyph& getFontGlyph(Font* font, int index);
         TEE_API float getFontGlyphKerning(Font* font, int glyphIdx, int nextGlyphIdx);
+        TEE_API bool fontIsUnicode(Font* font);
 
         // Text Drawing
         TEE_API TextDraw* createTextDraw(int maxChars, AssetHandle fontHandle, bx::AllocatorI* alloc);

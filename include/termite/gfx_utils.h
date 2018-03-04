@@ -10,6 +10,7 @@ namespace tee
     struct IoDriver;
     struct PostProcessBlur;
     struct PostProcessVignetteSepia;
+    struct PostProcessTint;
     struct GfxDriver;
 
     struct DisplayPolicy
@@ -43,24 +44,28 @@ namespace tee
         // Vignette/Sepia PostProcess
         TEE_API PostProcessVignetteSepia* createVignetteSepiaPostProcess(bx::AllocatorI* alloc,
                                                                          uint16_t width, uint16_t height,
-                                                                         float radius, float softness,
+                                                                         float start, float end,
                                                                          float vignetteIntensity,
                                                                          float sepiaIntensity,
                                                                          ucolor_t sepiaColor,
                                                                          ucolor_t vignetteColor = ucolor(0));
+        TEE_API void destroyVignetteSepiaPostProcess(PostProcessVignetteSepia* vignette);
+        TEE_API void resizeVignetteSepiaPostProcessBuffers(PostProcessVignetteSepia* vignette, uint16_t width, uint16_t height);
         TEE_API TextureHandle drawVignetteSepiaPostProcess(PostProcessVignetteSepia* vignette, uint8_t viewId,
                                                            FrameBufferHandle targetFb, TextureHandle sourceTexture,
                                                            float intensity = 1.0f);
-        TEE_API TextureHandle drawVignetteSepiaPostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId,
-                                                                   FrameBufferHandle targetFb, TextureHandle sourceTexture,
-                                                                   float intensity = 1.0f, float sepiaIntensity = 1.0f,
-                                                                   float sepiaRadius = 0);
         TEE_API TextureHandle drawVignettePostProcessOverride(PostProcessVignetteSepia* vignette, uint8_t viewId,
                                                               FrameBufferHandle targetFb, TextureHandle sourceTexture,
-                                                              float softness, float radius, float intensity = 1.0f,
+                                                              float start, float end, float intensity = 1.0f,
                                                               vec4_t vignetteColor = vec4(0, 0, 0, 0));
-        TEE_API void destroyVignetteSepiaPostProcess(PostProcessVignetteSepia* vignette);
-        TEE_API void resizeVignetteSepiaPostProcessBuffers(PostProcessVignetteSepia* vignette, uint16_t width, uint16_t height);
+
+        // Tint PostProcess
+        TEE_API PostProcessTint* createTintPostPorcess(bx::AllocatorI* alloc, uint16_t width, uint16_t height);
+        TEE_API void destroyTintPostProcess(PostProcessTint* tint);
+        TEE_API TextureHandle drawTintPostProcess(PostProcessTint* tint, uint8_t viewId, FrameBufferHandle targetFb, 
+                                                  TextureHandle sourceTexture, const vec4_t& color, float intensity);
+        TEE_API void resizeTintPostProcessBuffers(PostProcessTint* tint, uint16_t width, uint16_t height);
+
     }
 
 } // namespace tee

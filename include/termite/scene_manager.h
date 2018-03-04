@@ -83,12 +83,12 @@ namespace tee
     class BX_NO_VTABLE SceneCallbacksI
     {
     public:
-        virtual void loadResources(Scene* scene, const CIncrLoader& loader) = 0;
+        virtual void loadResources(Scene* scene, IncrLoader* loader) = 0;
         virtual SceneCallbackResult::Enum createObjects(Scene* scene) = 0;
         virtual void onEnter(Scene* scene, Scene* prevScene) = 0;
         virtual bool onExit(Scene* scene, Scene* nextScene) = 0;        // Return TRUE to permit the scene to unload
         virtual SceneCallbackResult::Enum destroyObjects(Scene* scene) = 0;
-        virtual void unloadResources(Scene* scene, const CIncrLoader& loader) = 0;
+        virtual void unloadResources(Scene* scene, IncrLoader* loader) = 0;
         virtual void update(Scene* scene, float dt, uint8_t& viewId, FrameBufferHandle renderFb, bool mustClearFb) = 0;
     };
 

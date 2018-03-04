@@ -79,9 +79,9 @@ namespace tee {
         Texture* failTexture;
         GfxDriver* driver;
         bx::Array<TextureCacheItem> decodeCacheItems;
+        JobHandle saveCacheJobHandle;
         bool enableTextureDecodeCache;
         bool isETC2Supported;
-        JobHandle saveCacheJobHandle;
 
         TextureLoader(bx::AllocatorI* _alloc)
         {

@@ -35,6 +35,7 @@ namespace tee {
         size_t typeNameHash;
         uint32_t paramsHash;
         AssetState::Enum loadState;
+        AssetState::Enum initLoadState;
     };
 
     struct AsyncLoadRequest
@@ -54,6 +55,7 @@ namespace tee {
     public:
         AssetLibInitFlags::Bits flags;
         IoDriver* driver;
+        IoDriver* blockingDriver;
         IoOperationMode::Enum opMode;
         bx::HandlePool assetTypes;
         bx::HashTableUint16 assetTypesTable;    // hash(name) -> handle in assetTypes
@@ -78,6 +80,7 @@ namespace tee {
             alloc(_alloc)
         {
             driver = nullptr;
+            blockingDriver = nullptr;
             opMode = IoOperationMode::Async;
             flags = AssetLibInitFlags::None;
             modifiedCallback = nullptr;
@@ -104,7 +107,7 @@ namespace tee {
 
     static AssetLib* gAssetLib = nullptr;
 
-    bool asset::init(AssetLibInitFlags::Bits flags, IoDriver* driver, bx::AllocatorI* alloc)
+    bool asset::init(AssetLibInitFlags::Bits flags, IoDriver* driver, bx::AllocatorI* alloc, IoDriver* blockingDriver)
     {
         assert(driver);
         if (gAssetLib) {
@@ -119,6 +122,11 @@ namespace tee {
 
         assetLib->driver = driver;
         assetLib->opMode = driver->getOpMode();
+        if (assetLib->opMode == IoOperationMode::Async)
+            assetLib->blockingDriver = blockingDriver;
+        else
+            assetLib->blockingDriver = driver;
+
         assetLib->flags = flags;
 
         if (assetLib->opMode == IoOperationMode::Async)
@@ -277,6 +285,7 @@ namespace tee {
         rs->obj = obj;
         rs->typeNameHash = typeNameHash;
         rs->objAlloc = objAlloc;
+        rs->initLoadState = AssetState::LoadFailed;
 
         if (userParamsSize > 0) {
             assert(userParamsSize);
@@ -361,6 +370,7 @@ namespace tee {
         AssetLib* assetLib = gAssetLib;
         Asset* res = assetLib->assets.getHandleData<Asset>(0, resHandle.value);
         res->loadState = state;
+        res->initLoadState = state;
     }
 
     static bx::Path getReplacementUri(const char* uri)
@@ -455,7 +465,7 @@ namespace tee {
 
         // Load the asset for the first time
         if (!handle.isValid()) {
-            if (assetLib->opMode == IoOperationMode::Async) {
+            if (assetLib->opMode == IoOperationMode::Async && !(flags & AssetFlags::ForceBlockLoad)) {
                 // Add asset with an empty object
                 handle = addAsset(tdata->callbacks, uri, userParams, tdata->userParamsSize,
                                      tdata->asyncProgressObj, overrideHandle, nameHash, objAlloc);
@@ -476,7 +486,8 @@ namespace tee {
                 assetLib->driver->read(newUri.cstr(), IoPathType::Assets, 0);
             } else {
                 // Load the file
-                MemoryBlock* mem = assetLib->driver->read(newUri.cstr(), IoPathType::Assets, 0);
+                BX_ASSERT(assetLib->blockingDriver, "Blocking driver must be set int 'init'");
+                MemoryBlock* mem = assetLib->blockingDriver->read(newUri.cstr(), IoPathType::Assets, 0);
                 if (!mem) {
                     BX_WARN("Opening asset '%s' failed", newUri.cstr());
                     BX_WARN(err::getString());
@@ -903,6 +914,7 @@ namespace tee {
     void asset::reloadAssets(const char* name)
     {
         AssetLib* assetLib = gAssetLib;
+
         int typeIdx = assetLib->assetTypesTable.find(tinystl::hash_string(name, strlen(name)));
         if (typeIdx != -1) {
             AssetTypeData* rt = assetLib->assetTypes.getHandleData<AssetTypeData>(0, assetLib->assetTypesTable[typeIdx]);
@@ -949,6 +961,27 @@ namespace tee {
         }
 
         assetLib->ignoreUnloadResourceCalls = false;
+    }
+
+    bool asset::checkAssetsLoaded(const char* name)
+    {
+        AssetLib* assetLib = gAssetLib;
+        int typeIdx = assetLib->assetTypesTable.find(tinystl::hash_string(name, strlen(name)));
+        if (typeIdx != -1) {
+            AssetTypeData* rt = assetLib->assetTypes.getHandleData<AssetTypeData>(0, assetLib->assetTypesTable[typeIdx]);
+            size_t hash = tinystl::hash_string(name, strlen(name));
+
+            for (int i = 0, c = assetLib->assets.getCount(); i < c; i++) {
+                AssetHandle handle = assetLib->assets.handleAt(i);
+                Asset* r = assetLib->assets.getHandleData<Asset>(0, handle);
+                if (r->typeNameHash == hash && !(r->uri.isEqual("[FAIL]") | r->uri.isEqual("[ASYNC]"))) {
+                    if (r->loadState != AssetState::LoadOk && r->initLoadState != AssetState::LoadFailed)
+                        return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     void asset::replaceFileExtension(const char* ext, const char* extReplacement)

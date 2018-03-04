@@ -7,7 +7,7 @@ namespace tee {
             decl->count = 0;
         }
 
-        inline void addMtlDeclAttrib(MaterialDecl* decl, const char* name, UniformType::Enum type, uint16_t num)
+        inline int addMtlDeclAttrib(MaterialDecl* decl, const char* name, UniformType::Enum type, uint16_t num)
         {
             if (decl->count < MAX_MATERIAL_VARS) {
                 BX_ASSERT(name, "");
@@ -16,10 +16,12 @@ namespace tee {
                 decl->names[index] = name;
                 decl->types[index] = type;
                 decl->arrayCounts[index] = num;
-                decl->initValues[index] = false;
+                decl->initTypes[index] = MaterialDecl::InitTypeNone;
                 ++decl->count;
+                return index;
             } else {
                 BX_ASSERT(false, "Material Vars should not exceed %d", MAX_MATERIAL_VARS);
+                return -1;
             }
         }
 
@@ -27,20 +29,36 @@ namespace tee {
         {
         }
 
-        inline void setMtlDeclInitData(MaterialDecl* decl, const vec4_t& v)
+        inline void setMtlDeclInitData(MaterialDecl* decl, int index, const vec4_t& v)
         {
-            int index = decl->count - 1;
-            BX_ASSERT(index >= 0, "First add an attrib, then set data");
-            decl->initValues[index] = true;
+            BX_ASSERT(index >= 0 && index < decl->count, "out of bounds index");
+            decl->initTypes[index] = MaterialDecl::InitTypeVector;
             decl->initData[index].v = v;
         }
 
-        inline void setMtlDeclInitData(MaterialDecl* decl, AssetHandle aHandle)
+        inline void setMtlDeclInitData(MaterialDecl* decl, int index, AssetHandle aHandle)
         {
-            int index = decl->count - 1;
-            BX_ASSERT(index >= 0, "First add an attrib, then set data");
-            decl->initValues[index] = true;
+            BX_ASSERT(index >= 0 && index < decl->count, "out of bounds index");
+            decl->initTypes[index] = MaterialDecl::InitTypeTextureResource;
             decl->initData[index].t = aHandle;
+        }
+
+
+        inline void setMtlDeclInitData(MaterialDecl* decl, int index, TextureHandle tHandle)
+        {
+            BX_ASSERT(index >= 0 && index < decl->count, "out of bounds index");
+            decl->initTypes[index] = MaterialDecl::InitTypeTextureHandle;
+            decl->initData[index].th = tHandle;
+        }
+
+        inline int findMtlAttrib(const MaterialDecl* decl, const char* name)
+        {
+            for (int i = 0, c = decl->count; i < c; i++) {
+                if (bx::strCmp(decl->names[i], name) != 0)
+                    continue;
+                return i;
+            }
+            return -1;
         }
     }
 }

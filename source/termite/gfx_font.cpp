@@ -211,13 +211,14 @@ namespace tee
     {
         float x;
         float y;
+        float alpha;
         float tx;
         float ty;
 
         static void init()
         {
             gfx::beginDecl(&Decl);
-            gfx::addAttrib(&Decl, VertexAttrib::Position, 2, VertexAttribType::Float);
+            gfx::addAttrib(&Decl, VertexAttrib::Position, 3, VertexAttribType::Float);
             gfx::addAttrib(&Decl, VertexAttrib::TexCoord0, 2, VertexAttribType::Float);
             gfx::endDecl(&Decl);
         }
@@ -715,7 +716,8 @@ namespace tee
 
         if (!texFilepath.isEmpty()) {
             LoadTextureParams tparams;
-            tparams.generateMips = params.generateMips;
+            tparams.flags = TextureFlag::U_Clamp | TextureFlag::V_Clamp;
+            tparams.generateMips = !(params.flags & FontFlags::DistantField) ? params.generateMips : false;
             font->texHandles[0] = asset::load("texture", texFilepath.cstr(), &tparams, 0,
                                                alloc == gFontMgr->alloc ? nullptr : alloc);
         }
@@ -956,6 +958,11 @@ namespace tee
         return 0;
     }
 
+    bool gfx::fontIsUnicode(Font* font)
+    {
+        return (font->flags & FontFlags::Persian) ? true : false;
+    }
+
     int gfx::findFontCharGlyph(Font* font, uint16_t chId)
     {
         int index = font->glyphTable.find(chId);
@@ -1127,31 +1134,49 @@ namespace tee
         return 0;
     }
 
-    static void resolveMultiline(Font* font, FontGlyph* glyphs, float* ys, int numGlyphs, float maxWidth, float scale)
+    static void resolveMultiline(Font* font, FontGlyph* glyphs, float* xs, float* ys, int numGlyphs, float maxWidth, 
+                                 float scale, TextFlags::Bits flags)
     {
         float w = 0;
         float lineIdx = 0;
         float lineHeight = float(font->lineHeight) * scale;
         int spaceIdx = -1;
+        int lastLineCharIdx = 0;
+        float wToSpace = 0;
+        float spaceCharWidth = 0;
 
         for (int i = 0; i < numGlyphs; i++) {
             FontGlyph* glyph = &glyphs[i];
 
-            w += bx::fceil(glyph->xadvance * scale);
-            if (glyph->charId == 32)
+            float charWidth = bx::fceil(glyph->xadvance * scale);
+            w += charWidth;
+
+            if (glyph->charId == 32) {
                 spaceIdx = i;
+                wToSpace = w - charWidth;
+                spaceCharWidth = charWidth;
+            }
             ys[i] = lineIdx * lineHeight;
 
             // proceed to next line ?
             // If we have reached the end of line, cut the line from the last space
             if (w > (maxWidth - 1.0f) && spaceIdx != -1) {
+                int newLineCharIdx = spaceIdx + 1;
+                float xoffset = (flags & TextFlags::AlignCenter) ? (maxWidth - wToSpace)*0.5f : 0;
+                for (int k = lastLineCharIdx; k < newLineCharIdx; k++)
+                    xs[k] = xoffset;
                 lineIdx++;
                 for (int k = spaceIdx + 1; k <= i; k++)
                     ys[k] = lineIdx * lineHeight;
                 spaceIdx = -1;
+                lastLineCharIdx = newLineCharIdx;
                 w = 0;
             }
         }
+
+        float xoffset = (flags & TextFlags::AlignCenter) ? (maxWidth - w - spaceCharWidth)*0.5f : 0;
+        for (int k = lastLineCharIdx; k < numGlyphs; k++)
+            xs[k] = xoffset;
     }
 
     void gfx::addText(TextDraw* batch, float scale, const rect_t& rectFit, TextFlags::Bits flags, const char* text)
@@ -1160,7 +1185,10 @@ namespace tee
 
         Font* font = asset::getObjPtr<Font>(batch->fontHandle);
         if ((flags & (TextFlags::AlignLeft | TextFlags::AlignRight | TextFlags::AlignCenter)) == 0) {
-            flags |= TextFlags::AlignCenter;
+            if (!(flags & TextFlags::Multiline))
+                flags |= TextFlags::AlignCenter;
+            else
+                flags |= !(font->flags & FontFlags::Persian) ? TextFlags::AlignLeft : TextFlags::AlignRight;
         }
         if ((flags & (TextFlags::RightToLeft | TextFlags::LeftToRight)) == 0) {
             flags |= !(font->flags & FontFlags::Persian) ? TextFlags::LeftToRight : TextFlags::RightToLeft;
@@ -1210,6 +1238,7 @@ namespace tee
         int firstVertIdx = batch->numChars*4;
         TextVertex* verts = batch->verts + firstVertIdx;
         uint16_t* indices = batch->indices + batch->numChars*6;
+        float alpha = !(flags & TextFlags::Dim) ? 1.0f : 0.5f;
 
         float dir = 1.0f;
         float dirInvFactor = 0;
@@ -1221,16 +1250,22 @@ namespace tee
         if (flags & TextFlags::Narrow)
             advanceScale = 0.9f;
 
+        float width = screenRect.xmax - screenRect.xmin;
         float* ys = (float*)alloca(sizeof(float)*len);
-        memset(ys, 0x00, sizeof(float)*len);
+        float* xs = (float*)alloca(sizeof(float)*len);
+        bx::memSet(ys, 0x00, sizeof(float)*len);
+        bx::memSet(xs, 0x00, sizeof(float)*len);
         if (flags & TextFlags::Multiline) {
-            resolveMultiline(font, glyphs, ys, len, screenRect.xmax - screenRect.xmin, scale);
+            resolveMultiline(font, glyphs, xs, ys, len, width, scale, flags);
         }
        
         float xMax = 0;
+        float lineOffsetX = 0;  // for multiline aligning
+        int newLineIdx = 0;
         for (int i = 0; i < len; i++) {
             const FontGlyph& glyph = glyphs[i];
             if (i > 0 && ys[i] > ys[i-1]) {
+                // Move to new line
                 xMax = x < 0 ? bx::min(x, xMax) : bx::max(x, xMax);
                 x = 0;
             }
@@ -1242,7 +1277,7 @@ namespace tee
 
             float gw = glyph.width*scale;
             float gh = glyph.height*scale;
-            float xoffset = glyph.xoffset*scale;
+            float xoffset = glyph.xoffset*scale + xs[i]*dir;
             float yoffset = glyph.yoffset*scale;
             float gx = glyph.x;
             float gy = glyph.y;
@@ -1273,6 +1308,8 @@ namespace tee
             v3.tx = (gx + glyph.width) / texSize.x;
             v3.ty = (gy + glyph.height) / texSize.y;
 
+            v0.alpha = v1.alpha = v2.alpha = v3.alpha = alpha;
+
             x += glyph.xadvance*scale*(1.0f - dirInvFactor)*advanceScale;
 
 #if 0
@@ -1301,7 +1338,7 @@ namespace tee
         batch->numChars += len;
 
         // We have the final width, Calculate alignment
-        vec2_t pos = vec2(0, -font->lineHeight*0.5f*scale);
+        vec2_t pos = vec2(0, -font->lineHeight*scale*0.5f);
 
         if (!(flags & TextFlags::Multiline)) {
             if (flags & TextFlags::AlignCenter) {
@@ -1314,7 +1351,9 @@ namespace tee
         } else {
             // In multiline, don't vertically align to center
             if (flags & TextFlags::AlignCenter) {
-                pos = pos + ((screenRect.vmax + screenRect.vmin)*0.5f - vec2(xMax*0.5f, 0));
+                float x = (flags & TextFlags::RightToLeft) ? screenRect.xmax - xMax*(1.0f - dirInvFactor) :
+                    screenRect.xmin - xMax*dirInvFactor;
+                pos = pos + vec2(x, screenRect.ymin);
             } else if (flags & TextFlags::AlignLeft) {
                 pos = pos + vec2(screenRect.xmin - xMax*dirInvFactor, screenRect.ymin);
             } else if (flags & TextFlags::AlignRight) {

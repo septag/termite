@@ -5,7 +5,10 @@
 // Make Async HTTP requests
 #include "bx/bx.h"
 #include "bxx/string.h"
-#include <functional>
+
+#define TEE_HTTP_OPERATION_TIMEOUT 28
+#define TEE_HTTP_CERT_ERROR 58
+#define TEE_HTTP_FAILED -1
 
 // Fwd declare: Include "restclient-cpp/connection.h" to use this class
 namespace RestClient
@@ -39,8 +42,9 @@ namespace tee
         TEE_API void setKey(const char* filepath, const char* passphrase = nullptr);
         TEE_API void setTimeout(int timeoutSecs);
         TEE_API void setBaseUrl(const char* url);
+        TEE_API bool isRequestFailed(int code);
 
-        // 
+        // Async requests
         TEE_API void get(const char* url, HttpResponseCallback responseFn, void* userData = nullptr);
         TEE_API void post(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn, 
                           void* userData = nullptr);
@@ -48,8 +52,17 @@ namespace tee
                          void* userData = nullptr);
         TEE_API void del(const char* url, HttpResponseCallback responseFn, void* userData = nullptr);
         TEE_API void head(const char* url, HttpResponseCallback responseFn, void* userData = nullptr);
-
         TEE_API void request(const char* url, HttpConnectionCallback connFn, HttpResponseCallback responseFn, void* userData = nullptr);
+
+        // Blocking (Sync) requests
+        TEE_API void getSync(const char* url, HttpResponseCallback responseFn, void* userData = nullptr);
+        TEE_API void postSync(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn, void* userData);
+        TEE_API void putSync(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn,
+                             void* userData = nullptr);
+
+        TEE_API void delSync(const char* url, HttpResponseCallback responseFn, void* userData);
+        TEE_API void headSync(const char* url, HttpResponseCallback responseFn, void* userData);
+        TEE_API void requestSync(const char* url, HttpConnectionCallback connFn, HttpResponseCallback responseFn, void* userData);
     }
 }
 

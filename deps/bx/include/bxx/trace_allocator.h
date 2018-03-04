@@ -9,6 +9,7 @@
 #include "hash_table.h"
 #include "linked_list.h"
 #include "pool.h"
+#include "bxx/lock.h"
 
 namespace bx
 {
@@ -22,7 +23,7 @@ namespace bx
                  , NO_ASSIGNMENT
         );
 
-    private:
+    public:
         struct TraceItem
         {
             size_t size;
@@ -47,9 +48,12 @@ namespace bx
         Pool<TraceItem> m_tracePool;
         HashTable<TraceItem*, uintptr_t> m_traceTable;
         List<TraceItem*> m_traceList;
+        List<TraceItem*>::Node* m_traceNode;
 
         uintptr_t m_size;
         uint32_t m_numAllocs;
+
+        bx::Lock m_lock;
 
     public:
         /// @param[in] _alloc ProxyAllocator that the calls should pass through
@@ -66,6 +70,7 @@ namespace bx
 
         void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) override;
 
-        uint32_t dumpLeaks() const;
+        const TraceItem* getFirstLeak();
+        const TraceItem* getNextLeak();
     };
 }   // namespace bx

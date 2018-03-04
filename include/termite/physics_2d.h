@@ -384,7 +384,7 @@ namespace tee
 
         // Returns blending coeff for interpolating between frames
         // State = currentState * alpha + prevState * (1 - alpha)
-        void (*stepScene)(PhysScene2D* scene, float dt);   
+        void (*stepScene)(PhysScene2D* scene, float dt, int velIterations/* = 8*/, int posIterations/* = 4*/);   
         void (*debugScene)(PhysScene2D* scene, const irect_t viewport, const Camera2D& cam, 
                            PhysDebugFlags2D::Bits flags/* = PhysDebugFlags2D::All*/);
 

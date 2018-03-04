@@ -24,11 +24,8 @@
 #include "gfx_defines.h"
 #include "sound_driver.h"
 
-#define TEE_MEMID_TEMP 0x666ce76b992f595e 
 
-#if BX_PLATFORM_ANDROID
-#include <jni.h>
-#endif
+#define TEE_MEMID_TEMP 0x666ce76b992f595e 
 
 namespace tee
 {
@@ -139,7 +136,7 @@ namespace tee
     {
         char brand[16];
         char model[16];
-        char uniqueId[32];
+        char uniqueId[34];
         uint64_t totalMem;
         int apiVersion;
         uint16_t numCores;
@@ -148,10 +145,12 @@ namespace tee
         {
             brand[0] = 0;
             model[0] = 0;
-            uniqueId[0] = 0;
             totalMem = 0;
             apiVersion = 0;
             numCores = 0;
+
+            
+            uniqueId[0] = 0;
         }
     };
 
@@ -247,6 +246,7 @@ namespace tee
     TEE_API Config* getMutableConfig() TEE_THREAD_SAFE;
     TEE_API const char* getCacheDir() TEE_THREAD_SAFE;
     TEE_API const char* getDataDir() TEE_THREAD_SAFE;
+    TEE_API const char* getPackageVersion() TEE_THREAD_SAFE;
     TEE_API void dumpGfxLog() TEE_THREAD_SAFE;
     TEE_API bool needGfxReset() TEE_THREAD_SAFE;
 
@@ -257,30 +257,6 @@ namespace tee
     TEE_API void registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback);
 
     TEE_API const HardwareInfo& getHardwareInfo();
-
-#if BX_PLATFORM_ANDROID
-    struct JavaMethod
-    {
-        JNIEnv* env;
-        jclass cls;
-        jobject obj;
-        jmethodID methodId;
-    };
-
-    struct JavaMethodType
-    {
-        enum Enum {
-            Method,
-            StaticMethod
-        };
-    };
-
-    // Calls a method in java
-    // for classPath, methodName and methodSig parameters, see:
-    //      http://journals.ecs.soton.ac.uk/java/tutorial/native1.1/implementing/method.html
-    TEE_API JavaMethod androidFindMethod(const char* methodName, const char* methodSig, const char* classPath = nullptr,
-                                             JavaMethodType::Enum type = JavaMethodType::Method);
-#endif
-
+    TEE_API bool hasHardwareNavKey();
 } // namespace tee
 

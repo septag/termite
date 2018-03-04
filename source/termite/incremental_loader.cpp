@@ -11,9 +11,9 @@
 
 namespace tee {
 
-    struct LoadResourceRequest
+    struct LoadAssetRequest
     {
-        typedef bx::List<LoadResourceRequest*>::Node LNode;
+        typedef bx::List<LoadAssetRequest*>::Node LNode;
 
         char name[32];
         bx::Path uri;
@@ -25,20 +25,20 @@ namespace tee {
 
         LNode lnode;
 
-        LoadResourceRequest() :
+        LoadAssetRequest() :
             lnode(this)
         {
             objAlloc = nullptr;
         }
     };
 
-    struct UnloadResourceRequest
+    struct UnloadAssetRequest
     {
-        typedef bx::List<UnloadResourceRequest*>::Node LNode;
+        typedef bx::List<UnloadAssetRequest*>::Node LNode;
         AssetHandle handle;
         LNode lnode;
 
-        UnloadResourceRequest() :
+        UnloadAssetRequest() :
             lnode(this)
         {
         }
@@ -47,18 +47,20 @@ namespace tee {
     struct LoaderGroup
     {
         IncrLoadingScheme scheme;
-        bx::List<LoadResourceRequest*> loadRequestList;
-        bx::List<UnloadResourceRequest*> unloadRequestList;
+        bx::List<LoadAssetRequest*> loadRequestList;
+        bx::List<UnloadAssetRequest*> unloadRequestList;
+        bx::List<LoadAssetRequest*> loadFailedList;
 
         float elapsedTime;
         int frameCount;
+        int retryCount;
     };
 
     struct IncrLoader
     {
         bx::AllocatorI* alloc;
-        bx::Pool<LoadResourceRequest> loadRequestPool;
-        bx::Pool<UnloadResourceRequest> unloadRequestPool;
+        bx::Pool<LoadAssetRequest> loadRequestPool;
+        bx::Pool<UnloadAssetRequest> unloadRequestPool;
         bx::HandlePool groupPool;
         IncrLoaderGroupHandle curGroupHandle;
 
@@ -96,20 +98,21 @@ namespace tee {
         BX_DELETE(loader->alloc, loader);
     }
 
-    void asset::beginIncrLoad(IncrLoader* loader, const IncrLoadingScheme& scheme)
+    void asset::beginIncrLoadGroup(IncrLoader* loader, const IncrLoadingScheme& scheme)
     {
         assert(loader);
         IncrLoaderGroupHandle handle = IncrLoaderGroupHandle(loader->groupPool.newHandle());
         assert(handle.isValid());
-        LoaderGroup* group = new(loader->groupPool.getHandleData(0, handle)) LoaderGroup();
-        memcpy(&group->scheme, &scheme, sizeof(scheme));
+        LoaderGroup* group = BX_PLACEMENT_NEW(loader->groupPool.getHandleData(0, handle), LoaderGroup);
+        bx::memCopy(&group->scheme, &scheme, sizeof(scheme));
         group->frameCount = 0;
         group->elapsedTime = 0;
+        group->retryCount = 0;
 
         loader->curGroupHandle = handle;
     }
 
-    IncrLoaderGroupHandle asset::endIncrLoad(IncrLoader* loader)
+    IncrLoaderGroupHandle asset::endIncrLoadGroup(IncrLoader* loader)
     {
         assert(loader);
         IncrLoaderGroupHandle handle = loader->curGroupHandle;
@@ -118,15 +121,86 @@ namespace tee {
         return handle;
     }
 
-    bool asset::isLoadDone(IncrLoader* loader, IncrLoaderGroupHandle handle)
+    void asset::deleteIncrloadGroup(IncrLoader* loader, IncrLoaderGroupHandle handle)
+    {
+        BX_ASSERT(handle.isValid(), "Invalid handle");
+        LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, handle);
+
+        if (!group->loadRequestList.isEmpty()) {
+            // just empty the list and delete the group
+            bx::List<LoadAssetRequest*>::Node* node = group->loadRequestList.getFirst();
+            while (node) {
+                bx::List<LoadAssetRequest*>::Node* next = node->next;
+                loader->loadRequestPool.deleteInstance(node->data);
+                node = next;
+            }
+        }
+
+
+        if (!group->unloadRequestList.isEmpty()) {
+            // just empty the list and delete the group
+            bx::List<UnloadAssetRequest*>::Node* node = group->unloadRequestList.getFirst();
+            while (node) {
+                bx::List<UnloadAssetRequest*>::Node* next = node->next;
+                loader->unloadRequestPool.deleteInstance(node->data);
+                node = next;
+            }
+        }
+
+
+        if (!group->loadFailedList.isEmpty()) {
+            // just empty the list and delete the group
+            bx::List<LoadAssetRequest*>::Node* node = group->loadFailedList.getFirst();
+            while (node) {
+                bx::List<LoadAssetRequest*>::Node* next = node->next;
+                group->loadFailedList.remove(node);
+                loader->loadRequestPool.deleteInstance(node->data);
+                node = next;
+            }
+        }
+
+        loader->groupPool.freeHandle(handle);
+    }
+
+    bool asset::isLoadDone(IncrLoader* loader, IncrLoaderGroupHandle handle, IncrLoaderFlags::Bits flags)
     {
         assert(loader);
         assert(handle.isValid());
 
         LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, handle);
-        bool done = group->loadRequestList.isEmpty() && group->unloadRequestList.isEmpty();
+        bool done = group->loadRequestList.isEmpty() & group->unloadRequestList.isEmpty();
         if (done) {
-            loader->groupPool.freeHandle(handle);
+            if ((flags & IncrLoaderFlags::RetryFailed) && !group->loadFailedList.isEmpty() && group->retryCount < 1) {
+                // The flag is set and there are some failed resources
+                // Reactivate the group and load those resources once again
+                loader->curGroupHandle = handle;
+                bx::List<LoadAssetRequest*>::Node* node = group->loadFailedList.getFirst();
+                while (node) {
+                    bx::List<LoadAssetRequest*>::Node* next = node->next;
+                    LoadAssetRequest* req = node->data;
+                    load(loader, req->pHandle, req->name, req->uri.cstr(), req->userParams, 
+                         req->flags|AssetFlags::Reload, req->objAlloc);
+
+                    group->loadFailedList.remove(node);
+                    loader->loadRequestPool.deleteInstance(req);
+                    node = next;
+                }
+                loader->curGroupHandle = IncrLoaderGroupHandle();
+                ++group->retryCount;
+                done = false;   // so we are not done yet
+            } else if (flags & IncrLoaderFlags::DeleteGroup) {
+                if (!group->loadFailedList.isEmpty()) {
+                    // just empty the list and delete the group
+                    bx::List<LoadAssetRequest*>::Node* node = group->loadFailedList.getFirst();
+                    while (node) {
+                        bx::List<LoadAssetRequest*>::Node* next = node->next;
+                        group->loadFailedList.remove(node);
+                        loader->loadRequestPool.deleteInstance(node->data);
+                        node = next;
+                    }
+                }
+                loader->groupPool.freeHandle(handle);
+            }
         } 
         return done;
     }
@@ -142,7 +216,7 @@ namespace tee {
         pHandle->reset();
 
         // create a new request
-        LoadResourceRequest* req = loader->loadRequestPool.newInstance();
+        LoadAssetRequest* req = loader->loadRequestPool.newInstance();
         if (!req) {
             assert(false);
             return;
@@ -171,7 +245,7 @@ namespace tee {
         assert(loader->curGroupHandle.isValid());
         assert(handle.isValid());
 
-        UnloadResourceRequest* req = loader->unloadRequestPool.newInstance();
+        UnloadAssetRequest* req = loader->unloadRequestPool.newInstance();
         if (!req) {
             assert(false);
             return;
@@ -185,20 +259,25 @@ namespace tee {
         group->unloadRequestList.addToEnd(&req->lnode);
     }
 
-    static LoadResourceRequest* getFirstLoadRequest(IncrLoader* loader, LoaderGroup* group)
+    static LoadAssetRequest* getFirstLoadRequest(IncrLoader* loader, LoaderGroup* group)
     {
-        LoadResourceRequest::LNode* node = group->loadRequestList.getFirst();
+        LoadAssetRequest::LNode* node = group->loadRequestList.getFirst();
         while (node) {
-            LoadResourceRequest* req = node->data;
-            LoadResourceRequest::LNode* next = node->next;
+            LoadAssetRequest* req = node->data;
+            LoadAssetRequest::LNode* next = node->next;
 
             if (!req->pHandle->isValid())
                 return req;
 
             // Remove items that are not in progress
-            if (asset::getState(*req->pHandle) != AssetState::LoadInProgress) {
+            AssetState::Enum astate = asset::getState(*req->pHandle);
+            if (astate != AssetState::LoadInProgress) {
                 group->loadRequestList.remove(&req->lnode);
-                loader->loadRequestPool.deleteInstance(req);
+
+                if (astate == AssetState::LoadOk)
+                    loader->loadRequestPool.deleteInstance(req);
+                else if (astate == AssetState::LoadFailed)
+                    group->loadFailedList.addToEnd(&req->lnode);    // Keep track of failed ones so we can report them later
             }
 
             node = next;
@@ -207,11 +286,11 @@ namespace tee {
         return nullptr;
     }
 
-    static UnloadResourceRequest* popFirstUnloadRequest(IncrLoader* loader, LoaderGroup* group)
+    static UnloadAssetRequest* popFirstUnloadRequest(IncrLoader* loader, LoaderGroup* group)
     {
-        UnloadResourceRequest::LNode* node = group->unloadRequestList.getFirst();
+        UnloadAssetRequest::LNode* node = group->unloadRequestList.getFirst();
         if (node) {
-            UnloadResourceRequest* req = node->data;
+            UnloadAssetRequest* req = node->data;
             group->unloadRequestList.remove(node);
             return req;
         }
@@ -222,7 +301,7 @@ namespace tee {
     static void processUnloadRequests(IncrLoader* loader, LoaderGroup* group)
     {
         while (1) {
-            UnloadResourceRequest* unloadReq = popFirstUnloadRequest(loader, group);
+            UnloadAssetRequest* unloadReq = popFirstUnloadRequest(loader, group);
             if (unloadReq) {
                 assert(unloadReq->handle.isValid());
                 uint32_t refcount = asset::getRefCount(unloadReq->handle);
@@ -241,10 +320,10 @@ namespace tee {
     static void stepLoadGroupSequential(IncrLoader* loader, LoaderGroup* group)
     {
         // Process Loads
-        LoadResourceRequest* req = getFirstLoadRequest(loader, group);
+        LoadAssetRequest* req = getFirstLoadRequest(loader, group);
         if (req) {
             // check the previous request, it should be loaded in order to proceed to next one
-            LoadResourceRequest::LNode* prev = req->lnode.prev;
+            LoadAssetRequest::LNode* prev = req->lnode.prev;
             if (prev && asset::getState(*prev->data->pHandle) == AssetState::LoadInProgress)
                 return;
 
@@ -263,7 +342,7 @@ namespace tee {
     {
         group->frameCount++;
         if (group->frameCount >= group->scheme.frameDelta) {
-            LoadResourceRequest* req = getFirstLoadRequest(loader, group);
+            LoadAssetRequest* req = getFirstLoadRequest(loader, group);
             if (req) {
                 *req->pHandle = asset::load(req->name, req->uri.cstr(), req->userParams, req->flags, req->objAlloc);
                 if (!req->pHandle->isValid()) {
@@ -283,7 +362,7 @@ namespace tee {
     {
         group->elapsedTime += dt;
         if (group->elapsedTime >= group->scheme.deltaTime) {
-            LoadResourceRequest* req = getFirstLoadRequest(loader, group);
+            LoadAssetRequest* req = getFirstLoadRequest(loader, group);
             if (req) {
                 *req->pHandle = asset::load(req->name, req->uri.cstr(), req->userParams, req->flags, req->objAlloc);
                 if (!req->pHandle->isValid()) {

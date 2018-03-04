@@ -418,7 +418,7 @@ namespace bx
 #if BX_COMPILER_MSVC
         return _InterlockedDecrement64(_ptr);
 #else
-        return __sync_add_and_fetch(_ptr, 1);
+        return __sync_sub_and_fetch(_ptr, 1);
 #endif
     }
 
@@ -428,7 +428,7 @@ namespace bx
 #if BX_COMPILER_MSVC
         return (long)_InterlockedDecrement((volatile long*)_ptr);
 #else
-        return __sync_add_and_fetch(_ptr, 1);
+        return __sync_sub_and_fetch(_ptr, 1);
 #endif
     }
 
@@ -438,7 +438,7 @@ namespace bx
 #if BX_COMPILER_MSVC
         return _InterlockedDecrement16(_ptr);
 #else
-        return __sync_add_and_fetch(_ptr, 1);
+        return __sync_sub_and_fetch(_ptr, 1);
 #endif
     }
 

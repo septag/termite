@@ -10,6 +10,7 @@
 #include "bxx/lock.h"
 #include "bxx/array.h"
 #include "bxx/string.h"
+#include "bxx/trace_allocator.h"
 
 #include "gfx_driver.h"
 #include "gfx_font.h"
@@ -228,118 +229,50 @@ struct Tee
     }
 };
 
-#ifdef _DEBUG
+#if defined(_DEBUG)
 static bx::LeakCheckAllocator gAllocStub;
 #else
 static bx::DefaultAllocator gAllocStub;
 #endif
 static bx::AllocatorI* gAlloc = &gAllocStub;
 
+static bx::TraceAllocator* gTraceAlloc = nullptr;
+static bx::AllocatorI* gPrevAlloc = nullptr;
+
+// Global variables that must be set before initializing the engine
+// Some of these values are set in their platform specific units
 static bx::Path gDataDir;
 static bx::Path gCacheDir;
+static bx::String32 gPackageVersion("0.0.0");
 static HardwareInfo gHwInfo;
+static bool gHasHardwareKey = false;        // Used for android devices
+
 static Tee* gTee = nullptr;
 
-#if BX_PLATFORM_ANDROID
-static JavaVM* gJavaVM = nullptr;
-static jclass gActivityClass = 0;
-static jobject gActivityObj = 0;
-
-extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteInitEngineVars(JNIEnv* env, jclass cls, 
-                                                                                       jobject obj, jstring dataDir, 
-                                                                                       jstring cacheDir)
+void platformSetVars(const char* dataDir, const char* cacheDir, const char* version)
 {
-    BX_UNUSED(cls);
-
-    env->GetJavaVM(&gJavaVM);
-    gActivityClass = (jclass)env->NewGlobalRef(env->GetObjectClass(obj));
-    gActivityObj = env->NewGlobalRef(obj);
-    
-    const char* str = env->GetStringUTFChars(dataDir, nullptr);
-    bx::strCopy(gDataDir.getBuffer(), sizeof(gDataDir), str);
-    env->ReleaseStringUTFChars(dataDir, str);
-
-    str = env->GetStringUTFChars(cacheDir, nullptr);
-    bx::strCopy(gCacheDir.getBuffer(), sizeof(gCacheDir), str);
-    env->ReleaseStringUTFChars(cacheDir, str);
+    BX_ASSERT(dataDir && cacheDir, "");
+    gDataDir = dataDir;
+    gCacheDir = cacheDir;
+    if (version)
+        gPackageVersion = version;
 }
 
+void platformSetHwInfo(const HardwareInfo& hwinfo)
+{
+    bx::memCopy(&gHwInfo, &hwinfo, sizeof(HardwareInfo));
+}
 
-extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteSetGraphicsReset(JNIEnv* env, jclass cls)
+void platformSetHardwareKey(bool hasHardwareKey)
+{
+    gHasHardwareKey = hasHardwareKey;
+}
+
+void platformSetGfxReset(bool gfxReset)
 {
     if (gTee)
-        gTee->gfxReset = true;
+        gTee->gfxReset = gfxReset;
 }
-
-extern "C" JNIEXPORT void JNICALL Java_com_termite_util_Platform_termiteSetDeviceInfo(JNIEnv* env, jclass cls,
-                                                                                      jstring brand, jstring model, jstring uniqueId,
-                                                                                      jlong totalMem, jlong availMem, jlong thresholdMem,
-                                                                                      jint apiVersion)
-{
-    BX_UNUSED(cls);
-    
-    HardwareInfo& hwInfo = gHwInfo;
-
-    const char* strBrand = env->GetStringUTFChars(brand, nullptr);
-    bx::strCopy(hwInfo.brand, sizeof(hwInfo.brand), strBrand);
-    env->ReleaseStringUTFChars(brand, strBrand);
-
-    const char* strModel = env->GetStringUTFChars(model, nullptr);
-    bx::strCopy(hwInfo.model, sizeof(hwInfo.model), strModel);
-    env->ReleaseStringUTFChars(model, strModel);
-
-    const char* strUniqueId = env->GetStringUTFChars(uniqueId, nullptr);
-    bx::strCopy(hwInfo.uniqueId, sizeof(hwInfo.uniqueId), strUniqueId);
-    env->ReleaseStringUTFChars(uniqueId, strUniqueId);
-
-    hwInfo.totalMem = totalMem;
-    hwInfo.apiVersion = apiVersion;
-}
-
-JavaMethod androidFindMethod(const char* methodName, const char* methodSig, const char* classPath,
-                                      JavaMethodType::Enum type)
-{
-    assert(gJavaVM);
-
-    JavaMethod m;
-    bx::memSet(&m, 0x00, sizeof(m));
-
-    if (type == JavaMethodType::Method) {
-        gJavaVM->AttachCurrentThread(&m.env, nullptr);
-    } else if (type == JavaMethodType::StaticMethod) {
-        gJavaVM->GetEnv((void**)&m.env, JNI_VERSION_1_6);
-    }
-
-    if (m.env == nullptr) {
-        BX_WARN("Calling Java method '%s' failed: Cannot retreive Java Env", methodName);
-        return m;
-    }
-
-    if (classPath == nullptr) {
-        m.cls = gActivityClass;
-        m.obj = gActivityObj;
-    } else {
-        m.cls = m.env->FindClass(classPath);
-        if (m.cls == 0) {
-            BX_WARN("Calling Java method '%s' failed: Cannot find class '%s'", methodName, classPath);
-            return m;
-        }
-    }
-
-
-    if (type == JavaMethodType::Method) {
-        m.methodId = m.env->GetMethodID(m.cls, methodName, methodSig);
-    } else if (type == JavaMethodType::StaticMethod) {
-        m.methodId = m.env->GetStaticMethodID(m.cls, methodName, methodSig);
-    }
-    if (m.methodId == 0) {
-        BX_WARN("Finding Java method '%s' failed: Cannot find method in class '%s'", methodName, classPath);
-        return m;
-    }
-
-    return m;
-}
-#endif
 
 static void* remoteryMallocCallback(void* mm_context, rmtU32 size)
 {
@@ -396,6 +329,16 @@ bool init(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* pl
 
     bx::enableLogToFileHandle(stdout, stderr);
     json::HeapAllocator::SetAlloc(gAlloc);
+
+    // Switch memory manager to our TraceAllocator
+#if 0
+    if (BX_ENABLED(termite_DEV)) {
+        BX_VERBOSE("Using trace allocator");
+        gTraceAlloc = BX_NEW(gAlloc, bx::TraceAllocator)(gAlloc, 1, 256);
+        gPrevAlloc = gAlloc;
+        gAlloc = gTraceAlloc;
+    }
+#endif
 
     gTee = BX_NEW(gAlloc, Tee);
     if (!gTee)
@@ -479,7 +422,8 @@ bool init(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* pl
     }
 
     BX_BEGINP("Initializing Resource Library");
-    if (!asset::init(BX_ENABLED(termite_DEV) ? AssetLibInitFlags::HotLoading : 0, gTee->ioDriver->async, gAlloc)) 
+    if (!asset::init(BX_ENABLED(termite_DEV) ? AssetLibInitFlags::HotLoading : 0, gTee->ioDriver->async, 
+                     gAlloc, gTee->ioDriver->blocking))
     {
         TEE_ERROR("Core init failed: Creating default ResourceLib failed");
         return false;
@@ -845,7 +789,21 @@ void shutdown(ShutdownCallback callback, void* userData)
     BX_DELETE(gAlloc, gTee);
     gTee = nullptr;
 
-#ifdef _DEBUG
+    if (gTraceAlloc) {
+        const bx::TraceAllocator::TraceItem* trace = gTraceAlloc->getFirstLeak();
+        BX_WARN("Leaks found: (Total %u bytes (%u kb))", gTraceAlloc->getAllocatedSize(), gTraceAlloc->getAllocatedSize()/1024);
+        if (trace) {
+            while (trace) {
+                BX_TRACE("\t%u bytes: %s (%d)", (uint32_t)trace->size, trace->filename, trace->line);
+                trace = gTraceAlloc->getNextLeak();
+            }
+        }
+        
+        BX_DELETE(gPrevAlloc, gTraceAlloc);
+        gAlloc = gPrevAlloc;
+    }
+
+#if defined(_DEBUG)
     stb_leakcheck_dumpmem();
 #endif
 }
@@ -1327,6 +1285,11 @@ const char* getDataDir() TEE_THREAD_SAFE
     return gDataDir.cstr();
 }
 
+const char* getPackageVersion() TEE_THREAD_SAFE
+{
+    return gPackageVersion.cstr();
+}
+
 void dumpGfxLog() TEE_THREAD_SAFE
 {
     if (gTee->gfxLogCache) {
@@ -1482,6 +1445,11 @@ void registerConsoleCommand(const char* name, std::function<void(int, const char
 const HardwareInfo& getHardwareInfo()
 {
     return gHwInfo;
+}
+
+bool hasHardwareNavKey()
+{
+    return gHasHardwareKey;
 }
 
 void GfxDriverEvents::onFatal(GfxFatalType::Enum type, const char* str)

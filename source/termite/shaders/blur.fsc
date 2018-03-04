@@ -14,7 +14,7 @@ const int kKernelHalf = KERNEL_SIZE/2;
 
 void main()
 {
-    vec4 color = vec4(0, 0, 0, 0);
+    lowp vec4 color = vec4(0, 0, 0, 0);
     for (int i = -kKernelHalf; i <= kKernelHalf; i++) {
         int index = i + kKernelHalf;
         color += texture2D(u_texture, v_texcoord0 + u_blurKernel[index].xy) * u_blurKernel[index].z;

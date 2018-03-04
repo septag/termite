@@ -56,20 +56,20 @@ namespace tee {
         }
     };
 
-    static EventDispatcher* g_evDispatch = nullptr;
+    static EventDispatcher* gEvents = nullptr;
 
     bool initEventDispatcher(bx::AllocatorI* alloc)
     {
-        if (g_evDispatch) {
+        if (gEvents) {
             assert(0);
             return false;
         }
 
-        g_evDispatch = BX_NEW(alloc, EventDispatcher)(alloc);
-        if (!g_evDispatch)
+        gEvents = BX_NEW(alloc, EventDispatcher)(alloc);
+        if (!gEvents)
             return false;
 
-        if (!g_evDispatch->eventPool.create(32, alloc)) {
+        if (!gEvents->eventPool.create(32, alloc)) {
             return false;
         }
 
@@ -78,17 +78,17 @@ namespace tee {
 
     void shutdownEventDispatcher()
     {
-        if (!g_evDispatch)
+        if (!gEvents)
             return;
 
-        g_evDispatch->eventPool.destroy();
-        BX_DELETE(g_evDispatch->alloc, g_evDispatch);
-        g_evDispatch = nullptr;
+        gEvents->eventPool.destroy();
+        BX_DELETE(gEvents->alloc, gEvents);
+        gEvents = nullptr;
     }
 
     void runEventDispatcher(float dt)
     {
-        Event::LNode* node = g_evDispatch->eventList.getFirst();
+        Event::LNode* node = gEvents->eventList.getFirst();
         while (node) {
             Event* ev = node->data;
             Event::LNode* next = node->next;
@@ -96,8 +96,8 @@ namespace tee {
             if (ev->runCallback(ev->paramsSize > 0 ? ev->runParams : nullptr, dt)) {
                 ev->triggerCallback(ev->triggerUserData);
                 if (ev->destroyOnTrigger) {
-                    g_evDispatch->eventList.remove(node);
-                    g_evDispatch->eventPool.deleteInstance(ev);
+                    gEvents->eventList.remove(node);
+                    gEvents->eventPool.deleteInstance(ev);
                 }
             }
 
@@ -110,7 +110,7 @@ namespace tee {
     {
         assert(paramsSize < MAX_PARAM_SIZE);
 
-        Event* ev = g_evDispatch->eventPool.newInstance();
+        Event* ev = gEvents->eventPool.newInstance();
         if (!ev) {
             BX_WARN("Out of Memory");
             return nullptr;
@@ -126,7 +126,7 @@ namespace tee {
 
         ev->destroyOnTrigger = destroyOnTrigger;
 
-        g_evDispatch->eventList.add(&ev->lnode);
+        gEvents->eventList.add(&ev->lnode);
 
         return ev;
     }
@@ -148,8 +148,8 @@ namespace tee {
 
     void unregisterEvent(Event* ev)
     {
-        g_evDispatch->eventList.remove(&ev->lnode);
-        g_evDispatch->eventPool.deleteInstance(ev);
+        gEvents->eventList.remove(&ev->lnode);
+        gEvents->eventPool.deleteInstance(ev);
     }
 
 } // namespace tee

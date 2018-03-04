@@ -163,14 +163,13 @@ namespace tee
         TEE_API void setOrder(Sprite* sprite, uint8_t order); // higher orders gets to draw on top
         TEE_API int getOrder(Sprite* sprite);
         TEE_API void setPivot(Sprite* sprite, const vec2_t pivot);
-        TEE_API void setTint(Sprite* sprite, ucolor_t color);
-        TEE_API void setGlow(Sprite* sprite, float glow);
-        TEE_API ucolor_t getTint(Sprite* sprite);
+        TEE_API void setColor(Sprite* sprite, ucolor_t color);
+        TEE_API void setColorAdd(Sprite* sprite, ucolor_t color);
+        TEE_API ucolor_t getColor(Sprite* sprite);
         TEE_API rect_t getDrawRect(Sprite* sprite);
         TEE_API void getRealRect(Sprite* sprite, vec2_t* pHalfSize, vec2_t* pCenter);
         TEE_API vec2_t getImageSize(Sprite* sprite);
         TEE_API rect_t getTexelCoords(Sprite* sprite);
-        TEE_API ProgramHandle getAddProgram();
         TEE_API void setUserData(Sprite* sprite, void* userData);
         TEE_API void* getUserData(Sprite* sprite);
 
