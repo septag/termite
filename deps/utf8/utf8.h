@@ -75,6 +75,8 @@ int u8_is_locale_utf8(char *locale);
 int u8_vprintf(char *fmt, va_list ap);
 int u8_printf(char *fmt, ...);
 
+int u8_isutf8(const char* s);
+
 #ifdef __cplusplus
 }
 #endif

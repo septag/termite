@@ -242,7 +242,7 @@ namespace tee
 
     void ecs::destroy(EntityManager* emgr, Entity ent)
     {
-        assert(ecs::isAlive(emgr, ent));
+        BX_ASSERT(ecs::isAlive(emgr, ent), "Entity should already be alive");
 
         // Check if the entity has immediate deactivate components
         // And deactivate all components registered to entity

@@ -146,28 +146,6 @@ namespace tee
 
     static DebugDrawMgr* gDbgDraw = nullptr;
 
-    static bool projectToScreen(vec2_t* result, const vec3_t point, const irect_t& rect, const mat4_t& viewProjMtx)
-    {
-        float w = float(rect.xmax - rect.xmin);
-        float h = float(rect.ymax - rect.ymin);
-        float wh = w*0.5f;
-        float hh = h*0.5f;
-
-        vec4_t proj;
-        bx::vec4MulMtx(proj.f, vec4(point.x, point.y, point.z, 1.0f).f, viewProjMtx.f);
-        bx::vec3Mul(proj.f, proj.f, 1.0f / proj.w);     proj.w = 1.0f;
-
-        float x = bx::ffloor(proj.x*wh + wh + 0.5f);
-        float y = bx::ffloor(-proj.y*hh + hh + 0.5f);
-
-        // ZCull
-        if (proj.z < 0.0f || proj.z > 1.0f)
-            return false;
-
-        *result = vec2(x, y);
-        return true;
-    }
-
     static Shape createSolidAABB()
     {
         aabb_t box = aabbZero();
@@ -532,7 +510,7 @@ namespace tee
     {
         if (ctx->vgCtx) {
             vec2_t screenPt;
-            if (projectToScreen(&screenPt, pos, ctx->viewport, ctx->viewProjMtx)) {
+            if (tmath::projectToScreen(&screenPt, pos, ctx->viewport, ctx->viewProjMtx)) {
                 DebugDrawState* state;
                 ctx->stateStack.peek(&state);
 
@@ -571,7 +549,7 @@ namespace tee
     {
         if (ctx->vgCtx) {
             vec2_t screenPt;
-            if (projectToScreen(&screenPt, pos, ctx->viewport, ctx->viewProjMtx)) {
+            if (tmath::projectToScreen(&screenPt, pos, ctx->viewport, ctx->viewProjMtx)) {
                 DebugDrawState* state;
                 ctx->stateStack.peek(&state);
                 vec4_t c = state->color;
@@ -585,8 +563,8 @@ namespace tee
     {
         if (ctx->vgCtx) {
             vec2_t minPt, maxPt;
-            if (projectToScreen(&minPt, vmin, ctx->viewport, ctx->viewProjMtx) &&
-                projectToScreen(&maxPt, vmax, ctx->viewport, ctx->viewProjMtx)) {
+            if (tmath::projectToScreen(&minPt, vmin, ctx->viewport, ctx->viewProjMtx) &&
+                tmath::projectToScreen(&maxPt, vmax, ctx->viewport, ctx->viewProjMtx)) {
                 DebugDrawState* state;
                 ctx->stateStack.peek(&state);
                 vec4_t c = state->color;
@@ -769,7 +747,7 @@ namespace tee
                 verts[i].color = verts[ni].color = boldColor.n;
                 if (showVerticalInfo) {
                     vec2_t screenPt;
-                    projectToScreen(&screenPt, vec3(snapRect.xmin + spacing, yoffset, 0), ctx->viewport, ctx->viewProjMtx);
+                    tmath::projectToScreen(&screenPt, vec3(snapRect.xmin + spacing, yoffset, 0), ctx->viewport, ctx->viewProjMtx);
                     gfx::textfDbg2D(ctx->vgCtx, screenPt.x, screenPt.y - fontHH, "%.1f", yoffset);
                 }
             }
@@ -827,7 +805,7 @@ namespace tee
 
         if (showInfo) {
             vec2_t center2d;
-            if (projectToScreen(&center2d, center, ctx->viewport, ctx->viewProjMtx)) {
+            if (tmath::projectToScreen(&center2d, center, ctx->viewport, ctx->viewProjMtx)) {
                 DebugDrawState* state;
                 ctx->stateStack.peek(&state);
 
@@ -867,7 +845,7 @@ namespace tee
 
         if (showInfo) {
             vec2_t center2d;
-            if (projectToScreen(&center2d, sphere.center, ctx->viewport, ctx->viewProjMtx)) {
+            if (tmath::projectToScreen(&center2d, sphere.center, ctx->viewport, ctx->viewProjMtx)) {
                 gfx::fontDbg2D(ctx->vgCtx, state->fontHandle);
                 vec4_t c = state->color;
                 ucolor_t color = ucolorf(c.x, c.y, c.z, c.w);

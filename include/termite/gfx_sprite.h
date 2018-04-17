@@ -79,7 +79,8 @@ namespace tee
     // Sprite API
     namespace sprite {
         // Callback for setting custom states when drawing sprites
-        typedef void(*StateCallback)(GfxDriver* driver, void* userData);
+        // Return true
+        typedef void(*StateCallback)(GfxDriver* driver, void* userData, bool* pTextureOverride);
         // Callback for animation frames
         typedef void(*FrameCallback)(Sprite* sprite, int frameIdx, void* userData);
 
@@ -170,6 +171,7 @@ namespace tee
         TEE_API void getRealRect(Sprite* sprite, vec2_t* pHalfSize, vec2_t* pCenter);
         TEE_API vec2_t getImageSize(Sprite* sprite);
         TEE_API rect_t getTexelCoords(Sprite* sprite);
+        TEE_API TextureHandle getTextureHandle(Sprite* sprite);
         TEE_API void setUserData(Sprite* sprite, void* userData);
         TEE_API void* getUserData(Sprite* sprite);
 

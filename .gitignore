@@ -41,6 +41,8 @@ imgui.ini
 install
 out
 *.log
+.vscode
+
 
 # Downloaded
 deps/assimp
@@ -66,6 +68,7 @@ deps/curl_android
 *.fso
 *.vso
 *.pyc
+*.obj
 
 # external projects
 digger

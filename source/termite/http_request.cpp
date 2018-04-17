@@ -39,8 +39,9 @@ namespace tee {
         bx::Queue<HttpRequest*>::Node qnode;
 
         char url[256];
-        char contentType[32];
+        char contentType[64];
         char* data;                        // For PUT/POST methods
+        uint32_t dataSize;
         void* userData;
 
         HttpRequest() :
@@ -53,6 +54,7 @@ namespace tee {
         {
             url[0] = 0;
             contentType[0] = 0;
+            dataSize = 0;
         }
     };
 
@@ -138,7 +140,7 @@ namespace tee {
 
             case HttpRequestMethod::POST:
                 conn->AppendHeader("Content-Type", req->contentType);
-                res->r = conn->post(req->url, req->data ? req->data : "");
+                res->r = conn->post(req->url, req->data ? req->data : "", req->data ? req->dataSize : 1);
                 break;
 
             case HttpRequestMethod::DEL:
@@ -234,12 +236,15 @@ namespace tee {
             if (res->responseFn) {
                 if (res->r.headers.size() > 0) {
                     int numHeaders = (int)res->r.headers.size();
-                    HttpHeaderField* headers = (HttpHeaderField*)alloca(sizeof(HttpHeaderField)*numHeaders);
-                    int index = 0;
-                    for (std::map<std::string, std::string>::iterator it = res->r.headers.begin(); it != res->r.headers.end(); ++it) {
-                        headers[index].name = it->first.c_str();
-                        headers[index].value = it->second.c_str();
-                        index++;
+                    HttpHeaderField* headers = nullptr;
+                    if (numHeaders > 0) {
+                        headers = (HttpHeaderField*)alloca(sizeof(HttpHeaderField)*numHeaders);
+                        int index = 0;
+                        for (std::map<std::string, std::string>::iterator it = res->r.headers.begin(); it != res->r.headers.end(); ++it) {
+                            headers[index].name = it->first.c_str();
+                            headers[index].value = it->second.c_str();
+                            index++;
+                        }
                     }
                     res->responseFn(res->r.code, res->r.body.c_str(), headers, numHeaders, res->userData);
                 } else {
@@ -255,11 +260,11 @@ namespace tee {
         } 
     }
 
-    static void makeRequest(HttpRequestMethod::Enum method, const char* url, const char* contentType, 
-                            const char* data, HttpResponseCallback responseFn,
-                            HttpConnectionCallback connFn, void* userData)
+    static void makeRequest(HttpRequestMethod::Enum method, const char* url, 
+                            const char* contentType, const char* data, uint32_t size, 
+                            HttpResponseCallback responseFn, HttpConnectionCallback connFn, void* userData)
     {
-        size_t dataSz = data ? strlen(data) + 1 : 0;
+        size_t dataSz = data ? size : 0;
         size_t totalSz = sizeof(HttpRequest) + dataSz;
         uint8_t* buff = (uint8_t*)BX_ALLOC(gHttp->alloc, totalSz);
         if (buff) {
@@ -272,6 +277,7 @@ namespace tee {
             req->responseFn = responseFn;
             req->connFn = connFn;
             req->userData = userData;
+            req->dataSize = size;
 
             if (contentType)
                 bx::strCopy(req->contentType, sizeof(req->contentType), contentType);
@@ -288,14 +294,14 @@ namespace tee {
     }
 
     static void makeRequestSync(HttpRequestMethod::Enum method, const char* url, const char* contentType,
-                                const char* data, HttpResponseCallback responseFn,
+                                const char* data, uint32_t size, HttpResponseCallback responseFn,
                                 HttpConnectionCallback connFn, void* userData)
     {
         HttpResponse* res = BX_NEW(gHttp->alloc, HttpResponse);
         if (!res)
             return;
 
-        size_t dataSz = data ? strlen(data) + 1 : 0;
+        size_t dataSz = data ? size : 0;
         size_t totalSz = sizeof(HttpRequest) + dataSz;
         uint8_t* buff = (uint8_t*)BX_ALLOC(gHttp->alloc, totalSz);
         HttpRequest* req = nullptr;
@@ -345,62 +351,68 @@ namespace tee {
 
     void http::get(const char* url, HttpResponseCallback responseFn, void* userData)
     {
-        makeRequest(HttpRequestMethod::GET, url, nullptr, nullptr, responseFn, nullptr, userData);
+        makeRequest(HttpRequestMethod::GET, url, nullptr, nullptr, 0, responseFn, nullptr, userData);
     }
 
     void http::post(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn, void* userData)
     {
-        makeRequest(HttpRequestMethod::POST, url, contentType, data, responseFn, nullptr, userData);
+        makeRequest(HttpRequestMethod::POST, url, contentType, data, data ? (uint32_t)strlen(data) + 1 : 0, responseFn, nullptr, userData);
+    }
+
+    void http::post(const char* url, const char* contentType, const char* binaryData, const uint32_t dataSize, 
+                    HttpResponseCallback responseFn, void* userData /*= nullptr*/)
+    {
+        makeRequest(HttpRequestMethod::POST, url, contentType, binaryData, dataSize, responseFn, nullptr, userData);
     }
 
     void http::put(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn, void* userData)
     {
-        makeRequest(HttpRequestMethod::PUT, url, contentType, data, responseFn, nullptr, userData);
+        makeRequest(HttpRequestMethod::PUT, url, contentType, data, data ? (uint32_t)strlen(data) + 1 : 0, responseFn, nullptr, userData);
     }
 
     void http::del(const char* url, HttpResponseCallback responseFn, void* userData)
     {
-        makeRequest(HttpRequestMethod::DEL, url, nullptr, nullptr, responseFn, nullptr, userData);
+        makeRequest(HttpRequestMethod::DEL, url, nullptr, nullptr, 0, responseFn, nullptr, userData);
     }
 
     void http::head(const char* url, HttpResponseCallback responseFn, void* userData)
     {
-        makeRequest(HttpRequestMethod::HEAD, url, nullptr, nullptr, responseFn, nullptr, userData);
+        makeRequest(HttpRequestMethod::HEAD, url, nullptr, nullptr, 0, responseFn, nullptr, userData);
     }
 
     void http::request(const char* url, HttpConnectionCallback connFn, HttpResponseCallback responseFn, void* userData)
     {
-        makeRequest(HttpRequestMethod::Unknown, url, nullptr, nullptr, responseFn, connFn, userData);
+        makeRequest(HttpRequestMethod::Unknown, url, nullptr, nullptr, 0, responseFn, connFn, userData);
     }
 
     void http::getSync(const char* url, HttpResponseCallback responseFn, void* userData)
     {
-        makeRequestSync(HttpRequestMethod::GET, url, nullptr, nullptr, responseFn, nullptr, userData);
+        makeRequestSync(HttpRequestMethod::GET, url, nullptr, nullptr, 0, responseFn, nullptr, userData);
     }
 
     void http::postSync(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn, void* userData)
     {
-        makeRequestSync(HttpRequestMethod::POST, url, contentType, data, responseFn, nullptr, userData);
+        makeRequestSync(HttpRequestMethod::POST, url, contentType, data, data ? (uint32_t)strlen(data) + 1 : 0, responseFn, nullptr, userData);
     }
 
     void http::putSync(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn, void* userData)
     {
-        makeRequestSync(HttpRequestMethod::PUT, url, contentType, data, responseFn, nullptr, userData);
+        makeRequestSync(HttpRequestMethod::PUT, url, contentType, data, data ? (uint32_t)strlen(data) + 1 : 0, responseFn, nullptr, userData);
     }
 
     void http::delSync(const char* url, HttpResponseCallback responseFn, void* userData)
     {
-        makeRequestSync(HttpRequestMethod::DEL, url, nullptr, nullptr, responseFn, nullptr, userData);
+        makeRequestSync(HttpRequestMethod::DEL, url, nullptr, nullptr, 0, responseFn, nullptr, userData);
     }
 
     void http::headSync(const char* url, HttpResponseCallback responseFn, void* userData)
     {
-        makeRequestSync(HttpRequestMethod::HEAD, url, nullptr, nullptr, responseFn, nullptr, userData);
+        makeRequestSync(HttpRequestMethod::HEAD, url, nullptr, nullptr, 0, responseFn, nullptr, userData);
     }
 
     void http::requestSync(const char* url, HttpConnectionCallback connFn, HttpResponseCallback responseFn, void* userData)
     {
-        makeRequestSync(HttpRequestMethod::Unknown, url, nullptr, nullptr, responseFn, connFn, userData);
+        makeRequestSync(HttpRequestMethod::Unknown, url, nullptr, nullptr, 0, responseFn, connFn, userData);
     }
 
     void http::setCert(const char* filepath, bool insecure)

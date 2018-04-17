@@ -4,7 +4,7 @@ import subprocess
 import shutil
 import glob
 import optparse
-import lz4
+import lz4.block
 import json
 import hashlib
 import traceback
@@ -114,6 +114,7 @@ def encodeEtc2(filepath):
     if tpQuality:
         args.extend(tpQuality)
     args.extend(['-errormetric', 'rec709'])
+    #args.extend(['-m', '2'])
     args.extend(['-output', outputFilepath])
     r = subprocess.call(args)
     if r == 0:

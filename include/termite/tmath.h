@@ -384,6 +384,7 @@ namespace tee
                                  float persistance, bx::AllocatorI* alloc);
         TEE_API float normalDist(float x, float mean, float stdDev);
         TEE_API aabb_t aabbTransform(const aabb_t& b, const mat4_t& mtx);
+        TEE_API bool projectToScreen(vec2_t* result, const vec3_t point, const irect_t& viewport, const mat4_t& viewProjMtx);
 
         // Reference: http://stackoverflow.com/questions/707370/clean-efficient-algorithm-for-wrapping-integers-in-c
         int iwrap(int kX, int const kLowerBound, int const kUpperBound);

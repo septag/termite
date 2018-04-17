@@ -1676,12 +1676,13 @@ namespace tee {
             gDriver->setState(state, 0);
             gDriver->setTransientVertexBufferI(0, &tvb, 0, batch.numVerts);
             gDriver->setTransientIndexBufferI(&tib, batch.startIdx, batch.numIndices);
-            if (batch.texHandle.isValid())
-                gDriver->setTexture(0, gSpriteMgr->u_texture, asset::getObjPtr<Texture>(batch.texHandle)->handle, TextureFlag::FromTexture);
 
+            bool textureOverride = false;
             if (stateCallback) {
-                stateCallback(gDriver, stateUserData);
+                stateCallback(gDriver, stateUserData, &textureOverride);
             }
+            if (batch.texHandle.isValid() & !textureOverride)
+                gDriver->setTexture(0, gSpriteMgr->u_texture, asset::getObjPtr<Texture>(batch.texHandle)->handle, TextureFlag::FromTexture);
             gDriver->submit(viewId, prog, 0, false);
         }
 
@@ -1939,8 +1940,9 @@ namespace tee {
             gDriver->setIndexBuffer(sc->ib, batch.startIdx, batch.numIndices);
             if (batch.texHandle.isValid())
                 gDriver->setTexture(0, gSpriteMgr->u_texture, asset::getObjPtr<Texture>(batch.texHandle)->handle, TextureFlag::FromTexture);
+            bool textureOverride = false;
             if (stateCallback) {
-                stateCallback(gDriver, stateUserData);
+                stateCallback(gDriver, stateUserData, &textureOverride);
             }
             gDriver->submit(viewId, prog, 0, false);
         }

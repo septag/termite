@@ -48,6 +48,9 @@ namespace tee
         TEE_API void get(const char* url, HttpResponseCallback responseFn, void* userData = nullptr);
         TEE_API void post(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn, 
                           void* userData = nullptr);
+        TEE_API void post(const char* url, const char* contentType, const char* binaryData, const uint32_t dataSize,
+                          HttpResponseCallback responseFn,
+                          void* userData = nullptr);
         TEE_API void put(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn, 
                          void* userData = nullptr);
         TEE_API void del(const char* url, HttpResponseCallback responseFn, void* userData = nullptr);

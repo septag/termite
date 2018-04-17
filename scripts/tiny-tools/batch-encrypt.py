@@ -6,6 +6,8 @@ import glob
 import optparse
 import traceback
 import timeit
+import json
+import tempfile
 
 C_EncryptTool = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'encrypt')
 
@@ -27,6 +29,7 @@ def main():
         help = 'AES-128 key', default='')
     cmdParser.add_option('--iv', action='store', type='string', dest='ARG_Iv',
         help = 'AES-128 Iv', default='')
+    cmdParser.add_option('--packjson', action='store_true', dest='ARG_JSON', help='Pack and minify json files')
     (options, args) = cmdParser.parse_args()
 
     if not options.ARG_ListFile:
@@ -39,6 +42,12 @@ def main():
     files = readListFile(options.ARG_ListFile)
     numErrors = 0
     for f in files:
+        if options.ARG_JSON:
+            tmpfilepath = os.path.join(tempfile.gettempdir(), os.path.basename(f))
+            jdata = json.load(open(f, 'r'))
+            open(tmpfilepath, 'w').write(json.dumps(jdata))
+            f = tmpfilepath
+
         outputFilepath = os.path.join(options.ARG_OutputDir, os.path.basename(f)) + '.tenc'
         args = [C_EncryptTool, '-f', f, '-o', outputFilepath, '-k', options.ARG_Key, '-i', options.ARG_Iv]
         r = subprocess.call(args)

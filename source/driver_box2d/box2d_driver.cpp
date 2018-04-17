@@ -22,11 +22,15 @@ using namespace tee;
 // conversion functions
 inline b2Vec2 b2vec2(const vec2_t& v)
 {
+    assert(!bx::isNan(v.x));
+    assert(!bx::isNan(v.y));
     return b2Vec2(v.x, v.y);
 }
 
 inline vec2_t tvec2(const b2Vec2& v)
 {
+    assert(!bx::isNan(v.x));
+    assert(!bx::isNan(v.y));
     return vec2(v.x, v.y);
 }
 

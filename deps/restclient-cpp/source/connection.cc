@@ -397,6 +397,10 @@ RestClient::Connection::performCurlRequest(const std::string& uri) {
         ret.body = "Could not resolve host";
         ret.code = -1;
         break;
+      case CURLE_COULDNT_CONNECT:
+          ret.body = "Could not connect to server";
+          ret.code = -1;
+          break;
       default:
         ret.body = "Failed to query.";
         ret.code = -1;
@@ -460,6 +464,19 @@ RestClient::Connection::post(const std::string& url,
 
   return this->performCurlRequest(url);
 }
+
+RestClient::Response
+RestClient::Connection::post(const std::string& url, const char* data, uint32_t dataSize)
+{
+    /** Now specify we want to POST data */
+    curl_easy_setopt(this->curlHandle, CURLOPT_POST, 1L);
+    /** set post fields */
+    curl_easy_setopt(this->curlHandle, CURLOPT_POSTFIELDS, data);
+    curl_easy_setopt(this->curlHandle, CURLOPT_POSTFIELDSIZE, (size_t)dataSize);
+
+    return this->performCurlRequest(url);
+}
+
 /**
  * @brief HTTP PUT method
  *

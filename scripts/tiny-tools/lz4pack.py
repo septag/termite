@@ -4,7 +4,7 @@ import subprocess
 import shutil
 import glob
 import optparse
-import lz4
+import lz4.block
 import json
 import hashlib
 import traceback

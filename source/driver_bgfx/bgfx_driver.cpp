@@ -563,7 +563,7 @@ static void setTexture(uint8_t stage, UniformHandle sampler, TextureHandle handl
     BGFX_DECLARE_HANDLE(UniformHandle, s, sampler);
     BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
 
-    bgfx::setTexture(stage, s, h, flags);
+     bgfx::setTexture(stage, s, h, flags);
 }
 
 static void submit(uint8_t viewId, ProgramHandle program, int32_t depth, bool preserveState)

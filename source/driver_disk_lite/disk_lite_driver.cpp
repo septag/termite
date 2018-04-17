@@ -253,7 +253,7 @@ static void blockingReadJob(int jobIdx, void* userParam)
         off_t size = AAsset_getLength(asset);
         MemoryBlock* mem = nullptr;
         int r = -1;
-        if (size) {
+        if (size > 0) {
             mem = gTee->createMemoryBlock(size, gBlockingIo.alloc);
             if (mem)
                 r = AAsset_read(asset, mem->data, size);

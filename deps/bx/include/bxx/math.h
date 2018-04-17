@@ -130,6 +130,18 @@ namespace bx
         return len;
     }
 
+    inline float vec2NormSafe(float* __restrict _result, const float* __restrict _a)
+    {
+        const float len = vec2Length(_a);
+        if (len != 0) {
+            const float invLen = 1.0f/len;
+            _result[0] = _a[0] * invLen;
+            _result[1] = _a[1] * invLen;
+        }
+        return len;
+    }
+
+
     inline void vec2Min(float* __restrict _result, const float* __restrict _a, const float* __restrict _b)
     {
         _result[0] = bx::min(_a[0], _b[0]);

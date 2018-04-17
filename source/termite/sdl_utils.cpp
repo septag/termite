@@ -1,7 +1,7 @@
 #include "pch.h"
 
 #ifdef termite_SDL2
-#define SDL_MAIN_HANDLED
+//#define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <SDL_syswm.h>
 #undef None

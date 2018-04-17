@@ -188,4 +188,27 @@ namespace tee {
 
         return aabb(vmin, vmax);
     }
+
+    bool tmath::projectToScreen(vec2_t* result, const vec3_t point, const irect_t& viewport, const mat4_t& viewProjMtx)
+    {
+        float w = float(viewport.xmax - viewport.xmin);
+        float h = float(viewport.ymax - viewport.ymin);
+        float wh = w*0.5f;
+        float hh = h*0.5f;
+
+        vec4_t proj;
+        bx::vec4MulMtx(proj.f, vec4(point.x, point.y, point.z, 1.0f).f, viewProjMtx.f);
+        bx::vec3Mul(proj.f, proj.f, 1.0f / proj.w);     proj.w = 1.0f;
+
+        float x = bx::ffloor(proj.x*wh + wh + 0.5f);
+        float y = bx::ffloor(-proj.y*hh + hh + 0.5f);
+
+        *result = vec2(x, y);
+
+        // ZCull
+        if (proj.z < 0.0f || proj.z > 1.0f)
+            return false;
+        return true;
+    }
+
 }

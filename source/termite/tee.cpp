@@ -943,19 +943,29 @@ uint64_t getFrameIndex()
 
 MemoryBlock* createMemoryBlock(uint32_t size, bx::AllocatorI* alloc)
 {
-    gTee->memPoolLock.lock();
-    HeapMemoryImpl* mem = gTee->memPool.newInstance();
-    gTee->memPoolLock.unlock();
-    if (!alloc)
-        alloc = gAlloc;
-    mem->m.data = (uint8_t*)BX_ALLOC(alloc, size);
+    if (size > 0) {
+        gTee->memPoolLock.lock();
+        HeapMemoryImpl* mem = gTee->memPool.newInstance();
+        gTee->memPoolLock.unlock();
+        if (!mem)
+            return nullptr;
+        if (!alloc)
+            alloc = gAlloc;
 
-    if (!mem->m.data)
+        mem->m.data = (uint8_t*)BX_ALLOC(alloc, size);
+
+        if (mem->m.data != nullptr) {
+            mem->m.size = size;
+            mem->alloc = alloc;
+            return (MemoryBlock*)mem;
+        } else {
+            bx::LockScope l(gTee->memPoolLock);
+            gTee->memPool.deleteInstance(mem);
+            return nullptr;
+        }
+    } else {
         return nullptr;
-    mem->m.size = size;
-    mem->alloc = alloc;
-
-    return (MemoryBlock*)mem;
+    }
 }
 
 MemoryBlock* refMemoryBlockPtr(const void* data, uint32_t size)
@@ -963,6 +973,8 @@ MemoryBlock* refMemoryBlockPtr(const void* data, uint32_t size)
     gTee->memPoolLock.lock();
     HeapMemoryImpl* mem = gTee->memPool.newInstance();
     gTee->memPoolLock.unlock();
+    if (!mem)
+        return nullptr;
     mem->m.data = (uint8_t*)const_cast<void*>(data);
     mem->m.size = size;
 
@@ -974,11 +986,16 @@ MemoryBlock* copyMemoryBlock(const void* data, uint32_t size, bx::AllocatorI* al
     gTee->memPoolLock.lock();
     HeapMemoryImpl* mem = gTee->memPool.newInstance();
     gTee->memPoolLock.unlock();
+    if (!mem)
+        return nullptr;
     if (!alloc)
         alloc = gAlloc;
     mem->m.data = (uint8_t*)BX_ALLOC(alloc, size);
-    if (!mem->m.data)
+    if (!mem->m.data) {
+        bx::LockScope l(gTee->memPoolLock);
+        gTee->memPool.deleteInstance(mem);
         return nullptr;
+    }
     memcpy(mem->m.data, data, size);
     mem->m.size = size; 
     mem->alloc = alloc;

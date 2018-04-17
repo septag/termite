@@ -278,6 +278,11 @@ namespace tee {
         return rc;
     }
 
+    inline irect_t irectwh(int _x, int _y, int _width, int _height)
+    {
+        return irect(_x, _y, _x + _width, _y + _height);
+    }
+
     inline sphere_t sphere(const float* _f)
     {
         sphere_t s;

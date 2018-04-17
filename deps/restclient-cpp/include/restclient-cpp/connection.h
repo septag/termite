@@ -184,6 +184,9 @@ class Connection {
     RestClient::Response get(const std::string& uri);
     RestClient::Response post(const std::string& uri,
                               const std::string& data);
+    RestClient::Response post(const std::string& url,
+                              const char* data,
+                              uint32_t dataSize);
     RestClient::Response put(const std::string& uri,
                              const std::string& data);
     RestClient::Response del(const std::string& uri);
