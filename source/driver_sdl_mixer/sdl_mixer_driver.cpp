@@ -6,6 +6,7 @@
 
 #include "SDL_mixer.h"
 #include "beep_ogg.h"
+#include "blank_ogg.h"
 
 using namespace tee;
 
@@ -61,6 +62,7 @@ struct MixerWrapper
     void* musicFinishedUserData;
 
     Mix_Chunk* failChunk;
+    Mix_Chunk* asyncChunk;
 
     MixerWrapper()
     {
@@ -69,6 +71,7 @@ struct MixerWrapper
         soundFinishedFn = nullptr;
         soundFinishedUserData = nullptr;
         failChunk = nullptr;
+        asyncChunk = nullptr;
         musicFinishedFn = nullptr;
         musicFinishedUserData = nullptr;
         soundEnabled = true;
@@ -107,9 +110,10 @@ static bool mixerInit(AudioFreq::Enum freq/* = AudioFreq::Freq22Khz*/,
 
     // Create Beep sound for failed loads
     gSdlMixer.failChunk = Mix_LoadWAV_RW(SDL_RWFromConstMem(kBeepOGG, sizeof(kBeepOGG)), 1);
+    gSdlMixer.asyncChunk = Mix_LoadWAV_RW(SDL_RWFromConstMem(kBlankOGG, sizeof(kBlankOGG)), 1);
 
     // Register sound loader to resource_lib
-    gSdlMixer.asset->registerType("sound", &gSdlMixer.loader, 0, uintptr_t(gSdlMixer.failChunk), 0);
+    gSdlMixer.asset->registerType("sound", &gSdlMixer.loader, 0, uintptr_t(gSdlMixer.failChunk), uintptr_t(gSdlMixer.asyncChunk));
     gSdlMixer.asset->registerType("music", &gSdlMixer.musLoader, 0, 0, 0);
 
     return true;
@@ -122,6 +126,8 @@ static void mixerShutdown()
 
     if (gSdlMixer.failChunk)
         Mix_FreeChunk(gSdlMixer.failChunk);
+    if (gSdlMixer.asyncChunk)
+        Mix_FreeChunk(gSdlMixer.asyncChunk);
 
     Mix_Quit();
     Mix_CloseAudio();

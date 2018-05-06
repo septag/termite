@@ -21,6 +21,7 @@ namespace bx
     class HashTable
     {
     public:
+        HashTable() = delete;
         explicit HashTable(HashTableType type);
         ~HashTable();
 

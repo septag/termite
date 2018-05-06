@@ -29,6 +29,10 @@ namespace tee
     // Http response callback. Gets called in the caller thread
     typedef void (*HttpResponseCallback)(int code, const char* body, const HttpHeaderField* headers, int numHeaders, 
                                          void* userData);
+    typedef void (*HttpDownloadCallback)(int code, const MemoryBlock* mem, const char* filename, void* userData);
+
+    // Note: return false to abort the download/upload
+    typedef bool (*HttpProgressCallback)(size_t curSize, size_t totalSize, void* userData);
 
     // Connection callback is used for advanced requests , which you should include "restclient-cpp/connection.h" and use the methods
     // This function is called within async worker thread, so the user should only use 'conn' methods and work on userData in a thread-safe manner
@@ -42,20 +46,31 @@ namespace tee
         TEE_API void setKey(const char* filepath, const char* passphrase = nullptr);
         TEE_API void setTimeout(int timeoutSecs);
         TEE_API void setBaseUrl(const char* url);
+        TEE_API void setDownloadBaseUrl(const char* url);
         TEE_API bool isRequestFailed(int code);
+        TEE_API void setProgress(HttpProgressCallback progressFn, void* userData = nullptr);
 
         // Async requests
-        TEE_API void get(const char* url, HttpResponseCallback responseFn, void* userData = nullptr);
+        TEE_API void get(const char* url, HttpResponseCallback responseFn, void* userData = nullptr,
+                         HttpProgressCallback progressFn = nullptr, void* progressUserData = nullptr);
         TEE_API void post(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn, 
-                          void* userData = nullptr);
+                          void* userData = nullptr,
+                          HttpProgressCallback progressFn = nullptr, void* progressUserData = nullptr);
         TEE_API void post(const char* url, const char* contentType, const char* binaryData, const uint32_t dataSize,
-                          HttpResponseCallback responseFn,
-                          void* userData = nullptr);
-        TEE_API void put(const char* url, const char* contentType, const char* data, HttpResponseCallback responseFn, 
-                         void* userData = nullptr);
+                          HttpResponseCallback responseFn, void* userData = nullptr,
+                          HttpProgressCallback progressFn = nullptr, void* progressUserData = nullptr);
+        TEE_API void put(const char* url, const char* contentType, const char* data, 
+                         HttpResponseCallback responseFn, void* userData = nullptr,
+                         HttpProgressCallback progressFn = nullptr, void* progressUserData = nullptr);
         TEE_API void del(const char* url, HttpResponseCallback responseFn, void* userData = nullptr);
         TEE_API void head(const char* url, HttpResponseCallback responseFn, void* userData = nullptr);
-        TEE_API void request(const char* url, HttpConnectionCallback connFn, HttpResponseCallback responseFn, void* userData = nullptr);
+        TEE_API void request(const char* url, HttpConnectionCallback connFn, 
+                             HttpResponseCallback responseFn, void* userData = nullptr,
+                             HttpProgressCallback progressFn = nullptr, void* progressUserData = nullptr);
+
+        // Note: Download's base url is different from other request's base url, see `setDownloadBaseUrl`
+        TEE_API void download(const char* url, HttpDownloadCallback downloadFn, void* userData = nullptr,
+                              HttpProgressCallback progressFn = nullptr, void* progressUserData = nullptr);
 
         // Blocking (Sync) requests
         TEE_API void getSync(const char* url, HttpResponseCallback responseFn, void* userData = nullptr);

@@ -86,6 +86,7 @@ elseif (UNIX)
 endif()
 
 if (USE_CURL)
+    set(PRIVATE_INCLUDE_DIRS ${CURL_INCLUDE_DIR})
     list(APPEND PUBLIC_LIBS restclient-cpp)
 endif()
 
@@ -122,7 +123,9 @@ target_link_libraries(termite
 
 # 
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)
-target_include_directories(termite PUBLIC ${TERMITE_INCLUDE_DIR} ${DEP_ROOT_DIR} ${FCONTEXT_INCLUDE_DIR} ${BIMG_INCLUDE_DIR})
+target_include_directories(termite 
+                           PUBLIC ${TERMITE_INCLUDE_DIR} ${DEP_ROOT_DIR} ${FCONTEXT_INCLUDE_DIR} ${BIMG_INCLUDE_DIR}
+                           PRIVATE ${PRIVATE_INCLUDE_DIRS})
 if (USE_SDL2)
     target_include_directories(termite PUBLIC ${SDL2_INCLUDE_DIR})
     target_link_libraries(termite PUBLIC ${SDL2_LIBRARY})

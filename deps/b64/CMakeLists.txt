@@ -1,8 +1,9 @@
+# taken from apple implementation
 cmake_minimum_required(VERSION 3.0)
-project(b64)
+project(base64)
 
-set(SOURCE_FILES decode.c encode.c b64.h)
-add_library(b64 STATIC ${SOURCE_FILES})
-set_target_properties(b64 PROPERTIES FOLDER Deps)
+set(SOURCE_FILES base64.c base64.h)
+add_library(base64 STATIC ${SOURCE_FILES})
+set_target_properties(base64 PROPERTIES FOLDER Deps)
 
 

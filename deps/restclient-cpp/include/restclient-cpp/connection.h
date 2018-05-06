@@ -192,6 +192,9 @@ class Connection {
     RestClient::Response del(const std::string& uri);
     RestClient::Response head(const std::string& uri);
 
+    typedef int(*CurlProgressCallback)(void *clientp, int64_t dltotal, int64_t dlnow, int64_t ultotal, int64_t ulnow);
+    void SetProgressCallback(CurlProgressCallback callback, void* userData = nullptr);
+
  private:
     CURL* curlHandle;
     std::string baseUrl;

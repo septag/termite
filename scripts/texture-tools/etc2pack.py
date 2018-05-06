@@ -9,12 +9,15 @@ import json
 import hashlib
 import traceback
 import timeit
+import tempfile
+from PIL import Image
 
 ARG_InputFile = ''
 ARG_ListFile = ''
 ARG_OutputDir = '.'
 ARG_Encoder = 'etc2_alpha'
 ARG_Quality = 'normal'
+ARG_FixImageSizeModulo = 4
 
 C_TexturePackerPath = 'TexturePacker'
 C_EtcToolPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'EtcTool')
@@ -66,10 +69,11 @@ def compressLz4(filepath):
         f.write(compressed)
         f.close()
     compressedLen = len(compressed)
-    print('LZ4 compressed (%dkb -> %dkb)' % (srcDataLen/1024, compressedLen/1024))
+    print('\tLZ4 compressed (%dkb -> %dkb), Ratio: %.1f' % (srcDataLen/1024, compressedLen/1024, 
+        srcDataLen/compressedLen))
 
 def encodeEtc2(filepath):
-    global ARG_OutputDir, ARG_Quality, ARG_Encoder, ARG_ListFile
+    global ARG_OutputDir, ARG_Quality, ARG_Encoder, ARG_ListFile, ARG_FixImageSizeModulo
     global C_EtcToolPath
     global gFileHashes, gProcessedFileCount
 
@@ -108,7 +112,27 @@ def encodeEtc2(filepath):
     outputFilepath = os.path.join(destdir, os.path.basename(filename)) + '.ktx'
 
     print(filepath + ' -> ' + os.path.relpath(outputFilepath, ARG_OutputDir))
-    args = [C_EtcToolPath, filepath, '-j', '4']
+    modifiedFilepath = filepath
+    
+    # Open the image file, check the size to be a modulo of the argument
+    if (ARG_FixImageSizeModulo != 0):
+        img = Image.open(filepath)
+        width, height = img.size
+        if (width % ARG_FixImageSizeModulo != 0 or height % ARG_FixImageSizeModulo != 0):
+            prevWidth = width
+            prevHeight = height
+            if (width % ARG_FixImageSizeModulo != 0):
+                width = width + (ARG_FixImageSizeModulo - (width % ARG_FixImageSizeModulo))
+            if (height % ARG_FixImageSizeModulo != 0):
+                height = height + (ARG_FixImageSizeModulo - (height % ARG_FixImageSizeModulo))
+            print('\tFixing size (%d, %d) -> (%d, %d)' % (prevWidth, prevHeight, width, height))
+            tmpImageFilepath = os.path.join(tempfile.gettempdir(), os.path.basename(filename)) + fileext
+            newImage = Image.new('RGBA', (width, height))
+            newImage.paste(img)
+            newImage.save(tmpImageFilepath, fileext[1:])
+            modifiedFilepath = tmpImageFilepath
+
+    args = [C_EtcToolPath, modifiedFilepath, '-j', '4']
     if tpFmt:
         args.extend(['-format', tpFmt])
     if tpQuality:
@@ -122,6 +146,8 @@ def encodeEtc2(filepath):
         if ARG_ListFile:
             gFileHashes[filepath] = hashVal
         gProcessedFileCount = gProcessedFileCount + 1
+    if modifiedFilepath != filepath:
+        os.remove(modifiedFilepath)
     return (r == 0)
 
 def encodeWithTexturePacker(filepath):
@@ -157,10 +183,10 @@ def encodeFile(filepath):
         return False
 
 def main():
-    global ARG_ListFile, ARG_Quality, ARG_Encoder, ARG_OutputDir, ARG_InputFile
+    global ARG_ListFile, ARG_Quality, ARG_Encoder, ARG_OutputDir, ARG_InputFile, ARG_FixImageSizeModulo
     global gProcessedFileCount
 
-    cmdParser = optparse.OptionParser();
+    cmdParser = optparse.OptionParser()
     cmdParser.add_option('--file', action='store', type='string', dest='ARG_InputFile',
         help = 'Input image file', default=ARG_InputFile)
     cmdParser.add_option('--listfile', action='store', type='string', dest='ARG_ListFile', 
@@ -171,6 +197,8 @@ def main():
         choices=['etc2', 'etc2_alpha'], help = 'Choose encoder', default=ARG_Encoder)
     cmdParser.add_option('--quality', action='store', type='choice', dest='ARG_Quality',
         choices = ['low', 'normal', 'high'], help = '', default=ARG_Quality)
+    cmdParser.add_option('--msize', action='store', type='int', dest='ARG_FixImageSizeModulo',
+        default=4, help='Fix output image size to be a multiply of specified argument')
 
     (options, args) = cmdParser.parse_args()
     if options.ARG_InputFile:
@@ -180,6 +208,7 @@ def main():
     ARG_OutputDir = os.path.abspath(options.ARG_OutputDir)
     ARG_Encoder = options.ARG_Encoder
     ARG_Quality = options.ARG_Quality
+    ARG_FixImageSizeModulo = options.ARG_FixImageSizeModulo
     if not ARG_InputFile and not ARG_ListFile:
         raise Exception('Must provide either --file or --listfile arguments. See --help')
     if not os.path.isdir(ARG_OutputDir):
@@ -196,7 +225,7 @@ def main():
     elif ARG_InputFile:
         encodeFile(ARG_InputFile)
 
-    print('Total %d files processed' % gProcessedFileCount)
+    print('Total %d file(s) processed' % gProcessedFileCount)
     print('Took %.3f secs' % (timeit.default_timer() - startTm))
 
 if __name__ == '__main__':

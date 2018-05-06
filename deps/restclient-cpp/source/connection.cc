@@ -28,7 +28,7 @@
 RestClient::Connection::Connection(const std::string& baseUrl)
                                : lastRequest(), headerFields() {
   this->curlHandle = curl_easy_init();
-  //if (!this->curlHandle) {
+//  if (!this->curlHandle) {
 //    throw std::runtime_error("Couldn't initialize curl handle");
 //  }
   this->baseUrl = baseUrl;
@@ -542,4 +542,16 @@ RestClient::Connection::head(const std::string& url) {
     curl_easy_setopt(this->curlHandle, CURLOPT_NOBODY, 1L);
 
     return this->performCurlRequest(url);
+}
+
+void RestClient::Connection::SetProgressCallback(CurlProgressCallback callback, void* userData /*= nullptr*/)
+{
+    if (callback) {
+        curl_easy_setopt(this->curlHandle, CURLOPT_NOPROGRESS, 0L);
+        curl_easy_setopt(this->curlHandle, CURLOPT_XFERINFODATA, userData);
+        curl_easy_setopt(this->curlHandle, CURLOPT_XFERINFOFUNCTION, callback);
+    } else {
+        curl_easy_setopt(this->curlHandle, CURLOPT_NOPROGRESS, 1L);
+    }
+
 }

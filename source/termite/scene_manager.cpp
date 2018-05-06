@@ -927,6 +927,7 @@ namespace tee
         }
 
         addActiveScene(mgr, entryScene);
+        entryScene->callbacks->onEnter(entryScene, nullptr);
     }
 
     void debugSceneManager(SceneManager* mgr)
