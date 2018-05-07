@@ -17,8 +17,8 @@ namespace bx
     inline void mtx3x3Rotate(float* result, float theta)
     {
         bx::memSet(result, 0x00, sizeof(float) * 9);
-        float c = fcos(theta);
-        float s = fsin(theta);
+        float c = cos(theta);
+        float s = sin(theta);
         result[0] = c;     result[1] = -s;
         result[3] = s;     result[4] = c;
         result[8] = 1.0f;
@@ -42,8 +42,8 @@ namespace bx
     inline void mtx3x3Compose(float* result, float x, float y, float angle)
     {
         bx::memSet(result, 0x00, sizeof(float) * 9);
-        float c = bx::fcos(angle);
-        float s = fsin(angle);
+        float c = bx::cos(angle);
+        float s = bx::sin(angle);
         result[0] = c;     result[1] = -s;
         result[3] = s;     result[4] = c;
         result[6] = x;     result[7] = y;
@@ -55,7 +55,7 @@ namespace bx
         translation[0] = mat[6];
         translation[1] = mat[7];
 
-        *rotation = bx::fatan2(mat[3], mat[4]);
+        *rotation = bx::atan2(mat[3], mat[4]);
     }
 
     inline void vec2MulMtx3x3(float* __restrict _result, const float* __restrict _vec, const float* __restrict _mat)
@@ -83,26 +83,26 @@ namespace bx
     {
         float trace = mtx[0] + mtx[5] + mtx[10];
         if (trace > 0.00001f) {
-            float s = 0.5f / bx::fsqrt(trace + 1.0f);
+            float s = 0.5f / bx::sqrt(trace + 1.0f);
             _result[3] = 0.25f / s;
             _result[0] = (mtx[9] - mtx[6]) * s;
             _result[1] = (mtx[2] - mtx[8]) * s;
             _result[2] = (mtx[4] - mtx[1]) * s;
         } else {
             if (mtx[0] > mtx[5] && mtx[0] > mtx[10]) {
-                float s = 2.0f * bx::fsqrt(1.0f + mtx[0] - mtx[5] - mtx[10]);
+                float s = 2.0f * bx::sqrt(1.0f + mtx[0] - mtx[5] - mtx[10]);
                 _result[3] = (mtx[9] - mtx[6]) / s;
                 _result[0] = 0.25f * s;
                 _result[1] = (mtx[1] + mtx[4]) / s;
                 _result[2] = (mtx[2] + mtx[8]) / s;
             } else if (mtx[5] > mtx[10]) {
-                float s = 2.0f * bx::fsqrt(1.0f + mtx[5] - mtx[0] - mtx[10]);
+                float s = 2.0f * bx::sqrt(1.0f + mtx[5] - mtx[0] - mtx[10]);
                 _result[3] = (mtx[2] - mtx[8]) / s;
                 _result[0] = (mtx[1] + mtx[4]) / s;
                 _result[1] = 0.25f * s;
                 _result[2] = (mtx[6] + mtx[9]) / s;
             } else {
-                float s = 2.0f * bx::fsqrt(1.0f + mtx[10] - mtx[0] - mtx[5]);
+                float s = 2.0f * bx::sqrt(1.0f + mtx[10] - mtx[0] - mtx[5]);
                 _result[3] = (mtx[4] - mtx[1]) / s;
                 _result[0] = (mtx[2] + mtx[8]) / s;
                 _result[1] = (mtx[6] + mtx[9]) / s;
@@ -118,7 +118,7 @@ namespace bx
 
     inline float vec2Length(const float* _a)
     {
-        return fsqrt(vec2Dot(_a, _a));
+        return bx::sqrt(vec2Dot(_a, _a));
     }
 
     inline float vec2Norm(float* __restrict _result, const float* __restrict _a)
@@ -156,8 +156,8 @@ namespace bx
 
     inline void vec2Lerp(float* __restrict _result, const float* __restrict _a, const float* __restrict _b, float _t)
     {
-        _result[0] = flerp(_a[0], _b[0], _t);
-        _result[1] = flerp(_a[1], _b[1], _t);
+        _result[0] = bx::lerp(_a[0], _b[0], _t);
+        _result[1] = bx::lerp(_a[1], _b[1], _t);
     }
 
 }

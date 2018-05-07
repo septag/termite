@@ -91,6 +91,10 @@ function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OU
                     set(BGFX_SHADER_PROFILE --profile ps_5_0)
                 endif()
                 set(ARGS ${ARGS} ${BGFX_SHADER_PROFILE})
+
+                if (${CMAKE_BUILD_TYPE} MATCHES "Debug")
+                    set(ARGS ${ARGS} "--debug" "-O 0")
+                endif()
             endif()
 
             # Varyingdef files is the same name as the shader file (under the same directory) with .vdef extension

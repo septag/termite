@@ -932,12 +932,12 @@ namespace tee {
             Sprite* sprite = sprites[i];
             bool playReverse = sprite->playReverse;
 
-            if (!bx::fequal(sprite->playSpeed, 0, 0.00001f)) {
+            if (!bx::equal(sprite->playSpeed, 0, 0.00001f)) {
                 float t = sprite->animTm;
                 t += dt;
                 float progress = t * sprite->playSpeed;
-                float frames = bx::ffloor(progress);
-                float reminder = frames > 0 ? bx::fmod(progress, frames) : progress;
+                float frames = bx::floor(progress);
+                float reminder = frames > 0 ? bx::mod(progress, frames) : progress;
                 t = reminder / sprite->playSpeed;
 
                 // Progress sprite frame

@@ -66,9 +66,12 @@ namespace tee
         uint16_t refScreenHeight;
 
         // Graphics
+        RendererType::Enum gfxRenderApi;
         uint16_t gfxDeviceId;
         uint16_t gfxWidth;
         uint16_t gfxHeight;
+        uint32_t gfxTransientVbSize;
+        uint32_t gfxTransientIbSize;
         GfxResetFlag::Bits gfxDriverFlags; 
         int keymap[19];
 
@@ -94,6 +97,8 @@ namespace tee
 
         Config()
         {
+            gfxRenderApi = RendererType::Count;
+
             // Default drivers
             gfxName = "Bgfx";
             soundName = "SDL_mixer";
@@ -108,6 +113,7 @@ namespace tee
             gfxHeight = 0;
             gfxDeviceId = 0;
             gfxDriverFlags = BX_ENABLED(BX_PLATFORM_IOS) ? GfxResetFlag::HiDPi : 0;
+            gfxTransientVbSize = gfxTransientIbSize = 0;
             bx::memSet(keymap, 0x00, sizeof(keymap));
 
             audioFreq = AudioFreq::Freq22Khz;

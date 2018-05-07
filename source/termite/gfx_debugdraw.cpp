@@ -243,8 +243,8 @@ namespace tee
 
         // Circle on the XY plane (center = (0, 0, 0), radius = 1)
         for (int i = 0; i < numSegs; i++) {
-            verts[idx].setPos(bx::fcos(theta), bx::fsin(theta), 0);
-            verts[idx + 1].setPos(bx::fcos(theta + dt), bx::fsin(theta + dt), 0);
+            verts[idx].setPos(bx::cos(theta), bx::sin(theta), 0);
+            verts[idx + 1].setPos(bx::cos(theta + dt), bx::sin(theta + dt), 0);
             idx += 2;
             theta += dt;
         }
@@ -300,8 +300,8 @@ namespace tee
 
         for (int i = 0; i < numIter; i++) {
             /* calculate z and slice radius */
-            r = bx::fcos(phi);
-            y = bx::fsin(phi);
+            r = bx::cos(phi);
+            y = bx::sin(phi);
             phi += delta_phi;
 
             /* normal drawing (quad between upper level and lower level) */
@@ -309,8 +309,8 @@ namespace tee
                 theta = 0.0f;
                 for (int k = 0; k < numSegsX; k++) {
                     /* current level verts */
-                    verts[idx].setPos(r*bx::fcos(theta), y, r*bx::fsin(theta));
-                    verts[idx + 1].setPos(r*bx::fcos(theta + delta_theta), y, r*bx::fsin(theta + delta_theta));
+                    verts[idx].setPos(r*bx::cos(theta), y, r*bx::sin(theta));
+                    verts[idx + 1].setPos(r*bx::cos(theta + delta_theta), y, r*bx::sin(theta + delta_theta));
                     verts[idx + 2].setPos(verts[lower_idx].x, verts[lower_idx].y, verts[lower_idx].z);
                     verts[idx + 3].setPos(verts[idx + 1].x, verts[idx + 1].y, verts[idx + 1].z);
                     verts[idx + 4].setPos(verts[lower_idx + 1].x, verts[lower_idx + 1].y, verts[lower_idx + 1].z);
@@ -330,8 +330,8 @@ namespace tee
                 lower_idx = idx;
                 delta_idx = 3;
                 for (int k = 0; k < numSegsX; k++) {
-                    verts[idx].setPos(r*bx::fcos(theta), y, r*bx::fsin(theta));
-                    verts[idx + 1].setPos(r*bx::fcos(theta + delta_theta), y, r*bx::fsin(theta + delta_theta));
+                    verts[idx].setPos(r*bx::cos(theta), y, r*bx::sin(theta));
+                    verts[idx + 1].setPos(r*bx::cos(theta + delta_theta), y, r*bx::sin(theta + delta_theta));
                     verts[idx + 2].setPos(y_min);
                     idx += delta_idx;
                     theta += delta_theta;
@@ -592,7 +592,7 @@ namespace tee
     void gfx::xzGridDbg(DebugDraw* ctx, const Camera& cam, float spacing, float boldSpacing, float maxDepth,
                         ucolor_t color, ucolor_t boldColor)
     {
-        spacing = bx::fceil(bx::clamp(spacing, 1.0f, 20.0f));
+        spacing = bx::ceil(bx::clamp(spacing, 1.0f, 20.0f));
 
         vec3_t corners[8];
         float ratio = float(ctx->viewport.xmax - ctx->viewport.xmin) / float(ctx->viewport.ymax - ctx->viewport.ymin);
@@ -622,7 +622,7 @@ namespace tee
                                float(int(maxpt.z) - int(maxpt.z) % nspace));
         float w = snapbox.xmax - snapbox.xmin;
         float d = snapbox.zmax - snapbox.zmin;
-        if (bx::fequal(w, 0, 0.00001f) || bx::fequal(d, 0, 0.00001f))
+        if (bx::equal(w, 0, 0.00001f) || bx::equal(d, 0, 0.00001f))
             return;
 
         int xlines = int(w) / nspace + 1;
@@ -651,7 +651,7 @@ namespace tee
             verts[ni].y = 0;
             verts[ni].z = zoffset;
 
-            verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(zoffset, boldSpacing), 0.0f, 0.0001f) ? color.n : boldColor.n;
+            verts[i].color = verts[ni].color = !bx::equal(bx::mod(zoffset, boldSpacing), 0.0f, 0.0001f) ? color.n : boldColor.n;
         }
 
         for (float xoffset = snapbox.xmin; xoffset <= snapbox.xmax; xoffset += spacing, i += 2) {
@@ -664,7 +664,7 @@ namespace tee
             verts[ni].y = 0;
             verts[ni].z = snapbox.zmax;
 
-            verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(xoffset, boldSpacing), 0.0f, 0.0001f) ? color.n : boldColor.n;
+            verts[i].color = verts[ni].color = !bx::equal(bx::mod(xoffset, boldSpacing), 0.0f, 0.0001f) ? color.n : boldColor.n;
         }
 
         mat4_t ident = mat4I();
@@ -680,7 +680,7 @@ namespace tee
     void gfx::xyGridDbg(DebugDraw* ctx, const Camera2D& cam, float spacing, float boldSpacing,
                         ucolor_t color, ucolor_t boldColor, bool showVerticalInfo)
     {
-        spacing = bx::fceil(bx::clamp(spacing, 1.0f, 20.0f));
+        spacing = bx::ceil(bx::clamp(spacing, 1.0f, 20.0f));
 
         rect_t rc = cam.getRect();
 
@@ -697,7 +697,7 @@ namespace tee
 
         float w = snapRect.xmax - snapRect.xmin;
         float h = snapRect.ymax - snapRect.ymin;
-        if (bx::fequal(w, 0, 0.00001f) || bx::fequal(h, 0, 0.00001f))
+        if (bx::equal(w, 0, 0.00001f) || bx::equal(h, 0, 0.00001f))
             return;
 
         int xlines = int(w) / nspace + 1;
@@ -726,7 +726,7 @@ namespace tee
             vec4_t c = state->color;
             ucolor_t color = ucolorf(c.x, c.y, c.z, c.w);
             gfx::textColorDbg2D(ctx->vgCtx, color);
-            fontHH = bx::ffloor(getFontLineHeight(asset::getObjPtr<Font>(state->fontHandle)) * 0.5f);
+            fontHH = bx::floor(getFontLineHeight(asset::getObjPtr<Font>(state->fontHandle)) * 0.5f);
         }
 
         // Horizontal Lines
@@ -741,7 +741,7 @@ namespace tee
             verts[ni].z = 0;
 
             verts[i].tx = verts[i].ty = verts[ni].tx = verts[ni].ty = 0;
-            if (!bx::fequal(bx::fmod(yoffset, boldSpacing), 0.0f, 0.0001f)) {
+            if (!bx::equal(bx::mod(yoffset, boldSpacing), 0.0f, 0.0001f)) {
                 verts[i].color = verts[ni].color = color.n;
             } else {
                 verts[i].color = verts[ni].color = boldColor.n;
@@ -765,7 +765,7 @@ namespace tee
             verts[ni].z = 0;
 
             verts[i].tx = verts[i].ty = verts[ni].tx = verts[ni].ty = 0;
-            verts[i].color = verts[ni].color = !bx::fequal(bx::fmod(xoffset, boldSpacing), 0.0f, 0.0001f) ? color.n : boldColor.n;
+            verts[i].color = verts[ni].color = !bx::equal(bx::mod(xoffset, boldSpacing), 0.0f, 0.0001f) ? color.n : boldColor.n;
         }
 
         mat4_t ident = mat4I();

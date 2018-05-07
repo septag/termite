@@ -204,12 +204,12 @@ namespace tee
         int hk = kernelSize / 2;
         float sum = 0.0f;
         float stdDevSqr = stdDev*stdDev;
-        float k = bx::fsqrt(2.0f*bx::kPi*stdDevSqr);
+        float k = bx::sqrt(2.0f*bx::kPi*stdDevSqr);
 
         for (int i = 0; i < kernelSize; i++) {
             float p = float(i - hk);
             float x = p / float(hk);
-            float w = bx::fexp2(-(x*x) / (2.0f*stdDevSqr)) / k;
+            float w = bx::exp2(-(x*x) / (2.0f*stdDevSqr)) / k;
             sum += w;
             kernel[i] = vec4(p, p, w, 0.0f);
         }

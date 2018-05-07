@@ -54,10 +54,10 @@ void tee::camCalcFrustumCorners(const Camera* cam, vec3_t result[8], float aspec
     vec3_t yaxis = cam->up;
     vec3_t zaxis = cam->forward;
 
-    float nearPlaneHeight = bx::ftan(fov * 0.5f) * fnear;
+    float nearPlaneHeight = bx::tan(fov * 0.5f) * fnear;
     float nearPlaneWidth = nearPlaneHeight * aspectRatio;
 
-    float farPlaneHeight = bx::ftan(fov * 0.5f) * ffar;
+    float farPlaneHeight = bx::tan(fov * 0.5f) * ffar;
     float farPlaneWidth = farPlaneHeight * aspectRatio;
 
     // Far/Near planes
@@ -186,7 +186,7 @@ mat4_t tee::camViewMtx(const Camera* cam)
 
 mat4_t tee::camProjMtx(const Camera* cam, float aspectRatio)
 {
-    float xscale = 1.0f / bx::ftan(bx::toRad(cam->fov)*0.5f);
+    float xscale = 1.0f /bx::tan(bx::toRad(cam->fov)*0.5f);
     float yscale = aspectRatio*xscale;
     float zf = cam->ffar;
     float zn = cam->fnear;

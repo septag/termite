@@ -5,6 +5,7 @@ $output v_texcoord0, v_color0
 
 uniform vec4 u_color;
 
+//
 void main()
 {
     vec4 pos = mul(u_model[0], vec4(a_position, 1.0));

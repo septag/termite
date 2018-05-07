@@ -207,7 +207,8 @@ struct BgfxWrapper
 
 static BgfxWrapper gBgfx;
 
-static bool initBgfx(uint16_t deviceId, GfxDriverEventsI* callbacks, bx::AllocatorI* alloc)
+static bool initBgfx(RendererType::Enum rendererType, uint16_t deviceId, GfxDriverEventsI* callbacks, bx::AllocatorI* alloc, 
+                     uint32_t transientVbSize, uint32_t transientIbSize)
 {
     gBgfx.alloc = alloc;
     if (callbacks) {
@@ -217,8 +218,17 @@ static bool initBgfx(uint16_t deviceId, GfxDriverEventsI* callbacks, bx::Allocat
     }
 
     gBgfx.smallPool.create(512, alloc);
+    bgfx::Init initParams;
+    initParams.type = (bgfx::RendererType::Enum)rendererType;
+    initParams.deviceId = deviceId;
+    initParams.allocator = alloc;
+    initParams.callback = gBgfx.callbacks;
+    if (transientVbSize > 0)
+        initParams.limits.transientIbSize = transientVbSize;
+    if (transientIbSize > 0)
+        initParams.limits.transientIbSize = transientIbSize;
 
-    return bgfx::init(bgfx::RendererType::Count, 0, deviceId, gBgfx.callbacks, alloc);
+    return bgfx::init(initParams);
 }
 
 static void shutdownBgfx()
@@ -541,9 +551,9 @@ static void setTransientVertexBufferI(uint8_t stream, const TransientVertexBuffe
     bgfx::setVertexBuffer(stream, (const bgfx::TransientVertexBuffer*)tvb, startVertex, numVertices);
 }
 
-static void setInstanceDataBuffer(const InstanceDataBuffer* idb, uint32_t num)
+static void setInstanceDataBuffer(const InstanceDataBuffer* idb, uint32_t start, uint32_t num)
 {
-    bgfx::setInstanceDataBuffer((const bgfx::InstanceDataBuffer*)idb, num);
+    bgfx::setInstanceDataBuffer((const bgfx::InstanceDataBuffer*)idb, start, num);
 }
 
 static void setInstanceDataBufferVb(VertexBufferHandle handle, uint32_t startVertex, uint32_t num)
@@ -617,12 +627,11 @@ static void setComputeBufferIndirect(uint8_t stage, IndirectBufferHandle handle,
     bgfx::setBuffer(stage, h, (bgfx::Access::Enum)access);
 }
 
-static void setComputeImage(uint8_t stage, UniformHandle sampler, TextureHandle handle, uint8_t mip, 
+static void setComputeImage(uint8_t stage, TextureHandle handle, uint8_t mip, 
                             GpuAccessFlag::Enum access, TextureFormat::Enum fmt)
 {
-    BGFX_DECLARE_HANDLE(UniformHandle, s, sampler);
     BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
-    bgfx::setImage(stage, s, h, mip, (bgfx::Access::Enum)access, (bgfx::TextureFormat::Enum)fmt);
+    bgfx::setImage(stage, h, mip, (bgfx::Access::Enum)access, (bgfx::TextureFormat::Enum)fmt);
 }
 
 static void computeDispatch(uint8_t viewId, ProgramHandle handle, uint32_t numX, uint32_t numY, uint32_t numZ,
@@ -1176,6 +1185,8 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     // Some assertions for enum matching between ours and bgfx
     static_assert(RendererType::Count == bgfx::RendererType::Count, "RendererType mismatch");
     static_assert(RendererType::Vulkan == bgfx::RendererType::Vulkan, "RendererType mismatch");
+    static_assert(RendererType::OpenGLES == bgfx::RendererType::OpenGLES, "RendererType mismatch");
+    static_assert(RendererType::Metal == bgfx::RendererType::Metal, "RendererType mismatch");
     static_assert(GpuAccessFlag::Count == bgfx::Access::Count, "AccessFlag mismatch");
     static_assert(VertexAttrib::TexCoord7  == bgfx::Attrib::TexCoord7, "VertexAttrib Mismatch");
     static_assert(VertexAttribType::Float == bgfx::AttribType::Float, "VertexAttribType mismatch");
@@ -1194,6 +1205,44 @@ void* initBgfxDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     static_assert(sizeof(HMDDesc) == sizeof(bgfx::HMD), "HMD mismatch");
     static_assert(sizeof(VertexDecl) == sizeof(bgfx::VertexDecl), "VertexDecl mismatch");
     static_assert(sizeof(GfxMemory) == sizeof(bgfx::Memory), "Memory mismatch");
+
+    // states
+    static_assert(GfxState::RGBWrite == BGFX_STATE_WRITE_RGB, "State mismatch");
+    static_assert(GfxState::AlphaWrite == BGFX_STATE_WRITE_A, "State mismatch");
+    static_assert(GfxState::DepthWrite == BGFX_STATE_WRITE_Z, "State mismatch");
+    static_assert(GfxState::DepthTestLess == BGFX_STATE_DEPTH_TEST_LESS, "State mismatch");
+    static_assert(GfxState::DepthTestLequal == BGFX_STATE_DEPTH_TEST_LEQUAL, "State mismatch");
+    static_assert(GfxState::DepthTestEqual == BGFX_STATE_DEPTH_TEST_EQUAL, "State mismatch");
+    static_assert(GfxState::DepthTestGequal == BGFX_STATE_DEPTH_TEST_GEQUAL, "State mismatch");
+    static_assert(GfxState::DepthTestGreater == BGFX_STATE_DEPTH_TEST_GREATER, "State mismatch");
+    static_assert(GfxState::DepthTestNotEqual == BGFX_STATE_DEPTH_TEST_NOTEQUAL, "State mismatch");
+    static_assert(GfxState::DepthTestNever == BGFX_STATE_DEPTH_TEST_NEVER, "State mismatch");
+    static_assert(GfxState::DepthTestAlways == BGFX_STATE_DEPTH_TEST_ALWAYS, "State mismatch");
+    static_assert(GfxState::BlendZero == BGFX_STATE_BLEND_ZERO, "State mismatch");
+    static_assert(GfxState::BlendOne == BGFX_STATE_BLEND_ONE, "State mismatch");
+    static_assert(GfxState::BlendSrcColor == BGFX_STATE_BLEND_SRC_COLOR, "State mismatch");
+    static_assert(GfxState::BlendInvSrcColor == BGFX_STATE_BLEND_INV_SRC_COLOR, "State mismatch");
+    static_assert(GfxState::BlendSrcAlpha == BGFX_STATE_BLEND_SRC_ALPHA, "State mismatch");
+    static_assert(GfxState::BlendInvSrcAlpha == BGFX_STATE_BLEND_INV_SRC_ALPHA, "State mismatch");
+    static_assert(GfxState::BlendDestAlpha == BGFX_STATE_BLEND_DST_ALPHA, "State mismatch");
+    static_assert(GfxState::BlendInvDestAlpha == BGFX_STATE_BLEND_INV_DST_ALPHA, "State mismatch");
+    static_assert(GfxState::BlendDestColor == BGFX_STATE_BLEND_DST_COLOR, "State mismatch");
+    static_assert(GfxState::BlendInvDestColor == BGFX_STATE_BLEND_INV_DST_COLOR, "State mismatch");
+    static_assert(GfxState::BlendSrcAlphaSat == BGFX_STATE_BLEND_SRC_ALPHA_SAT, "State mismatch");
+    static_assert(GfxState::BlendFactor == BGFX_STATE_BLEND_FACTOR, "State mismatch");
+    static_assert(GfxState::BlendInvFactor == BGFX_STATE_BLEND_INV_FACTOR, "State mismatch");
+    static_assert(GfxState::BlendEqAdd == BGFX_STATE_BLEND_EQUATION_ADD, "State mismatch");
+    static_assert(GfxState::BlendEqSub == BGFX_STATE_BLEND_EQUATION_SUB, "State mismatch");
+    static_assert(GfxState::BlendEqRevSub == BGFX_STATE_BLEND_EQUATION_REVSUB, "State mismatch");
+    static_assert(GfxState::BlendEqMin == BGFX_STATE_BLEND_EQUATION_MIN, "State mismatch");
+    static_assert(GfxState::BlendEqMax == BGFX_STATE_BLEND_EQUATION_MAX, "State mismatch");
+    static_assert(GfxState::CullCW == BGFX_STATE_CULL_CW, "State mismatch");
+    static_assert(GfxState::CullCCW == BGFX_STATE_CULL_CCW, "State mismatch");
+    static_assert(GfxState::PrimitiveTriStrip == BGFX_STATE_PT_TRISTRIP, "State mismatch");
+    static_assert(GfxState::PrimitiveLines == BGFX_STATE_PT_LINES, "State mismatch");
+    static_assert(GfxState::PrimitiveLineStrip == BGFX_STATE_PT_LINESTRIP, "State mismatch");
+    static_assert(GfxState::PrimitivePoints == BGFX_STATE_PT_POINTS, "State mismatch");
+    static_assert(GfxState::MSAA == BGFX_STATE_MSAA, "State mismatch");
 
     gTee = (CoreApi*)getApi(ApiId::Core, 0);
 

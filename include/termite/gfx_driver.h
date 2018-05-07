@@ -104,7 +104,9 @@ namespace tee
     {
     public:
         // Init
-        bool(*init)(uint16_t deviceId, GfxDriverEventsI* callbacks, bx::AllocatorI* alloc);
+        bool(*init)(RendererType::Enum rendererType,
+                    uint16_t deviceId, GfxDriverEventsI* callbacks, bx::AllocatorI* alloc, 
+                    uint32_t transientVbSize/* = 0*/, uint32_t transientIbSize/* = 0*/);
         void(*shutdown)();
 
         void(*reset)(uint32_t width, uint32_t height, GfxResetFlag::Bits flags/* = GfxResetFlag::None*/);
@@ -170,7 +172,7 @@ namespace tee
         void(*setDynamicVertexBuffer)(uint8_t stream, DynamicVertexBufferHandle handle, uint32_t startVertex, uint32_t numVertices);
         void(*setTransientVertexBuffer)(uint8_t stream, const TransientVertexBuffer* tvb);
         void(*setTransientVertexBufferI)(uint8_t stream, const TransientVertexBuffer* tvb, uint32_t startVertex, uint32_t numVertices);
-        void(*setInstanceDataBuffer)(const InstanceDataBuffer* idb, uint32_t num);
+        void(*setInstanceDataBuffer)(const InstanceDataBuffer* idb, uint32_t start, uint32_t num);
         void(*setInstanceDataBufferVb)(VertexBufferHandle handle, uint32_t startVertex, uint32_t num);
         void(*setInstanceDataBufferDynamicVb)(DynamicVertexBufferHandle handle, uint32_t startVertex, uint32_t num);
 
@@ -192,7 +194,7 @@ namespace tee
         void(*setComputeBufferIndirect)(uint8_t stage, IndirectBufferHandle handle, GpuAccessFlag::Enum access);
 
         // Compute Images
-        void(*setComputeImage)(uint8_t stage, UniformHandle sampler, TextureHandle handle, uint8_t mip,
+        void(*setComputeImage)(uint8_t stage, TextureHandle handle, uint8_t mip,
                                 GpuAccessFlag::Enum access, TextureFormat::Enum fmt);
 
         // Compute Dispatch

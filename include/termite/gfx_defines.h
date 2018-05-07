@@ -534,9 +534,9 @@ namespace tee
     {
         enum Enum : uint64_t
         {
-            RGBWrite = 0x0000000000000001,
-            AlphaWrite = 0x0000000000000002,
-            DepthWrite = 0x0000000000000004,
+            RGBWrite = (0x0000000000000001|0x0000000000000002|0x0000000000000004),
+            AlphaWrite = 0x0000000000000008,
+            DepthWrite = 0x0000004000000000,
             DepthTestLess = 0x0000000000000010,
             DepthTestLequal = 0x0000000000000020,
             DepthTestEqual = 0x0000000000000030,
@@ -570,7 +570,7 @@ namespace tee
             PrimitiveLines = 0x0002000000000000,
             PrimitiveLineStrip = 0x0003000000000000,
             PrimitivePoints = 0x0004000000000000,
-            MSAA = 0x1000000000000000,
+            MSAA = 0x0100000000000000,
             None = 0x0000000000000000,
             Mask = 0xffffffffffffffff
         };

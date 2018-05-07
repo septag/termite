@@ -470,7 +470,7 @@ namespace tee {
         inline float fwrap(float x, float vmin, float vmax)
         {
             vmax -= vmin;
-            x = bx::fmod(x, vmax);
+            x = bx::mod(x, vmax);
             return x + vmin;
         }
 
@@ -486,16 +486,16 @@ namespace tee {
 
         inline float falign(float value, float size)
         {
-            return value - bx::fabs(bx::fmod(value, size));
+            return value - bx::abs(bx::mod(value, size));
         }
 
         // Line fgain, but goes up to 1.0 and then back to 0
         inline float fwave(float _time, float _gain)
         {
             if (_time < 0.5f) {
-                return bx::fbias(_time * 2.0f, _gain);
+                return bx::bias(_time * 2.0f, _gain);
             } else {
-                return 1.0f - bx::fbias(_time * 2.0f - 1.0f, 1.0f - _gain);
+                return 1.0f - bx::bias(_time * 2.0f - 1.0f, 1.0f - _gain);
             }
         }
 
@@ -503,9 +503,9 @@ namespace tee {
         inline float fwaveSharp(float _time, float _gain)
         {
             if (_time < 0.5f) {
-                return bx::fbias(_time * 2.0f, _gain);
+                return bx::bias(_time * 2.0f, _gain);
             } else {
-                return 1.0f - bx::fbias(_time * 2.0f - 1.0f, _gain);
+                return 1.0f - bx::bias(_time * 2.0f - 1.0f, _gain);
             }
         }
 
@@ -554,8 +554,8 @@ namespace tee {
             float wHalf = (rc.xmax - rc.xmin)*0.5f;
             float hHalf = (rc.ymax - rc.ymin)*0.5f;
 
-            float dx = bx::fabs((rc.xmin + wHalf) - center.x);
-            float dy = bx::fabs((rc.ymin + hHalf) - center.y);
+            float dx = bx::abs((rc.xmin + wHalf) - center.x);
+            float dy = bx::abs((rc.ymin + hHalf) - center.y);
             if (dx > (radius + wHalf) || dy > (radius + hHalf))
                 return false;
 

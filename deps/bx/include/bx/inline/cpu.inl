@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2017 Branimir Karadzic. All rights reserved.
+ * Copyright 2010-2018 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bx#license-bsd-2-clause
  */
 
@@ -8,6 +8,10 @@
 #endif // BX_CPU_H_HEADER_GUARD
 
 #if BX_COMPILER_MSVC
+#	if BX_PLATFORM_WINRT
+#		include <windows.h>
+#	endif // BX_PLATFORM_WINRT
+
 #	include <emmintrin.h> // _mm_fence
 #   include <intrin.h>
 
@@ -32,8 +36,29 @@ extern "C" long _InterlockedCompareExchange(long volatile* _ptr, long _exchange,
 extern "C" int64_t _InterlockedCompareExchange64(int64_t volatile* _ptr, int64_t _exchange, int64_t _comparand);
 #	pragma intrinsic(_InterlockedCompareExchange64)
 
+#if (_MSC_VER == 1800) && !defined(FIXED_592562) && defined (_M_IX86) && !defined (_M_CEE_PURE)
+
+extern "C" long _InterlockedExchange(long volatile* _ptr, long _value);
+#	pragma intrinsic(_InterlockedExchange)
+
+__forceinline static void * _InterlockedExchangePointer_impl(void * volatile * _Target, void * _Value)
+{
+    return (void *)_InterlockedExchange((long volatile *) _Target, (long) _Value);
+}
+#define _InterlockedExchangePointer(p,v)  _InterlockedExchangePointer_impl(p,v)
+
+#else
+
 extern "C" void* _InterlockedExchangePointer(void* volatile* _ptr, void* _value);
 #	pragma intrinsic(_InterlockedExchangePointer)
+
+//extern "C" long _InterlockedExchange(long volatile * Target, long Value);
+#   pragma intrinsic(_InterlockedExchange)
+
+//extern "C" __int64 _InterlockedExchange64(__int64 volatile * Target, __int64 Value);
+#   pragma intrinsic(_InterlockedExchange64)
+
+#endif
 
 //extern "C" long _InterlockedIncrement(long * lpAddend);
 #   pragma intrinsic(_InterlockedIncrement)
@@ -46,12 +71,6 @@ extern "C" void* _InterlockedExchangePointer(void* volatile* _ptr, void* _value)
 
 //extern "C" __int64 _InterlockedDecrement64(__int64 * lpAddend);
 #   pragma intrinsic(_InterlockedDecrement64)
-
-//extern "C" long _InterlockedExchange(long volatile * Target, long Value);
-#   pragma intrinsic(_InterlockedExchange)
-
-//extern "C" __int64 _InterlockedExchange64(__int64 volatile * Target, __int64 Value);
-#   pragma intrinsic(_InterlockedExchange64)
 
 extern "C" long _InterlockedXor(long volatile* _value, long mask);
 #   pragma intrinsic(_InterlockedXor)

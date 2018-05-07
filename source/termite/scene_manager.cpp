@@ -247,7 +247,7 @@ namespace tee
         {
             m_elapsedTm += dt;
             float normTm = bx::min(1.0f, m_elapsedTm / m_params.duration);
-            vec4_t mixValue = vec4(bx::fbias(normTm, m_params.biasFactor), 0, 0, 0);
+            vec4_t mixValue = vec4(bx::bias(normTm, m_params.biasFactor), 0, 0, 0);
             uint64_t extraState = (m_mode != FadeEffect::FadeOutAlpha && m_mode != FadeEffect::FadeInAlpha) ? 0 :
                 gfx::stateBlendAlpha();
             m_driver->setViewFrameBuffer(viewId, renderFb);
@@ -258,7 +258,7 @@ namespace tee
             m_driver->setUniform(m_umixValue, mixValue.f, 1);
             gfx::drawFullscreenQuad(viewId, m_prog);
 
-            m_finished = bx::fequal(normTm, 1.0f, 0.00001f);
+            m_finished = bx::equal(normTm, 1.0f, 0.00001f);
         }
 
         void end() override

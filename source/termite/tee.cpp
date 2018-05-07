@@ -462,7 +462,9 @@ bool init(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* pl
                   TEE_VERSION_MINOR(desc.version));
         if (platform)
             gTee->gfxDriver->setPlatformData(*platform);
-        if (!gTee->gfxDriver->init(conf.gfxDeviceId, &gTee->gfxDriverEvents, gAlloc)) {
+        if (!gTee->gfxDriver->init(conf.gfxRenderApi, conf.gfxDeviceId, &gTee->gfxDriverEvents, gAlloc,
+                                   conf.gfxTransientVbSize, conf.gfxTransientIbSize)) 
+        {
             BX_END_FATAL();
             dumpGfxLog();
             TEE_ERROR("Core init failed: Could not initialize Graphics driver");
@@ -1373,7 +1375,9 @@ bool resetGraphics(const GfxPlatformData* platform)
               TEE_VERSION_MINOR(desc.version));
     if (platform)
         gTee->gfxDriver->setPlatformData(*platform);
-    if (!gTee->gfxDriver->init(conf.gfxDeviceId, &gTee->gfxDriverEvents, gAlloc)) {
+    if (!gTee->gfxDriver->init(conf.gfxRenderApi, conf.gfxDeviceId, &gTee->gfxDriverEvents, gAlloc,
+                               conf.gfxTransientVbSize, conf.gfxTransientIbSize)) 
+    {
         BX_END_FATAL();
         dumpGfxLog();
         TEE_ERROR("Core init failed: Could not initialize Graphics driver");

@@ -5,6 +5,7 @@
 #include "bxx/path.h"
 #include "bxx/array.h"
 #include "bxx/logger.h"
+#include "bx/debug.h"
 
 #include "termite/types.h"
 #include "termite/tmath.h"
@@ -112,8 +113,8 @@ static void packXyNormZRg(const ImageData* images, int numImages, const char* ou
 
             // decode
             /*
-            const float px = bx::fabs(bx::ffract(hh + 1.0f) * 6.0f - 3.0f);
-            const float py = bx::fabs(bx::ffract(hh + 2.0f/3.0f) * 6.0f - 3.0f);
+            const float px = bx::abs(bx::ffract(hh + 1.0f) * 6.0f - 3.0f);
+            const float py = bx::abs(bx::ffract(hh + 2.0f/3.0f) * 6.0f - 3.0f);
             ucolor_t o = ucolorf(bx::clamp(px - 1.0f, 0.0f, 1.0f), bx::clamp(py - 1.0f, 0.0f, 1.0f), 0, color.w);
             */
 

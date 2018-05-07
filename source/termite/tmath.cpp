@@ -38,10 +38,10 @@ namespace tee {
                 float vertBlend = float(j - sample_j0) * sampleFreq;
 
                 // blend two top corners
-                float top = bx::flerp(baseNoise->get(sample_i0, sample_j0), baseNoise->get(sample_i1, sample_j0), horzBlend);
-                float bottom = bx::flerp(baseNoise->get(sample_i0, sample_j1), baseNoise->get(sample_i1, sample_j1), horzBlend);
+                float top = bx::lerp(baseNoise->get(sample_i0, sample_j0), baseNoise->get(sample_i1, sample_j0), horzBlend);
+                float bottom = bx::lerp(baseNoise->get(sample_i0, sample_j1), baseNoise->get(sample_i1, sample_j1), horzBlend);
 
-                smoothNoise->set(i, j, bx::flerp(top, bottom, vertBlend));
+                smoothNoise->set(i, j, bx::lerp(top, bottom, vertBlend));
             }
         }
 
@@ -95,11 +95,11 @@ namespace tee {
     {
         float variance = stdDev*stdDev;
         float var2x = 2.0f*variance;
-        float f = 1.0f / bx::fsqrt(var2x*bx::kPi);
+        float f = 1.0f / bx::sqrt(var2x*bx::kPi);
         float p = x - mean;
         float ep = -(p*p) / var2x;
 
-        return f*bx::fexp2(ep);
+        return f*bx::exp2(ep);
     }
 
     aabb_t tmath::aabbTransform(const aabb_t& b, const mat4_t& mtx)
@@ -200,8 +200,8 @@ namespace tee {
         bx::vec4MulMtx(proj.f, vec4(point.x, point.y, point.z, 1.0f).f, viewProjMtx.f);
         bx::vec3Mul(proj.f, proj.f, 1.0f / proj.w);     proj.w = 1.0f;
 
-        float x = bx::ffloor(proj.x*wh + wh + 0.5f);
-        float y = bx::ffloor(-proj.y*hh + hh + 0.5f);
+        float x = bx::floor(proj.x*wh + wh + 0.5f);
+        float y = bx::floor(-proj.y*hh + hh + 0.5f);
 
         *result = vec2(x, y);
 

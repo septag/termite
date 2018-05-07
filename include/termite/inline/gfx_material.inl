@@ -1,5 +1,7 @@
 #pragma once
 
+#include "bx/debug.h"
+
 namespace tee {
     namespace gfx {
         inline void beginMtlDecl(MaterialDecl* decl)

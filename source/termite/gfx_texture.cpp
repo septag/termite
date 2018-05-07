@@ -510,7 +510,7 @@ namespace tee {
         int numMips = 1;    // default
         const GfxMemory* gmem = nullptr;
         if (texParams->generateMips) {
-            numMips = 1 + (int)bx::ffloor(bx::flog2((float)bx::uint32_max(width, height)));
+            numMips = 1 + (int)bx::floor(bx::log2((float)bx::uint32_max(width, height)));
             int skipMips = bx::uint32_min(numMips - 1, texParams->skipMips);
             int origWidth = width, origHeight = height;
 

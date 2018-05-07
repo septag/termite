@@ -1148,7 +1148,7 @@ namespace tee
         for (int i = 0; i < numGlyphs; i++) {
             FontGlyph* glyph = &glyphs[i];
 
-            float charWidth = bx::fceil(glyph->xadvance * scale);
+            float charWidth = bx::ceil(glyph->xadvance * scale);
             w += charWidth;
 
             if (glyph->charId == 32) {

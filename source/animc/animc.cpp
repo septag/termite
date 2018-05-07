@@ -145,7 +145,7 @@ static AnimData* importAnim(const Args& args)
                     scale = (achannel->mScalingKeys[f].mValue.x +
                              achannel->mScalingKeys[f].mValue.y +
                              achannel->mScalingKeys[f].mValue.z) / 3.0f;
-                    hasScale = !bx::fequal(scale, 1.0f, 0.00001f);
+                    hasScale = !bx::equal(scale, 1.0f, 0.00001f);
                 }
 
                 float* p = &channel->poss[f * 4];
