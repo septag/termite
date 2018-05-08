@@ -887,7 +887,6 @@ namespace tee {
         // Hot Loading
         if (this->flags & AssetLibInitFlags::HotLoading) {
             bx::Path origUri = getOriginalUri(uri);
-            int r = this->asyncLoadsTable.find(tinystl::hash_string(origUri.cstr(), origUri.getLength()));
 
             // strip "assets/" from the begining of uri
             size_t uriOffset = 0;
@@ -917,7 +916,6 @@ namespace tee {
 
         int typeIdx = assetLib->assetTypesTable.find(tinystl::hash_string(name, strlen(name)));
         if (typeIdx != -1) {
-            AssetTypeData* rt = assetLib->assetTypes.getHandleData<AssetTypeData>(0, assetLib->assetTypesTable[typeIdx]);
             size_t hash = tinystl::hash_string(name, strlen(name));
 
             for (int i = 0, c = assetLib->assets.getCount(); i < c; i++) {
@@ -968,7 +966,6 @@ namespace tee {
         AssetLib* assetLib = gAssetLib;
         int typeIdx = assetLib->assetTypesTable.find(tinystl::hash_string(name, strlen(name)));
         if (typeIdx != -1) {
-            AssetTypeData* rt = assetLib->assetTypes.getHandleData<AssetTypeData>(0, assetLib->assetTypesTable[typeIdx]);
             size_t hash = tinystl::hash_string(name, strlen(name));
 
             for (int i = 0, c = assetLib->assets.getCount(); i < c; i++) {

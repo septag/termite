@@ -155,7 +155,6 @@ namespace tee {
         }
 
         // Create gfx materials
-        int mtlIdx = 0;
         for (int i = 0, c = model->numMtls; i < c; i++) {
             inst->i.mtls[i] = gfx::createMaterial(ProgramHandle(), model->mtls[i], alloc);
             if (!inst->i.mtls[i].isValid()) {

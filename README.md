@@ -68,21 +68,16 @@ make
 For _Visual Studio_ under windows you can use ```cmake .. -DCMAKE_BUILD_TYPE=Debug -G "Visual Studio 14 2015 Win64"``` and open the generated solution file.
 
 ### Android
-Android uses a different toolchain that is also included with the project, so you have to specify it for cmake.  
-Before that download and install _Android NDK_ and _Android SDK_. Define Environment variable *ANDROID_NDK* path to your NDK directory root, and run the following commands within _termite_ root project directory:  
+Recommended solution is to use Android studio (with cmake support) to build your project.
+
+### iOS
+iOS build uses a custom [https://github.com/leetal/ios-cmake](toolchain file) to make iOS project files. 
 
 ```
-mkdir .build  
-cd .build  
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/android.toolchain.cmake -DBUILD_FISHERBOY=1 -DANDROID_ABI="armeabi-v7a with NEON" -DANDROID_NATIVE_API_LEVEL=android-19 -DCMAKE_BUILD_TYPE=Release -GNinja
+mkdir build-ios
+cd build-ios
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/ios.toolchain.cmake -DIOS_PLATFORM=OS -G Xcode
 ```
-
-In the example above, I built for _armv7a_ architecture in ```-DANDROID_ABI="armeabi-v7a with NEON"```.  
-
-```-DANDROID_NATIVE_API_LEVEL=android-19``` defines the API version number, which in here I used kitkat 4.4 (19) API.  
-```-DCMAKE_BUILD_TYPE=Release``` defines that we want to build with Release compile flags. See Above for other configuration names.  
-```-GNinja``` Defines that we want to use _Ninja_ build system. which the executable also resides in ```deps/bx/tools/bin```. You can use different build systems.  
-For more info on android build, read [this](https://github.com/taka-no-me/android-cmake).
 
 ## Test
 Currently there are two test apps and sources are under ```tests``` directory:

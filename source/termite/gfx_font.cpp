@@ -1260,8 +1260,6 @@ namespace tee
         }
        
         float xMax = 0;
-        float lineOffsetX = 0;  // for multiline aligning
-        int newLineIdx = 0;
         for (int i = 0; i < len; i++) {
             const FontGlyph& glyph = glyphs[i];
             if (i > 0 && ys[i] > ys[i-1]) {

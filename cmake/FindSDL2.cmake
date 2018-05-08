@@ -225,6 +225,10 @@ if (SDL2_LIBRARY AND SDL2_INCLUDE_DIR)
 	set(SDL2_FOUND TRUE)
 endif()
 
+if (SDL2_MIXER_LIBRARY AND SDL2_MIXER_INCLUDE_DIR)
+	set(SDL2_MIXER_FOUND TRUE)
+endif()
+
 if (SDL2_FOUND AND WIN32)
     function(sdl2_copy_binaries TargetDirectory)
         add_custom_target(SDL2CopyBinaries
