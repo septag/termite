@@ -852,7 +852,6 @@ namespace tee {
         assert(name);
         if (ssHandle.isValid()) {
             assert(asset::getState(ssHandle) != AssetState::LoadInProgress);
-            SpriteSheet* ss = asset::getObjPtr<SpriteSheet>(ssHandle);
 
             SpriteFrame* frame = BX_PLACEMENT_NEW(sprite->frames.push(), SpriteFrame);
             if (frame) {
@@ -1446,7 +1445,6 @@ namespace tee {
         GfxState::Bits state = 
             gfx::stateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite | GfxState::PrimitiveLines;
         ProgramHandle prog = gSpriteMgr->spriteProg;
-        const vec4_t vglowColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
         for (int i = 0, c = batches.getCount(); i < c; i++) {
             const SpriteDrawBatch batch = batches[i];
             gDriver->setState(state, 0);

@@ -29,7 +29,13 @@ function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OU
     if (NOT OUTPUT_DIR)
         set(OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
     endif()
-    set(OUTPUT_DIR ${OUTPUT_DIR}/${CMAKE_SYSTEM_NAME})
+
+    if (NOT IOS)
+        set(OUTPUT_DIR_EXT ${CMAKE_SYSTEM_NAME})
+    else()
+        set(OUTPUT_DIR_EXT "ios")
+    endif()
+    set(OUTPUT_DIR ${OUTPUT_DIR}/${OUTPUT_DIR_EXT})
 
     if (NOT IS_DIRECTORY ${OUTPUT_DIR})
         file(MAKE_DIRECTORY ${OUTPUT_DIR})

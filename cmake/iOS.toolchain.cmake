@@ -39,13 +39,23 @@
 # Platform/UnixPaths.cmake files which are included with CMake 2.8.4
 # It has been altered for iOS development.
 #
-# Updated by Alex Stewart (alexs.mac@gmail.com).
+# Updated by Alex Stewart (alexs.mac@gmail.com)
+#
+# *****************************************************************************
+#      Now maintained by Alexander Widerberg (widerbergaren [at] gmail.com)
+#                      under the BSD-3-Clause license
+# *****************************************************************************
+#
+#                           INFORMATION / HELP
+#
 # The following variables control the behaviour of this toolchain:
 #
-# IOS_PLATFORM: OS (default) or SIMULATOR or SIMULATOR64
+# IOS_PLATFORM: OS (default) or SIMULATOR or SIMULATOR64 or TVOS or SIMULATOR_TVOS
 #    OS = Build for iPhoneOS.
 #    SIMULATOR = Build for x86 i386 iPhone Simulator.
-#    SIMULATOR64 = Build for x86 x86_64 iPhone Simulator.
+#    SIMULATOR64 = Build for x86_64 iPhone Simulator.
+#    TVOS = Build for AppleTVOS.
+#    SIMULATOR_TVOS = Build for x86_64 AppleTV Simulator.
 # CMAKE_OSX_SYSROOT: Path to the iOS SDK to use.  By default this is
 #    automatically determined from IOS_PLATFORM and xcodebuild, but
 #    can also be manually specified (although this should not be required).
@@ -53,6 +63,15 @@
 #    being compiled for.  By default this is automatically determined from
 #    CMAKE_OSX_SYSROOT, but can also be manually specified (although this should
 #    not be required).
+# ENABLE_BITCODE: (1|0) Enables or disables bitcode support. Default 1 (true)
+# ENABLE_ARC: (1|0) Enables or disables ARC support. Default 1 (true, ARC enabled by default)
+# ENABLE_VISIBILITY: (1|0) Enables or disables symbol visibility support. Default 0 (false, visibility hidden by default)
+# IOS_ARCH: (armv7 armv7s arm64 i386 x86_64) If specified, will override the default architectures for the given IOS_PLATFORM
+#    OS = armv7 armv7s arm64
+#    SIMULATOR = i386
+#    SIMULATOR64 = x86_64
+#    TVOS = arm64
+#    SIMULATOR_TVOS = x86_64
 #
 # This toolchain defines the following variables for use externally:
 #
@@ -63,14 +82,22 @@
 #
 # This toolchain defines the following macros for use externally:
 #
-# set_xcode_property (TARGET XCODE_PROPERTY XCODE_VALUE)
-#   A convenience macro for setting xcode specific properties on targets
-#   example: set_xcode_property (myioslib IPHONEOS_DEPLOYMENT_TARGET "3.1").
+# set_xcode_property (TARGET XCODE_PROPERTY XCODE_VALUE XCODE_VARIANT)
+#   A convenience macro for setting xcode specific properties on targets.
+#   Available variants are: All, Release, RelWithDebInfo, Debug, MinSizeRel
+#   example: set_xcode_property (myioslib IPHONEOS_DEPLOYMENT_TARGET "3.1" "all").
 #
 # find_host_package (PROGRAM ARGS)
 #   A macro used to find executable programs on the host system, not within the
 #   iOS environment.  Thanks to the android-cmake project for providing the
 #   command.
+
+# Fix for PThread library not in path
+set(CMAKE_THREAD_LIBS_INIT "-lpthread")
+set(CMAKE_HAVE_THREADS_LIBRARY 1)
+set(CMAKE_USE_WIN32_THREADS_INIT 0)
+set(CMAKE_USE_PTHREADS_INIT 1)
+
 # Get the Xcode version being used.
 execute_process(COMMAND xcodebuild -version
   OUTPUT_VARIABLE XCODE_VERSION
@@ -80,7 +107,7 @@ string(REGEX MATCH "Xcode [0-9\\.]+" XCODE_VERSION "${XCODE_VERSION}")
 string(REGEX REPLACE "Xcode ([0-9\\.]+)" "\\1" XCODE_VERSION "${XCODE_VERSION}")
 message(STATUS "Building with Xcode version: ${XCODE_VERSION}")
 # Default to building for iPhoneOS if not specified otherwise, and we cannot
-# determine the platform from the CMAKE_OSX_ARCHITECTURES variable.  The use
+# determine the platform from the CMAKE_OSX_ARCHITECTURES variable. The use
 # of CMAKE_OSX_ARCHITECTURES is such that try_compile() projects can correctly
 # determine the value of IOS_PLATFORM from the root project, as
 # CMAKE_OSX_ARCHITECTURES is propagated to them by CMake.
@@ -104,13 +131,29 @@ set(IOS_PLATFORM ${IOS_PLATFORM} CACHE STRING
 # from the specified IOS_PLATFORM name.
 if (IOS_PLATFORM STREQUAL "OS")
   set(XCODE_IOS_PLATFORM iphoneos)
-  set(IOS_ARCH armv7 armv7s arm64)
+  if(NOT IOS_ARCH)
+    set(IOS_ARCH armv7 armv7s arm64)
+  endif()
 elseif (IOS_PLATFORM STREQUAL "SIMULATOR")
   set(XCODE_IOS_PLATFORM iphonesimulator)
-  set(IOS_ARCH i386)
+  if(NOT IOS_ARCH)
+    set(IOS_ARCH i386)
+  endif()
 elseif(IOS_PLATFORM STREQUAL "SIMULATOR64")
   set(XCODE_IOS_PLATFORM iphonesimulator)
-  set(IOS_ARCH x86_64)
+  if(NOT IOS_ARCH)
+    set(IOS_ARCH x86_64)
+  endif()
+elseif (IOS_PLATFORM STREQUAL "TVOS")
+  set(XCODE_IOS_PLATFORM appletvos)
+  if(NOT IOS_ARCH)
+    set(IOS_ARCH arm64)
+  endif()
+elseif (IOS_PLATFORM STREQUAL "SIMULATOR_TVOS")
+  set(XCODE_IOS_PLATFORM appletvsimulator)
+  if(NOT IOS_ARCH)
+    set(IOS_ARCH x86_64)
+  endif()
 else()
   message(FATAL_ERROR "Invalid IOS_PLATFORM: ${IOS_PLATFORM}")
 endif()
@@ -127,6 +170,34 @@ endif()
 if (NOT EXISTS ${CMAKE_OSX_SYSROOT})
   message(FATAL_ERROR "Invalid CMAKE_OSX_SYSROOT: ${CMAKE_OSX_SYSROOT} "
     "does not exist.")
+endif()
+# Specify minimum version of deployment target.
+if (NOT DEFINED IOS_DEPLOYMENT_TARGET)
+  # Unless specified, SDK version 8.0 is used by default as minimum target version.
+  set(IOS_DEPLOYMENT_TARGET "8.0"
+      CACHE STRING "Minimum iOS version to build for." )
+  message(STATUS "Using the default min-version since IOS_DEPLOYMENT_TARGET not provided!")
+endif()
+# Use bitcode or not
+if (NOT DEFINED ENABLE_BITCODE AND NOT IOS_ARCH MATCHES "((^|, )(i386|x86_64))+")
+  # Unless specified, enable bitcode support by default
+  set(ENABLE_BITCODE TRUE CACHE BOOL "Whether or not to enable bitcode")
+  message(STATUS "Enabling bitcode support by default. ENABLE_BITCODE not provided!")
+endif()
+if (NOT DEFINED ENABLE_BITCODE)
+  message(STATUS "Disabling bitcode support by default on simulators. ENABLE_BITCODE not provided for override!")
+endif()
+# Use ARC or not
+if (NOT DEFINED ENABLE_ARC)
+  # Unless specified, enable ARC support by default
+  set(ENABLE_ARC TRUE CACHE BOOL "Whether or not to enable ARC")
+  message(STATUS "Enabling ARC support by default. ENABLE_ARC not provided!")
+endif()
+# Use hidden visibility or not
+if (NOT DEFINED ENABLE_VISIBILITY)
+  # Unless specified, disable symbols visibility by default
+  set(ENABLE_VISIBILITY FALSE CACHE BOOL "Whether or not to hide symbols (-fvisibility=hidden)")
+  message(STATUS "Hiding symbols visibility by default. ENABLE_VISIBILITY not provided!")
 endif()
 # Get the SDK version information.
 execute_process(COMMAND xcodebuild -sdk ${CMAKE_OSX_SYSROOT} -version SDKVersion
@@ -179,11 +250,13 @@ execute_process(COMMAND uname -r
   ERROR_QUIET
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 # Standard settings.
-set(CMAKE_SYSTEM_NAME Darwin)
-set(CMAKE_SYSTEM_VERSION ${IOS_SDK_VERSION})
-set(UNIX TRUE)
-set(APPLE TRUE)
-set(IOS TRUE)
+set(CMAKE_SYSTEM_NAME Darwin CACHE INTERNAL "")
+set(CMAKE_SYSTEM_VERSION ${IOS_SDK_VERSION} CACHE INTERNAL "")
+set(UNIX TRUE CACHE BOOL "")
+set(APPLE TRUE CACHE BOOL "")
+set(IOS TRUE CACHE BOOL "")
+set(CMAKE_AR ar CACHE FILEPATH "" FORCE)
+set(CMAKE_RANLIB ranlib CACHE FILEPATH "" FORCE)
 # Force unset of OS X-specific deployment target (otherwise autopopulated),
 # required as of cmake 2.8.10.
 set(CMAKE_OSX_DEPLOYMENT_TARGET "" CACHE STRING
@@ -200,61 +273,113 @@ set(CMAKE_SHARED_LIBRARY_PREFIX "lib")
 set(CMAKE_SHARED_LIBRARY_SUFFIX ".dylib")
 set(CMAKE_SHARED_MODULE_PREFIX "lib")
 set(CMAKE_SHARED_MODULE_SUFFIX ".so")
+set(CMAKE_C_COMPILER_ABI ELF)
+set(CMAKE_CXX_COMPILER_ABI ELF)
+set(CMAKE_C_HAS_ISYSROOT 1)
+set(CMAKE_CXX_HAS_ISYSROOT 1)
 set(CMAKE_MODULE_EXISTS 1)
 set(CMAKE_DL_LIBS "")
 set(CMAKE_C_OSX_COMPATIBILITY_VERSION_FLAG "-compatibility_version ")
 set(CMAKE_C_OSX_CURRENT_VERSION_FLAG "-current_version ")
 set(CMAKE_CXX_OSX_COMPATIBILITY_VERSION_FLAG "${CMAKE_C_OSX_COMPATIBILITY_VERSION_FLAG}")
 set(CMAKE_CXX_OSX_CURRENT_VERSION_FLAG "${CMAKE_C_OSX_CURRENT_VERSION_FLAG}")
-# Specify minimum version of deployment target.
-# Unless specified, the latest SDK version is used by default.
-set(IOS_DEPLOYMENT_TARGET "${IOS_SDK_VERSION}"
-    CACHE STRING "Minimum iOS version to build for." )
+
+if(IOS_ARCH MATCHES "((^|, )(arm64|x86_64))+")
+  set(CMAKE_C_SIZEOF_DATA_PTR 8)
+  set(CMAKE_CXX_SIZEOF_DATA_PTR 8)
+  message(STATUS "Using a data_ptr size of 8")
+else()
+  set(CMAKE_C_SIZEOF_DATA_PTR 4)
+  set(CMAKE_CXX_SIZEOF_DATA_PTR 4)
+  message(STATUS "Using a data_ptr size of 4")
+endif()
+
 message(STATUS "Building for minimum iOS version: ${IOS_DEPLOYMENT_TARGET}"
                " (SDK version: ${IOS_SDK_VERSION})")
 # Note that only Xcode 7+ supports the newer more specific:
 # -m${XCODE_IOS_PLATFORM}-version-min flags, older versions of Xcode use:
 # -m(ios/ios-simulator)-version-min instead.
-if (XCODE_VERSION VERSION_LESS 7.0)
-  if (IOS_PLATFORM STREQUAL "OS")
+if (IOS_PLATFORM STREQUAL "OS")
+  if (XCODE_VERSION VERSION_LESS 7.0)
     set(XCODE_IOS_PLATFORM_VERSION_FLAGS
       "-mios-version-min=${IOS_DEPLOYMENT_TARGET}")
   else()
-    # SIMULATOR or SIMULATOR64 both use -mios-simulator-version-min.
+    # Xcode 7.0+ uses flags we can build directly from XCODE_IOS_PLATFORM.
     set(XCODE_IOS_PLATFORM_VERSION_FLAGS
-      "-mios-simulator-version-min=${IOS_DEPLOYMENT_TARGET}")
+      "-m${XCODE_IOS_PLATFORM}-version-min=${IOS_DEPLOYMENT_TARGET}")
   endif()
-else()
-  # Xcode 7.0+ uses flags we can build directly from XCODE_IOS_PLATFORM.
+elseif (IOS_PLATFORM STREQUAL "TVOS")
   set(XCODE_IOS_PLATFORM_VERSION_FLAGS
-    "-m${XCODE_IOS_PLATFORM}-version-min=${IOS_DEPLOYMENT_TARGET}")
+    "-mtvos-version-min=${IOS_DEPLOYMENT_TARGET}")
+elseif (IOS_PLATFORM STREQUAL "SIMULATOR_TVOS")
+  set(XCODE_IOS_PLATFORM_VERSION_FLAGS
+    "-mtvos-simulator-version-min=${IOS_DEPLOYMENT_TARGET}")
+else()
+  # SIMULATOR or SIMULATOR64 both use -mios-simulator-version-min.
+  set(XCODE_IOS_PLATFORM_VERSION_FLAGS
+    "-mios-simulator-version-min=${IOS_DEPLOYMENT_TARGET}")
 endif()
+message(STATUS "Version flags set to: ${XCODE_IOS_PLATFORM_VERSION_FLAGS}")
+
+if (ENABLE_BITCODE)
+  set(BITCODE "-fembed-bitcode")
+  set(HEADER_PAD "")
+  message(STATUS "Enabling bitcode support.")
+else()
+  set(BITCODE "")
+  set(HEADER_PAD "-headerpad_max_install_names")
+  message(STATUS "Disabling bitcode support.")
+endif()
+
+if (ENABLE_ARC)
+  set(FOBJC_ARC "-fobjc-arc")
+  message(STATUS "Enabling ARC support.")
+else()
+  set(FOBJC_ARC "-fno-objc-arc")
+  message(STATUS "Disabling ARC support.")
+endif()
+
+if (NOT ENABLE_VISIBILITY)
+  set(VISIBILITY "-fvisibility=hidden")
+  message(STATUS "Hiding symbols (-fvisibility=hidden).")
+else()
+  set(VISIBILITY "")
+endif()
+
 set(CMAKE_C_FLAGS
-  "${XCODE_IOS_PLATFORM_VERSION_FLAGS} -fobjc-abi-version=2 -fobjc-arc ${CMAKE_C_FLAGS}")
+"${XCODE_IOS_PLATFORM_VERSION_FLAGS} ${BITCODE} -fobjc-abi-version=2 ${FOBJC_ARC} ${C_FLAGS}")
 # Hidden visibilty is required for C++ on iOS.
 set(CMAKE_CXX_FLAGS
-  "${XCODE_IOS_PLATFORM_VERSION_FLAGS} -fvisibility=hidden -fvisibility-inlines-hidden -fobjc-abi-version=2 -fobjc-arc ${CMAKE_CXX_FLAGS}")
-set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -fomit-frame-pointer -ffast-math ${CMAKE_CXX_FLAGS_RELEASE}")
-set(CMAKE_C_LINK_FLAGS "${XCODE_IOS_PLATFORM_VERSION_FLAGS} -Wl,-search_paths_first ${CMAKE_C_LINK_FLAGS}")
-set(CMAKE_CXX_LINK_FLAGS "${XCODE_IOS_PLATFORM_VERSION_FLAGS}  -Wl,-search_paths_first ${CMAKE_CXX_LINK_FLAGS}")
+"${XCODE_IOS_PLATFORM_VERSION_FLAGS} ${BITCODE} ${VISIBILITY} -fvisibility-inlines-hidden -fobjc-abi-version=2 ${FOBJC_ARC} ${CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS} -DNDEBUG -Os -fomit-frame-pointer -ffast-math ${BITCODE} ${CXX_FLAGS_MINSIZEREL}")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS} -DNDEBUG -O2 -g -fomit-frame-pointer -ffast-math ${BITCODE} ${CXX_FLAGS_RELWITHDEBINFO}")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -DNDEBUG -O3 -fomit-frame-pointer -ffast-math ${BITCODE} ${CXX_FLAGS_RELEASE}")
+set(CMAKE_C_LINK_FLAGS "${XCODE_IOS_PLATFORM_VERSION_FLAGS} -Wl,-search_paths_first ${C_LINK_FLAGS}")
+set(CMAKE_CXX_LINK_FLAGS "${XCODE_IOS_PLATFORM_VERSION_FLAGS}  -Wl,-search_paths_first ${CXX_LINK_FLAGS}")
+
 # In order to ensure that the updated compiler flags are used in try_compile()
 # tests, we have to forcibly set them in the CMake cache, not merely set them
 # in the local scope.
 list(APPEND VARS_TO_FORCE_IN_CACHE
   CMAKE_C_FLAGS
   CMAKE_CXX_FLAGS
-  CMAKE_CXX_RELEASE
+  CMAKE_CXX_FLAGS_RELWITHDEBINFO
+  CMAKE_CXX_FLAGS_MINSIZEREL
+  CMAKE_CXX_FLAGS_RELEASE
   CMAKE_C_LINK_FLAGS
   CMAKE_CXX_LINK_FLAGS)
 foreach(VAR_TO_FORCE ${VARS_TO_FORCE_IN_CACHE})
   set(${VAR_TO_FORCE} "${${VAR_TO_FORCE}}" CACHE STRING "" FORCE)
 endforeach()
+
 set(CMAKE_PLATFORM_HAS_INSTALLNAME 1)
-set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "-dynamiclib -headerpad_max_install_names")
-set(CMAKE_SHARED_MODULE_CREATE_C_FLAGS "-bundle -headerpad_max_install_names")
+set (CMAKE_SHARED_LINKER_FLAGS "-rpath @executable_path/Frameworks -rpath @loader_path/Frameworks")
+set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "-dynamiclib ${HEADER_PAD}")
+set(CMAKE_SHARED_MODULE_CREATE_C_FLAGS "-bundle ${HEADER_PAD}")
 set(CMAKE_SHARED_MODULE_LOADER_C_FLAG "-Wl,-bundle_loader,")
 set(CMAKE_SHARED_MODULE_LOADER_CXX_FLAG "-Wl,-bundle_loader,")
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".dylib" ".so" ".a")
+
 # Hack: if a new cmake (which uses CMAKE_INSTALL_NAME_TOOL) runs on an old
 # build tree (where install_name_tool was hardcoded) and where
 # CMAKE_INSTALL_NAME_TOOL isn't in the cache and still cmake didn't fail in
@@ -264,6 +389,7 @@ set(CMAKE_FIND_LIBRARY_SUFFIXES ".dylib" ".so" ".a")
 if (NOT DEFINED CMAKE_INSTALL_NAME_TOOL)
   find_program(CMAKE_INSTALL_NAME_TOOL install_name_tool)
 endif (NOT DEFINED CMAKE_INSTALL_NAME_TOOL)
+
 # Set the find root to the iOS developer roots and to user defined paths.
 set(CMAKE_FIND_ROOT_PATH ${CMAKE_IOS_DEVELOPER_ROOT} ${CMAKE_OSX_SYSROOT}
   ${CMAKE_PREFIX_PATH} CACHE string  "iOS find search path root" FORCE)
@@ -279,9 +405,15 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 # This little macro lets you set any XCode specific property.
-macro(set_xcode_property TARGET XCODE_PROPERTY XCODE_VALUE)
-  set_property(TARGET ${TARGET} PROPERTY
-    XCODE_ATTRIBUTE_${XCODE_PROPERTY} ${XCODE_VALUE})
+macro(set_xcode_property TARGET XCODE_PROPERTY XCODE_VALUE XCODE_RELVERSION)
+  set(XCODE_RELVERSION_I "${XCODE_RELVERSION}")
+  if (XCODE_RELVERSION_I STREQUAL "All")
+    set_property(TARGET ${TARGET} PROPERTY
+    XCODE_ATTRIBUTE_${XCODE_PROPERTY} "${XCODE_VALUE}")
+  else()
+    set_property(TARGET ${TARGET} PROPERTY
+    XCODE_ATTRIBUTE_${XCODE_PROPERTY}[variant=${XCODE_RELVERSION_I}] "${XCODE_VALUE}")
+  endif()
 endmacro(set_xcode_property)
 # This macro lets you find executable programs on the host system.
 macro(find_host_package)
