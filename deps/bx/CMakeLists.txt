@@ -9,7 +9,10 @@ source_group(source FILES ${SOURCE_FILES})
 source_group(bx_include FILES ${INCLUDE_FILES_BX})
 source_group(bxx_include FILES ${INCLUDE_FILES_BXX})
 
-add_definitions("-D__STDC_LIMIT_MACROS" "-D__STDC_FORMAT_MACROS" "-D__STDC_CONSTANT_MACROS")
+add_definitions(-D__STDC_LIMIT_MACROS)
+add_definitions(-D__STDC_FORMAT_MACROS)
+add_definitions(-D__STDC_CONSTANT_MACROS)
+add_compile_options("$<$<CONFIG:Debug>:-DBX_CONFIG_DEBUG=1;-DBX_CONFIG_CHECK_ASSERT>")
 
 add_library(bx STATIC ${SOURCE_FILES} ${INCLUDE_FILES_BX} ${INCLUDE_FILES_BXX})
 

@@ -4,9 +4,8 @@
  * @author Daniel Schauenberg <d@unwiredcouch.com>
  */
 
-#include "restclient-cpp/connection.h"
-
 #include <curl/curl.h>
+#include "restclient-cpp/connection.h"
 
 #include <cstring>
 #include <string>

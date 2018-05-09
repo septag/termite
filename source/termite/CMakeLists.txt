@@ -117,14 +117,14 @@ endif()
 
 target_link_libraries(termite 
     PRIVATE ${FCONTEXT_LIB} imgui imgui_impl remotery utf8 ${PLUGIN_LIBS} 
-            ${PRIVATE_LIBS} tiny-AES128-C ${BIMG_LIBRARY} ${BIMG_DECODE_LIBRARY}
+            ${PRIVATE_LIBS} tiny-AES128-C bimg bimg_decode
             etcpack 
     PUBLIC bx rapidjson AHEasing lz4 ${PUBLIC_LIBS})
 
 # 
 get_filename_component(TERMITE_INCLUDE_DIR ../../include/termite ABSOLUTE)
 target_include_directories(termite 
-                           PUBLIC ${TERMITE_INCLUDE_DIR} ${DEP_ROOT_DIR} ${FCONTEXT_INCLUDE_DIR} ${BIMG_INCLUDE_DIR}
+                           PUBLIC ${TERMITE_INCLUDE_DIR} ${DEP_ROOT_DIR} ${FCONTEXT_INCLUDE_DIR}
                            PRIVATE ${PRIVATE_INCLUDE_DIRS})
 if (USE_SDL2)
     target_include_directories(termite PUBLIC ${SDL2_INCLUDE_DIR})

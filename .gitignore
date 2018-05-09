@@ -46,12 +46,10 @@ out
 
 # Downloaded
 deps/assimp
-deps/bgfx
 deps/libuv
 deps/SDL2
 deps/SDL2_android
 deps/libuv_android_arm
-deps/bgfx_android
 deps/bgfx_ios_arm
 deps/sdl2_ios_arm
 deps/curl

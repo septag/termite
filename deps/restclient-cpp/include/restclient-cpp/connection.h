@@ -16,7 +16,6 @@
 
 #include "restclient-cpp/restclient.h"
 #include "restclient-cpp/version.h"
-#include "curl/system.h"
 
 typedef void CURL;
 

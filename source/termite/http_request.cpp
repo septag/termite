@@ -2,9 +2,9 @@
 
 #if termite_CURL
 
+#include <curl/curl.h>
 #include "restclient-cpp/restclient.h"
 #include "restclient-cpp/connection.h"
-#include <curl/curl.h>
 
 #include "http_request.h"
 #include "bxx/queue.h"
