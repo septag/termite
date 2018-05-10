@@ -224,7 +224,7 @@ static bool initBgfx(RendererType::Enum rendererType, uint16_t deviceId, GfxDriv
     initParams.allocator = alloc;
     initParams.callback = gBgfx.callbacks;
     if (transientVbSize > 0)
-        initParams.limits.transientIbSize = transientVbSize;
+        initParams.limits.transientVbSize = transientVbSize;
     if (transientIbSize > 0)
         initParams.limits.transientIbSize = transientIbSize;
 

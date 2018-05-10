@@ -201,11 +201,11 @@ namespace bx
 
 	inline BX_CONST_FUNC float sqrt(float _a)
 	{
-#if BX_CONFIG_SUPPORTS_SIMD
-		return sqrtSimd(_a);
-#else
+//#if BX_CONFIG_SUPPORTS_SIMD
+//		return sqrtSimd(_a);
+//#else
 		return sqrtRef(_a);
-#endif // BX_CONFIG_SUPPORTS_SIMD
+//#endif // BX_CONFIG_SUPPORTS_SIMD
 	}
 
 	inline BX_CONST_FUNC float rsqrtRef(float _a)
@@ -230,11 +230,11 @@ namespace bx
 
 	inline BX_CONST_FUNC float rsqrt(float _a)
 	{
-#if BX_CONFIG_SUPPORTS_SIMD
-		return rsqrtSimd(_a);
-#else
+//#if BX_CONFIG_SUPPORTS_SIMD
+//		return rsqrtSimd(_a);
+//#else
 		return rsqrtRef(_a);
-#endif // BX_CONFIG_SUPPORTS_SIMD
+//#endif // BX_CONFIG_SUPPORTS_SIMD
 	}
 
 	inline BX_CONST_FUNC float trunc(float _a)

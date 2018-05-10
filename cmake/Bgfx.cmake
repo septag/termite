@@ -23,7 +23,7 @@ function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OU
 
     bgfx_get_platform(SHADER_PLATFORM)
     set(BGFX_SHADER_INCLUDE_DIR ${DEP_ROOT_DIR}/bgfx/src)
-    set(BGFX_SHADERC_PATH ${DEP_ROOT_DIR}/bgfx/bin/${CMAKE_SYSTEM_NAME}/shaderc${SHADERC_EXT})
+    set(BGFX_SHADERC_PATH ${DEP_ROOT_DIR}/bgfx/bin/${CMAKE_HOST_SYSTEM_NAME}/shaderc${SHADERC_EXT})
 
     # make output directory
     if (NOT OUTPUT_DIR)
