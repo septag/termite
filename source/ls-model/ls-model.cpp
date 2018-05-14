@@ -10,9 +10,6 @@
 #define BX_IMPLEMENT_JSON
 #include "bxx/json.h"
 
-#define BX_IMPLEMENT_LOGGER
-#include "bxx/logger.h"
-
 #include "../tools_common/log_format_proxy.h"
 
 #include "bx/file.h"
@@ -46,7 +43,6 @@ int main(int argc, char **argv)
     }
 
     LogFormatProxy logger(jsonlog ? LogProxyOptions::Json : LogProxyOptions::Text);
-    bx::enableLogToFileHandle(stdout);    
 
     bx::FileInfo finfo;
     if (!bx::stat(inFilepath.cstr(), finfo) || finfo.m_type != bx::FileInfo::Regular) {
@@ -90,7 +86,7 @@ int main(int argc, char **argv)
 
     char* result = bx::makeJson(jroot, &gAlloc, false);
     jroot->destroy();
-    bx::logPrint(__FILE__, __LINE__, bx::LogType::Text, result);
+    puts(result);
     BX_FREE(&gAlloc, result);
     return 0;
 }

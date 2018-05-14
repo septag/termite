@@ -65,6 +65,8 @@ namespace tee
         template <typename _T, typename _AllocT> _T createFloatArray(const float* f, int num, _AllocT& alloc);
         template <typename _T, typename _AllocT> _T createIntArray(const int* n, int num, _AllocT& alloc);
     } // namespace json
+
+    TEE_API void testSax(const char* filepath);
 } // namespace tee
 
 

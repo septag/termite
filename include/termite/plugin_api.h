@@ -10,14 +10,14 @@
 #   define TEE_PLUGIN_EXPORT extern "C" 
 #endif
 
-#define BX_TRACE_API(_Api, _Fmt, ...) _Api->logPrintf(__FILE__, __LINE__, bx::LogType::Text, _Fmt, ##__VA_ARGS__)
-#define BX_VERBOSE_API(_Api, _Fmt, ...) _Api->logPrintf(__FILE__, __LINE__, bx::LogType::Verbose, _Fmt, ##__VA_ARGS__)
-#define BX_FATAL_API(_Api, _Fmt, ...) _Api->logPrintf(__FILE__, __LINE__, bx::LogType::Fatal, _Fmt, ##__VA_ARGS__)
-#define BX_WARN_API(_Api, _Fmt, ...) _Api->logPrintf(__FILE__, __LINE__, bx::LogType::Warning, _Fmt, ##__VA_ARGS__)
+#define BX_TRACE_API(_Api, _Fmt, ...) _Api->logPrintf(__FILE__, __LINE__, tee::LogType::Text, _Fmt, ##__VA_ARGS__)
+#define BX_VERBOSE_API(_Api, _Fmt, ...) _Api->logPrintf(__FILE__, __LINE__, tee::LogType::Verbose, _Fmt, ##__VA_ARGS__)
+#define BX_FATAL_API(_Api, _Fmt, ...) _Api->logPrintf(__FILE__, __LINE__, tee::LogType::Fatal, _Fmt, ##__VA_ARGS__)
+#define BX_WARN_API(_Api, _Fmt, ...) _Api->logPrintf(__FILE__, __LINE__, tee::LogType::Warning, _Fmt, ##__VA_ARGS__)
 #define BX_BEGINP_API(_Api, _Fmt, ...) _Api->logBeginProgress(__FILE__, __LINE__, _Fmt, ##__VA_ARGS__)
-#define BX_END_OK_API(_Api) _Api->logEndProgress(bx::LogProgressResult::Ok)
-#define BX_END_FATAL_API(_Api) _Api->logEndProgress(bx::LogProgressResult::Fatal)
-#define BX_END_NONFATAL_API(_Api) _Api->logEndProgress(bx::LogProgressResult::NonFatal)
+#define BX_END_OK_API(_Api) _Api->logEndProgress(tee::LogProgressResult::Ok)
+#define BX_END_FATAL_API(_Api) _Api->logEndProgress(tee::LogProgressResult::Fatal)
+#define BX_END_NONFATAL_API(_Api) _Api->logEndProgress(tee::LogProgressResult::NonFatal)
 
 #define TEE_ERROR_API(_Api, _Fmt, ...) _Api->reportErrorf(__FILE__, __LINE__, _Fmt, ##__VA_ARGS__)
 
@@ -91,7 +91,6 @@ namespace tee
 
 #ifdef TEE_CORE_API
 #include "tee.h"
-#include "bxx/logger.h"
 #include "job_dispatcher.h"
 
 namespace tee {
@@ -104,13 +103,14 @@ namespace tee {
         void(*releaseMemoryBlock)(MemoryBlock* mem);
         MemoryBlock* (*readTextFile)(const char* filepath);
         double(*getElapsedTime)();
+
         void(*reportError)(const char* source, int line, const char* desc);
         void(*reportErrorf)(const char* source, int line, const char* fmt, ...);
 
-        void(*logPrint)(const char* sourceFile, int line, bx::LogType::Enum type, const char* text);
-        void(*logPrintf)(const char* sourceFile, int line, bx::LogType::Enum type, const char* fmt, ...);
+        void(*logPrint)(const char* sourceFile, int line, tee::LogType::Enum type, const char* text);
+        void(*logPrintf)(const char* sourceFile, int line, tee::LogType::Enum type, const char* fmt, ...);
         void(*logBeginProgress)(const char* sourceFile, int line, const char* fmt, ...);
-        void(*logEndProgress)(bx::LogProgressResult::Enum result);
+        void(*logEndProgress)(tee::LogProgressResult::Enum result);
 
         const Config& (*getConfig)();
         uint32_t(*getEngineVersion)();

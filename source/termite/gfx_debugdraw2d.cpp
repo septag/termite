@@ -10,7 +10,6 @@
 #include "bx/hash.h"
 #include "bxx/pool.h"
 #include "bxx/stack.h"
-#include "bxx/logger.h"
 
 #include <stdarg.h>
 

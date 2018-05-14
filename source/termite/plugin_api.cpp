@@ -344,10 +344,10 @@ static void* getCoreApi(uint32_t version)
     coreApi.getElapsedTime = getElapsedTime;
     coreApi.reportError = err::report;
     coreApi.reportErrorf = err::reportf;
-    coreApi.logBeginProgress = bx::logBeginProgress;
-    coreApi.logEndProgress = bx::logEndProgress;
-    coreApi.logPrint = bx::logPrint;
-    coreApi.logPrintf = bx::logPrintf;
+    coreApi.logBeginProgress = debug::beginProgress;
+    coreApi.logEndProgress = debug::endProgress;
+    coreApi.logPrint = debug::print;
+    coreApi.logPrintf = debug::printf;
     coreApi.getConfig = getConfig;
     coreApi.getEngineVersion = getEngineVersion;
     coreApi.getTempAlloc = getTempAlloc;

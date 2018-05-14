@@ -9,7 +9,6 @@
 #include "bx/string.h"
 #include "bxx/pool.h"
 #include "bxx/stack.h"
-#include "bxx/logger.h"
 #include "bxx/linked_list.h"
 #include "bxx/lock.h"
 

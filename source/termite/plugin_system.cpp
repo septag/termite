@@ -5,7 +5,6 @@
 #include "bx/os.h"
 #include "bxx/array.h"
 #include "bxx/path.h"
-#include "bxx/logger.h"
 
 #include <dirent.h>
 

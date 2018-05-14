@@ -48,15 +48,6 @@
 
 #include "bxx/path.h"
 
-#define BX_IMPLEMENT_LOGGER
-#ifdef termite_SHARED_LIB
-#   define BX_SHARED_LIB
-#endif
-#include "bxx/logger.h"
-
-#define BX_IMPLEMENT_JSON
-#include "bxx/json.h"
-
 #include <dirent.h>
 #include <random>
 #include <chrono>
@@ -164,7 +155,7 @@ public:
 
 struct LogCache
 {
-    bx::LogType::Enum type;
+    LogType::Enum type;
     char text[LOG_STRING_SIZE];
 };
 
@@ -246,7 +237,6 @@ static bx::Path gCacheDir;
 static bx::String32 gPackageVersion("0.0.0");
 static HardwareInfo gHwInfo;
 static bool gHasHardwareKey = false;        // Used for android devices
-
 static Tee* gTee = nullptr;
 
 void platformSetVars(const char* dataDir, const char* cacheDir, const char* version)
@@ -327,7 +317,6 @@ bool init(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* pl
         return false;
     }
 
-    bx::enableLogToFileHandle(stdout, stderr);
     json::HeapAllocator::SetAlloc(gAlloc);
 
     // Switch memory manager to our TraceAllocator
@@ -1314,7 +1303,7 @@ void dumpGfxLog() TEE_THREAD_SAFE
     if (gTee->gfxLogCache) {
         for (int i = 0, c = gTee->numGfxLogCache; i < c; i++) {
             const LogCache& l = gTee->gfxLogCache[i];
-            bx::logPrint(__FILE__, __LINE__, l.type, l.text);
+            debug::print(__FILE__, __LINE__, l.type, l.text);
         }
 
         BX_FREE(gAlloc, gTee->gfxLogCache);
@@ -1482,7 +1471,7 @@ void GfxDriverEvents::onFatal(GfxFatalType::Enum type, const char* str)
     if (gTee->numGfxLogCache < 1000) {
         m_lock.lock();
         gTee->gfxLogCache = (LogCache*)BX_REALLOC(gAlloc, gTee->gfxLogCache, sizeof(LogCache) * (++gTee->numGfxLogCache));
-        gTee->gfxLogCache[gTee->numGfxLogCache-1].type = bx::LogType::Fatal;
+        gTee->gfxLogCache[gTee->numGfxLogCache-1].type = LogType::Fatal;
         strcpy(gTee->gfxLogCache[gTee->numGfxLogCache-1].text, strTrimed);
         m_lock.unlock();
     }
@@ -1496,7 +1485,7 @@ void GfxDriverEvents::onTraceVargs(const char* filepath, int line, const char* f
     if (gTee->numGfxLogCache < 1000) {
         m_lock.lock();
         gTee->gfxLogCache = (LogCache*)BX_REALLOC(gAlloc, gTee->gfxLogCache, sizeof(LogCache) * (++gTee->numGfxLogCache));
-        gTee->gfxLogCache[gTee->numGfxLogCache-1].type = bx::LogType::Verbose;
+        gTee->gfxLogCache[gTee->numGfxLogCache-1].type = LogType::Verbose;
         strcpy(gTee->gfxLogCache[gTee->numGfxLogCache-1].text, text);
         m_lock.unlock();
     }

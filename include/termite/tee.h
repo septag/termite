@@ -24,7 +24,6 @@
 #include "gfx_defines.h"
 #include "sound_driver.h"
 
-
 #define TEE_MEMID_TEMP 0x666ce76b992f595e 
 
 namespace tee

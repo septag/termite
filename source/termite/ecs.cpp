@@ -8,7 +8,6 @@
 #include "bxx/queue.h"
 #include "bxx/handle_pool.h"
 #include "bxx/hash_table.h"
-#include "bxx/logger.h"
 
 #include "remotery/Remotery.h"
 

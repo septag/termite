@@ -11,9 +11,6 @@
 #include "bxx/path.h"
 #include "bx/os.h"
 
-#define BX_IMPLEMENT_LOGGER
-#include "bxx/logger.h"
-
 #define BX_IMPLEMENT_JSON
 #include "bxx/json.h"
 
@@ -241,7 +238,6 @@ int main(int argc, char** argv)
     }
 
     // Logger
-    bx::enableLogToFileHandle(stdout);
     LogFormatProxy logger(jsonLog ? LogProxyOptions::Json : LogProxyOptions::Text);
     g_logger = &logger;
 

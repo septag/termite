@@ -11,7 +11,6 @@
 #include "bxx/array.h"
 #include "bxx/linked_list.h"
 #include "bxx/pool.h"
-#include "bxx/logger.h"
 #include "bxx/linear_allocator.h"
 
 #include TEE_MAKE_SHADER_PATH(shaders_h, sprite.vso)

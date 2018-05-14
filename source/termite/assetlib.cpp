@@ -5,7 +5,6 @@
 #include "internal.h"
 
 #include "bx/hash.h"
-#include "bxx/logger.h"
 #include "bxx/hash_table.h"
 #include "bxx/path.h"
 #include "bxx/handle_pool.h"

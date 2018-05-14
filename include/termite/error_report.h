@@ -1,7 +1,8 @@
 #pragma once
 
 #include "bx/allocator.h"
-#include "bxx/logger.h"
+#include "logger.h"
+#include "bx/debug.h"
 
 // Maximum error stack size that is allocated inside error handler
 // Which means that more throws than the maximum number will not be saved unless they are 'Clear'ed
@@ -18,7 +19,7 @@
 #endif
 #define BX_CHECK(_condition, _fmt, ...) \
     if (!BX_IGNORE_C4127(_condition)) { \
-         bx::logPrintf(__FILE__, __LINE__, bx::LogType::Fatal, _fmt, ##__VA_ARGS__);    \
+         bx::debugPrintf(_fmt, ##__VA_ARGS__);    \
     }
 #endif
 

@@ -13,9 +13,6 @@
 #define BX_IMPLEMENT_JSON
 #include "bxx/json.h"
 
-#define BX_IMPLEMENT_LOGGER
-#include "bxx/logger.h"
-
 #include "assimp/Importer.hpp"
 #include "assimp/scene.h"
 #include "assimp/postprocess.h"
@@ -938,7 +935,7 @@ static bool exportMeta(const char* metaJsonFilepath, const ModelData& model)
         char* jmeta = bx::makeJson(jroot, &gAlloc, false);
         if (!jmeta)
             return false;
-        bx::logPrint(__FILE__, __LINE__, bx::LogType::Text, jmeta);
+        puts(jmeta);
         BX_FREE(&gAlloc, jmeta);
     }
 
@@ -1059,7 +1056,6 @@ int main(int argc, char** argv)
         return 0;
     }        
 
-    bx::enableLogToFileHandle(stdout);
     LogFormatProxy logger(jsonLog ? LogProxyOptions::Json : LogProxyOptions::Text);
     g_logger = &logger;
 

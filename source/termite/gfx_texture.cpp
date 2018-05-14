@@ -2,7 +2,6 @@
 
 #include "bxx/pool.h"
 #include "bxx/array.h"
-#include "bxx/logger.h"
 #include "bx/math.h"
 #include "bx/uint32_t.h"
 #include "bx/error.h"

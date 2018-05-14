@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 project(bx)
 
+# source files
 file(GLOB SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "src/*.c*")
 list(REMOVE_ITEM SOURCE_FILES "src/amalgamated.cpp")
 file(GLOB INCLUDE_FILES_BX RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "include/bx/*.h") 

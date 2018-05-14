@@ -4,7 +4,6 @@
 #include "bx/file.h"
 #include "bxx/path.h"
 #include "bxx/array.h"
-#include "bxx/logger.h"
 #include "bx/debug.h"
 
 #include "termite/types.h"
@@ -72,7 +71,7 @@ static const char* getPackModeStr(PackMode::Enum mode)
 static void packXyNormZRg(const ImageData* images, int numImages, const char* outputFilepath)
 {
     if (numImages < 2) {
-        BX_WARN("Must specify two images for this packing mode");
+        puts("Must specify two images for this packing mode");
         return;
     }
 
@@ -80,11 +79,11 @@ static void packXyNormZRg(const ImageData* images, int numImages, const char* ou
     const ImageData& colorImg = images[1];
 
     if (normImg.w != colorImg.w || normImg.h != colorImg.h) {
-        BX_WARN("Input images '%s' and '%s' must have identical dimensions", normImg.path.cstr(), colorImg.path.cstr());
+        printf("Input images '%s' and '%s' must have identical dimensions\n", normImg.path.cstr(), colorImg.path.cstr());
         return;
     }
 
-    BX_TRACE("Packing '%s' and '%s' -> '%s'", images[0].path.cstr(), images[1].path.cstr(), outputFilepath);
+    printf("Packing '%s' and '%s' -> '%s'\n", images[0].path.cstr(), images[1].path.cstr(), outputFilepath);
 
     int w = normImg.w;
     int h = normImg.h;
@@ -92,7 +91,7 @@ static void packXyNormZRg(const ImageData* images, int numImages, const char* ou
     uint8_t* colorBuff = colorImg.srcPixels;
     uint8_t* destBuff = (uint8_t*)BX_ALLOC(gAlloc, w*h*4);
     if (!destBuff) {
-        BX_WARN("Out of memory");
+        puts("Out of memory");
         return;
     }
     uint8_t* dest = destBuff;
@@ -131,19 +130,19 @@ static void packXyNormZRg(const ImageData* images, int numImages, const char* ou
     bx::Path ext = opath.getFileExt();
     if (ext.isEqualNoCase("png")) {
         if (!stbi_write_png(opath.cstr(), w, h, 4, destBuff, 4*w)) {
-            BX_FATAL("Writing '%s' failed", opath.cstr());
+            printf("Writing '%s' failed\n", opath.cstr());
         }
     } else if (ext.isEqualNoCase("bmp")) {
         if (!stbi_write_bmp(opath.cstr(), w, h, 4, destBuff)) {
-            BX_FATAL("Writing '%s' failed", opath.cstr());
+            printf("Writing '%s' failed\n", opath.cstr());
         }
     } else if (ext.isEqualNoCase("tga")) {
         if (!stbi_write_tga(opath.cstr(), w, h, 4, destBuff)) {
-            BX_FATAL("Writing '%s' failed", opath.cstr());
+            printf("Writing '%s' failed\n", opath.cstr());
         }
     } else {
         if (!stbi_write_png(opath.cstr(), w, h, 4, destBuff, 4)) {
-            BX_FATAL("Writing '%s' failed", opath.cstr());
+            printf("Writing '%s' failed\n", opath.cstr());
         }
     }
 
@@ -152,7 +151,7 @@ static void packXyNormZRg(const ImageData* images, int numImages, const char* ou
 
 static void showHelp() 
 {
-    BX_TRACE("");
+    puts("");
 }
 
 int main(int argc, char* argv[])
@@ -162,10 +161,8 @@ int main(int argc, char* argv[])
     const char* outputFilepath = cmdline.findOption('o', "out");
     const char* spackmode = cmdline.findOption('m', "mode");
 
-    bx::enableLogToFileHandle(stdout, stderr);
-
     if (!filepaths || !outputFilepath || !spackmode) {
-        BX_FATAL("-f, -o, -m Parameters must be set");
+        puts("-f, -o, -m Parameters must be set");
         showHelp();
         return -1;
     }
@@ -173,9 +170,9 @@ int main(int argc, char* argv[])
     // check valid packing modes
     PackMode::Enum packMode = getPackMode(spackmode);
     if (packMode == PackMode::None) {
-        BX_FATAL("Invalid packing mode, Valid values are:\n");
+        puts("Invalid packing mode, Valid values are:");
         for (int i = 0; i < PackMode::None; i++) {
-            BX_VERBOSE("\t%s\n", getPackModeStr((PackMode::Enum)i));
+            printf("\t%s\n", getPackModeStr((PackMode::Enum)i));
         }
         showHelp();
         return -1;
@@ -204,7 +201,7 @@ int main(int argc, char* argv[])
     }
 
     if (images.getCount() == 0) {
-        BX_FATAL("No valid input file path found");
+        puts("No valid input file path found");
         BX_TRACE("");
         images.destroy();
         return -1;
@@ -212,10 +209,10 @@ int main(int argc, char* argv[])
 
     for (int i = 0; i < images.getCount(); i++) {
         // Open image 
-        BX_VERBOSE("Loading: %s", images[i].path.cstr());
+        printf("Loading: %s\n", images[i].path.cstr());
         images[i].srcPixels = stbi_load(images[i].path.cstr(), &images[i].w, &images[i].h, &images[i].comp, 4);
         if (!images[i].srcPixels) {
-            BX_WARN("Could not load image '%s'", images[i].path.cstr());
+            printf("Could not load image '%s'\n", images[i].path.cstr());
         }
     }
 
@@ -234,7 +231,7 @@ int main(int argc, char* argv[])
     }
     images.destroy();
 
-    BX_TRACE("Done");
+    puts("Done");
 
 #if _DEBUG
     stb_leakcheck_dumpmem();

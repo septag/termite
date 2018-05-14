@@ -1,10 +1,9 @@
 #include "log_format_proxy.h"
 
-#include <cstdio>
-#include <cstdarg>
+#include <stdio.h>
+#include <stdarg.h>
 
 #include "bxx/json.h"
-#include "bxx/logger.h"
 
 static bx::DefaultAllocator gAlloc;
 
@@ -27,7 +26,7 @@ void tee::LogFormatProxy::fatal(const char* fmt, ...)
         char* jsonText = bx::makeJson(jroot, &gAlloc, true);
         jroot->destroy();
         if (jsonText) {
-            bx::logPrint(__FILE__, __LINE__, bx::LogType::Fatal, jsonText);
+            puts(jsonText);
             BX_FREE(&gAlloc, jsonText);
         }
         break;
@@ -35,7 +34,7 @@ void tee::LogFormatProxy::fatal(const char* fmt, ...)
 
     case LogProxyOptions::Text:
     {
-        bx::logPrint(__FILE__, __LINE__, bx::LogType::Fatal, text);
+        puts(text);
         break;
     }
     }
@@ -60,7 +59,7 @@ void tee::LogFormatProxy::warn(const char* fmt, ...)
         char* jsonText = bx::makeJson(jroot, &gAlloc, true);
         jroot->destroy();
         if (jsonText) {
-            bx::logPrint(__FILE__, __LINE__, bx::LogType::Warning, jsonText);
+            puts(jsonText);
             BX_FREE(&gAlloc, jsonText);
         }
         break;
@@ -68,7 +67,7 @@ void tee::LogFormatProxy::warn(const char* fmt, ...)
 
     case LogProxyOptions::Text:
     {
-        bx::logPrint(__FILE__, __LINE__, bx::LogType::Warning, text);
+        puts(text);
         break;
     }
     }
@@ -93,7 +92,7 @@ void tee::LogFormatProxy::text(const char* fmt, ...)
         char* jsonText = bx::makeJson(jroot, &gAlloc, true);
         jroot->destroy();
         if (jsonText) {
-            bx::logPrint(__FILE__, __LINE__, bx::LogType::Text, jsonText);
+            puts(jsonText);
             BX_FREE(&gAlloc, jsonText);
         }
         break;
@@ -101,7 +100,7 @@ void tee::LogFormatProxy::text(const char* fmt, ...)
 
     case LogProxyOptions::Text:
     {
-        bx::logPrint(__FILE__, __LINE__, bx::LogType::Text, text);
+        puts(text);
         break;
     }
     }

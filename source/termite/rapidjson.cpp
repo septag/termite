@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "termite/rapidjson.h"
 
+#include "tee.h"
+
 namespace tee {
 
     void json::HeapAllocator::SetAlloc(bx::AllocatorI* alloc)
@@ -59,6 +61,108 @@ namespace tee {
             return NULL;
         }
         return BX_REALLOC(m_alloc, originalPtr, newSize);
+    }
+
+    using namespace rapidjson;
+    struct JsonHandler : public BaseReaderHandler<UTF8<>, JsonHandler>
+    {
+        bool StartObject() 
+        {
+            BX_TRACE("{");
+            return true;
+        }
+
+        bool EndObject(SizeType)
+        {
+            BX_TRACE("}");
+            return true;
+        }
+
+        bool String(const char* str, SizeType len, bool)
+        {
+            BX_TRACE("String: %s", str);
+            return true;
+        }
+
+        bool Default()
+        {
+            return false;
+        }
+
+        bool Null()
+        {
+            BX_TRACE("[NULL]");
+            return true;
+        }
+
+        bool Bool(bool v)
+        {
+            BX_TRACE("Boolean: %s", v ? "true" : "false");
+            return true;
+        }
+
+        bool Int(int v)
+        {
+            BX_TRACE("Int: %d", v);
+            return true;
+        }
+
+        bool Uint(int v)
+        {
+            BX_TRACE("UInt: %u", v);
+            return true;
+        }
+
+        bool Int64(int64_t v)
+        {
+            BX_TRACE("Int64: %d", v);
+            return true;
+        }
+
+        bool Uint64(uint64_t v)
+        {
+            BX_TRACE("UInt64: %u", v);
+            return true;
+        }
+
+        bool Double(double v)
+        {
+            BX_TRACE("Float: %f", v);
+            return true;
+        }
+
+        bool Key(const char* str, SizeType len, bool)
+        {
+            BX_TRACE("Key: %s", str);
+            return true;
+        }
+
+        bool StartArray()
+        {
+            BX_TRACE("[");
+            return true;
+        }
+
+        bool EndArray(SizeType)
+        {
+            BX_TRACE("]");
+            return true;
+        }
+    };
+
+    void testSax(const char* filepath)
+    {
+        json::HeapAllocator jalloc;
+        GenericReader<UTF8<>, UTF8<>, json::HeapAllocator> reader(&jalloc, 256);
+        JsonHandler handler;
+
+        MemoryBlock* mem = readTextFile(filepath);
+        if (mem) {
+            StringStream ss((const char*)mem->data);
+            reader.Parse(ss, handler);
+            //InsituStringStream ss(
+            //reader.Parse<kParseInsituFlag>(ss, handler);
+        }
     }
 
 } // namespace tee

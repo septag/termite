@@ -5,7 +5,6 @@
 
 #include "bxx/linked_list.h"
 #include "bxx/pool.h"
-#include "bxx/logger.h"
 
 #define MAX_PARAM_SIZE 256
 

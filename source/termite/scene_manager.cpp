@@ -4,7 +4,6 @@
 #include "bxx/handle_pool.h"
 #include "bxx/array.h"
 #include "bxx/pool.h"
-#include "bxx/logger.h"
 #include "bx/string.h"
 #include "bx/math.h"
 #include "bx/cpu.h"
