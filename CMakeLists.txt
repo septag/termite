@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.3)
 project(termite)
 
 set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/install CACHE PATH "Install path" FORCE)
+if (APPLE)
+    set(CMAKE_MACOSX_RPATH 1)
+endif()     
 
 # Default output directories for runtime and libraries
 if (NOT CMAKE_RUNTIME_OUTPUT_DIRECTORY)
