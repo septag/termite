@@ -15,6 +15,8 @@
 		144847B51E3291610075187F /* make_arm64_aapcs_macho_gas.S in Sources */ = {isa = PBXBuildFile; fileRef = 144847921E32909A0075187F /* make_arm64_aapcs_macho_gas.S */; };
 		144847B61E3291610075187F /* ontop_arm64_aapcs_macho_gas.S in Sources */ = {isa = PBXBuildFile; fileRef = 144847941E32909A0075187F /* ontop_arm64_aapcs_macho_gas.S */; };
 		144847B71E3291640075187F /* stack.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1448478E1E3290680075187F /* stack.cpp */; };
+		148B550720AF6B600065FAE5 /* make_i386_x86_64_sysv_macho_gas.S in Sources */ = {isa = PBXBuildFile; fileRef = 148B550520AF6B600065FAE5 /* make_i386_x86_64_sysv_macho_gas.S */; };
+		148B550820AF6B600065FAE5 /* make_i386_sysv_macho_gas.S in Sources */ = {isa = PBXBuildFile; fileRef = 148B550620AF6B600065FAE5 /* make_i386_sysv_macho_gas.S */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,6 +77,8 @@
 		144847991E3291040075187F /* libfcontext_arm.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libfcontext_arm.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		144847AB1E3291550075187F /* libfcontext_arm64.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libfcontext_arm64.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		144847D71E32A4050075187F /* libfcontext.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libfcontext.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		148B550520AF6B600065FAE5 /* make_i386_x86_64_sysv_macho_gas.S */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.asm; name = make_i386_x86_64_sysv_macho_gas.S; path = ../../../asm/make_i386_x86_64_sysv_macho_gas.S; sourceTree = "<group>"; };
+		148B550620AF6B600065FAE5 /* make_i386_sysv_macho_gas.S */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.asm; name = make_i386_sysv_macho_gas.S; path = ../../../asm/make_i386_sysv_macho_gas.S; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -105,6 +109,8 @@
 		144847871E3290490075187F = {
 			isa = PBXGroup;
 			children = (
+				148B550620AF6B600065FAE5 /* make_i386_sysv_macho_gas.S */,
+				148B550520AF6B600065FAE5 /* make_i386_x86_64_sysv_macho_gas.S */,
 				1448478F1E32909A0075187F /* jump_arm_aapcs_macho_gas.S */,
 				144847901E32909A0075187F /* jump_arm64_aapcs_macho_gas.S */,
 				144847911E32909A0075187F /* make_arm_aapcs_macho_gas.S */,
@@ -252,6 +258,8 @@
 				144847A51E3291270075187F /* ontop_arm_aapcs_macho_gas.S in Sources */,
 				144847A41E3291270075187F /* make_arm_aapcs_macho_gas.S in Sources */,
 				144847A31E3291270075187F /* jump_arm_aapcs_macho_gas.S in Sources */,
+				148B550720AF6B600065FAE5 /* make_i386_x86_64_sysv_macho_gas.S in Sources */,
+				148B550820AF6B600065FAE5 /* make_i386_sysv_macho_gas.S in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -293,6 +301,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				HEADER_SEARCH_PATHS = ../../../include/fcontext;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
 			};
 			name = Debug;
@@ -301,6 +310,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				HEADER_SEARCH_PATHS = ../../../include/fcontext;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
 			};
 			name = Release;
@@ -333,6 +343,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_BITCODE = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -349,7 +360,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_LDFLAGS = "-ObjC";
@@ -388,6 +399,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_BITCODE = YES;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -398,7 +410,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -434,6 +446,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_BITCODE = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -450,7 +463,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_LDFLAGS = "-ObjC";
@@ -486,6 +499,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_BITCODE = YES;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -496,7 +510,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -511,6 +525,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = (
+					armv7,
+					arm64,
+					armv7s,
+				);
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
 				CLANG_CXX_LIBRARY = "libc++";
@@ -531,6 +550,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_BITCODE = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -547,7 +567,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_LDFLAGS = "-ObjC";
@@ -561,6 +581,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = (
+					armv7,
+					arm64,
+					armv7s,
+				);
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
 				CLANG_CXX_LIBRARY = "libc++";
@@ -581,6 +606,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_BITCODE = YES;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -591,7 +617,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				OTHER_LDFLAGS = "-ObjC";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -620,6 +646,7 @@
 				144847A21E3291040075187F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		144847B11E3291550075187F /* Build configuration list for PBXNativeTarget "fcontext_arm64" */ = {
 			isa = XCConfigurationList;
@@ -628,6 +655,7 @@
 				144847B31E3291550075187F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		144847DD1E32A4050075187F /* Build configuration list for PBXNativeTarget "fcontext" */ = {
 			isa = XCConfigurationList;
@@ -636,6 +664,7 @@
 				144847DF1E32A4050075187F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

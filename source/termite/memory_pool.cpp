@@ -224,7 +224,6 @@ size_t tee::getMemPoolAllocSize() TEE_THREAD_SAFE
 {
     bx::ReadLockScope lock(g_mempool->lock);
 
-    size_t pageSize = g_mempool->pageSize;
     size_t sz = 0;
     MemoryPage::LNode* node = g_mempool->pageList.getFirst();
     while (node) {
@@ -241,7 +240,6 @@ size_t tee::getMemTagAllocSize(uint64_t tag) TEE_THREAD_SAFE
 {
     bx::ReadLockScope lock(g_mempool->lock);
     
-    size_t pageSize = g_mempool->pageSize;
     size_t sz = 0;
     MemoryPage::LNode* node = g_mempool->pageList.getFirst();
     while (node) {

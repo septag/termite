@@ -15,5 +15,5 @@ if (WIN32)
     add_dependencies(modelc AssimpCopyBinaries)
 endif()
 
-set_target_properties(modelc PROPERTIES FOLDER Tools)
+set_target_properties(modelc PROPERTIES FOLDER Tools ${IOS_GENERAL_PROPERTIES})
 install(TARGETS modelc RUNTIME DESTINATION bin)

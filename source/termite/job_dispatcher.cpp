@@ -529,7 +529,7 @@ bool tee::initJobDispatcher(bx::AllocatorI* alloc,
             gDispatcher->threads[i] = BX_NEW(alloc, bx::Thread);
             char name[32];
             bx::snprintf(name, sizeof(name), "TJobThread #%d", i + 1);
-            gDispatcher->threads[i]->init(threadFunc, nullptr, 8 * 1024, name);
+            gDispatcher->threads[i]->init(threadFunc, nullptr, 32 * 1024, name);
         }
     }
     return true;

@@ -125,7 +125,7 @@ target_include_directories(efsw PUBLIC include PRIVATE src)
 #install(TARGETS efsw LIBRARY DESTINATION ${LIB_DESTINATION} ARCHIVE DESTINATION ${LIB_DESTINATION} RUNTIME DESTINATION ${LIB_DESTINATION})
 #file (GLOB HDRS "include/efsw/*.h" "include/efsw/*.hpp")
 #install (FILES ${HDRS} DESTINATION ${CMAKE_INSTALL_PREFIX}/include/efsw)
-set_target_properties(efsw PROPERTIES FOLDER Deps)
+set_target_properties(efsw PROPERTIES FOLDER Deps ${IOS_GENERAL_PROPERTIES})
 
 if (BUILD_TEST_APP)
     add_executable(efsw-test src/test/efsw-test.cpp)

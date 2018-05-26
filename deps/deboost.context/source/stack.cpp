@@ -22,9 +22,9 @@
     || defined(_M_X64) || defined(_M_AMD64)
 /* Windows seams not to provide a constant or function
  * telling the minimal stacksize */
-#   define MIN_STACKSIZE  8 * 1024
+#   define MINSIGSTKSZ  8192
 #else
-#   define MIN_STACKSIZE  4 * 1024
+#   define MINSIGSTKSZ  4096
 #endif
 
 static size_t getPageSize()
@@ -36,7 +36,7 @@ static size_t getPageSize()
 
 static size_t getMinSize()
 {
-    return MIN_STACKSIZE;
+    return MINSIGSTKSZ;
 }
 
 static size_t getMaxSize()
@@ -46,7 +46,7 @@ static size_t getMaxSize()
 
 static size_t getDefaultSize()
 {
-    return 64 * 1024;   /* 64Kb */
+    return 131072;  // 128kb
 }
 
 #elif defined(_HAVE_POSIX)
@@ -58,8 +58,13 @@ static size_t getDefaultSize()
 #include <fcntl.h>
 
 #if !defined (SIGSTKSZ)
-# define SIGSTKSZ (8 * 1024)
+# define SIGSTKSZ 131072 // 128kb recommended
 # define UDEF_SIGSTKSZ
+#endif
+
+#if !defined (MINSIGSTKSZ)
+# define MINSIGSTKSZ 32768 // 32kb minimum
+# define UDEF_MINSIGSTKSZ
 #endif
 
 static size_t getPageSize()
@@ -70,7 +75,7 @@ static size_t getPageSize()
 
 static size_t getMinSize()
 {
-    return SIGSTKSZ;
+    return MINSIGSTKSZ;
 }
 
 static size_t getMaxSize()
@@ -83,17 +88,7 @@ static size_t getMaxSize()
 
 static size_t getDefaultSize()
 {
-    size_t size;
-    size_t maxSize;
-    rlimit limit;
-
-    getrlimit(RLIMIT_STACK, &limit);
-
-    size = 8 * getMinSize();
-    if (RLIM_INFINITY == limit.rlim_max)
-        return size;
-    maxSize = getMaxSize();
-    return maxSize < size ? maxSize : size;
+    return SIGSTKSZ;
 }
 #endif
 
@@ -107,13 +102,15 @@ fcontext_stack_t create_fcontext_stack(size_t size)
     s.sptr = NULL;
     s.ssize = 0;
 
+    /* fix size */
     if (size == 0)
         size = getDefaultSize();
-    if (size <= getMinSize())
-        size = getMinSize();
-
-    // TODO: this assert fails on iOS, check it
-    assert(size <= getMaxSize());
+    size_t minsz = getMinSize();
+    size_t maxsz = getMaxSize();
+    if (size < minsz)
+        size = minsz;
+    if (size > maxsz)
+        size = maxsz;
 
     pages = (size_t)floorf(float(size) / float(getPageSize()));
     assert(pages >= 2);     /* at least two pages must fit into stack (one page is guard-page) */
@@ -168,3 +165,11 @@ void destroy_fcontext_stack(fcontext_stack_t* s)
 
     memset(s, 0x00, sizeof(fcontext_stack_t));
 }
+
+#ifdef UDEF_SIGSTKSZ
+#   undef SIGSTKSZ
+#endif
+
+#ifdef UDEF_MINSIGSTKSZ
+#   undef MINSIGSTKSZ
+#endif

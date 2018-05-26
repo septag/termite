@@ -56,8 +56,8 @@ namespace tee {
             downloadFn(nullptr),
             qnode(this),
             data(nullptr),
-            userData(nullptr),
             progressFn(nullptr),
+            userData(nullptr),
             progressUserData(nullptr)
         {
             url[0] = 0;
@@ -78,11 +78,11 @@ namespace tee {
         void* userData;
 
         HttpResponse() :
-            qnode(this),
-            userData(nullptr),
             responseFn(nullptr),
             downloadFn(nullptr),
-            mem(nullptr)
+            mem(nullptr),
+            qnode(this),
+            userData(nullptr)
         {
             filename[0] = 0;
         }
@@ -141,7 +141,6 @@ namespace tee {
     static void sendRequest(HttpRequest* req, HttpResponse* res)
     {
         // Create connection object
-        size_t connUrlHash = tinystl::hash_string(req->url, strlen(req->url));
         RestClient::Connection* conn = BX_NEW(gHttp->alloc, RestClient::Connection)(gHttp->baseUrl);
         BX_ASSERT(conn, "");
 

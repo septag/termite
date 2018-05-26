@@ -102,7 +102,7 @@ namespace tee
             gfxName = "Bgfx";
             soundName = "SDL_mixer";
             phys2dName = "Box2D";
-            ioName = "DiskIO_Lite";
+            ioName = "DiskIO";
             uiIniFilename = "termite_imgui.ini";
 
             refScreenWidth = 0;

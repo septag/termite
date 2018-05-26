@@ -40,7 +40,7 @@ Note that the engine is in heavy development, and some of them may be broken on 
 
 ## Build
 _Termite_ uses [cmake](https://cmake.org) build system, so you have to install cmake on your host computer in order be able to build. 
-I've also prebuilt some dependencies like _bgfx_ for most platforms, and some more 3rdparties for windows platform, And they are downloaded from my server upon cmake build. But I have built the 64bit binaries for PC and ARM binaries for Android/iOS. If you want other architectures on a specific platforms you can always download the code and build them yourself.
+I've also prebuilt some dependencies like _SDL2_ and _libcurl_ for some platforms that doesn't have them as a package.
 
 ### Windows/Linux/MacOS
 Use cmake and a configuration name, note that configuration name is mandatory, there are four available configurations:
@@ -76,8 +76,12 @@ iOS build uses a custom [https://github.com/leetal/ios-cmake](toolchain file) to
 ```
 mkdir build-ios
 cd build-ios
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/ios.toolchain.cmake -DIOS_PLATFORM=OS -G Xcode
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/ios.toolchain.cmake -DIOS_PLATFORM=OS -DIOS_DEPLOYMENT_TARGET=9.0 -G Xcode
 ```
+
+- *IOS_DEPLOYMENT_TARGET*: minimum SDK version that you wish to target for. For now you can't set it less than 9.0, because the curl library is built on that requirement (some build fixes needed to build for 8.0)
+
+Check out ```cmake/ios.toolchain.cmake``` to see more iOS specific options.
 
 ## Test
 Currently there are two test apps and sources are under ```tests``` directory:
@@ -87,7 +91,6 @@ Currently there are two test apps and sources are under ```tests``` directory:
 
 ## Open Source Libraries
 - [__Bgfx__](https://github.com/bkaradzic/bgfx) Low-level graphics.
-- [__libuv__](https://github.com/libuv/libuv) AsyncIO for PC platforms
 - [__SDL2__](https://www.libsdl.org) Window and input
 - [__SDL_mixer__](https://www.libsdl.org/projects/SDL_mixer/) 2D sound library
 - [__NanoVg__](https://github.com/memononen/nanovg) Vector based debug drawing

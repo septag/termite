@@ -1,6 +1,8 @@
 #pragma once
 
-#ifdef _WIN32
+#include "bx/platform.h"
+
+#if BX_PLATFORM_WINDOWS || BX_PLATFORM_ANDROID || BX_PLATFORM_IOS
 #   define  TERM_RESET          ""
 #   define  TERM_RED            ""
 #   define  TERM_YELLOW         ""

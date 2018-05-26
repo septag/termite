@@ -246,9 +246,9 @@ namespace tee {
 
         SpriteSheet() :
             buff(nullptr),
-            numFrames(0),
             frames(nullptr),
-            meshes(nullptr)
+            meshes(nullptr),
+            numFrames(0)
         {
         }
     };

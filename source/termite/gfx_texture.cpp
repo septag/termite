@@ -690,7 +690,6 @@ namespace tee {
 
         if (isFormatSupported) {
             // TODO: support Cube/3D textures
-            uint32_t size = img->m_size;
             assert(img->m_depth == 1 && !img->m_cubeMap);
             texture->handle = driver->createTexture2D(img->m_width, img->m_height, img->m_numMips>1, img->m_numLayers,
                 (TextureFormat::Enum)img->m_format, texParams->flags, driver->makeRef(img->m_data, img->m_size, [](void* ptr, void* userData) {

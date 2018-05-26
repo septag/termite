@@ -13,5 +13,5 @@ if (WIN32)
     add_dependencies(ls-model AssimpCopyBinaries)
 endif()
 
-set_target_properties(ls-model PROPERTIES FOLDER Tools)
+set_target_properties(ls-model PROPERTIES FOLDER Tools ${IOS_GENERAL_PROPERTIES})
 install(TARGETS ls-model RUNTIME DESTINATION bin)

@@ -31,4 +31,7 @@ find_library(CURL_LIBRARY curl PATHS ${CURL_ROOT_DIR}/lib${CURL_LIB_DIR_SUB} ${F
 
 if (CURL_LIBRARY AND CURL_INCLUDE_DIR)
     set(CURL_FOUND TRUE)
+    if (APPLE)
+        set(CURL_LIBRARY ${CURL_LIBRARY} "-framework Security")
+    endif()
 endif()

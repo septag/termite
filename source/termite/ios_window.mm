@@ -1,6 +1,7 @@
 #include <UIKit/UIKit.h>
 #include <AVFoundation/AVFoundation.h>
 #include "tmath.h"
+#include <mach/mach_host.h>
 
 void* iosCreateNativeLayer(void* wnd)
 {
@@ -28,4 +29,9 @@ void iosTurnOnAudioSession()
 {
     [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback withOptions:AVAudioSessionCategoryOptionMixWithOthers error:nil];
     [[AVAudioSession sharedInstance] setActive:true error:nil];
+}
+
+uint8_t iosGetCoreCount()
+{
+    return [[NSProcessInfo processInfo] processorCount];
 }

@@ -23,6 +23,6 @@ elseif (ANDROID)
 endif()
 
 target_link_libraries(restclient-cpp PUBLIC ${CURL_LIBRARY} ${ADDITIONAL_LIBS})
-set_target_properties(restclient-cpp PROPERTIES FOLDER Deps)
+set_target_properties(restclient-cpp PROPERTIES FOLDER Deps ${IOS_GENERAL_PROPERTIES})
 
 
