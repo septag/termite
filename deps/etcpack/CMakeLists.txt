@@ -4,6 +4,6 @@ project(etcpack)
 set(SOURCE_FILES etcdec.cxx)
 
 add_library(etcpack STATIC ${SOURCE_FILES})
-set_target_properties(etcpack PROPERTIES FOLDER Deps)
+set_target_properties(etcpack PROPERTIES FOLDER Deps ${IOS_GENERAL_PROPERTIES})
 
 

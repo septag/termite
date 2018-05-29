@@ -31,6 +31,6 @@ add_definitions(-D__STDC_FORMAT_MACROS)
 add_definitions(-D__STDC_CONSTANT_MACROS)
 
 add_executable(shaderc ${source_list})
-target_link_libraries(shaderc bx fcpp glslang glsl-optimizer spirv-opt)
+target_link_libraries(shaderc bx fcpp glslang glsl-optimizer spirv-opt "-framework Foundation")
 
 install(TARGETS shaderc RUNTIME DESTINATION bin) 

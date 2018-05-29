@@ -284,6 +284,8 @@ namespace tee {
 
             if (BX_ENABLED(BX_PLATFORM_IOS))
                 windowFlags |= SDL_WINDOW_ALLOW_HIGHDPI;
+            
+            width = height = 0;
         } else {
             bool maximized = pSdlWindowFlags ? ((*pSdlWindowFlags & SDL_WINDOW_MAXIMIZED) ? true : false) : false;
             if (width == 0 || height == 0 || maximized)

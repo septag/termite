@@ -8,5 +8,5 @@ add_executable(texpack ${SOURCE_FILES} ${INCLUDE_FILES})
 target_link_libraries(texpack bx lz4)
 target_include_directories(texpack PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps)
 
-set_target_properties(texpack PROPERTIES FOLDER Tools)
+set_target_properties(texpack PROPERTIES FOLDER Tools ${IOS_GENERAL_PROPERTIES})
 install(TARGETS texpack RUNTIME DESTINATION bin)

@@ -2,7 +2,11 @@ cmake_minimum_required(VERSION 3.3)
 project(termite)
 
 set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/install CACHE PATH "Install path" FORCE)
+if (APPLE)
+    set(CMAKE_MACOSX_RPATH 1)
+endif()     
 
+################################################################################
 # Default output directories for runtime and libraries
 if (NOT CMAKE_RUNTIME_OUTPUT_DIRECTORY)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/out)
@@ -22,8 +26,7 @@ if (CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_CONFIGURATION_TYPES "Debug;Release;Profile;Development" CACHE STRING "" FORCE)
 endif()
 
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-
+################################################################################
 # load modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(PrecompiledHeader)
@@ -31,7 +34,8 @@ include(Utility)
 include(DownloadPackage)
 include(Bgfx)
 
-# options
+################################################################################
+# parameters
 option(USE_BOX2D "Build Box2D Physics engine" ON)
 option(BUILD_FISHERBOY "Build Fisherboy Game" OFF)
 option(BUILD_MODELVIEWER "Build model viewer" OFF)
@@ -39,6 +43,7 @@ option(USE_SDL2 "Use SDL2 with the engine" ON)
 option(USE_SDL2_MIXER "Use SDL2 Mixer sound driver, this option implies that you set USE_SDL2 too" ON)
 option(USE_CURL "Use Curl and OpenSSL libraries" ON)
 option(BUILD_STATIC "Force Static library builds" OFF)
+# disable build tools on android and iOS devices
 if (NOT ANDROID AND NOT IOS)
     option(BUILD_TOOLS "Build tools" ON)
     option(ENABLE_HOT_LOADING "Enable hot loading from disk" ON)
@@ -52,17 +57,17 @@ if (APPLE)
     option(USE_METAL "Force Use Metal Graphics API for macOS and iOS" OFF)
 endif()
 
-# Dependencies #
+################################################################################
+# Dependencies
 
 # Run find package scripts
 if (USE_SDL2)
     include(FindSDL2)
 endif()
+
 if (USE_CURL)
     include(FindCurl)
 endif()
-
-#include(FindBgfx)
 
 if (BUILD_TOOLS)
     include(FindAssimp)
@@ -87,36 +92,6 @@ if (ANDROID)
         include (FindSDL2)
     endif()
 endif()
-
-# Download dependencies that doesn't have packages on any platform
-if (0)
-    if (NOT BGFX_FOUND)
-        if (ANDROID)
-            download_package(${DOWNLOAD_URL_ROOT}/bgfx_android.tar.gz ${DEP_ROOT_DIR})
-        elseif (IOS)
-            download_package(${DOWNLOAD_URL_ROOT}/bgfx_ios_arm.tar.gz ${DEP_ROOT_DIR})
-        elseif (MSVC)
-            download_package(${DOWNLOAD_URL_ROOT}/bgfx_vc140.tar.gz ${DEP_ROOT_DIR})
-        elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-            download_package(${DOWNLOAD_URL_ROOT}/bgfx_linux64.tar.gz ${DEP_ROOT_DIR})
-        elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
-            download_package(${DOWNLOAD_URL_ROOT}/bgfx_osx64.tar.gz ${DEP_ROOT_DIR})
-        endif()
-
-        include(FindBgfx)
-    endif()
-
-    if (BGFX_FOUND)
-        if (WIN32)
-            message(STATUS "Found Bgfx library")
-        else()
-            message(STATUS "Found Bgfx Library: ${BGFX_LIBRARY}")
-        endif()
-    else()
-        message(FATAL_ERROR "Bgfx library not found")
-    endif()
-endif()
-
 
 if (USE_SDL2)   
     if (SDL2_FOUND)
@@ -172,6 +147,15 @@ if (BUILD_TOOLS)
 endif()
 
 ################################################################################
+# Global properties
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+# force static libs on android and iOS
+if (IOS OR ANDROID)
+    set(BUILD_STATIC 1)
+endif()
+
+################################################################################
 # Compilation flags
 add_definitions(-D__STDC_FORMAT_MACROS)
 if(MSVC)
@@ -197,13 +181,7 @@ if (CMAKE_C_FLAGS)
 endif()
 
 if (ANDROID)    
-    add_definitions(-D__STDC_LIMIT_MACROS 
-                    -D__STDC_CONSTANT_MACROS)
-    set(BUILD_STATIC 1)
-endif()
-
-if (IOS)
-    set(BUILD_STATIC 1)
+    add_definitions(-D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS)
 endif()
 
 if (BUILD_STATIC)
@@ -262,7 +240,12 @@ add_compile_options("$<$<CONFIG:Release>:${RELEASE_COMPILE_OPTIONS}>")
 # Common include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# dependencies
+################################################################################
+# projects
+if (IOS)
+    set(IOS_GENERAL_PROPERTIES XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${IOS_DEPLOYMENT_TARGET})
+endif()
+
 add_subdirectory(deps/deboost.context)
 add_subdirectory(deps/bx)
 add_subdirectory(deps/bgfx)
@@ -276,9 +259,6 @@ add_subdirectory(deps/miniz)
 add_subdirectory(deps/etcpack)
 add_subdirectory(deps/efsw)
 add_subdirectory(deps/b64)
-if (NOT IOS)
-    set_target_properties(fcontext PROPERTIES FOLDER Deps)
-endif()
 if (USE_CURL)
     add_subdirectory(deps/restclient-cpp)
 endif()
@@ -291,11 +271,11 @@ add_subdirectory(source/termite)
 
 # plugins
 add_subdirectory(source/driver_bgfx)
-add_subdirectory(source/driver_disk_lite)
+add_subdirectory(source/driver_disk)
 
 if (USE_BOX2D)
     add_subdirectory(deps/Box2D)
-    set_target_properties(Box2D PROPERTIES FOLDER Deps)
+    set_target_properties(Box2D PROPERTIES FOLDER Deps ${IOS_GENERAL_PROPERTIES})
 
     add_subdirectory(source/driver_box2d)
 endif()
@@ -326,3 +306,4 @@ endif()
 if (BUILD_MODELVIEWER)
     add_subdirectory(model_viewer)
 endif()
+

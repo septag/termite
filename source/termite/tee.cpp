@@ -64,7 +64,11 @@
 #define RANDOM_NUMBER_POOL 10000
 
 #define T_ENC_SIGN 0x54454e43        // "TENC"
-#define T_ENC_VERSION TEE_MAKE_VERSION(1, 0)       
+#define T_ENC_VERSION TEE_MAKE_VERSION(1, 0)
+
+#if BX_PLATFORM_IOS || BX_PLATFORM_OSX
+uint8_t iosGetCoreCount();
+#endif
 
 typedef std::chrono::high_resolution_clock TClock;
 typedef std::chrono::high_resolution_clock::time_point TClockTimePt;
@@ -336,8 +340,11 @@ bool init(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* pl
     memcpy(&gTee->conf, &conf, sizeof(gTee->conf));
 
     // Hardware stats
-    // Same on all platforms
+#if BX_PLATFORM_IOS || BX_PLATFORM_OSX
+    gHwInfo.numCores = iosGetCoreCount();
+#else
     gHwInfo.numCores = std::thread::hardware_concurrency();
+#endif
 
     gTee->updateFn = updateFn;
 
@@ -374,7 +381,7 @@ bool init(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* pl
     }
 
     // IO
-    PluginHandle ioPlugin = findPlugin(!conf.ioName.isEmpty() ? conf.ioName.cstr() : "DiskIO_Lite", PluginType::IoDriver);
+    PluginHandle ioPlugin = findPlugin(!conf.ioName.isEmpty() ? conf.ioName.cstr() : "DiskIO", PluginType::IoDriver);
     if (ioPlugin.isValid()) {
         gTee->ioDriver = (IoDriverDual*)initPlugin(ioPlugin, gAlloc);
         if (!gTee->ioDriver) {

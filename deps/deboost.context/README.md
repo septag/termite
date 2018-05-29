@@ -7,40 +7,7 @@
 - Linux (x86_64/x86)
 - OSX (x86_64/x86)
 - Android (ARM/x86/ARM64/x86_64)
-- More will be added soon ...
-
-#### Linux/Unix/Mac
-```
-cd deboost.context
-mkdir .build
-cd .build
-cmake ..
-make
-make install
-```
-
-#### Windows
-Assuming you have visual studio installed on your system
-```
-cd deboost.context
-mkdir .build
-cd .build
-cmake .. -G "Visual Studio 14 2015 Win64"
-```
-Now open the generated solution file and build
-
-#### Android
-Uses [android-cmake](https://github.com/taka-no-me/android-cmake) for Android builds. visit the page for help on command line options.  
-It requres android NDK to build. extract the android NDK and set _ANDROID_NDK_ environment variable to the NDK root path.  
-As an example if you want to build for Android ARMv7(Neon) 
-```
-cd deboost.context
-mkdir .build
-cd .build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/android.toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DANDROID_ABI="armeabi-v7a with NEON" -DANDROID_STL="stlport_static" -DANDROID_NATIVE_API_LEVEL=android-19
-```
-On Windows, This command tries to make Visual Studio sln files. Which requires you to install [Nsight Visual Studio Edition](https://developer.nvidia.com/nsight-visual-studio-edition-downloads)  
-If you wish to install without visual studio and Nsight on windows. You have to install [Ninja](https://ninja-build.org/) and Add it to your PATH. Then add ```-GNinja``` to your cmake command line.
+- iOS (Arm64, Arm7, x86_64, i386)
 
 #### iOS
 I've made an extra xcode project files for iOS ```projects/xcode/fcontext``` because I didn't know how to set different ASM files for each ARM architecture in cmake. So If you know how to do it, I'd be happy if you tell me.  
@@ -49,7 +16,7 @@ So, you can use the included toolchain file or use your own, just define _IOS_ t
 cd deboost.context
 mkdir .build
 cd .build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/iOS.toolchain.cmake
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/ios.toolchain.cmake -G Xcode
 ```
 
 

@@ -2,6 +2,7 @@
 
 #include "bx/platform.h"
 #include "bxx/terminal_colors.h"
+#include <time.h>
 
 #ifdef BX_TRACE
 #   undef BX_TRACE

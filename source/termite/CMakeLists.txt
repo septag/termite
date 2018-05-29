@@ -101,23 +101,15 @@ endif()
 
 # statically linked plugin libraries
 if (BUILD_STATIC)
-    set(PLUGIN_LIBS bgfx_driver box2d_driver disk_lite_driver)
+    set(PLUGIN_LIBS bgfx_driver box2d_driver disk_driver)
 
     if (USE_SDL2_MIXER)
         set(PLUGIN_LIBS ${PLUGIN_LIBS} sdl_mixer_driver)
     endif()
 endif()
 
-if (NOT IOS)
-    set(FCONTEXT_LIB fcontext)
-else()
-    add_dependencies(termite fcontext)
-    get_filename_component(FCONTEXT_LIB ${CMAKE_CURRENT_SOURCE_DIR}/../../out/libfcontext.a ABSOLUTE)
-    get_filename_component(FCONTEXT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/deboost.context/include ABSOLUTE)
-endif()
-
 target_link_libraries(termite 
-    PRIVATE ${FCONTEXT_LIB} imgui imgui_impl remotery utf8 ${PLUGIN_LIBS} 
+    PRIVATE fcontext imgui remotery utf8 ${PLUGIN_LIBS} 
             ${PRIVATE_LIBS} tiny-AES128-C bimg bimg_decode
             etcpack 
     PUBLIC bx rapidjson lz4 ${PUBLIC_LIBS})
@@ -134,6 +126,8 @@ endif()
 
 # PCH
 add_precompiled_header(termite pch.h FORCEINCLUDE)
+
+set_target_properties(termite PROPERTIES ${IOS_GENERAL_PROPERTIES})
 
 ## Install
 install(TARGETS termite

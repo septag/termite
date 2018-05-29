@@ -39,6 +39,6 @@ add_library(bgfx_driver ${BUILD_LIBRARY_TYPE} ${SOURCE_FILES})
 
 target_include_directories(bgfx_driver PRIVATE ${BGFX_INCLUDE_DIR})
 target_link_libraries(bgfx_driver PRIVATE bx bgfx bimg ${EXTRA_LIBS})
-set_target_properties(bgfx_driver PROPERTIES FOLDER Plugins)
+set_target_properties(bgfx_driver PROPERTIES FOLDER Plugins ${IOS_GENERAL_PROPERTIES})
 
 

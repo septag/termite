@@ -73,6 +73,14 @@ if (WIN32)
   set(EXTRA_INCLUDE_DIRS "../../3rdparty/dxsdk/include")
 endif()
 
+if (APPLE)
+  add_compile_options(-fno-objc-arc)
+  list(APPEND source_list 
+    ../../src/glcontext_eagl.mm 
+    ../../src/glcontext_nsgl.mm 
+    ../../src/renderer_mtl.mm)
+endif()
+
 add_library(bgfx STATIC ${source_list})
 target_link_libraries(bgfx PRIVATE bx bimg bimg_decode)
 target_include_directories(bgfx PRIVATE ../../3rdparty ../../3rdparty/khronos ${EXTRA_INCLUDE_DIRS} 

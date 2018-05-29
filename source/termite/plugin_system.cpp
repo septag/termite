@@ -11,9 +11,9 @@
 // default Plugin initialization for static linking builds
 #ifdef termite_STATIC_LIB
 // Fwd declerations, these functions are declared inside static plugins
-void* initDiskLiteDriver(bx::AllocatorI* alloc, tee::GetApiFunc getApi);
-tee::PluginDesc* getDiskLiteDriverDesc();
-void shutdownDiskLiteDriver();
+void* initDiskDriver(bx::AllocatorI* alloc, tee::GetApiFunc getApi);
+tee::PluginDesc* getDiskDriverDesc();
+void shutdownDiskDriver();
 
 tee::PluginDesc* getBgfxDriverDesc();
 void* initBgfxDriver(bx::AllocatorI* alloc, tee::GetApiFunc getApi);
@@ -31,10 +31,10 @@ static void loadStaticPlugins()
 {
     // IoDriver
     static tee::PluginApi ioApi;
-    ioApi.init = initDiskLiteDriver;
-    ioApi.shutdown = shutdownDiskLiteDriver;
-    ioApi.getDesc = getDiskLiteDriverDesc;
-    addCustomPlugin(getDiskLiteDriverDesc(), &ioApi);
+    ioApi.init = initDiskDriver;
+    ioApi.shutdown = shutdownDiskDriver;
+    ioApi.getDesc = getDiskDriverDesc;
+    addCustomPlugin(getDiskDriverDesc(), &ioApi);
 
     // BgfxDriver
     static tee::PluginApi bgfxApi;

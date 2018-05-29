@@ -86,7 +86,6 @@ source_list
   ../../3rdparty/glslang/glslang/MachineIndependent/propagateNoContraction.h
   ../../3rdparty/glslang/glslang/MachineIndependent/reflection.cpp
   ../../3rdparty/glslang/glslang/MachineIndependent/reflection.h
-  ../../3rdparty/glslang/glslang/OSDependent/Windows/ossource.cpp
   ../../3rdparty/glslang/glslang/OSDependent/osinclude.h
   ../../3rdparty/glslang/glslang/Public/ShaderLang.h
   ../../3rdparty/glslang/hlsl/hlslAttributes.cpp
@@ -105,6 +104,12 @@ source_list
   ../../3rdparty/glslang/hlsl/hlslTokenStream.h
   ../../3rdparty/glslang/hlsl/hlslTokens.h
 )
+
+if (WIN32)
+  list(APPEND source_list ../../3rdparty/glslang/glslang/OSDependent/Windows/ossource.cpp)
+else()
+  list(APPEND source_list ../../3rdparty/glslang/glslang/OSDependent/Unix/ossource.cpp)
+endif()
 
 include_directories(../../3rdparty/glslang)
 include_directories(../../3rdparty/spirv-tools/include)

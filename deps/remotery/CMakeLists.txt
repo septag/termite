@@ -11,4 +11,4 @@ endif()
 
 target_include_directories(remotery INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include 
                                     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/remotery)
-set_target_properties(remotery PROPERTIES FOLDER Deps)
+set_target_properties(remotery PROPERTIES FOLDER Deps ${IOS_GENERAL_PROPERTIES})

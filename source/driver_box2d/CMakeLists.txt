@@ -19,6 +19,6 @@ endif()
 add_library(box2d_driver ${BUILD_LIBRARY_TYPE} ${SOURCE_FILES})
 
 target_link_libraries(box2d_driver PRIVATE Box2D bx nanovg ${GCC_LIBS})
-set_target_properties(box2d_driver PROPERTIES FOLDER Plugins)
+set_target_properties(box2d_driver PROPERTIES FOLDER Plugins ${IOS_GENERAL_PROPERTIES})
 
 

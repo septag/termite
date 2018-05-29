@@ -14,6 +14,4 @@
 #include "bx/string.h"
 #include "bx/platform.h"
 
-#include <time.h>
-
 #endif

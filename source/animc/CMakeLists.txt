@@ -15,5 +15,5 @@ if (WIN32)
     add_dependencies(animc AssimpCopyBinaries)
 endif()
 
-set_target_properties(animc PROPERTIES FOLDER Tools)
+set_target_properties(animc PROPERTIES FOLDER Tools ${IOS_GENERAL_PROPERTIES})
 install(TARGETS animc RUNTIME DESTINATION bin)
