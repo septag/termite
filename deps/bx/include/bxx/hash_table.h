@@ -347,7 +347,7 @@ namespace bx
     template <typename Ty, typename Ky>
     bool HashTable<Ty, Ky>::isEmpty() const
     {
-        return m_numItems > 0;
+        return m_numItems == 0;
     }
 
     template <typename Ty, typename Ky>

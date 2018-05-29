@@ -98,6 +98,7 @@ namespace tee
         // Recommended: pass 'ext' and 'extReplacement' as lower-case
         // Pass extReplacement = nullptr to remove the override
         TEE_API void replaceFileExtension(const char* ext, const char* extReplacement = nullptr);
+        TEE_API void replaceAsset(const char* uri, const char* replaceUri);
 
         template <typename Ty>
         Ty* getObjPtr(AssetHandle handle)

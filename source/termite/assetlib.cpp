@@ -49,6 +49,12 @@ namespace tee {
         const char* replacement;
     };
 
+    struct AssetPathOverride
+    {
+        bx::Path orig;
+        bx::Path replacement;
+    };
+
     class AssetLib : public IoDriverEventsI
     {
     public:
@@ -67,8 +73,11 @@ namespace tee {
         asset::AssetModifiedCallback modifiedCallback;
         void* fileModifiedUserParam;
         bx::AllocatorI* alloc;
-        bool ignoreUnloadResourceCalls;
         bx::Array<AssetExtensionOverride> overrides;
+        bx::Array<AssetPathOverride> pathOverrides;
+        bx::HashTableInt pathOverrideTable; // orig->replacement, index to pathOverrides
+        bx::HashTableInt pathOverrideTableRev;  // replacement->orig, intdex to pathOverrides
+        bool ignoreUnloadResourceCalls;
 
     public:
         AssetLib(bx::AllocatorI* _alloc) :
@@ -76,7 +85,9 @@ namespace tee {
             assetsTable(bx::HashTableType::Mutable),
             asyncLoadsTable(bx::HashTableType::Mutable),
             hotLoadsTable(bx::HashTableType::Mutable),
-            alloc(_alloc)
+            alloc(_alloc),
+            pathOverrideTable(bx::HashTableType::Mutable),
+            pathOverrideTableRev(bx::HashTableType::Mutable)
         {
             driver = nullptr;
             blockingDriver = nullptr;
@@ -137,7 +148,10 @@ namespace tee {
             !assetLib->assetsTable.create(512, alloc) || 
             !assetLib->asyncLoads.create(sizeof(AsyncLoadRequest), 32, 64, alloc) ||
             !assetLib->asyncLoadsTable.create(64, alloc) ||             
-            !assetLib->overrides.create(10, 10, alloc))
+            !assetLib->overrides.create(10, 10, alloc) ||
+            !assetLib->pathOverrides.create(128, 128, alloc) ||
+            !assetLib->pathOverrideTable.create(128, alloc) ||
+            !assetLib->pathOverrideTableRev.create(128, alloc))
         {
             return false;
         }
@@ -159,7 +173,10 @@ namespace tee {
         if (!assetLib)
             return;
 
+        assetLib->pathOverrideTable.destroy();
+        assetLib->pathOverrideTableRev.destroy();
         assetLib->overrides.destroy();
+        assetLib->pathOverrides.destroy();
 
         // Got to clear the callbacks of the driver if DataStore is overloading it
         if (assetLib->driver && assetLib->driver->getCallbacks() == assetLib) {
@@ -375,7 +392,18 @@ namespace tee {
     static bx::Path getReplacementUri(const char* uri)
     {
         AssetLib* assetLib = gAssetLib;
-        bx::Path newUri(uri);
+
+        bx::Path newUri;
+        if (assetLib->pathOverrideTable.isEmpty()) {
+            newUri = uri;
+        } else {
+            int r = assetLib->pathOverrideTable.find(tinystl::hash_string(uri, strlen(uri)));
+            if (r != -1)
+                newUri = assetLib->pathOverrides[assetLib->pathOverrideTable[r]].replacement;
+            else
+                newUri = uri;
+        }
+
         if (assetLib->overrides.getCount() > 0) {
             bx::Path ext = newUri.getFileExt();
             ext.toLower();
@@ -396,7 +424,17 @@ namespace tee {
     static bx::Path getOriginalUri(const char* uri)
     {
         AssetLib* assetLib = gAssetLib;
-        bx::Path newUri(uri);
+        bx::Path newUri;
+        if (assetLib->pathOverrideTableRev.isEmpty()) {
+            newUri = uri;
+        } else {
+            int r = assetLib->pathOverrideTableRev.find(tinystl::hash_string(uri, strlen(uri)));
+            if (r != -1)
+                newUri = assetLib->pathOverrides[assetLib->pathOverrideTableRev[r]].orig;
+            else
+                newUri = uri;
+        }
+
         if (assetLib->overrides.getCount() > 0) {
             bx::Path ext = newUri.getFileExt();
             ext.toLower();
@@ -1001,4 +1039,21 @@ namespace tee {
             teo->replacement = extReplacement;
         }
     }
+
+    void asset::replaceAsset(const char* uri, const char* replaceUri)
+    {
+        size_t hash = tinystl::hash_string(uri, strlen(uri));
+        AssetLib* assetLib = gAssetLib;
+        
+        int r = assetLib->pathOverrideTable.find(hash);
+        if (r == -1) {
+            AssetPathOverride* ao = assetLib->pathOverrides.push();
+            ao->orig = uri;
+            ao->replacement = replaceUri;
+            int index = assetLib->pathOverrides.getCount() - 1;
+            assetLib->pathOverrideTable.add(hash, index);
+            assetLib->pathOverrideTableRev.add(tinystl::hash_string(replaceUri, strlen(replaceUri)), index);
+        } 
+    }
+
 } // namespace tee
