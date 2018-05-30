@@ -185,6 +185,9 @@ namespace bx
     ///
     uint32_t toUint(const char* _str);
 
+    ///
+    float toFloat(const char* _str);
+
     /// String compare.
 	int32_t strCmp(const StringView& _lhs, const StringView& _rhs, int32_t _max = INT32_MAX);
 

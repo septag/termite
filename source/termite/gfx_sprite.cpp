@@ -241,6 +241,7 @@ namespace tee {
         SpriteSheetFrame* frames;
         SpriteMesh* meshes;         // If meshes is not nullptr, we have a mesh for each frame
         int numFrames;
+        float scale;
         AssetHandle texHandle;
         uint8_t padding[2];
 
@@ -248,7 +249,8 @@ namespace tee {
             buff(nullptr),
             frames(nullptr),
             meshes(nullptr),
-            numFrames(0)
+            numFrames(0),
+            scale(1.0f)
         {
         }
     };
@@ -411,6 +413,9 @@ namespace tee {
         ss->frames = (SpriteSheetFrame*)BX_ALLOC(&lalloc, numFrames*sizeof(SpriteSheetFrame));
         ss->numFrames = numFrames;
         ss->meshes = (SpriteMesh*)BX_ALLOC(&lalloc, numFrames*sizeof(SpriteMesh));
+
+        if (jmeta.HasMember("scale"))
+            ss->scale = bx::toFloat(jmeta["scale"].GetString());
 
         // image width/height
         const json::svalue_t& jsize = jmeta["size"];
@@ -1240,6 +1245,11 @@ namespace tee {
         getRealRect(sprite, &halfSize, &center);
         SpriteFlip::Bits flip = sprite->flip;
 
+        const SpriteFrame& frame = sprite->getCurFrame();
+        float scale = 1.0f;
+        if (frame.ssHandle.isValid())
+            scale = asset::getObjPtr<SpriteSheet>(frame.ssHandle)->scale;
+
         for (int i = 0; i < numPts; i++) {
             vec2_t pt = ptsIn[i];
             if (flip & SpriteFlip::FlipX)
@@ -1248,7 +1258,7 @@ namespace tee {
                 pt.y = -pt.y;
 
             pt = vec2(pt.x/imgSize.x, pt.y/imgSize.y);
-            ptsOut[i] = pt * halfSize * 2.0f - center;
+            ptsOut[i] = (pt * halfSize * 2.0f - center) * scale;
         }
     }
 

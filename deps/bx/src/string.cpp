@@ -184,7 +184,13 @@ namespace bx
         return strtoul(_str, nullptr, 10);
     }
 
-	typedef char (*CharFn)(char _ch);
+
+    float toFloat(const char* _str)
+    {
+        return strtof(_str, NULL);
+    }
+
+    typedef char(*CharFn)(char _ch);
 
 	inline char toNoop(char _ch)
 	{

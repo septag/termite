@@ -127,7 +127,9 @@ endif()
 # PCH
 add_precompiled_header(termite pch.h FORCEINCLUDE)
 
-set_target_properties(termite PROPERTIES ${IOS_GENERAL_PROPERTIES})
+if (IOS_GENERAL_PROPERTIES)
+    set_target_properties(termite PROPERTIES ${IOS_GENERAL_PROPERTIES})
+endif()
 
 ## Install
 install(TARGETS termite
