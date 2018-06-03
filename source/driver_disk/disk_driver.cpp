@@ -166,7 +166,7 @@ static bx::Path resolvePath(const char* uri, const bx::Path& rootDir, IoPathType
 #if BX_PLATFORM_IOS
         filepath = iosResolveBundlePath(gAssetsBundleId, uri);
 #elif BX_PLATFORM_ANDROID
-        assert(false);      // Resolving from assetManager is not supported
+        BX_ASSERT(0, "Not Implemented");      // Resolving from assetManager is not supported
 #else
         filepath = rootDir;
         filepath.join("assets").join(uri);
@@ -217,12 +217,12 @@ static IoDriverEventsI* blockGetCallbacks()
 
 static MemoryBlock* uncompressBlob(MemoryBlock* mem, bx::AllocatorI* alloc, const char* filepath)
 {
-    assert(mem);
+    BX_ASSERT(mem);
     // check the last extension
     const char* ext = strrchr(filepath, '.');
     if (ext && bx::strCmpI(ext + 1, "lz4") == 0 && mem->size > sizeof(uint32_t)) {
         uint32_t size = *((uint32_t*)mem->data);
-        assert(size > 0);
+        BX_ASSERT(size > 0);
         MemoryBlock* uncompressed = gTee->createMemoryBlock(size, alloc);
         if (uncompressed) {
             LZ4_decompress_safe((const char*)(mem->data + sizeof(uint32_t)), (char*)uncompressed->data, mem->size, size);
@@ -328,7 +328,7 @@ static void blockingWriteJob(int jobIdx, void* userParam)
     }
 #endif
 
-    assert(job->mem);
+    BX_ASSERT(job->mem);
     size_t size = 0;
     bx::Path filepath = resolvePath(job->uri.cstr(), gBlockingIo.rootDir, job->pathType);
 
@@ -475,7 +475,7 @@ static MemoryBlock* asyncRead(const char* uri, IoPathType::Enum pathType, IoRead
         dj->handle = gTee->dispatchSmallJobs(&job, 1);
         if (dj->handle) {
             ++gAsyncIo.numDiskJobs;
-            gAsyncIo.maxDiskJobsProcessed = std::max(gAsyncIo.numDiskJobs, gAsyncIo.maxDiskJobsProcessed);
+            gAsyncIo.maxDiskJobsProcessed = bx::max(gAsyncIo.numDiskJobs, gAsyncIo.maxDiskJobsProcessed);
             gAsyncIo.jobList.add(&dj->lnode);
         } else {
             // Add to pending to process later
@@ -500,7 +500,7 @@ static size_t asyncWrite(const char* uri, const MemoryBlock* mem, IoPathType::En
         dj->handle = gTee->dispatchSmallJobs(&job, 1);
         if (dj->handle) {
             ++gAsyncIo.numDiskJobs;
-            gAsyncIo.maxDiskJobsProcessed = std::max(gAsyncIo.numDiskJobs, gAsyncIo.maxDiskJobsProcessed);
+            gAsyncIo.maxDiskJobsProcessed = bx::max(gAsyncIo.numDiskJobs, gAsyncIo.maxDiskJobsProcessed);
             gAsyncIo.jobList.add(&dj->lnode);
         } else {
             // Add to pending to process later
@@ -574,11 +574,11 @@ static void asyncRunAsyncLoop()
     while (gAsyncIo.efswQueue.pop(&result)) {
         switch (result->action) {
         case efsw::Action::Modified:
-            assert(gAsyncIo.callbacks);
+            BX_ASSERT(gAsyncIo.callbacks);
             gAsyncIo.callbacks->onModified(result->filepath.cstr());
             break;
         default:
-            assert(0);  // not implemented
+            BX_ASSERT(0);  // not implemented
             break;
         }
         BX_DELETE(gAsyncIo.alloc, result);
@@ -640,7 +640,7 @@ void FileWatchListener::handleFileAction(efsw::WatchID watchid, const std::strin
             break;
 
         default:
-            assert(0);
+            BX_ASSERT(0);
         }
     }
 }

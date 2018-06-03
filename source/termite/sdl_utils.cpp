@@ -70,7 +70,7 @@ namespace tee {
     bool sdl::init(bx::AllocatorI* alloc)
     {
         if (gSDL) {
-            assert(0);
+            BX_ASSERT(0);
             return false;
         }
 
@@ -131,11 +131,11 @@ namespace tee {
 
     static void processShortcutKeys()
     {
-        assert(gSDL);
+        BX_ASSERT(gSDL);
         for (int i = 0, c = gSDL->shortcutKeys.getCount(); i < c; i++) {
             const ShortcutKey& sk = gSDL->shortcutKeys[i];
             if (gSDL->keysDown[sk.key] && sk.modKeys == gSDL->modKeys) {
-                assert(sk.callback);
+                BX_ASSERT(sk.callback);
                 sk.callback(sk.userData);
             }
         }
@@ -249,8 +249,8 @@ namespace tee {
 
     void sdl::registerShortcutKey(SDL_Keycode vkey, ModifierKey::Bits modKeys, ShortcutKeyCallback callback, void* userData)
     {
-        assert(gSDL);
-        assert(callback);
+        BX_ASSERT(gSDL);
+        BX_ASSERT(callback);
 
         // Search previous shortcuts for a duplicate, if found just change the callback
         int index = gSDL->shortcutKeys.find([vkey, modKeys](const ShortcutKey& sk) {

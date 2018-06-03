@@ -8,6 +8,13 @@
 
 #include "bx.h"
 
+#if defined(_DEBUG) || defined(BX_CONFIG_DEBUG)
+#   ifndef BX_CONFIG_ALLOCATOR_DEBUG
+#       define BX_CONFIG_ALLOCATOR_DEBUG 1
+#   endif
+#   define BX_ENABLE_ASSERTS 1
+#endif
+
 #ifndef BX_CONFIG_ALLOCATOR_DEBUG
 #	define BX_CONFIG_ALLOCATOR_DEBUG 0
 #endif // BX_CONFIG_DEBUG_ALLOC

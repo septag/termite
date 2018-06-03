@@ -257,14 +257,14 @@ namespace bx
 
     Socket::~Socket()
     {
-        assert(m_buffer == nullptr);
-        assert(m_sock == SOCK_NULL);
+        BX_ASSERT(m_buffer == nullptr);
+        BX_ASSERT(m_sock == SOCK_NULL);
     }
 
     bool Socket::setBufferedWrite(int size, AllocatorI* alloc)
     {
-        assert(alloc);
-        assert(size);
+        BX_ASSERT(alloc);
+        BX_ASSERT(size);
 
         m_buffer = (uint8_t*)BX_ALLOC(alloc, size);
         if (!m_buffer)
@@ -278,8 +278,8 @@ namespace bx
 
     void Socket::setBufferedWritePtr(void* buffer, int size)
     {
-        assert(buffer);
-        assert(size);
+        BX_ASSERT(buffer);
+        BX_ASSERT(size);
 
         m_buffer = (uint8_t*)buffer;
         m_bufferSize = size;
@@ -288,7 +288,7 @@ namespace bx
 
     bool Socket::pollRead(int timeoutMs) const
     {
-        assert(m_sock != SOCK_NULL);
+        BX_ASSERT(m_sock != SOCK_NULL);
         SocketId sock = m_sock;
 
         timeval tmout = { timeoutMs / 1000, (timeoutMs % 1000) * 1000 };
@@ -304,7 +304,7 @@ namespace bx
 
     bool Socket::pollWrite(int timeoutMs) const
     {
-        assert(m_sock != SOCK_NULL);
+        BX_ASSERT(m_sock != SOCK_NULL);
         SocketId sock = m_sock;
 
         timeval tmout = { timeoutMs / 1000, (timeoutMs % 1000) * 1000 };
@@ -350,7 +350,7 @@ namespace bx
 
     bool SocketTCP::listen(int port)
     {
-        assert(m_sock == SOCK_NULL);
+        BX_ASSERT(m_sock == SOCK_NULL);
 
         // Create socket
         m_sock = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -394,7 +394,7 @@ namespace bx
 
     bool SocketTCP::connect(const SocketAddr& addr)
     {
-        assert(m_sock == SOCK_NULL);
+        BX_ASSERT(m_sock == SOCK_NULL);
 
         if (addr.type == SocketAddrType::IPv4) {
             // Create IP4 socket
@@ -438,7 +438,7 @@ namespace bx
             return r != SOCK_ERROR;
         }
 
-        assert(0);
+        BX_ASSERT(0);
         return false;
     }
 
@@ -499,7 +499,7 @@ namespace bx
 
     bool SocketUDP::bind(int port)
     {
-        assert(m_sock == SOCK_NULL);
+        BX_ASSERT(m_sock == SOCK_NULL);
 
         // Create socket
         m_sock = ::socket(AF_INET, SOCK_DGRAM, 0);

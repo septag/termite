@@ -244,7 +244,7 @@ namespace tee {
 
     static int32_t reqThread(bx::Thread* _self, void* userData)
     {
-        assert(gHttp);
+        BX_ASSERT(gHttp);
         RestClient::init();
 
         while (!gHttp->quit) {
@@ -282,7 +282,7 @@ namespace tee {
     bool http::init(bx::AllocatorI* alloc)
     {
         if (gHttp) {
-            assert(false);
+            BX_ASSERT(false);
             return false;
         }
 

@@ -299,37 +299,6 @@ static void* getEcsApi(uint32_t version)
 	}
 }
 
-static void* getCameraApi(uint32_t version)
-{
-    static MathApi mathApi;
-    bx::memSet(&mathApi, 0x00, sizeof(mathApi));
-
-    switch (version) {
-    case 0:
-        mathApi.camInit = camInit;
-        mathApi.camLookAt = camLookAt;
-        mathApi.camCalcFrustumCorners = camCalcFrustumCorners;
-        mathApi.camCalcFrustumPlanes = camCalcFrustumPlanes;
-        mathApi.camPitch = camPitch;
-        mathApi.camYaw = camYaw;
-        mathApi.camPitchYaw = camPitchYaw;
-        mathApi.camRoll = camRoll;
-        mathApi.camForward = camForward;
-        mathApi.camStrafe = camStrafe;
-        mathApi.camViewMtx = camViewMtx;
-        mathApi.camProjMtx = camProjMtx;
-        mathApi.cam2dInit = cam2dInit;
-        mathApi.cam2dPan = cam2dPan;
-        mathApi.cam2dZoom = cam2dZoom;
-        mathApi.cam2dViewMtx = cam2dViewMtx;
-        mathApi.cam2dProjMtx = cam2dProjMtx;
-        mathApi.cam2dGetRect = cam2dGetRect;
-        return &mathApi;
-    default:
-        return nullptr;
-    }
-}
-
 static void* getCoreApi(uint32_t version)
 {
     static CoreApi coreApi;
@@ -385,6 +354,18 @@ static void* getGfxApi(uint32_t version)
     return &gfxApi;
 }
 
+static void* getMathApi(uint32_t version)
+{
+    static MathApi mathApi;
+    mathApi.cam2dInit = tmath::cam2dInit;
+    mathApi.cam2dPan = tmath::cam2dPan;
+    mathApi.cam2dZoom = tmath::cam2dZoom;
+    mathApi.cam2dGetProjMat = tmath::cam2dGetProjMat;
+    mathApi.cam2dGetViewMat = tmath::cam2dGetViewMat;
+    mathApi.cam2dGetViewRect = tmath::cam2dGetViewRect;
+    return &mathApi;
+}
+
 void* tee::getEngineApi(uint16_t apiId, uint32_t version)
 {
     switch (apiId) {
@@ -397,17 +378,17 @@ void* tee::getEngineApi(uint16_t apiId, uint32_t version)
     case ApiId::ImGui:
         return getImGuiApi(version);
 
-    case ApiId::Camera:
-        return getCameraApi(version);
-
     case ApiId::Component:
         return getEcsApi(version);
 
     case ApiId::Asset:
         return getAssetApi(version);
 
+    case ApiId::Math:
+        return getMathApi(version);
+
     default:
-        assert(0);
+        BX_ASSERT(0);
         return nullptr;
     }
 }

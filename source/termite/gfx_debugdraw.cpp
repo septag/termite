@@ -148,7 +148,7 @@ namespace tee
 
     static Shape createSolidAABB()
     {
-        aabb_t box = aabbZero();
+        aabb_t box = aabb_t::Null;
         vec3_t pts[8];
 
         const int numVerts = 36;
@@ -188,7 +188,7 @@ namespace tee
 
     static Shape createAABB()
     {
-        aabb_t box = aabbZero();
+        aabb_t box = aabb_t::Null;
         vec3_t pts[8];
 
         const int numVerts = 24;
@@ -234,7 +234,7 @@ namespace tee
         // Create buffer and fill it with data
         int size = numVerts * sizeof(eddVertexPosCoordColor);
         eddVertexPosCoordColor* verts = (eddVertexPosCoordColor*)alloca(size);
-        assert(verts);
+        BX_ASSERT(verts);
         bx::memSet(verts, 0x00, size);
 
         const float dt = bx::kPi2 / float(numSegs);
@@ -362,7 +362,7 @@ namespace tee
     bool gfx::initDebugDraw(bx::AllocatorI* alloc, GfxDriver* driver)
     {
         if (gDbgDraw) {
-            assert(false);
+            BX_ASSERT(false);
             return false;
         }
 
@@ -393,13 +393,13 @@ namespace tee
         eddVertexPosCoordColor::init();
 
         gDbgDraw->uTexture = driver->createUniform("u_texture", UniformType::Int1, 1);
-        assert(gDbgDraw->uTexture.isValid());
+        BX_ASSERT(gDbgDraw->uTexture.isValid());
         gDbgDraw->uColor = driver->createUniform("u_color", UniformType::Vec4, 1);
-        assert(gDbgDraw->uColor.isValid());
+        BX_ASSERT(gDbgDraw->uColor.isValid());
 
         // Create a 1x1 white texture 
         gDbgDraw->whiteTexture = getWhiteTexture1x1();
-        assert(gDbgDraw->whiteTexture.isValid());
+        BX_ASSERT(gDbgDraw->whiteTexture.isValid());
 
         gDbgDraw->bbShape = createAABB();
         gDbgDraw->bsphereShape = createBoundingSphere(30);
@@ -433,7 +433,7 @@ namespace tee
 
     DebugDraw* gfx::createDebugDraw()
     {
-        assert(gDbgDraw);
+        BX_ASSERT(gDbgDraw);
 
         bx::AllocatorI* alloc = gDbgDraw->alloc;
         DebugDraw* ctx = BX_NEW(alloc, DebugDraw)(alloc);
@@ -461,8 +461,8 @@ namespace tee
 
     void gfx::destroyDebugDraw(DebugDraw* ctx)
     {
-        assert(gDbgDraw);
-        assert(ctx);
+        BX_ASSERT(gDbgDraw);
+        BX_ASSERT(ctx);
 
         if (!ctx->alloc)
             return;
@@ -477,7 +477,7 @@ namespace tee
     void gfx::beginDebugDraw(DebugDraw* ctx, uint8_t viewId, const irect_t& viewport,
                              const mat4_t& viewMtx, const mat4_t& projMtx, DebugDraw2D* vg)
     {
-        assert(ctx);
+        BX_ASSERT(ctx);
         gfx::resetDbg(ctx);
         ctx->viewId = viewId;
         ctx->vgCtx = vg;
@@ -576,17 +576,17 @@ namespace tee
 
     void gfx::lineDbg(DebugDraw* ctx, const vec3_t& startPt, const vec3_t& endPt, const mat4_t* modelMtx /*= nullptr*/)
     {
-        assert(0);
+        BX_ASSERT(0);
     }
 
     void gfx::circleDbg(DebugDraw* ctx, const vec3_t& pos, float radius, const mat4_t* modelMtx /*= nullptr*/, bool showDir /*= false*/)
     {
-        assert(0);
+        BX_ASSERT(0);
     }
 
     void gfx::rectDbg(DebugDraw* ctx, const vec3_t& minpt, const vec3_t& maxpt, const mat4_t* modelMtx /*= nullptr*/)
     {
-        assert(0);
+        BX_ASSERT(0);
     }
 
     void gfx::xzGridDbg(DebugDraw* ctx, const Camera& cam, float spacing, float boldSpacing, float maxDepth,
@@ -602,7 +602,7 @@ namespace tee
         tmath::mtxProjPlane(&projToXz, vec3(0, 1.0f, 0));
 
         // project frustum corners to XZ plane add them to bounding box
-        aabb_t bb = aabbZero();
+        aabb_t bb = aabb_t::Null;
         for (int i = 0; i < 8; i++) {
             vec3_t tmp;
             bx::vec3MulMtx(tmp.f, corners[i].f, projToXz.f);
@@ -682,7 +682,7 @@ namespace tee
     {
         spacing = bx::ceil(bx::clamp(spacing, 1.0f, 20.0f));
 
-        rect_t rc = cam.getRect();
+        rect_t rc = cam.getViewRect();
 
         // Snap grid bounds to 'spacing'
         // Example: spacing = 5, snap bounds to -5, 0, 5, ...

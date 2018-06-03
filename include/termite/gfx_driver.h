@@ -1,9 +1,7 @@
 #pragma once
 
-#include <cstdarg>
 #include "bx/bx.h"
 #include "bx/allocator.h"
-
 #include "gfx_defines.h"
 
 namespace tee

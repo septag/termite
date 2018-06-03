@@ -4,7 +4,7 @@
 #include "bx/allocator.h"
 #include "bx/commandline.h"
 #include "bx/file.h"
-#include "bx/math.h"
+#include "bxx/math.h"
 #include "bx/string.h"
 #include "bx/uint32_t.h"
 #include "bxx/array.h"
@@ -126,8 +126,8 @@ static AnimData* importAnim(const Args& args)
             if (!channel->poss || !channel->rots)
                 return nullptr;
 
-            vec3_t pos;
-            quat_t quat;
+            bx::vec3_t pos;
+            bx::quat_t quat;
             for (int f = 0; f < numFrames; f++) {
                 float scale = 1.0f;
                 if (f < (int)achannel->mNumPositionKeys) {

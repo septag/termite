@@ -2,7 +2,6 @@ import os
 import sys
 import subprocess
 import shutil
-import glob
 import optparse
 import lz4.block
 import json
@@ -113,6 +112,14 @@ def encodeEtc2(filepath):
 
     print(filepath + ' -> ' + os.path.relpath(outputFilepath, ARG_OutputDir))
     modifiedFilepath = filepath
+
+    # check if have a json file with the same name (TexturePacker spritesheet)
+    # then change it's size in the json too, or just copy the file to target path
+    spritesheet_filepath = filename + '.json'
+    if (os.path.isfile(spritesheet_filepath)):
+        jdata = json.load(open(spritesheet_filepath)) 
+    else:
+        jdata = None
     
     # Open the image file, check the size to be a modulo of the argument
     if (ARG_FixImageSizeModulo != 0):
@@ -131,7 +138,21 @@ def encodeEtc2(filepath):
             newImage.paste(img)
             newImage.save(tmpImageFilepath, fileext[1:])
             modifiedFilepath = tmpImageFilepath
+            
+            # modify image size inside the spritesheet 'meta' tag
+            if jdata:
+                jdata['meta']['size']['w'] = width
+                jdata['meta']['size']['h'] = height
 
+    # trim/modify spritesheet json data for the image, and put them into target
+    if jdata:
+        json_filepath = os.path.join(destdir, os.path.basename(filename)) + '.json'
+        with open(json_filepath, 'w', encoding='utf8') as f:
+            f.write(json.dumps(jdata, sort_keys=False))
+            f.close()
+        print('\t' + spritesheet_filepath + ' -> ' + os.path.relpath(json_filepath, ARG_OutputDir))
+
+    # ETC2 convert the file
     args = [C_EtcToolPath, modifiedFilepath, '-j', '4']
     if tpFmt:
         args.extend(['-format', tpFmt])

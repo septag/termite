@@ -1,8 +1,10 @@
 #pragma once
 
+#ifndef BX_HANDLE_POOL_H_
+#   define BX_HANDLE_POOL_H_
+
 #include "bx/bx.h"
 #include "bx/allocator.h"
-#include <assert.h>
 
 #define BX_INDEXED_POOL_MAX_BUFFERS 4
 
@@ -62,3 +64,5 @@ namespace bx
 } // namespace bx
 
 #include "inline/handle_pool.inl"
+
+#endif

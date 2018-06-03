@@ -255,9 +255,9 @@ namespace tee {
         // TODO: REMOVE THIS line later
         enableTextureDecodeCache = false;
 
-        assert(driver);
+        BX_ASSERT(driver);
         if (gTexLoader) {
-            assert(false);
+            BX_ASSERT(false);
             return false;
         }
 
@@ -349,7 +349,7 @@ namespace tee {
         AssetTypeHandle handle;
         handle = asset::registerType("texture", &gTexLoader->loader, sizeof(LoadTextureParams),
                                       uintptr_t(gTexLoader->failTexture), uintptr_t(gTexLoader->asyncBlankTexture));
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
     }
 
     void gfx::shutdownTextureLoader()
@@ -427,7 +427,7 @@ namespace tee {
 
     static bool loadUncompressed(const MemoryBlock* mem, const AssetParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
     {
-        assert(gTexLoader);
+        BX_ASSERT(gTexLoader);
         GfxDriver* driver = gTexLoader->driver;
         const LoadTextureParams* texParams = (const LoadTextureParams*)params.userParams;
 
@@ -467,7 +467,7 @@ namespace tee {
             break;
 
         default:
-            assert(0);  // Unsupported format
+            BX_ASSERT(0);  // Unsupported format
             return false;
         }
 
@@ -549,8 +549,8 @@ namespace tee {
             stbi_image_free(pixels);
 
             int srcWidth = width, srcHeight = height;
-            mipWidth = std::max<int>(1, width >> 1);
-            mipHeight = std::max<int>(1, height >> 1);
+            mipWidth = bx::max<int>(1, width >> 1);
+            mipHeight = bx::max<int>(1, height >> 1);
             for (int i = 1; i < numMips; i++) {
                 uint8_t* destPixels = srcPixels + srcWidth*srcHeight*numComp;
 
@@ -618,7 +618,7 @@ namespace tee {
                 }
             }
         } else {
-            assert(0);  // unsupported format
+            BX_ASSERT(0);  // unsupported format
             return nullptr;
         }
 
@@ -690,7 +690,7 @@ namespace tee {
 
         if (isFormatSupported) {
             // TODO: support Cube/3D textures
-            assert(img->m_depth == 1 && !img->m_cubeMap);
+            BX_ASSERT(img->m_depth == 1 && !img->m_cubeMap);
             texture->handle = driver->createTexture2D(img->m_width, img->m_height, img->m_numMips>1, img->m_numLayers,
                 (TextureFormat::Enum)img->m_format, texParams->flags, driver->makeRef(img->m_data, img->m_size, [](void* ptr, void* userData) {
                 bimg::ImageContainer* img = (bimg::ImageContainer*)userData;
@@ -791,8 +791,8 @@ namespace tee {
 
     void TextureLoaderAll::unloadObj(uintptr_t obj, bx::AllocatorI* alloc)
     {
-        assert(gTexLoader);
-        assert(obj);
+        BX_ASSERT(gTexLoader);
+        BX_ASSERT(obj);
 
         Texture* texture = (Texture*)obj;
         if (texture->handle.isValid())

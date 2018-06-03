@@ -1,13 +1,11 @@
 #pragma once
 
-#include <assert.h>
-#include <math.h>
-
 // Stuff we need from stl
-#include <algorithm>
-#include <functional>
+#include <algorithm>    // std::sort (TODO: replace with bx::sort functions)
+#include <functional>   // std::function
 
 #include "bx/allocator.h"
+#include "bx/debug.h"
 #include "bxx/path.h"
 #include "tinystl/hash.h"
 
@@ -169,6 +167,8 @@ namespace tee
     class TimeStepper
     {
     public:
+        TimeStepper() = delete;
+
         explicit TimeStepper(float timestep) :
             m_accum(0),
             m_timestep(timestep)

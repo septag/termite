@@ -16,8 +16,8 @@ namespace bx {
 
     bool HandlePool::create(const uint32_t* itemSizes, int numBuffers, uint16_t maxItems, uint16_t growSize, AllocatorI* alloc)
     {
-        assert(numBuffers <= BX_INDEXED_POOL_MAX_BUFFERS);
-        assert(numBuffers > 0);
+        BX_ASSERT(numBuffers <= BX_INDEXED_POOL_MAX_BUFFERS);
+        BX_ASSERT(numBuffers > 0);
 
         m_alloc = alloc;
         m_maxItems = maxItems;
@@ -54,7 +54,7 @@ namespace bx {
     void HandlePool::destroy()
     {
         if (m_indices) {
-            assert(m_alloc);
+            BX_ASSERT(m_alloc);
             BX_FREE(m_alloc, m_indices);
         }
 
@@ -67,8 +67,8 @@ namespace bx {
 
     HandlePool::~HandlePool()
     {
-        assert(m_indices == nullptr);
-        assert(m_revIndices == nullptr);
+        BX_ASSERT(m_indices == nullptr);
+        BX_ASSERT(m_revIndices == nullptr);
     }
 
     uint16_t HandlePool::newHandle()
@@ -76,7 +76,7 @@ namespace bx {
         // Grow buffer if needed
         if (m_partition == m_maxItems) {
             uint16_t prevMax = m_maxItems;
-            assert(m_growSize);
+            BX_ASSERT(m_growSize);
             m_maxItems += m_growSize;
             size_t totalSize = 2 * sizeof(uint16_t)*m_maxItems;
             for (int i = 0; i < m_numBuffers; i++)
@@ -110,7 +110,7 @@ namespace bx {
 
     void HandlePool::freeHandle(uint16_t handle)
     {
-        assert(handle < m_maxItems);
+        BX_ASSERT(handle < m_maxItems);
 
         uint16_t freeIndex = m_revIndices[handle];
         uint16_t moveIndex = m_partition - 1;
@@ -118,7 +118,7 @@ namespace bx {
         uint16_t freeHdl = handle;
         uint16_t moveHdl = m_indices[m_partition - 1];
 
-        assert(freeIndex < m_partition);
+        BX_ASSERT(freeIndex < m_partition);
 
         bx::xchg(m_indices[freeIndex], m_indices[moveIndex]);
         bx::xchg(m_revIndices[freeHdl], m_revIndices[moveHdl]);

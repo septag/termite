@@ -1,8 +1,10 @@
 #pragma once
 
+// TODO: Remove this in the next project
+
 #include "bx/bx.h"
 #include "bx/allocator.h"
-#include <assert.h>
+#include "bx/debug.h"
 
 #ifndef TEE_API
 #   define TEE_API
@@ -21,6 +23,11 @@ namespace tee
         };
 
         float f[4];
+
+        static const vec4_t Zero;
+        static const vec4_t Up;
+        static const vec4_t Right;
+        static const vec4_t Forward;
     };
 
     union vec2_t
@@ -32,6 +39,10 @@ namespace tee
         };
 
         float f[2];
+
+        static const vec2_t Zero;
+        static const vec2_t Right;
+        static const vec2_t Up;
     };
 
     union vec3_t
@@ -44,6 +55,11 @@ namespace tee
         };
 
         float f[3];
+
+        static const vec3_t Zero;
+        static const vec3_t Right;
+        static const vec3_t Up;
+        static const vec3_t Forward;
     };
 
     union ucolor_t
@@ -57,6 +73,15 @@ namespace tee
         };
 
         uint32_t n;
+
+        static const ucolor_t White;
+        static const ucolor_t Black;
+        static const ucolor_t Red;
+        static const ucolor_t Green;
+        static const ucolor_t Blue;
+        static const ucolor_t Yellow;
+        static const ucolor_t Cyan;
+        static const ucolor_t Magenta;
     };
 
 
@@ -69,6 +94,10 @@ namespace tee
         };
 
         int n[2];
+
+        static const ivec2_t Zero;
+        static const ivec2_t Up;
+        static const ivec2_t Right;
     };
 
     union quat_t
@@ -82,6 +111,8 @@ namespace tee
         };
 
         float f[4];
+
+        static const quat_t Ident;
     };
 
     union mat3_t
@@ -108,6 +139,9 @@ namespace tee
         };
 
         float f[9];
+
+        static const mat3_t Zero;
+        static const mat3_t Ident;
     };
 
     union mat4_t
@@ -137,6 +171,9 @@ namespace tee
         };
 
         float f[16];
+
+        static const mat4_t Zero;
+        static const mat4_t Ident;
     };
 
     union aabb_t
@@ -160,6 +197,8 @@ namespace tee
         };
 
         float f[6];
+
+        TEE_API static const aabb_t Null;
     };
 
     union rect_t
@@ -183,6 +222,8 @@ namespace tee
         };
 
         float f[4];
+
+        TEE_API static const rect_t Null;
     };
 
     union irect_t
@@ -206,6 +247,8 @@ namespace tee
         };
 
         int n[4];
+
+        TEE_API static const irect_t Null;
     };
 
     union sphere_t
@@ -217,6 +260,8 @@ namespace tee
 
         vec3_t center;
         float f[4];
+
+        static const sphere_t Zero;
     };
 
     union plane_t
@@ -232,91 +277,96 @@ namespace tee
         };
 
         float f[4];
+
+        static const plane_t Up;
+        static const plane_t Forward;
+        static const plane_t Right;
     };
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    vec4_t vec4(float x, float y, float z, float w);
-    vec4_t vec4(const float* f);
+    BX_CONST_FUNC vec4_t vec4(float x, float y, float z, float w);
+    BX_CONST_FUNC vec4_t vec4(const float* f);
+    BX_CONST_FUNC vec4_t vec4_splat(float n);
 
-    vec2_t vec2(float x, float y);
-    vec2_t vec2(const float* f);
+    BX_CONST_FUNC vec2_t vec2(float x, float y);
+    BX_CONST_FUNC vec2_t vec2(const float* f);
+    BX_CONST_FUNC vec2_t vec2_splat(float n);
 
-    vec3_t vec3(float x, float y, float z);
-    vec3_t vec3(const float* f);
+    BX_CONST_FUNC vec3_t vec3(float x, float y, float z);
+    BX_CONST_FUNC vec3_t vec3(const float* f);
+    BX_CONST_FUNC vec3_t vec3_splat(float n);
 
-    ucolor_t ucolor(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
-    ucolor_t ucolor(uint32_t n);
-    ucolor_t ucolorSwizzle(uint32_t n);
-    ucolor_t ucolorf(float r, float g, float b, float a = 1.0f);
+    BX_CONST_FUNC ucolor_t ucolor(uint32_t n);
+    BX_CONST_FUNC ucolor_t ucolor(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
+    BX_CONST_FUNC ucolor_t ucolor_inv(uint32_t n);
+    BX_CONST_FUNC ucolor_t ucolorf(float r, float g, float b, float a = 1.0f);
 
-    ivec2_t ivec2(const int* n);
-    ivec2_t ivec2(int x, int y);
+    BX_CONST_FUNC ivec2_t ivec2(const int* n);
+    BX_CONST_FUNC ivec2_t ivec2(int x, int y);
 
-    quat_t quaternionI();
-    quat_t quaternion(float x, float y, float z, float w);
-    quat_t quaternion(const float* f);
+    BX_CONST_FUNC quat_t quaternionI();
+    BX_CONST_FUNC quat_t quaternion(float x, float y, float z, float w);
+    BX_CONST_FUNC quat_t quaternion(const float* f);
 
-    mat4_t mat4(float _m11, float _m12, float _m13, float _m14,
-                float _m21, float _m22, float _m23, float _m24,
-                float _m31, float _m32, float _m33, float _m34,
-                float _m41, float _m42, float _m43, float _m44);
-    mat4_t mat4(const float* _r0, const float* _r1, const float* _r2, const float* _r3);
-    mat4_t mat4(const vec4_t& _row0, const vec4_t& _row1, const vec4_t& _row2, const vec4_t& _row3);
+    BX_CONST_FUNC mat4_t mat4(float _m11, float _m12, float _m13, float _m14,
+                              float _m21, float _m22, float _m23, float _m24,
+                              float _m31, float _m32, float _m33, float _m34,
+                              float _m41, float _m42, float _m43, float _m44);
+    BX_CONST_FUNC mat4_t mat4(const float* _r0, const float* _r1, const float* _r2, const float* _r3);
+    BX_CONST_FUNC mat4_t mat4(const vec4_t& _row0, const vec4_t& _row1, const vec4_t& _row2, const vec4_t& _row3);
 
-    mat3_t mat3(float _m11, float _m12, float _m13,
-                float _m21, float _m22, float _m23,
-                float _m31, float _m32, float _m33);
-    mat3_t mat3(const float* _r0, const float* _r1, const float* _r2);
-    mat3_t mat3(const vec3_t& _row0, const vec3_t& _row1, const vec3_t& _row2);
+    BX_CONST_FUNC mat3_t mat3(float _m11, float _m12, float _m13,
+                              float _m21, float _m22, float _m23,
+                              float _m31, float _m32, float _m33);
+    BX_CONST_FUNC mat3_t mat3(const float* _r0, const float* _r1, const float* _r2);
+    BX_CONST_FUNC mat3_t mat3(const vec3_t& _row0, const vec3_t& _row1, const vec3_t& _row2);
 
-    aabb_t aabbZero();
-    aabb_t aabb(const vec3_t& _min, const vec3_t& _max);
-    aabb_t aabb(const float* _min, const float* _max);
-    aabb_t aabb(float _xmin, float _ymin, float _zmin, float _xmax, float _ymax, float _zmax);
+    BX_CONST_FUNC aabb_t aabb(const vec3_t& _min, const vec3_t& _max);
+    BX_CONST_FUNC aabb_t aabb(const float* _min, const float* _max);
+    BX_CONST_FUNC aabb_t aabb(float _xmin, float _ymin, float _zmin, float _xmax, float _ymax, float _zmax);
 
-    rect_t rectZero();
-    rect_t rect(float _xmin, float _ymin, float _xmax, float _ymax);
-    rect_t rect(const float* _min, const float* _max);
-    rect_t rect(const vec2_t& _vmin, const vec2_t& _vmax);
-    rect_t rectwh(float _x, float _y, float _width, float _height);
+    BX_CONST_FUNC rect_t rect(float _xmin, float _ymin, float _xmax, float _ymax);
+    BX_CONST_FUNC rect_t rect(const float* _min, const float* _max);
+    BX_CONST_FUNC rect_t rect(const vec2_t& _vmin, const vec2_t& _vmax);
+    BX_CONST_FUNC rect_t rectwh(float _x, float _y, float _width, float _height);
 
-    irect_t irect();
-    irect_t irect(int _xmin, int _ymin, int _xmax, int _ymax);
-    irect_t irect(const int* _min, const int* _max);
-    irect_t irect(const ivec2_t& _vmin, const ivec2_t& _vmax);
+    BX_CONST_FUNC irect_t irect(int _xmin, int _ymin, int _xmax, int _ymax);
+    BX_CONST_FUNC irect_t irect(const int* _min, const int* _max);
+    BX_CONST_FUNC irect_t irect(const ivec2_t& _vmin, const ivec2_t& _vmax);
+    BX_CONST_FUNC irect_t irectwh(int _x, int _y, int _width, int _height);
 
-    sphere_t sphere(const float* _f);
-    sphere_t sphere(float _x, float _y, float _z, float _r);
-    sphere_t sphere(const vec3_t& _cp, float _r);
+    BX_CONST_FUNC sphere_t sphere(const float* _f);
+    BX_CONST_FUNC sphere_t sphere(float _x, float _y, float _z, float _r);
+    BX_CONST_FUNC sphere_t sphere(const vec3_t& _cp, float _r);
 
-    plane_t plane(const float* _f);
-    plane_t plane(float _nx, float _ny, float _nz, float _d);
-    plane_t plane(const vec3_t& _n, float _d);
+    BX_CONST_FUNC plane_t plane(const float* _f);
+    BX_CONST_FUNC plane_t plane(float _nx, float _ny, float _nz, float _d);
+    BX_CONST_FUNC plane_t plane(const vec3_t& _n, float _d);
 
-    mat4_t mat4(float _m11, float _m12, float _m13,
-                float _m21, float _m22, float _m23,
-                float _m31, float _m32, float _m33,
-                float _m41, float _m42, float _m43);
-    mat4_t mat4f3(const float* _r0, const float* _r1, const float* _r2, const float* _r3);
-    mat4_t mat4(const mat3_t& m);
+    BX_CONST_FUNC mat4_t mat4(float _m11, float _m12, float _m13,
+                              float _m21, float _m22, float _m23,
+                              float _m31, float _m32, float _m33,
+                              float _m41, float _m42, float _m43);
+    BX_CONST_FUNC mat4_t mat4f3(const float* _r0, const float* _r1, const float* _r2, const float* _r3);
+    BX_CONST_FUNC mat4_t mat4(const mat3_t& m);
 
-    mat4_t mat4I();
-    mat3_t mat3I();
-    mat3_t mat3(const mat4_t& m);
+    BX_CONST_FUNC mat4_t mat4I();
+    BX_CONST_FUNC mat3_t mat3I();
+    BX_CONST_FUNC mat3_t mat3(const mat4_t& m);
 
     // Operators
-    inline vec2_t operator+(const vec2_t& a, const vec2_t& b);
-    inline vec2_t operator-(const vec2_t& a, const vec2_t& b);
-    inline vec2_t operator*(const vec2_t& v, float k);
-    inline vec2_t operator*(float k, const vec2_t& v);
-    inline vec2_t operator*(const vec2_t& v0, const vec2_t& v1);
-    inline vec3_t operator+(const vec3_t& v1, const vec3_t& v2);
-    inline vec3_t operator-(const vec3_t& v1, const vec3_t& v2);
-    inline vec3_t operator*(const vec3_t& v, float k);
-    inline vec3_t operator*(float k, const vec3_t& v);
-    inline mat4_t operator*(const mat4_t& a, const mat4_t& b);
-    inline mat3_t operator*(const mat3_t& a, const mat3_t& b);
-    inline quat_t operator*(const quat_t& a, const quat_t& b);
+    BX_CONST_FUNC vec2_t operator+(const vec2_t& a, const vec2_t& b);
+    BX_CONST_FUNC vec2_t operator-(const vec2_t& a, const vec2_t& b);
+    BX_CONST_FUNC vec2_t operator*(const vec2_t& v, float k);
+    BX_CONST_FUNC vec2_t operator*(float k, const vec2_t& v);
+    BX_CONST_FUNC vec2_t operator*(const vec2_t& v0, const vec2_t& v1);
+    BX_CONST_FUNC vec3_t operator+(const vec3_t& v1, const vec3_t& v2);
+    BX_CONST_FUNC vec3_t operator-(const vec3_t& v1, const vec3_t& v2);
+    BX_CONST_FUNC vec3_t operator*(const vec3_t& v, float k);
+    BX_CONST_FUNC vec3_t operator*(float k, const vec3_t& v);
+    BX_CONST_FUNC mat4_t operator*(const mat4_t& a, const mat4_t& b);
+    BX_CONST_FUNC mat3_t operator*(const mat3_t& a, const mat3_t& b);
+    BX_CONST_FUNC quat_t operator*(const quat_t& a, const quat_t& b);
 
     template <typename Ty>
     struct Matrix
@@ -335,14 +385,14 @@ namespace tee
 
         ~Matrix()
         {
-            assert(mtx == nullptr);
+            BX_ASSERT(mtx == nullptr);
         }
 
         bool create(int _width, int _height)
         {
-            assert(_width > 0);
-            assert(_height > 0);
-            assert(this->mtx == nullptr);
+            BX_ASSERT(_width > 0);
+            BX_ASSERT(_height > 0);
+            BX_ASSERT(this->mtx == nullptr);
 
             this->mtx = (Ty*)BX_ALLOC(alloc, _width*_height * sizeof(Ty));
             if (!this->mtx)
@@ -365,8 +415,8 @@ namespace tee
 
         void set(int x, int y, const Ty& f)
         {
-            assert(x < width);
-            assert(y < height);
+            BX_ASSERT(x < width);
+            BX_ASSERT(y < height);
             mtx[x + width*y] = f;
         }
 
@@ -389,7 +439,6 @@ namespace tee
         // Reference: http://stackoverflow.com/questions/707370/clean-efficient-algorithm-for-wrapping-integers-in-c
         int iwrap(int kX, int const kLowerBound, int const kUpperBound);
         float fwrap(float x, float vmin, float vmax);
-        int iclamp(int n, const int _min, const int _max);
         float falign(float value, float size);
         // Line fgain, but goes up to 1.0 and then back to 0
         float fwave(float _time, float _gain);

@@ -3,6 +3,8 @@
 
 #include <alloca.h>
 
+// TODO: Remove this in the next project
+
 namespace tee {
     bool tmath::whiteNoise(FloatMatrix* whiteNoise, int width, int height)
     {
@@ -211,4 +213,42 @@ namespace tee {
         return true;
     }
 
-}
+    const vec4_t vec4_t::Zero = vec4(0, 0, 0, 1.0f);
+    const vec4_t vec4_t::Up = vec4(0, 1.0f, 0, 1.0f);
+    const vec4_t vec4_t::Right = vec4(1.0f, 0, 0, 1.0f);
+    const vec4_t vec4_t::Forward = vec4(0, 0, 1.0f, 1.0f);
+
+    const vec2_t vec2_t::Zero = vec2(0, 0);
+    const vec2_t vec2_t::Right = vec2(1.0f, 0);
+    const vec2_t vec2_t::Up = vec2(0, 1.0f);
+
+    const vec3_t vec3_t::Zero = vec3(0, 0, 0);
+    const vec3_t vec3_t::Right = vec3(1.0f, 0, 0);
+    const vec3_t vec3_t::Up = vec3(0, 1.0f, 0);
+    const vec3_t vec3_t::Forward = vec3(0, 0, 1.0f);
+
+    const ucolor_t ucolor_t::White = ucolor(0xffffffff);
+    const ucolor_t ucolor_t::Black = ucolor(0xff000000);
+    const ucolor_t ucolor_t::Red = ucolor(0xff0000ff);
+    const ucolor_t ucolor_t::Green = ucolor(0xff00ff00);
+    const ucolor_t ucolor_t::Blue = ucolor(0xffff0000);
+    const ucolor_t ucolor_t::Yellow = ucolor(0xff00ffff);
+    const ucolor_t ucolor_t::Cyan = ucolor(0xffffff00);
+
+    const ivec2_t ivec2_t::Zero = ivec2(0, 0);
+    const ivec2_t ivec2_t::Up = ivec2(0, 1);
+    const ivec2_t ivec2_t::Right = ivec2(1, 0);
+
+    const quat_t quat_t::Ident = quaternionI();
+
+    const mat3_t mat3_t::Zero = mat3(0, 0, 0, 0, 0, 0, 0, 0, 0);
+    const mat3_t mat3_t::Ident = mat3I();
+
+    const mat4_t mat4_t::Zero = mat4(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    const mat4_t mat4_t::Ident = mat4I();
+
+    const aabb_t aabb_t::Null = aabb(FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX);
+    const rect_t rect_t::Null = rect(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
+    const irect_t irect_t::Null = irect(INT_MAX, INT_MAX, -INT_MAX, -INT_MAX);
+    
+}   // namespace tee

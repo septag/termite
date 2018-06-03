@@ -13,7 +13,6 @@
 
 #include <stdarg.h>
 #include <stdio.h>
-#include <assert.h>
 
 //
 using namespace tee;
@@ -30,7 +29,7 @@ private:
 public:
     BgfxCallbacks(GfxDriverEventsI* _callbacks)
     {
-        assert(_callbacks);
+        BX_ASSERT(_callbacks);
         callbacks = _callbacks;
     }
 
@@ -722,7 +721,7 @@ static ProgramHandle createProgram(ShaderHandle vsh, ShaderHandle fsh, bool dest
 
 static void destroyProgram(ProgramHandle handle)
 {
-    assert(handle.isValid());
+    BX_ASSERT(handle.isValid());
     BGFX_DECLARE_HANDLE(ProgramHandle, h, handle);
     bgfx::destroy(h);
 }

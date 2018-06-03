@@ -60,7 +60,7 @@ namespace tee {
     bool initEventDispatcher(bx::AllocatorI* alloc)
     {
         if (gEvents) {
-            assert(0);
+            BX_ASSERT(0);
             return false;
         }
 
@@ -107,7 +107,7 @@ namespace tee {
     Event* registerEvent(RunEventCallback runCallback, TriggerEventCallback triggerCallback, bool destroyOnTrigger,
                          const void* runParams, size_t paramsSize, void* triggerUserData)
     {
-        assert(paramsSize < MAX_PARAM_SIZE);
+        BX_ASSERT(paramsSize < MAX_PARAM_SIZE);
 
         Event* ev = gEvents->eventPool.newInstance();
         if (!ev) {

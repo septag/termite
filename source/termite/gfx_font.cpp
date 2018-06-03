@@ -299,10 +299,10 @@ namespace tee
 
     bool gfx::initFontSystem(bx::AllocatorI* alloc, const vec2_t refScreenSize)
     {
-        assert(alloc);
+        BX_ASSERT(alloc);
 
         if (gFontMgr) {
-            assert(false);
+            BX_ASSERT(false);
             return false;
         }
 
@@ -446,7 +446,7 @@ namespace tee
         AssetTypeHandle handle;
         handle = asset::registerType("font", &gFontMgr->loader, sizeof(LoadFontParams),
                                       uintptr_t(gFontMgr->failFont), uintptr_t(gFontMgr->asyncFont));
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
     }
 
     static Font* loadFontText(const MemoryBlock* mem, const char* filepath, const LoadFontParams& params, bx::AllocatorI* alloc)
@@ -570,7 +570,7 @@ namespace tee
                 readKeyValue(token, key, value, 32);
                 if (strcmp(key, "id") == 0) {
                     uint32_t charId = (uint32_t)bx::toInt(value);
-                    assert(charId < UINT16_MAX);
+                    BX_ASSERT(charId < UINT16_MAX);
                     g.charId = (uint16_t)charId;
                 } else if (strcmp(key, "x") == 0) {
                     g.x = (float)bx::toInt(value);
@@ -587,7 +587,7 @@ namespace tee
                 } else if (strcmp(key, "xadvance") == 0) {
                     int xadvance = bx::toInt(value);
                     g.xadvance = (float)xadvance;
-                    charWidth = std::max<uint16_t>(charWidth, (uint16_t)xadvance);
+                    charWidth = bx::max<uint16_t>(charWidth, (uint16_t)xadvance);
                 }
                 token = strtok(nullptr, " ");
             }
@@ -623,7 +623,7 @@ namespace tee
                 token = strtok(nullptr, " ");
             }
 
-            assert(firstGlyphIdx != -1);
+            BX_ASSERT(firstGlyphIdx != -1);
             if (glyphs[firstGlyphIdx].numKerns == 0)
                 glyphs[firstGlyphIdx].kernIdx = kernIdx;
             ++glyphs[firstGlyphIdx].numKerns;
@@ -634,7 +634,7 @@ namespace tee
         int kernIdx = 0;
         int charIdx = 0;
         while (eol) {
-            bx::strCopy(line, (int)std::min<size_t>(sizeof(line), size_t(eol - strbuff)+1), strbuff);
+            bx::strCopy(line, (int)bx::min<size_t>(sizeof(line), size_t(eol - strbuff)+1), strbuff);
             size_t lineLen = strlen(line);
             if (lineLen > 0) {
                 if (line[lineLen-1] == '\r')
@@ -650,22 +650,22 @@ namespace tee
                     readPage();
                 } else if (strcmp(token, "chars") == 0) {
                     readChars();
-                    assert(numGlyphs > 0);
+                    BX_ASSERT(numGlyphs > 0);
                     glyphs = (FontGlyph*)BX_ALLOC(tmpAlloc, sizeof(FontGlyph)*numGlyphs);
-                    assert(glyphs);
+                    BX_ASSERT(glyphs);
                     bx::memSet(glyphs, 0x00, sizeof(FontGlyph)*numGlyphs);
                 } else if (strcmp(token, "char") == 0) {
-                    assert(charIdx < numGlyphs);
+                    BX_ASSERT(charIdx < numGlyphs);
                     readChar(glyphs[charIdx++]);
                 } else if (strcmp(token, "kernings") == 0) {
                     readKernings();
                     if (numKernings > 0) {
                         kernings = (FontKerning*)BX_ALLOC(tmpAlloc, sizeof(FontKerning)*numKernings);
-                        assert(kernings);
+                        BX_ASSERT(kernings);
                         bx::memSet(kernings, 0x00, sizeof(FontKerning)*numKernings);
                     }
                 } else if (strcmp(token, "kerning") == 0) {
-                    assert(kernIdx < numKernings);
+                    BX_ASSERT(kernIdx < numKernings);
                     readKerning(kernings[kernIdx], kernIdx, glyphs, numGlyphs);
                     kernIdx++;
                 }
@@ -692,7 +692,7 @@ namespace tee
 
         // Hashtable for characters
         if (!font->glyphTable.createWithBuffer(numGlyphs, buff)) {
-            assert(false);
+            BX_ASSERT(false);
             return nullptr;
         }
         for (int i = 0; i < numGlyphs; i++)
@@ -805,7 +805,7 @@ namespace tee
 
         // Hashtable for characters
         if (!font->glyphTable.createWithBuffer(numGlyphs, buff)) {
-            assert(false);
+            BX_ASSERT(false);
             return nullptr;
         }
 
@@ -827,7 +827,7 @@ namespace tee
         uint16_t charWidth = 0;
         for (int i = 0; i < numGlyphs; i++) {
             const fntChar_t& ch = chars[i];
-            assert(ch.id < UINT16_MAX);
+            BX_ASSERT(ch.id < UINT16_MAX);
             font->glyphs[i].charId = uint16_t(ch.id);
             font->glyphs[i].width = (float)ch.width;
             font->glyphs[i].height = (float)ch.height;
@@ -839,7 +839,7 @@ namespace tee
 
             font->glyphTable.add(uint16_t(ch.id), i);
 
-            charWidth = std::max<uint16_t>(charWidth, ch.xadvance);
+            charWidth = bx::max<uint16_t>(charWidth, ch.xadvance);
         }
         font->numGlyphs = numGlyphs;
         font->charWidth = charWidth;
@@ -903,7 +903,7 @@ namespace tee
 
     AssetHandle gfx::getFontTexture(Font* font, int pageId /*= 0*/)
     {
-        assert(pageId < MAX_FONT_PAGES);
+        BX_ASSERT(pageId < MAX_FONT_PAGES);
         return font->texHandles[pageId];
     }
 
@@ -971,14 +971,14 @@ namespace tee
 
     const FontGlyph& gfx::getFontGlyph(Font* font, int index)
     {
-        assert(index < font->numGlyphs);
+        BX_ASSERT(index < font->numGlyphs);
         return font->glyphs[index];
     }
 
     TextDraw* gfx::createTextDraw(int maxChars, AssetHandle fontHandle, bx::AllocatorI* alloc)
     {
-        assert(gFontMgr);
-        assert(fontHandle.isValid());
+        BX_ASSERT(gFontMgr);
+        BX_ASSERT(fontHandle.isValid());
 
         TextDraw* tbatch = gFontMgr->batchPool.newInstance<bx::AllocatorI*>(alloc);
         tbatch->verts = (TextVertex*)BX_ALLOC(alloc, sizeof(TextVertex)*maxChars*4);
@@ -1181,7 +1181,7 @@ namespace tee
 
     void gfx::addText(TextDraw* batch, float scale, const rect_t& rectFit, TextFlags::Bits flags, const char* text)
     {
-        assert(batch);
+        BX_ASSERT(batch);
 
         Font* font = asset::getObjPtr<Font>(batch->fontHandle);
         if ((flags & (TextFlags::AlignLeft | TextFlags::AlignRight | TextFlags::AlignCenter)) == 0) {
@@ -1472,8 +1472,8 @@ namespace tee
 
     void gfx::destroyTextDraw(TextDraw* batch)
     {
-        assert(gFontMgr);
-        assert(batch->alloc);
+        BX_ASSERT(gFontMgr);
+        BX_ASSERT(batch->alloc);
 
         if (batch->verts)
             BX_FREE(batch->alloc, batch->verts);

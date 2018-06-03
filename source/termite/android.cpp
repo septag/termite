@@ -25,7 +25,7 @@ namespace tee {
     JniMethod
     android::findMethod(const char *methodName, const char *methodSig, const char *classPath,
                         JniMethodType::Enum type) {
-        assert(gJavaVM);
+        BX_ASSERT(gJavaVM);
 
         JniMethod m;
         bx::memSet(&m, 0x00, sizeof(m));

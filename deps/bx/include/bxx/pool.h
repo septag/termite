@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef BX_POOL_H_
+#   define BX_POOL_H_
+
 #include "../bx/allocator.h"
 
 namespace bx
@@ -91,3 +94,4 @@ namespace bx
 }
 
 #include "inline/pool.inl"
+#endif

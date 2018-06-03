@@ -10,8 +10,6 @@
 #include "bxx/proxy_allocator.h"
 #include "bxx/hash_table.h"
 
-#include <assert.h>
-
 #define TEE_CORE_API
 #define TEE_GFX_API
 #define TEE_MATH_API
@@ -22,15 +20,15 @@ using namespace tee;
 // conversion functions
 inline b2Vec2 b2vec2(const vec2_t& v)
 {
-    assert(!bx::isNan(v.x));
-    assert(!bx::isNan(v.y));
+    BX_ASSERT(!bx::isNan(v.x));
+    BX_ASSERT(!bx::isNan(v.y));
     return b2Vec2(v.x, v.y);
 }
 
 inline vec2_t tvec2(const b2Vec2& v)
 {
-    assert(!bx::isNan(v.x));
-    assert(!bx::isNan(v.y));
+    BX_ASSERT(!bx::isNan(v.x));
+    BX_ASSERT(!bx::isNan(v.y));
     return vec2(v.x, v.y);
 }
 
@@ -255,13 +253,13 @@ static void shutdownBox2dGraphicsObjects()
 
 static void* b2AllocCallback(int32 size, void* callbackData)
 {
-    assert(gBox2d.alloc);
+    BX_ASSERT(gBox2d.alloc);
     return BX_ALLOC(gBox2d.alloc, size);
 }
 
 static void b2FreeCallback(void* mem, void* callbackData)
 {
-    assert(gBox2d.alloc);
+    BX_ASSERT(gBox2d.alloc);
     BX_FREE(gBox2d.alloc, mem);
 }
 
@@ -334,7 +332,7 @@ static void stepSceneBox2d(PhysScene2D* scene, float dt, int velIterations, int 
 static void debugSceneBox2d(PhysScene2D* scene, const irect_t viewport, const Camera2D& cam,
                             PhysDebugFlags2D::Bits flags)
  {
-    assert(scene);
+    BX_ASSERT(scene);
 
     if (gBox2d.nvg) {
         scene->debugDraw.SetFlags(flags);
@@ -384,8 +382,8 @@ static PhysBody2D* createBodyBox2d(PhysScene2D* scene, const PhysBodyDef2D& body
 
 static void destroyBodyBox2d(PhysBody2D* body)
 {
-    assert(body);
-    assert(body->b);
+    BX_ASSERT(body);
+    BX_ASSERT(body->b);
     
     body->ownerScene->w.DestroyBody(body->b);
     body->b = nullptr;
@@ -909,7 +907,7 @@ static PhysParticleEmitter2D* box2dCreateParticleEmitter(PhysScene2D* scene, con
 
 static void box2dDestroyParticleEmitter(PhysScene2D* scene, PhysParticleEmitter2D* emitter)
 {
-    assert(emitter);
+    BX_ASSERT(emitter);
 
     scene->w.DestroyParticleSystem(emitter->p);
     
@@ -921,13 +919,13 @@ static void box2dDestroyParticleEmitter(PhysScene2D* scene, PhysParticleEmitter2
 
 static void* box2dGetParticleEmitterUserData(PhysParticleEmitter2D* emitter)
 {
-    assert(emitter);
+    BX_ASSERT(emitter);
     return emitter->userData;
 }
 
 static int box2dCreateParticle(PhysParticleEmitter2D* emitter, const PhysParticleDef2D& particleDef)
 {
-    assert(emitter);
+    BX_ASSERT(emitter);
     b2ParticleDef b2def;
     b2def.flags = particleDef.flags;
     b2def.position = b2vec2(particleDef.position);
@@ -941,55 +939,55 @@ static int box2dCreateParticle(PhysParticleEmitter2D* emitter, const PhysParticl
 
 static void box2dDestroyParticle(PhysParticleEmitter2D* emitter, int index, bool callDestructionCallback)
 {
-    assert(emitter);
+    BX_ASSERT(emitter);
     emitter->p->DestroyParticle(index, callDestructionCallback);
 }
 
 static int box2dGetParticleCount(PhysParticleEmitter2D* emitter)
 {
-    assert(emitter);
+    BX_ASSERT(emitter);
     return emitter->p->GetParticleCount();
 }
 
 static void box2dSetMaxParticleCount(PhysParticleEmitter2D* emitter, int maxCount)
 {
-    assert(emitter);
+    BX_ASSERT(emitter);
     emitter->p->SetMaxParticleCount(maxCount);
 }
 
 static int box2dGetMaxParticleCount(PhysParticleEmitter2D* emitter)
 {
-    assert(emitter);
+    BX_ASSERT(emitter);
     return emitter->p->GetMaxParticleCount();
 }
 
 static void box2dApplyParticleForceBatch(PhysParticleEmitter2D* emitter, int firstIdx, int lastIdx, const vec2_t& force)
 {
-    assert(emitter);
+    BX_ASSERT(emitter);
     emitter->p->ApplyForce(firstIdx, lastIdx, b2vec2(force));
 }
 
 static void box2dApplyParticleImpulseBatch(PhysParticleEmitter2D* emitter, int firstIdx, int lastIdx, const vec2_t& impulse)
 {
-    assert(emitter);
+    BX_ASSERT(emitter);
     emitter->p->ApplyLinearImpulse(firstIdx, lastIdx, b2vec2(impulse));
 }
 
 static void box2dApplyParticleForce(PhysParticleEmitter2D* emitter, int index, const vec2_t& force)
 {
-    assert(emitter);
+    BX_ASSERT(emitter);
     emitter->p->ParticleApplyForce(index, b2vec2(force));
 }
 
 static void box2dApplyParticleImpulse(PhysParticleEmitter2D* emitter, int index, const vec2_t& impulse)
 {
-    assert(emitter);
+    BX_ASSERT(emitter);
     emitter->p->ParticleApplyLinearImpulse(index, b2vec2(impulse));
 }
 
 static int box2dGetEmitterPositionBuffer(PhysParticleEmitter2D* emitter, vec2_t* poss, int maxItems)
 {
-    assert(emitter);
+    BX_ASSERT(emitter);
     int count = std::min<int>(emitter->p->GetParticleCount(), maxItems);
     memcpy(poss, emitter->p->GetPositionBuffer(), count*sizeof(vec2_t));
     return count;
@@ -997,7 +995,7 @@ static int box2dGetEmitterPositionBuffer(PhysParticleEmitter2D* emitter, vec2_t*
 
 static int box2dGetEmitterVelocityBuffer(PhysParticleEmitter2D* emitter, vec2_t* vels, int maxItems)
 {
-    assert(emitter);
+    BX_ASSERT(emitter);
     int count = std::min<int>(emitter->p->GetParticleCount(), maxItems);
     memcpy(vels, emitter->p->GetVelocityBuffer(), count*sizeof(vec2_t));
     return count;
@@ -1005,7 +1003,7 @@ static int box2dGetEmitterVelocityBuffer(PhysParticleEmitter2D* emitter, vec2_t*
 
 static int box2dGetEmitterColorBuffer(PhysParticleEmitter2D* emitter, ucolor_t* colors, int maxItems)
 {
-    assert(emitter);
+    BX_ASSERT(emitter);
     int count = std::min<int>(emitter->p->GetParticleCount(), maxItems);
     memcpy(colors, emitter->p->GetColorBuffer(), count*sizeof(ucolor_t));
     return count;
@@ -1066,7 +1064,7 @@ static uint32_t box2dGetParticleGroupFlags(PhysParticleGroup2D* group)
 
 void PhysDebugDraw::beginDraw(NVGcontext* nvg, const Camera2D& cam, const irect_t& viewport)
 {
-    assert(nvg);
+    BX_ASSERT(nvg);
     m_nvg = nvg;
     int viewWidth = viewport.xmax - viewport.xmin;
     int viewHeight = viewport.ymax - viewport.ymin;
@@ -1077,10 +1075,10 @@ void PhysDebugDraw::beginDraw(NVGcontext* nvg, const Camera2D& cam, const irect_
     float scale = 1.0f;
     switch (cam.policy) {
     case DisplayPolicy::FitToHeight:
-        scale = float(viewWidth) * cam.zoom;
+        scale = float(viewWidth) * cam.scale;
         break;
     case DisplayPolicy::FitToWidth:
-        scale = float(viewHeight) * cam.zoom;
+        scale = float(viewHeight) * cam.scale;
         break;
     }
     
@@ -1089,7 +1087,7 @@ void PhysDebugDraw::beginDraw(NVGcontext* nvg, const Camera2D& cam, const irect_
     nvgGlobalAlpha(nvg, 0.8f);
 
     m_strokeScale = 2.0f / scale;
-    m_viewRect = gMath->cam2dGetRect(cam);
+    m_viewRect = gMath->cam2dGetViewRect(&cam);
 }
 
 void PhysDebugDraw::endDraw()
@@ -1241,7 +1239,7 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
 
     gTee = (CoreApi*)getApi(ApiId::Core, 0);
     gGfx = (GfxApi*)getApi(ApiId::Gfx, 0);
-    gMath = (MathApi*)getApi(ApiId::Camera, 0);
+    gMath = (MathApi*)getApi(ApiId::Math, 0);
 
     api.init = initBox2d;
     api.shutdown = shutdownBox2d;
@@ -1340,7 +1338,7 @@ void* initBox2dDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     api.createWeldJoint2Pts = createWeldJoint2PtsBox2d;
     api.destroyWeldJoint = [](PhysScene2D* scene, PhysWeldJoint2D* _joint) {
         PhysJoint2D* joint = (PhysJoint2D*)_joint;
-        assert(joint->j);
+        BX_ASSERT(joint->j);
         scene->w.DestroyJoint(joint->j);
     };
 

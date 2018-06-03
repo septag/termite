@@ -58,7 +58,7 @@ namespace bx
 
         inline bool peek(Ty* pData)
         {
-            assert(pData);
+            BX_ASSERT(pData);
             if (m_first) {
                 *pData = m_first->data;
                 return true;

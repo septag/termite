@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../bx/string.h"
-#include <cassert>
+#include "bx/string.h"
+#include "bx/debug.h"
 #include <string.h>
 
 namespace bx
@@ -48,13 +48,13 @@ namespace bx
 
         char& operator[](int index)
         {
-            assert(index < _Size);
+            BX_ASSERT(index < _Size);
             return this->text[index];
         }
 
         const char operator[](int index) const
         {
-            assert(index < _Size);
+            BX_ASSERT(index < _Size);
             return this->text[index];
         }
 
@@ -244,16 +244,14 @@ namespace bx
     template <int _Size>
     bx::String<_Size>& bx::String<_Size>::toUpper()
     {
-        for (int i = 0; this->text[i]; i++) 
-            this->text[i] = toupper(this->text[i]);
+        bx::toUpper(this->text);
         return *this;
     }
 
     template <int _Size>
     bx::String<_Size>& bx::String<_Size>::toLower()
     {
-        for (int i = 0; this->text[i]; i++)
-            this->text[i] = tolower(this->text[i]);
+        bx::toLower(this->text);
         return *this;
     }
 

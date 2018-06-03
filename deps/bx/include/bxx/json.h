@@ -752,12 +752,12 @@ namespace bx
 
     JsonNode::~JsonNode()
     {
-        assert(type == JsonType::Null);
+        BX_ASSERT(type == JsonType::Null);
     }
 
     JsonNode& JsonNode::addChild(JsonNode* node)
     {
-        assert(this->type != JsonType::Null);
+        BX_ASSERT(this->type != JsonType::Null);
 
         // Add to linked list of traces
         if (this->lastChild)    {
@@ -787,7 +787,7 @@ namespace bx
 
     const JsonNode* JsonNode::getArrayItem(int index) const
     {
-        assert(index < this->numChildItems);
+        BX_ASSERT(index < this->numChildItems);
 
         int i = 0;
         JsonNode* node = this->firstChild;

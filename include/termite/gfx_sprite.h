@@ -9,8 +9,6 @@
 #include "assetlib.h"
 #include "math.h"
 
-#include <functional>
-
 namespace tee
 {
     struct Sprite;
@@ -205,7 +203,7 @@ namespace tee
                          ProgramHandle progOverride = ProgramHandle(), sprite::StateCallback stateCallback = nullptr,
                          void* stateUserData = nullptr)
         {
-            assert(sprite);
+            BX_ASSERT(sprite);
             draw(viewId, &sprite, 1, &mat, progOverride, stateCallback, stateUserData);
         }
     }

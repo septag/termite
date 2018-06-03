@@ -4,96 +4,111 @@
 #include "bxx/math.h"
 #include <math.h>
 #include <float.h>
-#include <assert.h>
-#include <utility>
 
 #if BX_COMPILER_CLANG || BX_COMPILER_GCC
 #  include <limits.h>
 #endif
 
 namespace tee {
-    inline vec4_t vec4(float x, float y, float z, float w)
+    BX_CONST_FUNC inline vec4_t vec4(float x, float y, float z, float w)
     {
         vec4_t v;
         v.x = x;    v.y = y;    v.z = z;    v.w = w;
         return v;
     }
 
-    inline vec4_t vec4(const float* f)
+    BX_CONST_FUNC inline vec4_t vec4(const float* f)
     {
         vec4_t v;
         v.x = f[0];     v.y = f[1];     v.z = f[2];     v.w = f[3];
         return v;
     }
 
-    inline vec2_t vec2(float x, float y)
+    BX_CONST_FUNC inline vec4_t vec4_splat(float n)
+    {
+        vec4_t v;
+        v.x = v.y = v.z = v.w = n;
+        return v;
+    }
+
+    BX_CONST_FUNC inline vec2_t vec2(float x, float y)
     {
         vec2_t v;
         v.x = x;        v.y = y;
         return v;
     }
 
-    inline vec2_t vec2(const float* f)
+    BX_CONST_FUNC inline vec2_t vec2(const float* f)
     {
         vec2_t v;
         v.x = f[0];     v.y = f[1];
         return v;
     }
 
-    inline vec3_t vec3(float x, float y, float z)
+    BX_CONST_FUNC inline vec2_t vec2_splat(float n)
+    {
+        vec2_t v;
+        v.x = v.y = n;
+        return v;
+    }
+
+    BX_CONST_FUNC inline vec3_t vec3(float x, float y, float z)
     {
         vec3_t v;
         v.x = x;        v.y = y;        v.z = z;
         return v;
     }
 
-    inline vec3_t vec3(const float* f)
+    BX_CONST_FUNC inline vec3_t vec3(const float* f)
     {
         vec3_t v;
         v.x = f[0];     v.y = f[1];     v.z = f[3];
         return v;
     }
 
-    inline ucolor_t ucolor(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+    BX_CONST_FUNC inline vec3_t vec3_splat(float n)
+    {
+        vec3_t v;
+        v.x = v.y = v.z = n;
+        return v;
+    }
+
+    BX_CONST_FUNC inline ucolor_t ucolor(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
     {
         ucolor_t c;
         c.r = r;    c.g = g;    c.b = b;    c.a = a;
         return c;
     }
 
-    inline ucolor_t ucolor(uint32_t n)
+    BX_CONST_FUNC inline ucolor_t ucolor(uint32_t n)
     {
         ucolor_t c;
         c.n = n;
         return c;
     }
 
-    inline ucolor_t ucolorf(float r, float g, float b, float a)
+    BX_CONST_FUNC inline ucolor_t ucolorf(float r, float g, float b, float a)
     {
-        uint8_t _r = uint8_t(r * 255.0f);
-        uint8_t _g = uint8_t(g * 255.0f);
-        uint8_t _b = uint8_t(b * 255.0f);
-        uint8_t _a = uint8_t(a * 255.0f);
-        return ucolor(_r, _g, _b, _a);
+        return ucolor(uint8_t(r * 255.0f), uint8_t(g * 255.0f), uint8_t(b * 255.0f), uint8_t(a * 255.0f));
     }
 
-    inline ucolor_t ucolorSwizzle(uint32_t n)
+    BX_CONST_FUNC inline ucolor_t ucolor_inv(uint32_t n)
     {
         ucolor_t c;
         c.n = n;
-        std::swap<uint8_t>(c.r, c.a);
-        std::swap<uint8_t>(c.g, c.b);
+        bx::xchg<uint8_t>(c.r, c.a);
+        bx::xchg<uint8_t>(c.g, c.b);
         return c;
     }
 
-    inline ivec2_t ivec2(const int* n)
+    BX_CONST_FUNC inline ivec2_t ivec2(const int* n)
     {
         ivec2_t v;
         v.x = n[0];     v.y = n[1];
         return v;
     }
 
-    inline ivec2_t ivec2(int x, int y)
+    BX_CONST_FUNC inline ivec2_t ivec2(int x, int y)
     {
         ivec2_t v;
         v.x = x;        v.y = y;
@@ -101,29 +116,30 @@ namespace tee {
     }
 
     // Quaternion
-    inline quat_t quaternionI()
-    {
-        return quaternion(0, 0, 0, 1.0f);
-    }
-
-    inline quat_t quaternion(float x, float y, float z, float w)
+    BX_CONST_FUNC inline quat_t quaternion(float x, float y, float z, float w)
     {
         quat_t q;
         q.x = x;        q.y = y;        q.z = z;        q.w = w;
         return q;
     }
 
-    inline quat_t quaternion(const float* f)
+    BX_CONST_FUNC inline quat_t quaternion(const float* f)
     {
         quat_t q;
         q.x = f[0];     q.y = f[1];     q.z = f[2];     q.w = f[3];
         return q;
     }
 
-    inline mat4_t mat4(float _m11, float _m12, float _m13, float _m14,
-                        float _m21, float _m22, float _m23, float _m24,
-                        float _m31, float _m32, float _m33, float _m34,
-                        float _m41, float _m42, float _m43, float _m44)
+
+    BX_CONST_FUNC inline quat_t quaternionI()
+    {
+        return quaternion(0, 0, 0, 1.0f);
+    }
+
+    BX_CONST_FUNC inline mat4_t mat4(float _m11, float _m12, float _m13, float _m14,
+                                     float _m21, float _m22, float _m23, float _m24,
+                                     float _m31, float _m32, float _m33, float _m34,
+                                     float _m41, float _m42, float _m43, float _m44)
     {
         mat4_t m;
         m.m11 = _m11;     m.m12 = _m12;     m.m13 = _m13;     m.m14 = _m14;
@@ -133,7 +149,7 @@ namespace tee {
         return m;
     }
 
-    inline mat4_t mat4(const float* _r0, const float* _r1, const float* _r2, const float* _r3)
+    BX_CONST_FUNC inline mat4_t mat4(const float* _r0, const float* _r1, const float* _r2, const float* _r3)
     {
         mat4_t m;
         m.m11 = _r0[0];     m.m12 = _r0[1];     m.m13 = _r0[2];     m.m14 = _r0[3];
@@ -143,14 +159,14 @@ namespace tee {
         return m;
     }
 
-    inline mat4_t mat4(const vec4_t& _row0, const vec4_t& _row1, const vec4_t& _row2, const vec4_t& _row3)
+    BX_CONST_FUNC inline mat4_t mat4(const vec4_t& _row0, const vec4_t& _row1, const vec4_t& _row2, const vec4_t& _row3)
     {
         return mat4(_row0.f, _row1.f, _row2.f, _row3.f);
     }
 
-    inline mat3_t mat3(float _m11, float _m12, float _m13,
-                        float _m21, float _m22, float _m23,
-                        float _m31, float _m32, float _m33)
+    BX_CONST_FUNC inline mat3_t mat3(float _m11, float _m12, float _m13,
+                                     float _m21, float _m22, float _m23,
+                                     float _m31, float _m32, float _m33)
     {
         mat3_t m;
         m.m11 = _m11;     m.m12 = _m12;     m.m13 = _m13;
@@ -159,7 +175,7 @@ namespace tee {
         return m;
     }
 
-    inline mat3_t mat3(const float* _r0, const float* _r1, const float* _r2)
+    BX_CONST_FUNC inline mat3_t mat3(const float* _r0, const float* _r1, const float* _r2)
     {
         mat3_t m;
         m.m11 = _r0[0];     m.m12 = _r0[1];     m.m13 = _r0[2];
@@ -168,20 +184,12 @@ namespace tee {
         return m;
     }
 
-    inline mat3_t mat3(const vec3_t& _row0, const vec3_t& _row1, const vec3_t& _row2)
+    BX_CONST_FUNC inline mat3_t mat3(const vec3_t& _row0, const vec3_t& _row1, const vec3_t& _row2)
     {
         return mat3(_row0.f, _row1.f, _row2.f);
     }
 
-    inline aabb_t aabbZero()
-    {
-        aabb_t aabb;
-        aabb.xmin = aabb.ymin = aabb.zmin = FLT_MAX;
-        aabb.xmax = aabb.ymax = aabb.zmax = -FLT_MAX;
-        return aabb;
-    }
-
-    inline aabb_t aabb(const vec3_t& _min, const vec3_t& _max)
+    BX_CONST_FUNC inline aabb_t aabb(const vec3_t& _min, const vec3_t& _max)
     {
         aabb_t aabb;
         aabb.vmin = _min;
@@ -189,7 +197,7 @@ namespace tee {
         return aabb;
     }
 
-    inline aabb_t aabb(const float* _min, const float* _max)
+    BX_CONST_FUNC inline aabb_t aabb(const float* _min, const float* _max)
     {
         aabb_t aabb;
         aabb.fmin[0] = _min[0];  aabb.fmin[1] = _min[1];  aabb.fmin[2] = _min[2];
@@ -197,7 +205,7 @@ namespace tee {
         return aabb;
     }
 
-    inline aabb_t aabb(float _xmin, float _ymin, float _zmin, float _xmax, float _ymax, float _zmax)
+    BX_CONST_FUNC inline aabb_t aabb(float _xmin, float _ymin, float _zmin, float _xmax, float _ymax, float _zmax)
     {
         aabb_t aabb;
         aabb.xmin = _xmin;   aabb.ymin = _ymin;   aabb.zmin = _zmin;
@@ -205,15 +213,7 @@ namespace tee {
         return aabb;
     }
 
-    inline rect_t rectZero()
-    {
-        rect_t rc;
-        rc.xmin = rc.ymin = FLT_MAX;
-        rc.xmax = rc.ymax = -FLT_MAX;
-        return rc;
-    }
-
-    inline rect_t rect(float _xmin, float _ymin, float _xmax, float _ymax)
+    BX_CONST_FUNC inline rect_t rect(float _xmin, float _ymin, float _xmax, float _ymax)
     {
         rect_t rc;
         rc.xmin = _xmin;   rc.ymin = _ymin;
@@ -221,7 +221,7 @@ namespace tee {
         return rc;
     }
 
-    inline rect_t rect(const float* _min, const float* _max)
+    BX_CONST_FUNC inline rect_t rect(const float* _min, const float* _max)
     {
         rect_t rc;
         rc.xmin = _min[0];
@@ -231,7 +231,7 @@ namespace tee {
         return rc;
     }
 
-    inline rect_t rect(const vec2_t& _vmin, const vec2_t& _vmax)
+    BX_CONST_FUNC inline rect_t rect(const vec2_t& _vmin, const vec2_t& _vmax)
     {
         rect_t rc;
         rc.vmin = _vmin;
@@ -239,20 +239,12 @@ namespace tee {
         return rc;
     }
 
-    inline rect_t rectwh(float _x, float _y, float _width, float _height)
+    BX_CONST_FUNC inline rect_t rectwh(float _x, float _y, float _width, float _height)
     {
         return rect(_x, _y, _x + _width, _y + _height);
     }
 
-    inline irect_t irect()
-    {
-        irect_t rc;
-        rc.xmin = rc.ymin = INT_MAX;
-        rc.xmax = rc.ymax = -INT_MAX;
-        return rc;
-    }
-
-    inline irect_t irect(int _xmin, int _ymin, int _xmax, int _ymax)
+    BX_CONST_FUNC inline irect_t irect(int _xmin, int _ymin, int _xmax, int _ymax)
     {
         irect_t rc;
         rc.xmin = _xmin;   rc.ymin = _ymin;
@@ -260,7 +252,7 @@ namespace tee {
         return rc;
     }
 
-    inline irect_t irect(const int* _min, const int* _max)
+    BX_CONST_FUNC inline irect_t irect(const int* _min, const int* _max)
     {
         irect_t rc;
         rc.xmin = _min[0];
@@ -270,7 +262,7 @@ namespace tee {
         return rc;
     }
 
-    inline irect_t irect(const ivec2_t& _vmin, const ivec2_t& _vmax)
+    BX_CONST_FUNC inline irect_t irect(const ivec2_t& _vmin, const ivec2_t& _vmax)
     {
         irect_t rc;
         rc.vmin = _vmin;
@@ -278,12 +270,12 @@ namespace tee {
         return rc;
     }
 
-    inline irect_t irectwh(int _x, int _y, int _width, int _height)
+    BX_CONST_FUNC inline irect_t irectwh(int _x, int _y, int _width, int _height)
     {
         return irect(_x, _y, _x + _width, _y + _height);
     }
 
-    inline sphere_t sphere(const float* _f)
+    BX_CONST_FUNC inline sphere_t sphere(const float* _f)
     {
         sphere_t s;
         s.x = _f[0];  s.y = _f[1];  s.z = _f[2];
@@ -291,21 +283,21 @@ namespace tee {
         return s;
     }
 
-    inline sphere_t sphere(float _x, float _y, float _z, float _r)
+    BX_CONST_FUNC inline sphere_t sphere(float _x, float _y, float _z, float _r)
     {
         sphere_t s;
         s.x = _x;     s.y = _y;     s.z = _z;     s.r = _r;
         return s;
     }
 
-    inline sphere_t sphere(const vec3_t& _cp, float _r)
+    BX_CONST_FUNC inline sphere_t sphere(const vec3_t& _cp, float _r)
     {
         sphere_t s;
         s.center = _cp;        s.r = _r;
         return s;
     }
 
-    inline plane_t plane(const float* _f)
+    BX_CONST_FUNC inline plane_t plane(const float* _f)
     {
         plane_t p;
         p.nx = _f[0];     p.ny = _f[1];     p.nz = _f[2];
@@ -313,14 +305,14 @@ namespace tee {
         return p;
     }
 
-    inline plane_t plane(float _nx, float _ny, float _nz, float _d)
+    BX_CONST_FUNC inline plane_t plane(float _nx, float _ny, float _nz, float _d)
     {
         plane_t p;
         p.nx = _nx;       p.ny = _ny;       p.nz = _nz;       p.d = _d;
         return p;
     }
 
-    inline plane_t plane(const vec3_t& _n, float _d)
+    BX_CONST_FUNC inline plane_t plane(const vec3_t& _n, float _d)
     {
         plane_t p;
         p.n = _n;        p.d = _d;
@@ -328,10 +320,10 @@ namespace tee {
     }
 
     // mtx4x4
-    inline mat4_t mat4(float _m11, float _m12, float _m13,
-                        float _m21, float _m22, float _m23,
-                        float _m31, float _m32, float _m33,
-                        float _m41, float _m42, float _m43)
+    BX_CONST_FUNC inline mat4_t mat4(float _m11, float _m12, float _m13,
+                                     float _m21, float _m22, float _m23,
+                                     float _m31, float _m32, float _m33,
+                                     float _m41, float _m42, float _m43)
     {
         return mat4(_m11, _m12, _m13, 0,
                     _m21, _m22, _m23, 0,
@@ -339,7 +331,7 @@ namespace tee {
                     _m41, _m42, _m43, 1.0f);
     }
 
-    inline mat4_t mat4f3(const float* _r0, const float* _r1, const float* _r2, const float* _r3)
+    BX_CONST_FUNC inline mat4_t mat4f3(const float* _r0, const float* _r1, const float* _r2, const float* _r3)
     {
         return mat4(_r0[0], _r0[1], _r0[2], 0,
                     _r1[0], _r1[1], _r1[2], 0,
@@ -347,7 +339,7 @@ namespace tee {
                     _r3[0], _r3[1], _r3[2], 1.0f);
     }
 
-    inline mat4_t mat4(const mat3_t& m)
+    BX_CONST_FUNC inline mat4_t mat4(const mat3_t& m)
     {
         return mat4(m.m11, m.m12, m.m13,
                     m.m21, m.m22, m.m23,
@@ -357,22 +349,7 @@ namespace tee {
 
     }
 
-    inline mat4_t mat4I()
-    {
-        return mat4(1.0f, 0, 0, 0,
-                    0, 1.0f, 0, 0,
-                    0, 0, 1.0f, 0,
-                    0, 0, 0, 1.0f);
-    }
-
-    inline mat3_t mat3I()
-    {
-        return mat3(1.0f, 0, 0,
-                    0, 1.0f, 0,
-                    0, 0, 1.0f);
-    }
-
-    inline mat3_t mat3(const mat4_t& m)
+    BX_CONST_FUNC inline mat3_t mat3(const mat4_t& m)
     {
         return mat3(m.m11, m.m12, m.m13,
                     m.m12, m.m22, m.m23,
@@ -380,78 +357,93 @@ namespace tee {
     }
 
     // Operators
-    inline vec2_t operator+(const vec2_t& a, const vec2_t& b)
+    BX_CONST_FUNC inline vec2_t operator+(const vec2_t& a, const vec2_t& b)
     {
         return vec2(a.x + b.x, a.y + b.y);
     }
 
-    inline vec2_t operator-(const vec2_t& a, const vec2_t& b)
+    BX_CONST_FUNC inline vec2_t operator-(const vec2_t& a, const vec2_t& b)
     {
         return vec2(a.x - b.x, a.y - b.y);
     }
 
-    inline vec2_t operator*(const vec2_t& v, float k)
+    BX_CONST_FUNC inline vec2_t operator*(const vec2_t& v, float k)
     {
         return vec2(v.x*k, v.y*k);
     }
 
-    inline vec2_t operator*(float k, const vec2_t& v)
+    BX_CONST_FUNC inline vec2_t operator*(float k, const vec2_t& v)
     {
         return vec2(v.x*k, v.y*k);
     }
 
-    inline vec2_t operator*(const vec2_t& v0, const vec2_t& v1)
+    BX_CONST_FUNC inline vec2_t operator*(const vec2_t& v0, const vec2_t& v1)
     {
         return vec2(v0.x*v1.x, v0.y*v1.y);
     }
 
-    inline vec3_t operator+(const vec3_t& v1, const vec3_t& v2)
+    BX_CONST_FUNC inline vec3_t operator+(const vec3_t& v1, const vec3_t& v2)
     {
         vec3_t r;
         bx::vec3Add(r.f, v1.f, v2.f);
         return r;
     }
 
-    inline vec3_t operator-(const vec3_t& v1, const vec3_t& v2)
+    BX_CONST_FUNC inline vec3_t operator-(const vec3_t& v1, const vec3_t& v2)
     {
         vec3_t r;
         bx::vec3Sub(r.f, v1.f, v2.f);
         return r;
     }
 
-    inline vec3_t operator*(const vec3_t& v, float k)
+    BX_CONST_FUNC inline vec3_t operator*(const vec3_t& v, float k)
     {
         vec3_t r;
         bx::vec3Mul(r.f, v.f, k);
         return r;
     }
 
-    inline vec3_t operator*(float k, const vec3_t& v)
+    BX_CONST_FUNC inline vec3_t operator*(float k, const vec3_t& v)
     {
         vec3_t r;
         bx::vec3Mul(r.f, v.f, k);
         return r;
     }
 
-    inline mat4_t operator*(const mat4_t& a, const mat4_t& b)
+    BX_CONST_FUNC inline mat4_t operator*(const mat4_t& a, const mat4_t& b)
     {
         mat4_t r;
         bx::mtxMul(r.f, a.f, b.f);
         return r;
     }
 
-    inline mat3_t operator*(const mat3_t& a, const mat3_t& b)
+    BX_CONST_FUNC inline mat3_t operator*(const mat3_t& a, const mat3_t& b)
     {
         mat3_t r;
-        bx::mtx3x3Mul(r.f, a.f, b.f);
+        bx::mat3Mul(r.f, a.f, b.f);
         return r;
     }
 
-    inline quat_t operator*(const quat_t& a, const quat_t& b)
+    BX_CONST_FUNC inline quat_t operator*(const quat_t& a, const quat_t& b)
     {
         quat_t r;
         bx::quatMul(r.f, a.f, b.f);
         return r;
+    }
+
+    BX_CONST_FUNC inline mat4_t mat4I()
+    {
+        return mat4(1.0f, 0, 0, 0,
+                    0, 1.0f, 0, 0,
+                    0, 0, 1.0f, 0,
+                    0, 0, 0, 1.0f);
+    }
+
+    BX_CONST_FUNC inline mat3_t mat3I()
+    {
+        return mat3(1.0f, 0, 0,
+                    0, 1.0f, 0,
+                    0, 0, 1.0f);
     }
 
     namespace tmath {
@@ -472,16 +464,6 @@ namespace tee {
             vmax -= vmin;
             x = bx::mod(x, vmax);
             return x + vmin;
-        }
-
-        inline int iclamp(int n, const int _min, const int _max)
-        {
-            if (n < _min)
-                return _min;
-            else if (n > _max)
-                return _max;
-            else
-                return n;
         }
 
         inline float falign(float value, float size)
@@ -581,7 +563,7 @@ namespace tee {
 
         inline vec3_t aabbGetCorner(const aabb_t& box, int index)
         {
-            assert(index < 8);
+            BX_ASSERT(index < 8);
             return vec3((index & 1) ? box.vmax.x : box.vmin.x,
                 (index & 2) ? box.vmax.y : box.vmin.y,
                         (index & 4) ? box.vmax.z : box.vmin.z);
@@ -624,5 +606,6 @@ namespace tee {
         {
             return vec4(c.x*c.x, c.y*c.y, c.z*c.z, c.w*c.w);
         }
+
     }   // namespace math
 }   // namespace tee

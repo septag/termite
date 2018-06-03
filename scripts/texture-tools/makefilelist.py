@@ -13,6 +13,8 @@ def main():
         help='Root directory to search for files', default='.')
     cmdParser.add_option('--prefix', action='store', type='string', dest='ARG_Prefix',
         help='Prefix directory that will be appended at the begining of each filepath', default='')
+    cmdParser.add_option('--name', action='store', type='string', dest='ARG_NamePattern',
+        help='Name pattern, can include wild cards', default='*')
     cmdParser.add_option('--out', action='store', type='string', dest='ARG_OutputFile',
         help='Output file list path', default='')
     (options, args) = cmdParser.parse_args()
@@ -29,9 +31,10 @@ def main():
 
     files = []
     numFiles = 0
+    search_phrase = options.ARG_NamePattern + '.'
     for root, dirnames, filenames in os.walk(destDir):
         for ext in extensions:
-            for filename in fnmatch.filter(filenames, '*.' + ext):
+            for filename in fnmatch.filter(filenames, search_phrase + ext):
                 files.append(os.path.join(options.ARG_Prefix, os.path.relpath(os.path.join(root, filename), destDir)))
                 numFiles = numFiles + 1
     print('Writing to: ' + destFilepath)

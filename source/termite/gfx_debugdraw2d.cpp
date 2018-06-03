@@ -271,7 +271,7 @@ namespace tee
             // Create a new batch
             Batch& batch = ctx->batches[batchIdx];
             batch.hash = hash;
-            assert(paramsSize < MAX_PARAM_SIZE);
+            BX_ASSERT(paramsSize < MAX_PARAM_SIZE);
             memcpy(batch.params, params, paramsSize);
             batch.handler = handler;
             batch.startVertex = firstVert;
@@ -338,9 +338,9 @@ namespace tee
 
     bool gfx::initDebugDraw2D(bx::AllocatorI* alloc, GfxDriver* driver)
     {
-        assert(driver);
+        BX_ASSERT(driver);
         if (gDebugDraw2D) {
-            assert(false);
+            BX_ASSERT(false);
             return false;
         }
 
@@ -368,11 +368,11 @@ namespace tee
         vgVertexPosCoordColor::init();
 
         gDebugDraw2D->uTexture = driver->createUniform("u_texture", UniformType::Int1, 1);
-        assert(gDebugDraw2D->uTexture.isValid());
+        BX_ASSERT(gDebugDraw2D->uTexture.isValid());
 
         // Create a 1x1 white texture 
         gDebugDraw2D->whiteTexture = getWhiteTexture1x1();
-        assert(gDebugDraw2D->whiteTexture.isValid());
+        BX_ASSERT(gDebugDraw2D->whiteTexture.isValid());
 
         return true;
     }
@@ -392,7 +392,7 @@ namespace tee
 
     DebugDraw2D* gfx::createDebugDraw2D(int maxVerts, int maxBatches)
     {
-        assert(gDebugDraw2D);
+        BX_ASSERT(gDebugDraw2D);
 
         bx::AllocatorI* alloc = gDebugDraw2D->alloc;
         DebugDraw2D* ctx = BX_NEW(alloc, DebugDraw2D)(alloc);
@@ -438,7 +438,7 @@ namespace tee
 
         // Push one state into state-stack
         VgState* state = ctx->statePool.newInstance();
-        assert(state);
+        BX_ASSERT(state);
         ctx->stateStack.push(&state->snode);
 
         ctx->program = gDebugDraw2D->program;
@@ -449,8 +449,8 @@ namespace tee
 
     void gfx::destroyDebugDraw2D(DebugDraw2D* ctx)
     {
-        assert(gDebugDraw2D);
-        assert(ctx);
+        BX_ASSERT(gDebugDraw2D);
+        BX_ASSERT(ctx);
 
         if (!ctx->alloc)
             return;
@@ -471,7 +471,7 @@ namespace tee
     void gfx::beginDebugDraw2D(DebugDraw2D* ctx, uint8_t viewId, const irect_t& viewport,
                           const mat4_t* viewMtx, const mat4_t* projMtx)
     {
-        assert(ctx);
+        BX_ASSERT(ctx);
         if (ctx->readyToDraw)
             return;
 
@@ -708,8 +708,8 @@ namespace tee
         ctx->stateStack.peek(&state);
         mat3_t m;
         mat3_t cur = state->mtx;
-        bx::mtx3x3Translate(m.f, x, y);
-        bx::mtx3x3Mul(state->mtx.f, cur.f, m.f);
+        bx::mat3Translate(m.f, x, y);
+        bx::mat3Mul(state->mtx.f, cur.f, m.f);
     }
 
     void gfx::scaleDbg2D(DebugDraw2D* ctx, float sx, float sy)
@@ -718,8 +718,8 @@ namespace tee
         ctx->stateStack.peek(&state);
         mat3_t m;
         mat3_t cur = state->mtx;
-        bx::mtx3x3Scale(m.f, sx, sy);
-        bx::mtx3x3Mul(state->mtx.f, cur.f, m.f);
+        bx::mat3Scale(m.f, sx, sy);
+        bx::mat3Mul(state->mtx.f, cur.f, m.f);
     }
 
     void gfx::rotateDbg2D(DebugDraw2D* ctx, float theta)
@@ -728,8 +728,8 @@ namespace tee
         ctx->stateStack.peek(&state);
         mat3_t m;
         mat3_t cur = state->mtx;
-        bx::mtx3x3Rotate(m.f, theta);
-        bx::mtx3x3Mul(state->mtx.f, cur.f, m.f);
+        bx::mat3Rotate(m.f, theta);
+        bx::mat3Mul(state->mtx.f, cur.f, m.f);
     }
 
     void gfx::resetTransformDbg2D(DebugDraw2D* ctx)

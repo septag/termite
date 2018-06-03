@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
-#include <assert.h>
 #include <string.h>
 
 #include "bx/string.h"
@@ -74,7 +73,7 @@ void stb_leakcheck_free(void *ptr)
 #endif
 
       if (mi->prev == NULL) {
-         assert(mi_head == mi);
+         BX_ASSERT(mi_head == mi);
          mi_head = mi->next;
       } else
          mi->prev->next = mi->next;

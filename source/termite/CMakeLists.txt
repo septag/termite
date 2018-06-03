@@ -5,16 +5,14 @@ cmake_minimum_required(VERSION 3.3)
 file(GLOB SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.c*" "*.h")
 # Include files (Interface)
 file(GLOB INCLUDE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "../../include/termite/*.h")
+file(GLOB INLINE_SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "../../include/termite/inline/*.inl")
+
 if (IOS)
     list(APPEND SOURCE_FILES "ios_window.mm")
 endif()
 source_group(source FILES ${SOURCE_FILES})
 source_group(include FILES ${INCLUDE_FILES})
-
-#inline sources
-file(GLOB INLINE_SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "inline/*.inline")
-source_group(source\\inline FILES ${INLINE_SOURCE_FILES})
-
+source_group(include\\inline FILES ${INLINE_SOURCE_FILES})
 
 ## Shaders
 set(SHADER_SOURCES "shaders/ddraw.vsc"          "shaders/ddraw.fsc" 
@@ -127,7 +125,9 @@ endif()
 # PCH
 add_precompiled_header(termite pch.h FORCEINCLUDE)
 
-set_target_properties(termite PROPERTIES ${IOS_GENERAL_PROPERTIES})
+if (IOS_GENERAL_PROPERTIES)
+    set_target_properties(termite PROPERTIES ${IOS_GENERAL_PROPERTIES})
+endif()
 
 ## Install
 install(TARGETS termite

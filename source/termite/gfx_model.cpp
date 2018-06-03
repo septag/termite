@@ -56,7 +56,7 @@ namespace tee {
     bool gfx::initModelLoader(GfxDriver* driver, bx::AllocatorI* alloc)
     {
         if (gModelMgr) {
-            assert(false);
+            BX_ASSERT(false);
             return false;
         }
 
@@ -82,7 +82,7 @@ namespace tee {
     {
         AssetTypeHandle handle;
         handle = asset::registerType("model", &gModelMgr->loader, sizeof(LoadModelParams));
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
     }
 
     ModelInstance* gfx::createModelInstance(AssetHandle modelHandle, bx::AllocatorI* alloc)
@@ -195,7 +195,7 @@ namespace tee {
 
     static void unloadModel(Model* model, bx::AllocatorI* alloc)
     {
-        assert(gModelMgr);
+        BX_ASSERT(gModelMgr);
         BX_ASSERT(alloc, "");
 
         if (!model)
@@ -466,7 +466,7 @@ namespace tee {
 
     void ModelLoader::unloadObj(uintptr_t obj, bx::AllocatorI* alloc)
     {
-        assert(gModelMgr);
+        BX_ASSERT(gModelMgr);
         unloadModel((Model*)obj, alloc ? alloc : gModelMgr->alloc);
     }
 
