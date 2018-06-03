@@ -127,7 +127,7 @@ namespace tee {
     bool initPluginSystem(const char* pluginPath, bx::AllocatorI* alloc)
     {
         if (gPluginSys) {
-            assert(false);
+            BX_ASSERT(false);
             return false;
         }
 
@@ -214,7 +214,7 @@ namespace tee {
 
     void shutdownPlugin(PluginHandle handle)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
 
         Plugin& p = gPluginSys->plugins[handle.value];
         if (p.api)
@@ -274,7 +274,7 @@ namespace tee {
 
     const PluginDesc& getPluginDesc(PluginHandle handle)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
         return gPluginSys->plugins[handle.value].desc;
     }
 

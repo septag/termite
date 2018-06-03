@@ -41,7 +41,7 @@ namespace bx
 		return u.ui;
 	}
 
-	inline BX_CONST_FUNC double bitsToDouble(uint64_t _a)
+	inline BX_CONST_FUNC  double bitsToDouble(uint64_t _a)
 	{
 		union { uint64_t ui; double f; } u = { _a };
 		return u.f;
@@ -181,12 +181,11 @@ namespace bx
 
 	inline BX_CONST_FUNC float sqrtRef(float _a)
 	{
-		if (_a < kNearZero)
-		{
-			return 0.0f;
-		}
-
-		return 1.0f/rsqrt(_a);
+		if (_a >= kNearZero) {
+            return 1.0f/rsqrt(_a);
+        } else {
+            return 0;
+        }
 	}
 
 	inline BX_CONST_FUNC float sqrtSimd(float _a)
@@ -201,11 +200,7 @@ namespace bx
 
 	inline BX_CONST_FUNC float sqrt(float _a)
 	{
-//#if BX_CONFIG_SUPPORTS_SIMD
-//		return sqrtSimd(_a);
-//#else
 		return sqrtRef(_a);
-//#endif // BX_CONFIG_SUPPORTS_SIMD
 	}
 
 	inline BX_CONST_FUNC float rsqrtRef(float _a)
@@ -230,11 +225,7 @@ namespace bx
 
 	inline BX_CONST_FUNC float rsqrt(float _a)
 	{
-//#if BX_CONFIG_SUPPORTS_SIMD
-//		return rsqrtSimd(_a);
-//#else
 		return rsqrtRef(_a);
-//#endif // BX_CONFIG_SUPPORTS_SIMD
 	}
 
 	inline BX_CONST_FUNC float trunc(float _a)
@@ -420,12 +411,14 @@ namespace bx
 	inline float vec3Norm(float* _result, const float* _a)
 	{
 		const float len = vec3Length(_a);
-		const float invLen = 1.0f/len;
-		_result[0] = _a[0] * invLen;
-		_result[1] = _a[1] * invLen;
-		_result[2] = _a[2] * invLen;
-		return len;
-	}
+        if (len >= kNearZero) {
+            const float invLen = 1.0f/len;
+            _result[0] = _a[0] * invLen;
+            _result[1] = _a[1] * invLen;
+            _result[2] = _a[2] * invLen;
+        }
+        return len;
+    }
 
 	inline void vec3Min(float* _result, const float* _a, const float* _b)
 	{

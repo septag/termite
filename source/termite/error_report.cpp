@@ -40,7 +40,7 @@ namespace tee {
     bool err::init(bx::AllocatorI* alloc)
     {
         if (gErr) {
-            assert(false);
+            BX_ASSERT(false);
             return false;
         }
 
@@ -54,12 +54,12 @@ namespace tee {
     void err::shutdown()
     {
         if (!gErr) {
-            assert(false);
+            BX_ASSERT(false);
             return;
         }
 
         bx::AllocatorI* alloc = gErr->alloc;
-        assert(alloc);
+        BX_ASSERT(alloc);
 
         for (int i = 0; i < TEE_ERROR_MAX_STACK_SIZE; i++) {
             if (gErr->reports[i])
@@ -147,7 +147,7 @@ namespace tee {
 
             gErr->fullString = (char*)BX_REALLOC(gErr->alloc, gErr->fullString, size);
             if (!gErr->fullString) {
-                assert(false);
+                BX_ASSERT(false);
                 return "";
             }
 
@@ -179,7 +179,7 @@ namespace tee {
 
             gErr->fullString = (char*)BX_REALLOC(gErr->alloc, gErr->fullString, size);
             if (!gErr->fullString) {
-                assert(0);
+                BX_ASSERT(0);
                 return "";
             }
             if (i == gErr->numReports - 1)

@@ -83,13 +83,13 @@ static MixerWrapper gSdlMixer;
 
 static void mixerSoundFinishedCallback(int channelId)
 {
-    assert(gSdlMixer.soundFinishedFn);
+    BX_ASSERT(gSdlMixer.soundFinishedFn);
     gSdlMixer.soundFinishedFn(channelId, gSdlMixer.soundFinishedUserData);
 }
 
 static void mixerMusicFinishedCallback()
 {
-    assert(gSdlMixer.musicFinishedFn);
+    BX_ASSERT(gSdlMixer.musicFinishedFn);
     gSdlMixer.musicFinishedFn(gSdlMixer.musicFinishedUserData);
 }
 
@@ -97,8 +97,8 @@ static bool mixerInit(AudioFreq::Enum freq/* = AudioFreq::Freq22Khz*/,
                           AudioChannels::Enum channels/* = AudioChannels::Mono*/,
                           int bufferSize/* = 4096*/)
 {
-    assert(gSdlMixer.core);
-    assert(gSdlMixer.alloc);
+    BX_ASSERT(gSdlMixer.core);
+    BX_ASSERT(gSdlMixer.alloc);
 
     if (Mix_OpenAudio(int(freq), MIX_DEFAULT_FORMAT, int(channels), bufferSize)) {
         TEE_ERROR_API(gSdlMixer.core, "Initializing SDL_AudioMixer failed: %s", Mix_GetError());
@@ -121,8 +121,8 @@ static bool mixerInit(AudioFreq::Enum freq/* = AudioFreq::Freq22Khz*/,
 
 static void mixerShutdown()
 {
-    assert(gSdlMixer.core);
-    assert(gSdlMixer.alloc);
+    BX_ASSERT(gSdlMixer.core);
+    BX_ASSERT(gSdlMixer.alloc);
 
     if (gSdlMixer.failChunk)
         Mix_FreeChunk(gSdlMixer.failChunk);
@@ -257,7 +257,7 @@ SoundFadeStatus::Enum mixerGetFadingStatus(int channelId)
     case MIX_FADING_IN:
         return SoundFadeStatus::FadingIn;
     default:
-        assert(0);
+        BX_ASSERT(0);
         return SoundFadeStatus::NoFading;
     }
 }

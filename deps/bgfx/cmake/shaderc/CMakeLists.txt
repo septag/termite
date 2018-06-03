@@ -30,7 +30,14 @@ add_definitions(-D__STDC_LIMIT_MACROS)
 add_definitions(-D__STDC_FORMAT_MACROS)
 add_definitions(-D__STDC_CONSTANT_MACROS)
 
+if (APPLE)
+    find_library(FOUNDATION_LIBRARY Foundation)
+    if (NOT FOUNDATION_LIBRARY)
+        message(FATAL_ERROR "Foundation Library not found")
+    endif()
+endif()
+
 add_executable(shaderc ${source_list})
-target_link_libraries(shaderc bx fcpp glslang glsl-optimizer spirv-opt "-framework Foundation")
+target_link_libraries(shaderc bx fcpp glslang glsl-optimizer spirv-opt ${FOUNDATION_LIBRARY})
 
 install(TARGETS shaderc RUNTIME DESTINATION bin) 

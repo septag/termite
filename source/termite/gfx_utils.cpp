@@ -116,7 +116,7 @@ namespace tee
     bool gfx::initGfxUtils(GfxDriver* driver)
     {
         if (gUtils) {
-            assert(0);
+            BX_ASSERT(0);
             return false;
         }
 
@@ -199,7 +199,7 @@ namespace tee
     */
     void gfx::calcGaussKernel(vec4_t* kernel, int kernelSize, float stdDev, float intensity)
     {
-        assert(kernelSize % 2 == 1);    // should be Odd number
+        BX_ASSERT(kernelSize % 2 == 1);    // should be Odd number
 
         int hk = kernelSize / 2;
         float sum = 0.0f;
@@ -253,7 +253,7 @@ namespace tee
 
     void gfx::blitToFramebuffer(uint8_t viewId, TextureHandle texture)
     {
-        assert(texture.isValid());
+        BX_ASSERT(texture.isValid());
 
         GfxDriver* driver = gUtils->driver;
 
@@ -264,8 +264,8 @@ namespace tee
 
     void gfx::drawFullscreenQuad(uint8_t viewId, ProgramHandle prog)
     {
-        assert(gUtils->fsIb.isValid());
-        assert(gUtils->fsVb.isValid());
+        BX_ASSERT(gUtils->fsIb.isValid());
+        BX_ASSERT(gUtils->fsVb.isValid());
 
         GfxDriver* driver = gUtils->driver;
 
@@ -306,7 +306,7 @@ namespace tee
                                                      TextureFlag::RT |
                                                      TextureFlag::MagPoint | TextureFlag::MinPoint |
                                                      TextureFlag::U_Clamp | TextureFlag::V_Clamp);
-            assert(blur->fbs[i].isValid());
+            BX_ASSERT(blur->fbs[i].isValid());
             blur->textures[i] = driver->getFrameBufferTexture(blur->fbs[i], 0);
         }
 
@@ -380,7 +380,7 @@ namespace tee
 
     void gfx::destroyBlurPostProcess(PostProcessBlur* blur)
     {
-        assert(blur);
+        BX_ASSERT(blur);
 
         GfxDriver* driver = gUtils->driver;
         if (blur->fbs[0].isValid())
@@ -400,7 +400,7 @@ namespace tee
 
     void gfx::resizeBlurPostProcessBuffers(PostProcessBlur* blur, uint16_t width, uint16_t height, float stdDev)
     {
-        assert(blur);
+        BX_ASSERT(blur);
         GfxDriver* driver = gUtils->driver;
         if (blur->fbs[0].isValid())
             driver->destroyFrameBuffer(blur->fbs[0]);
@@ -416,7 +416,7 @@ namespace tee
                                                      TextureFlag::RT |
                                                      TextureFlag::MagPoint | TextureFlag::MinPoint |
                                                      TextureFlag::U_Clamp | TextureFlag::V_Clamp);
-            assert(blur->fbs[i].isValid());
+            BX_ASSERT(blur->fbs[i].isValid());
             blur->textures[i] = driver->getFrameBufferTexture(blur->fbs[i], 0);
         }
     }
@@ -547,7 +547,7 @@ namespace tee
 
     void gfx::destroyVignetteSepiaPostProcess(PostProcessVignetteSepia* vignette)
     {
-        assert(vignette);
+        BX_ASSERT(vignette);
 
         GfxDriver* driver = gUtils->driver;
         if (vignette->uTexture.isValid())

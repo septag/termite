@@ -118,7 +118,7 @@ static void destroyBucket(PageBucket* bucket, bx::AllocatorI* alloc)
 bool tee::initMemoryPool(bx::AllocatorI* alloc, size_t pageSize /*= 0*/, int maxPagesPerPool /* =0*/)
 {
     if (g_mempool) {
-        assert(false);
+        BX_ASSERT(false);
         return false;
     }
 
@@ -166,7 +166,7 @@ static bx::AllocatorI* newPage(PageBucket* bucket, uint64_t tag)
 
 bx::AllocatorI* tee::allocMemPage(uint64_t tag) TEE_THREAD_SAFE
 {
-    assert(g_mempool);
+    BX_ASSERT(g_mempool);
 
     bx::WriteLockScope lock(g_mempool->lock);
 
@@ -190,7 +190,7 @@ bx::AllocatorI* tee::allocMemPage(uint64_t tag) TEE_THREAD_SAFE
 
 void tee::freeMemTag(uint64_t tag) TEE_THREAD_SAFE
 {
-    assert(g_mempool);
+    BX_ASSERT(g_mempool);
 
     bx::ReadLockScope lock(g_mempool->lock);
 
@@ -202,8 +202,8 @@ void tee::freeMemTag(uint64_t tag) TEE_THREAD_SAFE
         if (page->tag == tag) {
             // Remove the page from bucket pool
             PageBucket* bucket = page->owner;
-            assert(page >= &bucket->pages[0] && page <= &bucket->pages[g_mempool->maxPagesPerBucket - 1]);
-            assert(bucket->index != g_mempool->maxPagesPerBucket);
+            BX_ASSERT(page >= &bucket->pages[0] && page <= &bucket->pages[g_mempool->maxPagesPerBucket - 1]);
+            BX_ASSERT(bucket->index != g_mempool->maxPagesPerBucket);
 
             bucket->pagePtrs[bucket->index++] = page;
             

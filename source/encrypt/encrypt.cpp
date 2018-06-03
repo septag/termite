@@ -2,6 +2,7 @@
 #include "bx/commandline.h"
 #include "bx/allocator.h"
 #include "bx/file.h"
+#include "bx/debug.h"
 #include "bxx/path.h"
 
 #include "termite/types.h"
@@ -10,8 +11,6 @@
 #include "lz4/lz4.h"
 
 #include <stdio.h>
-
-#include <cassert>
 
 // default AES encryption keys
 static const uint8_t kAESKey[] = {0x32, 0xBF, 0xE7, 0x76, 0x41, 0x21, 0xF6, 0xA5, 0xEE, 0x70, 0xDC, 0xC8, 0x73, 0xBC, 0x9E, 0x37};
@@ -127,7 +126,7 @@ int main(int argc, char* argv[])
     int compressSize = LZ4_compress_default((const char*)mem, (char*)compressedBuff, size, maxSize);
     BX_FREE(gAlloc, mem);
     int alignedCompressSize = BX_ALIGN_16(compressSize);
-    assert(alignedCompressSize <= maxSize);
+    BX_ASSERT(alignedCompressSize <= maxSize);
     bx::memSet((uint8_t*)compressedBuff + compressSize, 0x00, alignedCompressSize - compressSize);
 
     // AES Encode

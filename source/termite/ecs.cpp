@@ -146,7 +146,7 @@ namespace tee
 
     void ecs::destroyEntityManager(EntityManager* emgr)
     {
-        assert(emgr);
+        BX_ASSERT(emgr);
 
         emgr->freeIndexPool.destroy();
         emgr->nodePool.destroy();
@@ -169,7 +169,7 @@ namespace tee
             idx = emgr->generations.getCount();
             uint16_t* gen = emgr->generations.push();
             *gen = 1;
-            assert(idx < (1 << kEntityIndexBits));
+            BX_ASSERT(idx < (1 << kEntityIndexBits));
         }
         Entity ent = Entity(idx, emgr->generations[idx]);
         return ent;
@@ -186,7 +186,7 @@ namespace tee
             }
         } else {
             ComponentGroupPair* p = gECS->deferredGroupAddCmds.push();
-            assert(p);
+            BX_ASSERT(p);
             p->cgroup = handle;
             p->component = component;
         }
@@ -194,8 +194,8 @@ namespace tee
 
     static void removeFromComponentGroup(ComponentGroupHandle handle, ComponentHandle component)
     {
-        assert(component.isValid());
-        assert(handle.isValid());
+        BX_ASSERT(component.isValid());
+        BX_ASSERT(handle.isValid());
 
         if (!gECS->lockComponentGroups) {
             ComponentGroup* group = gECS->componentGroups.getHandleData<ComponentGroup>(0, handle);
@@ -210,7 +210,7 @@ namespace tee
             }
         } else {
             ComponentGroupPair* p = gECS->deferredGroupRemoveCmds.push();
-            assert(p);
+            BX_ASSERT(p);
             p->cgroup = handle;
             p->component = component;
         }
@@ -218,7 +218,7 @@ namespace tee
 
     static void destroyComponentNoImmAction(Entity ent, ComponentHandle handle)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
 
         ComponentType& ctype = gECS->components[COMPONENT_TYPE_INDEX(handle)];
         uint16_t instHandle = COMPONENT_INSTANCE_HANDLE(handle);
@@ -338,7 +338,7 @@ namespace tee
     bool ecs::init(bx::AllocatorI* alloc)
     {
         if (gECS) {
-            assert(false);
+            BX_ASSERT(false);
             return false;
         }
 
@@ -403,7 +403,7 @@ namespace tee
 
     void ecs::destroyGroup(ComponentGroupHandle handle)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
         ComponentGroup* group = gECS->componentGroups.getHandleData<ComponentGroup>(0, handle);
 
         // Unlink all component references
@@ -439,8 +439,8 @@ namespace tee
                                                ComponentFlag::Bits flags, uint32_t dataSize, uint16_t poolSize,
                                                uint16_t growSize, bx::AllocatorI* alloc)
     {
-        assert(gECS);
-        assert(gECS->components.getCount() < UINT16_MAX);
+        BX_ASSERT(gECS);
+        BX_ASSERT(gECS->components.getCount() < UINT16_MAX);
 
         ComponentType* buff = gECS->components.push();
         if (!buff)
@@ -534,7 +534,7 @@ namespace tee
         ComponentType& ctype = gECS->components[handle.value];
 
         if (ctype.entTable.find(ent.id) != -1) {
-            assert(false);  // Component instance Already exists for the entity
+            BX_ASSERT(false);  // Component instance Already exists for the entity
             return ComponentHandle();
         }
 
@@ -637,7 +637,7 @@ namespace tee
 
     void ecs::updateGroup(ComponentUpdateStage::Enum stage, ComponentGroupHandle groupHandle, float dt)
     {
-        assert(groupHandle.isValid());
+        BX_ASSERT(groupHandle.isValid());
 
 #if RMT_ENABLED
         const char* stageName = "";
@@ -770,8 +770,8 @@ namespace tee
 
     ComponentHandle ecs::get(ComponentTypeHandle handle, Entity ent)
     {
-        assert(handle.isValid());
-        assert(ent.isValid());
+        BX_ASSERT(handle.isValid());
+        BX_ASSERT(ent.isValid());
 
         const ComponentType& ctype = gECS->components[handle.value];
         int r = ctype.entTable.find(ent.id);
@@ -783,7 +783,7 @@ namespace tee
 
     const char* ecs::getTypeName(ComponentHandle handle)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
 
         ComponentType& ctype = gECS->components[COMPONENT_TYPE_INDEX(handle)];
         return ctype.name;
@@ -791,7 +791,7 @@ namespace tee
 
     void* ecs::getData(ComponentHandle handle)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
 
         ComponentType& ctype = gECS->components[COMPONENT_TYPE_INDEX(handle)];
         return ctype.dataPool.getHandleData(1, COMPONENT_INSTANCE_HANDLE(handle));
@@ -799,7 +799,7 @@ namespace tee
 
     Entity ecs::getEntity(ComponentHandle handle)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
 
         ComponentType& ctype = gECS->components[COMPONENT_TYPE_INDEX(handle)];
         return *ctype.dataPool.getHandleData<Entity>(0, COMPONENT_INSTANCE_HANDLE(handle));
@@ -807,7 +807,7 @@ namespace tee
 
     ComponentGroupHandle ecs::getGroup(ComponentHandle handle)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
 
         ComponentType& ctype = gECS->components[COMPONENT_TYPE_INDEX(handle)];
         return *ctype.dataPool.getHandleData<ComponentGroupHandle>(2, COMPONENT_INSTANCE_HANDLE(handle));
@@ -815,7 +815,7 @@ namespace tee
 
     uint16_t ecs::getAllComponents(ComponentTypeHandle typeHandle, ComponentHandle* handles, uint16_t maxComponents)
     {
-        assert(typeHandle.isValid());
+        BX_ASSERT(typeHandle.isValid());
 
         const ComponentType& ctype = gECS->components[typeHandle.value];
         uint16_t count = ctype.dataPool.getCount();
@@ -852,9 +852,9 @@ namespace tee
 
     uint16_t ecs::getGroupComponents(ComponentGroupHandle groupHandle, ComponentHandle* handles, uint16_t maxComponents)
     {
-        assert(groupHandle.isValid());
+        BX_ASSERT(groupHandle.isValid());
         ComponentGroup* group = gECS->componentGroups.getHandleData<ComponentGroup>(0, groupHandle);
-        uint16_t count = std::min<uint16_t>(maxComponents, (uint16_t)group->components.getCount());
+        uint16_t count = bx::min<uint16_t>(maxComponents, (uint16_t)group->components.getCount());
 
         if (handles)
             memcpy(handles, group->components.getBuffer(), count*sizeof(ComponentHandle));
@@ -864,7 +864,7 @@ namespace tee
     uint16_t ecs::getGroupComponents(ComponentGroupHandle groupHandle, ComponentHandle* handles, uint16_t maxComponents,
                                      ComponentTypeHandle typeHandle)
     {
-        assert(groupHandle.isValid());
+        BX_ASSERT(groupHandle.isValid());
         ComponentGroup* group = gECS->componentGroups.getHandleData<ComponentGroup>(0, groupHandle);
 
         sortAndBatchComponents(group);
@@ -872,7 +872,7 @@ namespace tee
         for (int i = 0, c = group->batches.getCount(); i < c; i++) {
             const ComponentGroup::Batch& batch = group->batches[i];
             if (typeHandle == ComponentTypeHandle(COMPONENT_TYPE_INDEX(group->components[batch.index]))) {
-                uint16_t count = std::min<uint16_t>(maxComponents, (uint16_t)batch.count);
+                uint16_t count = bx::min<uint16_t>(maxComponents, (uint16_t)batch.count);
                 if (handles) {
                     memcpy(handles, group->components.itemPtr(batch.index), count*sizeof(ComponentHandle));
                 }

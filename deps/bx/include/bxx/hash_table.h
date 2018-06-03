@@ -47,7 +47,7 @@ namespace bx
 
         inline Ty& operator[](int index)
         {
-            assert(index>=0);
+            BX_ASSERT(index>=0);
             return m_values[index];
         }
 
@@ -208,21 +208,21 @@ namespace bx
         m_numTotal = 0;
         m_blockSize = 0;
         m_alloc = nullptr;
-        //assert(BX_TYPE_IS_POD(Ty));
+        //BX_ASSERT(BX_TYPE_IS_POD(Ty));
     }
 
     template <typename Ty, typename Ky>
     HashTable<Ty, Ky>::~HashTable()
     {
-        assert(m_keys == nullptr);
-        assert(m_values == nullptr);
+        BX_ASSERT(m_keys == nullptr);
+        BX_ASSERT(m_values == nullptr);
     }
 
     template <typename Ty, typename Ky>
     bool HashTable<Ty, Ky>::create(int capacity, AllocatorI* alloc)
     {
-        assert(capacity > 0);
-        assert(alloc);
+        BX_ASSERT(capacity > 0);
+        BX_ASSERT(alloc);
 
         capacity = getClosestPrime(capacity + capacity/2);
         m_blockSize = capacity;
@@ -244,8 +244,8 @@ namespace bx
     template <typename Ty, typename Ky /*= size_t*/>
     bool bx::HashTable<Ty, Ky>::createWithBuffer(int capacity, void* buff)
     {
-        assert(capacity);
-        assert(buff);
+        BX_ASSERT(capacity);
+        BX_ASSERT(buff);
 
         capacity = getClosestPrime(capacity + capacity/2);
         m_blockSize = capacity;
@@ -276,11 +276,11 @@ namespace bx
     template <typename Ty, typename Ky>
     int HashTable<Ty, Ky>::add(Ky key, const Ty& value)
     {
-        assert(m_keys && m_values);
+        BX_ASSERT(m_keys && m_values);
 
         // Grow hash table if items are more than 60% of hash table
         if (m_numItems >= (m_numTotal*60/100) && m_type == HashTableType::Mutable)   {
-            assert(m_alloc);
+            BX_ASSERT(m_alloc);
             int new_cnt = getClosestPrime(m_numTotal + m_blockSize);
 
             size_t totalSz = (sizeof(Ky) + sizeof(Ty))*new_cnt;
@@ -305,7 +305,7 @@ namespace bx
         // If slot is not empty, probe for other free slots
         if (m_keys[idx])
             idx = probeLinear(idx, 0, m_keys, m_numTotal);
-        assert(idx != -1);
+        BX_ASSERT(idx != -1);
 
         m_keys[idx] = key;
         m_values[idx] = value;
@@ -316,7 +316,7 @@ namespace bx
     template <typename Ty, typename Ky>
     void HashTable<Ty, Ky>::remove(int index)
     {
-        assert(index>=0);
+        BX_ASSERT(index>=0);
 
         m_keys[index] = 0;
         m_numItems --;
@@ -353,7 +353,7 @@ namespace bx
     template <typename Ty, typename Ky>
     const Ty& HashTable<Ty, Ky>::getValue(int index) const
     {
-        assert(index>=0);
+        BX_ASSERT(index>=0);
         return m_values[index];
     }
 
@@ -384,7 +384,7 @@ namespace bx
             int idx = key % total;
             if (keys[idx])
                 idx = probeLinear(idx, 0, keys, count);
-            assert(idx != -1);
+            BX_ASSERT(idx != -1);
 
             keys[idx] = key;
             values[idx] = m_values[i];
@@ -409,14 +409,14 @@ namespace bx
     template <typename Ty, typename Ky>
     MultiHashTable<Ty, Ky>::~MultiHashTable()
     {
-        assert(m_nodes == nullptr);
-        assert(m_keys == nullptr);
+        BX_ASSERT(m_nodes == nullptr);
+        BX_ASSERT(m_keys == nullptr);
     }
 
     template <typename Ty, typename Ky>
     bool MultiHashTable<Ty, Ky>::create(int capacity, AllocatorI* alloc, Pool<Node>* nodePool)
     {
-        assert(alloc);
+        BX_ASSERT(alloc);
 
         capacity = getClosestPrime(capacity + capacity/2);
 
@@ -455,7 +455,7 @@ namespace bx
     template <typename Ty, typename Ky>
     int MultiHashTable<Ty, Ky>::add(Ky key, const Ty& value)
     {
-        assert(m_keys && m_nodes);
+        BX_ASSERT(m_keys && m_nodes);
 
         // Grow hash table if items are more than 60% of hash table
         if (m_numItems >= (m_numTotal * 60 / 100) && m_type == HashTableType::Mutable) {
@@ -482,7 +482,7 @@ namespace bx
             idx = key % m_numTotal;
             if (m_keys[idx])
                 idx = probeLinear(idx, 0, m_keys, m_numTotal);
-            assert(idx != -1);
+            BX_ASSERT(idx != -1);
         }
 
 		Node* node = m_nodePool ? m_nodePool->newInstance() : BX_NEW(m_alloc, Node);
@@ -507,8 +507,8 @@ namespace bx
     template <typename Ty, typename Ky>
     void MultiHashTable<Ty, Ky>::remove(int index, Node* node)
     {
-        assert(index>=0);
-        assert(node);
+        BX_ASSERT(index>=0);
+        BX_ASSERT(node);
 
         // Remove from linked-list
         if (m_nodes[index] != node)    {
@@ -548,7 +548,7 @@ namespace bx
     template <typename Ty, typename Ky>
     typename MultiHashTable<Ty, Ky>::Node* MultiHashTable<Ty, Ky>::getNode(int index) const
     {
-        assert(index>=0);
+        BX_ASSERT(index>=0);
         return m_nodes[index];
     }
 
@@ -587,7 +587,7 @@ namespace bx
             int idx = key % count;
             if (keys[idx])
                 idx = probeLinear(idx, 0, keys, count);
-            assert(idx != -1);
+            BX_ASSERT(idx != -1);
 
             nodes[idx] = m_nodes[i];
             keys[idx] = key;

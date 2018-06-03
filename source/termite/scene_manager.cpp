@@ -235,7 +235,7 @@ namespace tee
 
         void begin(const void* params, uint8_t viewId) override
         {
-            assert(params);
+            BX_ASSERT(params);
 
             memcpy(&m_params, params, sizeof(m_params));
             m_elapsedTm = 0;
@@ -302,7 +302,7 @@ namespace tee
 
     void destroySceneManager(SceneManager* smgr)
     {
-        assert(smgr);
+        BX_ASSERT(smgr);
 
         // Release active Scenes
         for (int i = 0; i < smgr->numActiveScenes; i++)
@@ -464,7 +464,7 @@ namespace tee
                             uint32_t tag /*= 0*/, SceneFlag::Bits flags /*= 0*/, const IncrLoadingScheme& loadScheme /*= LoadingScheme()*/,
                             void* userData /*= nullptr*/, uint8_t order /*= 0*/)
     {
-        assert(mgr);
+        BX_ASSERT(mgr);
 
         Scene* scene = mgr->scenePool.newInstance<>();
         if (!scene)
@@ -487,7 +487,7 @@ namespace tee
 
     static bool addActiveScene(SceneManager* mgr, Scene* scene)
     {
-        assert(scene->state == Scene::Ready);
+        BX_ASSERT(scene->state == Scene::Ready);
 
         int index = -1;
         for (int i = 0; i < mgr->numActiveScenes; i++) {
@@ -531,8 +531,8 @@ namespace tee
 
     void destroyScene(SceneManager* mgr, Scene* scene)
     {
-        assert(mgr);
-        assert(scene);
+        BX_ASSERT(mgr);
+        BX_ASSERT(scene);
 
         // If Scene is active, destroy and release all it's resources/objects
         if (scene->state != Scene::Dead) {
@@ -644,7 +644,7 @@ namespace tee
 
     SceneLinkHandle linkScene(SceneManager* mgr, Scene* sceneA, Scene* sceneB, const SceneLinkDef& def /*= SceneLinkDef()*/)
     {
-        assert(sceneA);
+        BX_ASSERT(sceneA);
 
         SceneLinkHandle handle = SceneLinkHandle(mgr->linkPool.newHandle());
         if (!handle.isValid())
@@ -656,13 +656,13 @@ namespace tee
         link->effectB = def.effectNameB ? findEffect(mgr, def.effectNameB) : nullptr;
         link->loadScene = def.loadScene;
         if (link->effectA && link->effectA->paramSize > 0) {
-            assert(def.effectParamsA);
-            memcpy(link->effectParamsA, def.effectParamsA, std::min<uint32_t>(link->effectA->paramSize, sizeof(link->effectParamsA)));
+            BX_ASSERT(def.effectParamsA);
+            memcpy(link->effectParamsA, def.effectParamsA, bx::min<uint32_t>(link->effectA->paramSize, sizeof(link->effectParamsA)));
         }
 
         if (link->effectB && link->effectB->paramSize > 0) {
-            assert(def.effectParamsB);
-            memcpy(link->effectParamsB, def.effectParamsB, std::min<uint32_t>(link->effectB->paramSize, sizeof(link->effectParamsB)));
+            BX_ASSERT(def.effectParamsB);
+            memcpy(link->effectParamsB, def.effectParamsB, bx::min<uint32_t>(link->effectB->paramSize, sizeof(link->effectParamsB)));
         }
 
         return handle;
@@ -711,7 +711,7 @@ namespace tee
             }
             break;
         case FindSceneMode::Linked:
-            assert(0);
+            BX_ASSERT(0);
             break;
         default:
         {
@@ -739,7 +739,7 @@ namespace tee
             }
             break;
         case FindSceneMode::Linked:
-            assert(0);
+            BX_ASSERT(0);
             break;
         default:
         {
@@ -885,7 +885,7 @@ namespace tee
     void updateSceneManager(SceneManager* mgr, float dt, uint8_t* viewId, const ivec2_t renderSize,
                                  FrameBufferHandle* pRenderFb, TextureHandle* pRenderTex)
     {
-        assert(viewId);
+        BX_ASSERT(viewId);
         mgr->viewId = *viewId;
         mgr->finalFb = mgr->mainFb;
         mgr->finalTex = mgr->mainTex;
@@ -910,7 +910,7 @@ namespace tee
 
     void startSceneManager(SceneManager* mgr, Scene* entryScene, FrameBufferHandle mainFb, FrameBufferHandle effectFb)
     {
-        assert(entryScene);
+        BX_ASSERT(entryScene);
         GfxDriver* gDriver = getGfxDriver();
 
         mgr->numActiveScenes = 0;

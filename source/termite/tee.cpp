@@ -285,7 +285,7 @@ static void* remoteryReallocCallback(void* mm_context, void* ptr, rmtU32 size)
 
 static void remoteryInputHandlerCallback(const char* text, void* context)
 {
-    assert(gTee);
+    BX_ASSERT(gTee);
 
     const int maxArgs = 16;
     bx::String64 args[maxArgs];
@@ -317,7 +317,7 @@ static void remoteryInputHandlerCallback(const char* text, void* context)
 bool init(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* platform)
 {
     if (gTee) {
-        assert(false);
+        BX_ASSERT(false);
         return false;
     }
 
@@ -660,7 +660,7 @@ bool init(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* pl
 void shutdown(ShutdownCallback callback, void* userData)
 {
     if (!gTee) {
-        assert(false);
+        BX_ASSERT(false);
         return;
     }
 
@@ -1085,7 +1085,7 @@ bool saveBinaryFile(const char* absFilepath, const MemoryBlock* mem)
 
 MemoryBlock* encryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
 {
-    assert(mem);
+    BX_ASSERT(mem);
     if (key == nullptr)
         key = kAESKey;
     if (iv == nullptr)
@@ -1104,7 +1104,7 @@ MemoryBlock* encryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, 
         return nullptr;
     int compressSize = LZ4_compress_default((const char*)mem->data, (char*)compressedBuff, mem->size, maxSize);
     int alignedCompressSize = BX_ALIGN_16(compressSize);
-    assert(alignedCompressSize <= maxSize);
+    BX_ASSERT(alignedCompressSize <= maxSize);
     bx::memSet((uint8_t*)compressedBuff + compressSize, 0x00, alignedCompressSize - compressSize);
 
     // AES Encode
@@ -1124,7 +1124,7 @@ MemoryBlock* encryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, 
 
 MemoryBlock* decryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, const uint8_t* key, const uint8_t* iv)
 {
-    assert(mem);
+    BX_ASSERT(mem);
     if (key == nullptr)
         key = kAESKey;
     if (iv == nullptr)
@@ -1142,7 +1142,7 @@ MemoryBlock* decryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, 
 
     uint8_t* encBuff = (uint8_t*)mem->data + sizeof(header);
     uint32_t encSize = mem->size - sizeof(header);
-    assert(encSize % 16 == 0);
+    BX_ASSERT(encSize % 16 == 0);
 
     void* decBuff = BX_ALLOC(alloc, encSize);
     if (!decBuff)
@@ -1160,8 +1160,8 @@ MemoryBlock* decryptMemoryAES128(const MemoryBlock* mem, bx::AllocatorI* alloc, 
 
 void cipherXOR(uint8_t* outputBuff, const uint8_t* inputBuff, size_t buffSize, const uint8_t* key, size_t keySize)
 {
-    assert(buffSize > 0);
-    assert(keySize > 0);
+    BX_ASSERT(buffSize > 0);
+    BX_ASSERT(keySize > 0);
     for (size_t i = 0; i < buffSize; i++) {
         outputBuff[i] = inputBuff[i] ^ key[i % keySize];
     }
@@ -1186,7 +1186,7 @@ void restartRandom()
 
 float getRandomFloatUniform(float a, float b)
 {
-    assert(a <= b);
+    BX_ASSERT(a <= b);
     int off = gTee->randomFloatOffset;
     float r = (gTee->randomPoolFloat[off]*(b - a)) + a;
     bx::atomicExchange<int32_t>(&gTee->randomFloatOffset, (off + 1) % RANDOM_NUMBER_POOL);
@@ -1195,7 +1195,7 @@ float getRandomFloatUniform(float a, float b)
 
 int getRandomIntUniform(int a, int b)
 {
-    assert(a <= b);
+    BX_ASSERT(a <= b);
     int off = gTee->randomIntOffset;
     int r = (gTee->randomPoolInt[off] % (b - a + 1)) + a;
     bx::atomicExchange<int32_t>(&gTee->randomIntOffset, (off + 1) % RANDOM_NUMBER_POOL);
@@ -1452,7 +1452,7 @@ bool resetGraphics(const GfxPlatformData* platform)
 void registerConsoleCommand(const char* name, std::function<void(int, const char**)> callback)
 {
 #if termite_DEV && RMT_ENABLED
-    assert(gTee);
+    BX_ASSERT(gTee);
     ConsoleCommand* cmd = new(gTee->consoleCmds.push()) ConsoleCommand;
     cmd->cmdHash = tinystl::hash_string(name, strlen(name));
     cmd->callback = callback;

@@ -377,7 +377,7 @@ namespace tee {
         const json::svalue_t& jframes = jdoc["frames"];
         const json::svalue_t& jmeta = jdoc["meta"];
 
-        assert(jframes.IsArray());
+        BX_ASSERT(jframes.IsArray());
         int numFrames = jframes.Size();
         if (numFrames == 0)
             return false;
@@ -548,8 +548,8 @@ namespace tee {
 
     void SpriteSheetLoader::unloadObj(uintptr_t obj, bx::AllocatorI* alloc)
     {
-        assert(gSpriteMgr);
-        assert(obj);
+        BX_ASSERT(gSpriteMgr);
+        BX_ASSERT(obj);
 
         SpriteSheet* sheet = (SpriteSheet*)obj;
         if (sheet->texHandle.isValid()) {
@@ -621,7 +621,7 @@ namespace tee {
         ss->meshes = (SpriteMesh*)BX_ALLOC(&lalloc, sizeof(SpriteMesh));
 
         ss->texHandle = asset::getFailHandle("texture");
-        assert(ss->texHandle.isValid());
+        BX_ASSERT(ss->texHandle.isValid());
 
         Texture* tex = asset::getObjPtr<Texture>(ss->texHandle);
         float imgWidth = float(tex->info.width);
@@ -666,7 +666,7 @@ namespace tee {
     bool gfx::initSpriteSystem(GfxDriver* driver, bx::AllocatorI* alloc)
     {
         if (gSpriteMgr) {
-            assert(false);
+            BX_ASSERT(false);
             return false;
         }
 
@@ -778,8 +778,8 @@ namespace tee {
         while (node) {
             SpriteCache* sc = node->data;
 
-            assert(sc->verts);
-            assert(sc->indices);
+            BX_ASSERT(sc->verts);
+            BX_ASSERT(sc->indices);
             sc->vb = driver->createVertexBuffer(driver->makeRef(sc->verts, sc->vbSize, nullptr, nullptr), SpriteVertex::Decl, 0);
             sc->ib = driver->createIndexBuffer(driver->makeRef(sc->indices, sc->ibSize, nullptr, nullptr), 0);
 
@@ -828,7 +828,7 @@ namespace tee {
                           const char* frameTag /*= nullptr*/)
     {
         if (texHandle.isValid()) {
-            assert(asset::getState(texHandle) != AssetState::LoadInProgress);
+            BX_ASSERT(asset::getState(texHandle) != AssetState::LoadInProgress);
  
             SpriteFrame* frame = BX_PLACEMENT_NEW(sprite->frames.push(), SpriteFrame);
             if (frame) {
@@ -853,9 +853,9 @@ namespace tee {
                           AssetHandle ssHandle, const char* name, SpriteFlag::Bits flags, 
                           const char* frameTag /*= nullptr*/)
     {
-        assert(name);
+        BX_ASSERT(name);
         if (ssHandle.isValid()) {
-            assert(asset::getState(ssHandle) != AssetState::LoadInProgress);
+            BX_ASSERT(asset::getState(ssHandle) != AssetState::LoadInProgress);
 
             SpriteFrame* frame = BX_PLACEMENT_NEW(sprite->frames.push(), SpriteFrame);
             if (frame) {
@@ -905,7 +905,7 @@ namespace tee {
     void sprite::addAllFrames(Sprite* sprite, AssetHandle ssHandle, SpriteFlag::Bits flags)
     {
         if (ssHandle.isValid()) {
-            assert(asset::getState(ssHandle) != AssetState::LoadInProgress);
+            BX_ASSERT(asset::getState(ssHandle) != AssetState::LoadInProgress);
 
             SpriteSheet* sheet = asset::getObjPtr<SpriteSheet>(ssHandle);
             for (int i = 0, c = sheet->numFrames; i < c; i++) {
@@ -957,7 +957,7 @@ namespace tee {
                     }
 
                     int nextFrame = !playReverse ? (frameIdx + iframes) : (frameIdx - iframes);
-                    frameIdx = tmath::iclamp(nextFrame, 0, sprite->frames.getCount() - 1);
+                    frameIdx = bx::clamp<int>(nextFrame, 0, sprite->frames.getCount() - 1);
 
                     if (frameIdx != nextFrame && sprite->playSpeed != 0) {
                         sprite->triggerEndCallback = true;  // Tigger callback on the next update
@@ -1031,7 +1031,7 @@ namespace tee {
 
     void sprite::setFrameEvent(Sprite* sprite, int frameIdx, sprite::FrameCallback callback, void* userData)
     {
-        assert(frameIdx < sprite->frames.getCount());
+        BX_ASSERT(frameIdx < sprite->frames.getCount());
         SpriteFrame* frame = sprite->frames.itemPtr(frameIdx);
         frame->frameCallback = callback;
         frame->frameCallbackUserData = userData;
@@ -1066,7 +1066,7 @@ namespace tee {
 
     void sprite::goFrame(Sprite* sprite, int frameIdx)
     {
-        assert(frameIdx < sprite->frames.getCount());
+        BX_ASSERT(frameIdx < sprite->frames.getCount());
         sprite->curFrameIdx = frameIdx;
     }
 
@@ -1266,7 +1266,7 @@ namespace tee {
     {
         if (numSprites <= 0)
             return;
-        assert(sprites);
+        BX_ASSERT(sprites);
 
         GfxDriver* gDriver = gSpriteMgr->driver;
 
@@ -1277,7 +1277,7 @@ namespace tee {
             const SpriteFrame& frame = sprite->frames[sprite->curFrameIdx];
 
             if (frame.ssHandle.isValid()) {
-                assert(frame.meshId != -1);
+                BX_ASSERT(frame.meshId != -1);
                 SpriteSheet* sheet = asset::getObjPtr<SpriteSheet>(frame.ssHandle);
                 const SpriteMesh& mesh = sheet->meshes[frame.meshId];
                 numVerts += mesh.numVerts;
@@ -1358,7 +1358,7 @@ namespace tee {
             preMat.m11 = scale.x;       preMat.m12 = 0;             preMat.m13 = 0;
             preMat.m21 = 0;             preMat.m22 = scale.y;       preMat.m23 = 0;
             preMat.m31 = scale.x*pos.x; preMat.m32 = scale.y*pos.y; preMat.m33 = 1.0f;
-            bx::mtx3x3Mul(finalMat.f, preMat.f, mats[ss.index].f);
+            bx::mat3Mul(finalMat.f, preMat.f, mats[ss.index].f);
 
             vec3_t transform1 = vec3(finalMat.m11, finalMat.m12, finalMat.m21);
             vec3_t transform2 = vec3(finalMat.m22, finalMat.m31, finalMat.m32);
@@ -1379,7 +1379,7 @@ namespace tee {
             // Fill geometry data
             if (frame.ssHandle.isValid()) {
                 SpriteSheet* sheet = asset::getObjPtr<SpriteSheet>(frame.ssHandle);
-                assert(frame.meshId != -1);
+                BX_ASSERT(frame.meshId != -1);
                 const SpriteMesh& mesh = sheet->meshes[frame.meshId];
 
                 for (int i = 0, c = mesh.numVerts; i < c; i++) {
@@ -1486,7 +1486,7 @@ namespace tee {
 
         if (numSprites <= 0)
             return;
-        assert(sprites);
+        BX_ASSERT(sprites);
 
         GfxDriver* gDriver = gSpriteMgr->driver;
 
@@ -1497,7 +1497,7 @@ namespace tee {
             const SpriteFrame& frame = sprite->frames[sprite->curFrameIdx];
 
             if (frame.ssHandle.isValid()) {
-                assert(frame.meshId != -1);
+                BX_ASSERT(frame.meshId != -1);
                 SpriteSheet* sheet = asset::getObjPtr<SpriteSheet>(frame.ssHandle);
                 const SpriteMesh& mesh = sheet->meshes[frame.meshId];
                 numVerts += mesh.numVerts;
@@ -1583,7 +1583,7 @@ namespace tee {
             preMat.m11 = scale.x;       preMat.m12 = 0;             preMat.m13 = 0;
             preMat.m21 = 0;             preMat.m22 = scale.y;       preMat.m23 = 0;
             preMat.m31 = scale.x*pos.x; preMat.m32 = scale.y*pos.y; preMat.m33 = 1.0f;
-            bx::mtx3x3Mul(finalMat.f, preMat.f, mats[ss.index].f);
+            bx::mat3Mul(finalMat.f, preMat.f, mats[ss.index].f);
 
             vec3_t transform1 = vec3(finalMat.m11, finalMat.m12, finalMat.m21);
             vec3_t transform2 = vec3(finalMat.m22, finalMat.m31, finalMat.m32);
@@ -1607,7 +1607,7 @@ namespace tee {
             // Fill geometry data
             if (frame.ssHandle.isValid()) {
                 SpriteSheet* sheet = asset::getObjPtr<SpriteSheet>(frame.ssHandle);
-                assert(frame.meshId != -1);
+                BX_ASSERT(frame.meshId != -1);
                 const SpriteMesh& mesh = sheet->meshes[frame.meshId];
 
                 for (int i = 0, c = mesh.numVerts; i < c; i++) {
@@ -1709,7 +1709,7 @@ namespace tee {
 
         if (numSprites <= 0)
             return nullptr;
-        assert(sprites);
+        BX_ASSERT(sprites);
 
         // Evaluate final vertices and indexes
         int numVerts = 0, numIndices = 0;
@@ -1718,7 +1718,7 @@ namespace tee {
             const SpriteFrame& frame = sprite->frames[sprite->curFrameIdx];
 
             if (frame.ssHandle.isValid()) {
-                assert(frame.meshId != -1);
+                BX_ASSERT(frame.meshId != -1);
                 SpriteSheet* sheet = asset::getObjPtr<SpriteSheet>(frame.ssHandle);
                 const SpriteMesh& mesh = sheet->meshes[frame.meshId];
                 numVerts += mesh.numVerts;
@@ -1742,7 +1742,7 @@ namespace tee {
         bx::AllocatorI* tmpAlloc = getTempAlloc();
 
         // Calculate bounds
-        sc->bounds = rectZero();
+        sc->bounds = rect_t::Null;
         for (int i = 0; i < numSprites; i++) {
             rect_t spriteBounds = getDrawRect(sprites[i]);
             vec2_t bounds[4] = {spriteBounds.vmin,
@@ -1751,7 +1751,7 @@ namespace tee {
                 spriteBounds.vmax};
             for (int k = 0; k < 4; k++) {
                 vec2_t tpt;
-                bx::vec2MulMtx3x3(tpt.f, bounds[k].f, mats[i].f);
+                bx::vec2MulMat3(tpt.f, bounds[k].f, mats[i].f);
                 tmath::rectPushPoint(&sc->bounds, tpt);
             }
         }
@@ -1822,7 +1822,7 @@ namespace tee {
             preMat.m11 = scale.x;       preMat.m12 = 0;             preMat.m13 = 0;
             preMat.m21 = 0;             preMat.m22 = scale.y;       preMat.m23 = 0;
             preMat.m31 = scale.x*pos.x; preMat.m32 = scale.y*pos.y; preMat.m33 = 1.0f;
-            bx::mtx3x3Mul(finalMat.f, preMat.f, mats[ss.index].f);
+            bx::mat3Mul(finalMat.f, preMat.f, mats[ss.index].f);
 
             vec3_t transform1 = vec3(finalMat.m11, finalMat.m12, finalMat.m21);
             vec3_t transform2 = vec3(finalMat.m22, finalMat.m31, finalMat.m32);
@@ -1846,7 +1846,7 @@ namespace tee {
             int startIdx = indexIdx;
             if (frame.ssHandle.isValid()) {
                 SpriteSheet* sheet = asset::getObjPtr<SpriteSheet>(frame.ssHandle);
-                assert(frame.meshId != -1);
+                BX_ASSERT(frame.meshId != -1);
                 const SpriteMesh& mesh = sheet->meshes[frame.meshId];
 
                 for (int i = 0, c = mesh.numVerts; i < c; i++) {
@@ -1995,13 +1995,13 @@ namespace tee {
         AssetTypeHandle handle;
         handle = asset::registerType("spritesheet", &gSpriteMgr->loader, sizeof(LoadSpriteSheetParams), 
                                       uintptr_t(gSpriteMgr->failSheet), uintptr_t(gSpriteMgr->asyncSheet));
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
     }
 
     rect_t gfx::getSpriteSheetTextureFrame(AssetHandle spritesheet, int index)
     {
         SpriteSheet* ss = asset::getObjPtr<SpriteSheet>(spritesheet);
-        assert(index < ss->numFrames);
+        BX_ASSERT(index < ss->numFrames);
         return ss->frames[index].frame;
     }
 
@@ -2027,7 +2027,7 @@ namespace tee {
     vec2_t gfx::getSpriteSheetFrameSize(AssetHandle spritesheet, int index)
     {
         SpriteSheet* ss = asset::getObjPtr<SpriteSheet>(spritesheet);
-        assert(index < ss->numFrames);
+        BX_ASSERT(index < ss->numFrames);
         return ss->frames[index].sourceSize;
     }
 

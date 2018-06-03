@@ -99,10 +99,10 @@ namespace tee {
 
     bool cmd::init(uint16_t historySize, bx::AllocatorI* alloc)
     {
-        assert(historySize);
+        BX_ASSERT(historySize);
 
         if (g_cmdSys) {
-            assert(false);
+            BX_ASSERT(false);
             return false;
         }
 
@@ -132,7 +132,7 @@ namespace tee {
 
     static void removeCommand(CommandHandle handle, bool recursive)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
         Command* cmd = getCommand(handle);
 
         // Remove next recursively
@@ -190,7 +190,7 @@ namespace tee {
                                        cmd::UndoCommandFn undoFn,
                                        cmd::CleanupCommandFn cleanupFn, size_t paramSize)
     {
-        assert(g_cmdSys);
+        BX_ASSERT(g_cmdSys);
 
         CommandType* ptr = g_cmdSys->commandTypes.push();
         if (!ptr)
@@ -199,7 +199,7 @@ namespace tee {
         CommandType* ctype = new(ptr) CommandType();
 
         bx::strCopy(ctype->name, sizeof(ctype->name), name);
-        assert(executeFn);
+        BX_ASSERT(executeFn);
         ctype->executeFn = executeFn;
         ctype->undoFn = undoFn;
         ctype->cleanupFn = cleanupFn;
@@ -219,7 +219,7 @@ namespace tee {
 
     CommandTypeHandle cmd::findCmd(const char* name)
     {
-        assert(g_cmdSys);
+        BX_ASSERT(g_cmdSys);
 
         int r = g_cmdSys->commandTypeTable.find(tinystl::hash_string(name, strlen(name)));
         if (r != -1) {
@@ -232,7 +232,7 @@ namespace tee {
 
     static CommandHandle popFromMainList()
     {
-        assert(g_cmdSys->firstCommand.isValid());
+        BX_ASSERT(g_cmdSys->firstCommand.isValid());
 
         CommandHandle handle = g_cmdSys->firstCommand;
         CommandHandle nextHandle = getCommand(handle)->nextHandle;
@@ -250,7 +250,7 @@ namespace tee {
 
     static void pushToMainList(CommandHandle handle)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
 
         if (g_cmdSys->lastCommand.isValid()) {
             // Remove commands after the last one (recursive)
@@ -291,7 +291,7 @@ namespace tee {
 
     CommandHandle cmd::add(CommandTypeHandle handle, const void* param)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
 
         CommandType& ctype = g_cmdSys->commandTypes[handle.value];
         uint16_t cIndex = g_cmdSys->commandPool.newHandle();
@@ -315,8 +315,8 @@ namespace tee {
 
     CommandHandle cmd::addGroup(CommandTypeHandle handle, int numCommands, const void* const* params)
     {
-        assert(numCommands > 0);
-        assert(handle.isValid());
+        BX_ASSERT(numCommands > 0);
+        BX_ASSERT(handle.isValid());
 
         // Create dummy command for group
         uint16_t cIndex = g_cmdSys->commandPool.newHandle();
@@ -342,7 +342,7 @@ namespace tee {
 
     void cmd::beginChain()
     {
-        assert(!g_cmdSys->curChain.isValid());
+        BX_ASSERT(!g_cmdSys->curChain.isValid());
 
         // Create dummy command for chain
         uint16_t cIndex = g_cmdSys->commandPool.newHandle();
@@ -354,7 +354,7 @@ namespace tee {
     void cmd::addChain(CommandTypeHandle handle, const void* param)
     {
         if (!g_cmdSys->curChain.isValid()) {
-            assert(false);  // beginCommandChain is not called
+            BX_ASSERT(false);  // beginCommandChain is not called
             return;
         }
 
@@ -373,7 +373,7 @@ namespace tee {
 
     CommandHandle cmd::endChain()
     {
-        assert(g_cmdSys->curChain.isValid());
+        BX_ASSERT(g_cmdSys->curChain.isValid());
 
         CommandHandle handle = g_cmdSys->curChain;
         Command* chain = getCommand(handle);
@@ -390,7 +390,7 @@ namespace tee {
 
     void cmd::execute(CommandHandle handle)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
 
         Command* cmd = getCommand(handle);
 
@@ -430,7 +430,7 @@ namespace tee {
 
     void cmd::undo(CommandHandle handle)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
 
         Command* cmd = getCommand(handle);
 
@@ -535,31 +535,31 @@ namespace tee {
 
     CommandHandle cmd::getPrev(CommandHandle curHandle)
     {
-        assert(g_cmdSys);
-        assert(curHandle.isValid());
+        BX_ASSERT(g_cmdSys);
+        BX_ASSERT(curHandle.isValid());
 
         return g_cmdSys->commandPool.getHandleData<Command>(0, COMMAND_INSTANCE_INDEX(curHandle))->prevHandle;
     }
 
     CommandHandle cmd::getNext(CommandHandle curHandle)
     {
-        assert(g_cmdSys);
-        assert(curHandle.isValid());
+        BX_ASSERT(g_cmdSys);
+        BX_ASSERT(curHandle.isValid());
 
         return g_cmdSys->commandPool.getHandleData<Command>(0, COMMAND_INSTANCE_INDEX(curHandle))->nextHandle;
     }
 
     const char* cmd::getName(CommandHandle handle)
     {
-        assert(g_cmdSys);
-        assert(handle.isValid());
+        BX_ASSERT(g_cmdSys);
+        BX_ASSERT(handle.isValid());
 
         Command* cmd = getCommand(handle);
         uint16_t typeIdx = COMMAND_TYPE_INDEX(handle);
         if (typeIdx != UINT16_MAX) {
             return g_cmdSys->commandTypes[typeIdx].name;
         } else if (cmd->childHandle.isValid()) {
-            assert(cmd->mode != CommandMode::Normal);
+            BX_ASSERT(cmd->mode != CommandMode::Normal);
             switch (cmd->mode) {
             case CommandMode::Chain:
                 return "[Chain]";

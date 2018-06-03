@@ -10,7 +10,7 @@ namespace bx
     static bool parseIniFile(const char* iniFilepath, PfnIniKeyValueCallback callback, void* userParam, 
                              bx::AllocatorI* alloc)
     {
-        assert(alloc);
+        BX_ASSERT(alloc);
 
         bx::FileReader reader;
         bx::Error err;

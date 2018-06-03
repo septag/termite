@@ -5,8 +5,8 @@ namespace tee {
         template <typename _T>
         void getIntArray(const _T& jvalue, int* n, int num)
         {
-            assert(jvalue.IsArray());
-            num = std::min<int>(jvalue.Size(), num);
+            BX_ASSERT(jvalue.IsArray());
+            num = bx::min<int>(jvalue.Size(), num);
             for (int i = 0; i < num; i++)
                 n[i] = jvalue[i].GetInt();
         }
@@ -15,8 +15,8 @@ namespace tee {
         template <typename _T>
         void getUInt16Array(const _T& jvalue, uint16_t* n, int num)
         {
-            assert(jvalue.IsArray());
-            num = std::min<int>(jvalue.Size(), num);
+            BX_ASSERT(jvalue.IsArray());
+            num = bx::min<int>(jvalue.Size(), num);
             for (int i = 0; i < num; i++)
                 n[i] = (uint16_t)jvalue[i].GetInt();
         }
@@ -24,8 +24,8 @@ namespace tee {
         template <typename _T>
         void getFloatArray(const _T& jvalue, float* f, int num)
         {
-            assert(jvalue.IsArray());
-            num = std::min<int>(jvalue.Size(), num);
+            BX_ASSERT(jvalue.IsArray());
+            num = bx::min<int>(jvalue.Size(), num);
             for (int i = 0; i < num; i++)
                 f[i] = jvalue[i].GetFloat();
         }

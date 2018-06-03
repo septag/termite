@@ -100,7 +100,7 @@ namespace tee
 
     void debug::setLogToCallback(LogCallbackFn callback, void* userParam)
     {
-        assert(callback);
+        BX_ASSERT(callback);
 
         gLogger.callback = callback;
         gLogger.userParam = userParam;

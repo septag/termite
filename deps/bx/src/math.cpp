@@ -6,24 +6,27 @@
 #include "bx_p.h"
 #include <bx/math.h>
 #include <bx/uint32_t.h>
+#include <bxx/math.h>
+#include <float.h>
+#include <limits.h>
 
 namespace bx
 {
-	const float kPi         = 3.1415926535897932384626433832795f;
-	const float kPi2        = 6.2831853071795864769252867665590f;
-	const float kInvPi      = 1.0f/kPi;
-	const float kPiHalf     = 1.5707963267948966192313216916398f;
-	const float kPiQuarter  = 0.7853981633974483096156608458199f;
-	const float kSqrt2      = 1.4142135623730950488016887242097f;
-	const float kLogNat10   = 2.3025850929940456840179914546844f;
-	const float kInvLogNat2 = 1.4426950408889634073599246810019f;
-	const float kLogNat2Hi  = 0.6931471805599453094172321214582f;
-	const float kLogNat2Lo  = 1.90821492927058770002e-10f;
-	const float kE          = 2.7182818284590452353602874713527f;
-	const float kNearZero   = 1.0f/float(1 << 28);
-	const float kFloatMin   = 1.175494e-38f;
-	const float kFloatMax   = 3.402823e+38f;
-	const float kInfinity   = bitsToFloat(UINT32_C(0x7f800000) );
+	 const float kPi         = 3.1415926535897932384626433832795f;
+     const float kPi2        = 6.2831853071795864769252867665590f;
+     const float kInvPi      = 1.0f/kPi;
+     const float kPiHalf     = 1.5707963267948966192313216916398f;
+     const float kPiQuarter  = 0.7853981633974483096156608458199f;
+     const float kSqrt2      = 1.4142135623730950488016887242097f;
+     const float kLogNat10   = 2.3025850929940456840179914546844f;
+     const float kInvLogNat2 = 1.4426950408889634073599246810019f;
+     const float kLogNat2Hi  = 0.6931471805599453094172321214582f;
+     const float kLogNat2Lo  = 1.90821492927058770002e-10f;
+     const float kE          = 2.7182818284590452353602874713527f;
+     const float kNearZero   = 1.0f/float(1 << 28);
+     const float kFloatMin   = 1.175494e-38f;
+     const float kFloatMax   = 3.402823e+38f;
+     const float kInfinity   = bitsToFloat(UINT32_C(0x7f800000) );
 
 	namespace
 	{
@@ -922,5 +925,89 @@ namespace bx
 		_rgb[1] = vv * lerp(1.0f, clamp(py - 1.0f, 0.0f, 1.0f), ss);
 		_rgb[2] = vv * lerp(1.0f, clamp(pz - 1.0f, 0.0f, 1.0f), ss);
 	}
+
+    void mat3Mul(float* __restrict _result, const float* __restrict _a, const float* __restrict _b)
+    {
+        vec3MulMat3(&_result[0], &_a[0], _b);
+        vec3MulMat3(&_result[3], &_a[3], _b);
+        vec3MulMat3(&_result[6], &_a[6], _b);
+    }
+
+    // Reference: http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/
+    void quatFromMtx(float* _result, const float* mtx)
+    {
+        float trace = mtx[0] + mtx[5] + mtx[10];
+        if (trace > 0.00001f) {
+            float s = 0.5f / bx::sqrt(trace + 1.0f);
+            _result[3] = 0.25f / s;
+            _result[0] = (mtx[9] - mtx[6]) * s;
+            _result[1] = (mtx[2] - mtx[8]) * s;
+            _result[2] = (mtx[4] - mtx[1]) * s;
+        } else {
+            if (mtx[0] > mtx[5] && mtx[0] > mtx[10]) {
+                float s = 2.0f * bx::sqrt(1.0f + mtx[0] - mtx[5] - mtx[10]);
+                _result[3] = (mtx[9] - mtx[6]) / s;
+                _result[0] = 0.25f * s;
+                _result[1] = (mtx[1] + mtx[4]) / s;
+                _result[2] = (mtx[2] + mtx[8]) / s;
+            } else if (mtx[5] > mtx[10]) {
+                float s = 2.0f * bx::sqrt(1.0f + mtx[5] - mtx[0] - mtx[10]);
+                _result[3] = (mtx[2] - mtx[8]) / s;
+                _result[0] = (mtx[1] + mtx[4]) / s;
+                _result[1] = 0.25f * s;
+                _result[2] = (mtx[6] + mtx[9]) / s;
+            } else {
+                float s = 2.0f * bx::sqrt(1.0f + mtx[10] - mtx[0] - mtx[5]);
+                _result[3] = (mtx[4] - mtx[1]) / s;
+                _result[0] = (mtx[2] + mtx[8]) / s;
+                _result[1] = (mtx[6] + mtx[9]) / s;
+                _result[2] = 0.25f * s;
+            }
+        }
+    }
+
+
+    const vec4_t vec4_t::Zero = vec4_t(0, 0, 0, 1.0f);
+    const vec4_t vec4_t::Up = vec4_t(0, 1.0f, 0, 1.0f);
+    const vec4_t vec4_t::Right = vec4_t(1.0f, 0, 0, 1.0f);
+    const vec4_t vec4_t::Forward = vec4_t(0, 0, 1.0f, 1.0f);
+
+    const vec2_t vec2_t::Zero = vec2_t(0, 0);
+    const vec2_t vec2_t::Right = vec2_t(1.0f, 0);
+    const vec2_t vec2_t::Up = vec2_t(0, 1.0f);
+
+    const vec3_t vec3_t::Zero = vec3_t(0, 0, 0);
+    const vec3_t vec3_t::Right = vec3_t(1.0f, 0, 0);
+    const vec3_t vec3_t::Up = vec3_t(0, 1.0f, 0);
+    const vec3_t vec3_t::Forward = vec3_t(0, 0, 1.0f);
+
+    const ucolor_t ucolor_t::White = ucolor_t(0xffffffff);
+    const ucolor_t ucolor_t::Black = ucolor_t(0xff000000);
+    const ucolor_t ucolor_t::Red = ucolor_t(0xff0000ff);
+    const ucolor_t ucolor_t::Green = ucolor_t(0xff00ff00);
+    const ucolor_t ucolor_t::Blue = ucolor_t(0xffff0000);
+    const ucolor_t ucolor_t::Yellow = ucolor_t(0xff00ffff);
+    const ucolor_t ucolor_t::Cyan = ucolor_t(0xffffff00);
+
+    const ivec2_t ivec2_t::Zero = ivec2_t(0, 0);
+    const ivec2_t ivec2_t::Up = ivec2_t(0, 1);
+    const ivec2_t ivec2_t::Right = ivec2_t(1, 0);
+
+    const quat_t quat_t::Ident = quat_t(0, 0, 0, 1.0f);
+
+    const mat3_t mat3_t::Zero = mat3_t(0, 0, 0, 0, 0, 0, 0, 0, 0);
+    const mat3_t mat3_t::Ident = mat3_t(1.0f, 0, 0,
+                                        0, 1.0f, 0,
+                                        0, 0, 1.0f);
+
+    const mat4_t mat4_t::Zero = mat4_t(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    const mat4_t mat4_t::Ident = mat4_t(1.0f, 0, 0, 0,
+                                        0, 1.0f, 0, 0,
+                                        0, 0, 1.0f, 0,
+                                        0, 0, 0, 1.0f);
+
+    const aabb_t aabb_t::Null = aabb_t(FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX);
+    const rect_t rect_t::Null = rect_t(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
+    const irect_t irect_t::Null = irect_t(INT_MAX, INT_MAX, -INT_MAX, -INT_MAX);
 
 } // namespace bx

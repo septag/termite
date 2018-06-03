@@ -1,6 +1,7 @@
 #ifdef termite_SHARED_LIB
-#undef termite_SHARED_LIB
+#   undef termite_SHARED_LIB
 #endif
+
 #include "termite/tee.h"
 
 #include "bx/math.h"
@@ -69,7 +70,7 @@ static void imguiFree(void* ptr)
 
 static void imguiDrawLists(ImDrawData* data)
 {
-    assert(g_Im);
+    BX_ASSERT(g_Im);
 
     GfxDriver* driver = g_Im->driver;
 
@@ -152,7 +153,7 @@ int tee::initImGui(uint8_t viewId, GfxDriver* driver,
 					   bx::AllocatorI* alloc, const int* keymap, const char* iniFilename, void* nativeWindowHandle)
 {
     if (g_Im) {
-        assert(false);
+        BX_ASSERT(false);
         return false;
     }
 

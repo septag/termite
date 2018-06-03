@@ -284,7 +284,7 @@ Fiber* FiberPool::newFiber(JobCallback callbackFn, void* userData, uint16_t inde
 void FiberPool::deleteFiber(Fiber* fiber)
 {
     bx::LockScope lk(m_lock);
-    assert(m_index != m_maxFibers);
+    BX_ASSERT(m_index != m_maxFibers);
     m_ptrs[m_index++] = fiber;
 }
 
@@ -360,7 +360,7 @@ static JobHandle dispatch(const JobDesc* jobs, uint16_t numJobs, FiberPool* pool
     // Create N Fibers/Job
     uint32_t count = 0;
     Fiber** fibers = (Fiber**)alloca(sizeof(Fiber*)*numJobs);
-    assert(fibers);
+    BX_ASSERT(fibers);
 
     for (uint16_t i = 0; i < numJobs; i++) {
         Fiber* fiber = pool->newFiber(jobs[i].callback, jobs[i].userParam, i, jobs[i].priority, pool, counter);
@@ -374,7 +374,7 @@ static JobHandle dispatch(const JobDesc* jobs, uint16_t numJobs, FiberPool* pool
 
     if (count > 0) {
         *counter = count;
-        assert(data);       // Must be called within main or job_dispatcher threads only
+        BX_ASSERT(data);       // Must be called within main or job_dispatcher threads only
         if (data->running)
             data->running->waitCounter = counter;
 
@@ -480,7 +480,7 @@ bool tee::initJobDispatcher(bx::AllocatorI* alloc,
                             bool lockThreadsToCores, uint8_t numThreads)
 {
     if (gDispatcher) {
-        assert(false);
+        BX_ASSERT(false);
         return false;
     }
     gDispatcher = BX_NEW(alloc, JobDispatcher);
@@ -515,14 +515,14 @@ bool tee::initJobDispatcher(bx::AllocatorI* alloc,
     // Create threads
     uint16_t numCores = numThreads;
     if (numThreads == UINT8_MAX) {
-        numCores = std::min<uint16_t>(getHardwareInfo().numCores, UINT8_MAX);
+        numCores = bx::min<uint16_t>(getHardwareInfo().numCores, UINT8_MAX);
         numCores = numCores ? (numCores - 1) : 0;   // NumThreads is always one less than number of cores
     }
-    numThreads = (uint8_t)std::min<uint16_t>(numCores, numThreads);
+    numThreads = (uint8_t)bx::min<uint16_t>(numCores, numThreads);
 
     if (numThreads > 0) {
         gDispatcher->threads = (bx::Thread**)BX_ALLOC(alloc, sizeof(bx::Thread*)*numThreads);
-        assert(gDispatcher->threads);
+        BX_ASSERT(gDispatcher->threads);
         
         gDispatcher->numThreads = numThreads;
         for (uint8_t i = 0; i < numThreads; i++) {

@@ -119,9 +119,9 @@ namespace tee {
 
     bool asset::init(AssetLibInitFlags::Bits flags, IoDriver* driver, bx::AllocatorI* alloc, IoDriver* blockingDriver)
     {
-        assert(driver);
+        BX_ASSERT(driver);
         if (gAssetLib) {
-            assert(0);
+            BX_ASSERT(0);
             return false;
         }
 
@@ -217,7 +217,7 @@ namespace tee {
                                         uintptr_t asyncProgressObj/* = 0*/)
     {
         AssetLib* assetLib = gAssetLib;
-        assert(assetLib);
+        BX_ASSERT(assetLib);
 
         if (userParamsSize > TEE_ASSET_MAX_USERPARAM_SIZE)
             return AssetTypeHandle();
@@ -237,7 +237,7 @@ namespace tee {
 
         // 
         uint16_t tHandle = assetLib->assetTypes.newHandle();
-        assert(tHandle != UINT16_MAX);
+        BX_ASSERT(tHandle != UINT16_MAX);
         AssetTypeData* tdata = assetLib->assetTypes.getHandleData<AssetTypeData>(0, tHandle);
         bx::strCopy(tdata->name, sizeof(tdata->name), name);
         tdata->callbacks = callbacks;
@@ -254,7 +254,7 @@ namespace tee {
     void asset::unregisterType(AssetTypeHandle handle)
     {
         AssetLib* assetLib = gAssetLib;
-        assert(assetLib);
+        BX_ASSERT(assetLib);
 
         if (handle.isValid()) {
             AssetTypeData* tdata = assetLib->assetTypes.getHandleData<AssetTypeData>(0, handle);
@@ -304,7 +304,7 @@ namespace tee {
         rs->initLoadState = AssetState::LoadFailed;
 
         if (userParamsSize > 0) {
-            assert(userParamsSize);
+            BX_ASSERT(userParamsSize);
             memcpy(rs->userParams, userParams, userParamsSize);
             rs->paramsHash = bx::hash<bx::HashMurmur2A>(userParams, userParamsSize);
         }
@@ -462,7 +462,7 @@ namespace tee {
                                        bx::AllocatorI* objAlloc)
     {
         AssetLib* assetLib = gAssetLib;
-        assert(assetLib);
+        BX_ASSERT(assetLib);
         AssetHandle handle;
         AssetHandle overrideHandle;
 
@@ -589,7 +589,7 @@ namespace tee {
     AssetHandle asset::getFailHandle(const char* name)
     {
         AssetLib* assetLib = gAssetLib;
-        assert(assetLib);
+        BX_ASSERT(assetLib);
 
         size_t typeNameHash = tinystl::hash_string(name, strlen(name));
         int resTypeIdx = assetLib->assetTypesTable.find(typeNameHash);
@@ -607,7 +607,7 @@ namespace tee {
     AssetHandle asset::getAsyncHandle(const char* name)
     {
         AssetLib* assetLib = gAssetLib;
-        assert(assetLib);
+        BX_ASSERT(assetLib);
 
         size_t typeNameHash = tinystl::hash_string(name, strlen(name));
         int resTypeIdx = assetLib->assetTypesTable.find(typeNameHash);
@@ -624,7 +624,7 @@ namespace tee {
 
     AssetHandle asset::addRef(AssetHandle handle)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
         Asset* rs = gAssetLib->assets.getHandleData<Asset>(0, handle);
         rs->refcount++;
         return handle;
@@ -632,7 +632,7 @@ namespace tee {
 
     uint32_t asset::getRefCount(AssetHandle handle)
     {
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
         return gAssetLib->assets.getHandleData<Asset>(0, handle)->refcount;
     }
 
@@ -640,7 +640,7 @@ namespace tee {
                                             const void* userParams, AssetFlags::Bits flags, bx::AllocatorI* objAlloc)
     {
         AssetLib* assetLib = gAssetLib;
-        assert(assetLib);
+        BX_ASSERT(assetLib);
         AssetHandle handle;
         AssetHandle overrideHandle;
 
@@ -673,7 +673,7 @@ namespace tee {
 
         // Load the asset  for the first time
         if (!handle.isValid()) {
-            assert(mem);
+            BX_ASSERT(mem);
 
             AssetParams params;
             params.uri = uri;
@@ -716,8 +716,8 @@ namespace tee {
     void asset::unload(AssetHandle handle)
     {
         AssetLib* assetLib = gAssetLib;
-        assert(assetLib);
-        assert(handle.isValid());
+        BX_ASSERT(assetLib);
+        BX_ASSERT(handle.isValid());
 
         if (!assetLib->ignoreUnloadResourceCalls) {
             Asset* rs = assetLib->assets.getHandleData<Asset>(0, handle);
@@ -746,8 +746,8 @@ namespace tee {
     uintptr_t asset::getObj(AssetHandle handle)
     {
         AssetLib* assetLib = gAssetLib;
-        assert(assetLib);
-        assert(handle.isValid());
+        BX_ASSERT(assetLib);
+        BX_ASSERT(handle.isValid());
 
         return assetLib->assets.getHandleData<Asset>(0, handle)->obj;
     }
@@ -755,7 +755,7 @@ namespace tee {
     AssetState::Enum asset::getState(AssetHandle handle)
     {
         AssetLib* assetLib = gAssetLib;
-        assert(assetLib);
+        BX_ASSERT(assetLib);
         if (handle.isValid())
             return assetLib->assets.getHandleData<Asset>(0, handle)->loadState;
         else
@@ -765,7 +765,7 @@ namespace tee {
     int asset::getParamSize(const char* name)
     {
         AssetLib* assetLib = gAssetLib;
-        assert(assetLib);
+        BX_ASSERT(assetLib);
 
         int typeIdx = assetLib->assetTypesTable.find(tinystl::hash_string(name, strlen(name)));
         if (typeIdx != -1)
@@ -778,8 +778,8 @@ namespace tee {
     const char* asset::getUri(AssetHandle handle)
     {
         AssetLib* assetLib = gAssetLib;
-        assert(assetLib);
-        assert(handle.isValid());
+        BX_ASSERT(assetLib);
+        BX_ASSERT(handle.isValid());
 
         return assetLib->assets.getHandleData<Asset>(0, handle)->uri.cstr();
     }
@@ -787,8 +787,8 @@ namespace tee {
     const char* asset::getName(AssetHandle handle)
     {
         AssetLib* assetLib = gAssetLib;
-        assert(assetLib);
-        assert(handle.isValid());
+        BX_ASSERT(assetLib);
+        BX_ASSERT(handle.isValid());
 
         int r = assetLib->assetTypesTable.find(assetLib->assets.getHandleData<Asset>(0, handle)->typeNameHash);
         if (r != 0) {
@@ -801,8 +801,8 @@ namespace tee {
     const void* asset::getParams(AssetHandle handle)
     {
         AssetLib* assetLib = gAssetLib;
-        assert(assetLib);
-        assert(handle.isValid());
+        BX_ASSERT(assetLib);
+        BX_ASSERT(handle.isValid());
 
         return assetLib->assets.getHandleData<Asset>(0, handle)->userParams;
     }
@@ -874,7 +874,7 @@ namespace tee {
             AsyncLoadRequest* areq = this->asyncLoads.getHandleData<AsyncLoadRequest>(0, handle);
             this->asyncLoads.freeHandle(handle);
 
-            assert(areq->handle.isValid());
+            BX_ASSERT(areq->handle.isValid());
             AssetHandle aHandle = areq->handle;
             Asset* rs = this->assets.getHandleData<Asset>(0, areq->handle);
 
@@ -1020,7 +1020,7 @@ namespace tee {
 
     void asset::replaceFileExtension(const char* ext, const char* extReplacement)
     {
-        assert(ext);
+        BX_ASSERT(ext);
         AssetLib* assetLib = gAssetLib;
         int index = assetLib->overrides.find([ext](const AssetExtensionOverride& value)->bool {
             return strcmp(value.ext, ext) == 0;

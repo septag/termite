@@ -33,18 +33,24 @@ namespace bx
 
 } // namespace bx
 
-#if BX_CONFIG_CHECK_ASSERT
+#if BX_ENABLE_ASSERTS
 #   ifdef BX_ASSERT
 #       undef BX_ASSERT
 #   endif
 
-#define BX_ASSERT(_condition, _msg, ...) \
-    if (!(_condition)) {  \
-        bx::debugPrintf(_msg, ##__VA_ARGS__);   \
-        bx::debugBreak();   \
-    }
+#   if !BX_COMPILER_MSVC
+#       define BX_ASSERT_1(_cond)  if (!(_cond)) { bx::debugBreak(); }
+#       define BX_ASSERT_2(_cond, _arg1) if (!(_cond)) { bx::debugOutput(_arg1); bx::debugBreak(); }
+#       define BX_ASSERT_3(_cond, _arg1, _arg2) if (!(_cond)) { bx::debugPrintf(_arg1, _arg2); bx::debugBreak(); }
+#       define BX_ASSERT_4(_cond, _arg1, _arg2, _arg3) if (!(_cond)) { bx::debugPrintf(_arg1, _arg2, _arg3); bx::debugBreak(); }
+
+#       define BX_GET_ASSERT_MACRO(_1, _2, _3, _4, _NAME, ...) _NAME
+#       define BX_ASSERT(...) BX_GET_ASSERT_MACRO(__VA_ARGS__, BX_ASSERT_4, BX_ASSERT_3, BX_ASSERT_2, BX_ASSERT_1)(__VA_ARGS__);
+#   else
+#       define BX_ASSERT(_cond, ...)  if (!(_cond)) { bx::debugBreak();  }
+#   endif
 #else
-#   define BX_ASSERT(_condition, _msg, ...)
+#   define BX_ASSERT(...)
 #endif
 
 #endif // BX_DEBUG_H_HEADER_GUARD

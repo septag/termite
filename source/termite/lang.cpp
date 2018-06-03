@@ -63,7 +63,7 @@ namespace tee
     {
         AssetTypeHandle handle;
         handle = asset::registerType("lang", &gLangLoader, 0, 0, 0);
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
     }
 
     bool LangLoader::loadObj(const MemoryBlock* mem, const AssetParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
@@ -111,7 +111,7 @@ namespace tee
             } 
             if (jentry.HasMember("Value")) {
                 bx::memCopy(entry.text, jentry["Value"].GetString(), 
-                            std::min<size_t>(sizeof(entry.text), jentry["Value"].GetStringLength()+1));
+                            bx::min<size_t>(sizeof(entry.text), jentry["Value"].GetStringLength()+1));
             }
             if (jentry.HasMember("Scale")) {
                 entry.scale = jentry["Scale"].GetFloat();

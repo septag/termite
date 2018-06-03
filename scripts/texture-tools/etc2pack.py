@@ -2,7 +2,6 @@ import os
 import sys
 import subprocess
 import shutil
-import glob
 import optparse
 import lz4.block
 import json

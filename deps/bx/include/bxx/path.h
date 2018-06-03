@@ -258,7 +258,7 @@ namespace bx
 #else
     inline bx::Path getTempDir()
     {
-        assert(false);
+        BX_ASSERT(false);
         return bx::Path();
     }
 #endif

@@ -1,4 +1,6 @@
-#pragma once
+#ifndef BX_POOL_H_
+#   error "This file must only be included from pool.h"
+#endif
 
 #include "bx/debug.h"
 

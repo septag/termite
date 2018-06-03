@@ -89,8 +89,8 @@ namespace tee {
 
     void asset::destroyIncrementalLoader(IncrLoader* loader)
     {
-        assert(loader);
-        assert(loader->alloc);
+        BX_ASSERT(loader);
+        BX_ASSERT(loader->alloc);
 
         loader->unloadRequestPool.destroy();
         loader->loadRequestPool.destroy();
@@ -100,9 +100,9 @@ namespace tee {
 
     void asset::beginIncrLoadGroup(IncrLoader* loader, const IncrLoadingScheme& scheme)
     {
-        assert(loader);
+        BX_ASSERT(loader);
         IncrLoaderGroupHandle handle = IncrLoaderGroupHandle(loader->groupPool.newHandle());
-        assert(handle.isValid());
+        BX_ASSERT(handle.isValid());
         LoaderGroup* group = BX_PLACEMENT_NEW(loader->groupPool.getHandleData(0, handle), LoaderGroup);
         bx::memCopy(&group->scheme, &scheme, sizeof(scheme));
         group->frameCount = 0;
@@ -114,7 +114,7 @@ namespace tee {
 
     IncrLoaderGroupHandle asset::endIncrLoadGroup(IncrLoader* loader)
     {
-        assert(loader);
+        BX_ASSERT(loader);
         IncrLoaderGroupHandle handle = loader->curGroupHandle;
 
         loader->curGroupHandle = IncrLoaderGroupHandle();
@@ -164,8 +164,8 @@ namespace tee {
 
     bool asset::isLoadDone(IncrLoader* loader, IncrLoaderGroupHandle handle, IncrLoaderFlags::Bits flags)
     {
-        assert(loader);
-        assert(handle.isValid());
+        BX_ASSERT(loader);
+        BX_ASSERT(handle.isValid());
 
         LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, handle);
         bool done = group->loadRequestList.isEmpty() & group->unloadRequestList.isEmpty();
@@ -210,15 +210,15 @@ namespace tee {
                      const char* name, const char* uri, const void* userParams,
                      AssetFlags::Bits flags /*= 0*/, bx::AllocatorI* objAlloc/* = nullptr*/)
     {
-        assert(loader->curGroupHandle.isValid());
-        assert(pHandle);
+        BX_ASSERT(loader->curGroupHandle.isValid());
+        BX_ASSERT(pHandle);
 
         pHandle->reset();
 
         // create a new request
         LoadAssetRequest* req = loader->loadRequestPool.newInstance();
         if (!req) {
-            assert(false);
+            BX_ASSERT(false);
             return;
         }
 
@@ -236,18 +236,18 @@ namespace tee {
 
         // Add to group
         LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, loader->curGroupHandle);
-        assert(group);
+        BX_ASSERT(group);
         group->loadRequestList.addToEnd(&req->lnode);
     }
 
     void asset::unload(IncrLoader* loader, AssetHandle handle)
     {
-        assert(loader->curGroupHandle.isValid());
-        assert(handle.isValid());
+        BX_ASSERT(loader->curGroupHandle.isValid());
+        BX_ASSERT(handle.isValid());
 
         UnloadAssetRequest* req = loader->unloadRequestPool.newInstance();
         if (!req) {
-            assert(false);
+            BX_ASSERT(false);
             return;
         }
 
@@ -255,7 +255,7 @@ namespace tee {
 
         // Add to Group
         LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, loader->curGroupHandle);
-        assert(group);
+        BX_ASSERT(group);
         group->unloadRequestList.addToEnd(&req->lnode);
     }
 
@@ -303,7 +303,7 @@ namespace tee {
         while (1) {
             UnloadAssetRequest* unloadReq = popFirstUnloadRequest(loader, group);
             if (unloadReq) {
-                assert(unloadReq->handle.isValid());
+                BX_ASSERT(unloadReq->handle.isValid());
                 uint32_t refcount = asset::getRefCount(unloadReq->handle);
                 asset::unload(unloadReq->handle);
                 loader->unloadRequestPool.deleteInstance(unloadReq);

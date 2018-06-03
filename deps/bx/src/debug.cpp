@@ -30,6 +30,7 @@ extern "C" void NSLog(CFStringRef _format, ...);
 #	include <stdio.h> // fputs, fflush
 #endif // BX_PLATFORM_WINDOWS
 
+
 namespace bx
 {
 	void debugBreak()
@@ -88,9 +89,16 @@ namespace bx
 		char temp[4096];
 		while (0 != size)
 		{
-			uint32_t len = uint32_min(sizeof(temp)-1, size);
-			memCopy(temp, data, len);
+#if BX_PLATFORM_WINDOWS
+            uint32_t len = uint32_min(sizeof(temp)-2, size);
+            memCopy(temp, data, len);
+            temp[len] = '\n';
+            temp[len+1] = '\0';
+#else
+            uint32_t len = uint32_min(sizeof(temp)-1, size);
+            memCopy(temp, data, len);
 			temp[len] = '\0';
+#endif
 			data += len;
 			size -= len;
 			debugOutput(temp);
@@ -108,7 +116,8 @@ namespace bx
 			out = (char*)alloca(len+1);
 			len = vsnprintf(out, len, _format, _argList);
 		}
-		out[len] = '\0';
+
+        out[len] = '\0';
 		debugOutput(out);
 	}
 

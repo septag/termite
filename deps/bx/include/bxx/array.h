@@ -32,13 +32,13 @@ namespace bx
         int find(FindMatchFunc matchFn) const;
 
         Ty* itemPtr(int _index)  {  
-            assert(_index < m_numItems); return &m_buff[_index];   
+            BX_ASSERT(_index < m_numItems); return &m_buff[_index];   
         }
         Ty& item(int _index) {
-            assert(_index < m_numItems); return m_buff[_index];
+            BX_ASSERT(_index < m_numItems); return m_buff[_index];
         }
-        const Ty& operator[](int _index) const   {   assert(_index < m_numItems);  return m_buff[_index]; }
-        Ty& operator[](int _index) { assert(_index < m_numItems);  return m_buff[_index]; }
+        const Ty& operator[](int _index) const   {   BX_ASSERT(_index < m_numItems);  return m_buff[_index]; }
+        Ty& operator[](int _index) { BX_ASSERT(_index < m_numItems);  return m_buff[_index]; }
 
     private:
         AllocatorI* m_alloc;
@@ -62,13 +62,13 @@ namespace bx
     template <typename Ty>
     Array<Ty>::~Array()
     {
-        assert(m_buff == nullptr);
+        BX_ASSERT(m_buff == nullptr);
     }
 
     template <typename Ty>
     bool Array<Ty>::create(int _initCount, int _growCount, AllocatorI* _alloc)
     {
-        assert(_alloc);
+        BX_ASSERT(_alloc);
 
         m_buff = (Ty*)BX_ALLOC(_alloc, _initCount*sizeof(Ty));
         if (!m_buff)

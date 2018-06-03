@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../bx/string.h"
-#include <cassert>
+#include "bx/string.h"
+#include "bx/debug.h"
 #include <string.h>
 
 namespace bx
@@ -48,13 +48,13 @@ namespace bx
 
         char& operator[](int index)
         {
-            assert(index < _Size);
+            BX_ASSERT(index < _Size);
             return this->text[index];
         }
 
         const char operator[](int index) const
         {
-            assert(index < _Size);
+            BX_ASSERT(index < _Size);
             return this->text[index];
         }
 

@@ -7,7 +7,6 @@
 #define BX_STRING_H_HEADER_GUARD
 
 #include "allocator.h"
-#include <cctype>
 
 namespace bx
 {

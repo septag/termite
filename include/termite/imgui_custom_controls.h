@@ -76,7 +76,7 @@ namespace tee
 
         int getCount() const
         {
-            return (int)std::min<uint32_t>(num, _Max);
+            return (int)bx::min<uint32_t>(num, _Max);
         }
 
         const float* getValues() const
