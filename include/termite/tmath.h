@@ -4,6 +4,7 @@
 
 #include "bx/bx.h"
 #include "bx/allocator.h"
+#include "bx/debug.h"
 
 #ifndef TEE_API
 #   define TEE_API
