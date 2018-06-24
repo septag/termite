@@ -1348,10 +1348,11 @@ namespace tee {
             vec2_t pos = sprite->posOffset - frame.pivot;
             vec2_t scale = vec2(scalex, scaley) * sprite->scale;
 
-            if (flipX & SpriteFlip::FlipX)
+            if (flipX & SpriteFlip::FlipX) {
                 scale.x = -scale.x;
-            if (flipY & SpriteFlip::FlipY)
+            } if (flipY & SpriteFlip::FlipY) {
                 scale.y = -scale.y;
+            }
 
             // Transform (offset x sprite's own matrix)
             // PreMat = TranslateMat * ScaleMat
@@ -1362,6 +1363,7 @@ namespace tee {
 
             vec3_t transform1 = vec3(finalMat.m11, finalMat.m12, finalMat.m21);
             vec3_t transform2 = vec3(finalMat.m22, finalMat.m31, finalMat.m32);
+
             uint32_t color = sprite->color.n;
             uint32_t colorAdd = sprite->colorAdd.n;
 
@@ -1567,11 +1569,14 @@ namespace tee {
 
             vec2_t pos = sprite->posOffset - frame.pivot;
             vec2_t scale = vec2(scalex, scaley) * sprite->scale;
+            ucolor_t _colorAdd = sprite->colorAdd;
+            _colorAdd.a = 255;
 
             bool reorder = false;
             if (flipX & SpriteFlip::FlipX) {
                 scale.x = -scale.x;
                 reorder = !reorder;
+                _colorAdd.a = 0;
             }
             if (flipY & SpriteFlip::FlipY) {
                 scale.y = -scale.y;
@@ -1590,7 +1595,7 @@ namespace tee {
             uint32_t color;
             if (!colors)    color = ss.sprite->color.n;
             else            color = colors[ss.index].n;
-            uint32_t colorAdd = sprite->colorAdd.n;
+            uint32_t colorAdd = _colorAdd.n;
 
             // Batch
             uint32_t batchKey = SPRITE_KEY_GET_BATCH(ss.key);

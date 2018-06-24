@@ -942,9 +942,8 @@ uint64_t getFrameIndex()
 MemoryBlock* createMemoryBlock(uint32_t size, bx::AllocatorI* alloc)
 {
     if (size > 0) {
-        gTee->memPoolLock.lock();
+        bx::LockScope(gTee->memPoolLock);
         HeapMemoryImpl* mem = gTee->memPool.newInstance();
-        gTee->memPoolLock.unlock();
         if (!mem)
             return nullptr;
         if (!alloc)
@@ -957,7 +956,6 @@ MemoryBlock* createMemoryBlock(uint32_t size, bx::AllocatorI* alloc)
             mem->alloc = alloc;
             return (MemoryBlock*)mem;
         } else {
-            bx::LockScope l(gTee->memPoolLock);
             gTee->memPool.deleteInstance(mem);
             return nullptr;
         }
@@ -968,9 +966,8 @@ MemoryBlock* createMemoryBlock(uint32_t size, bx::AllocatorI* alloc)
 
 MemoryBlock* refMemoryBlockPtr(const void* data, uint32_t size)
 {
-    gTee->memPoolLock.lock();
+    bx::LockScope(gTee->memPoolLock);
     HeapMemoryImpl* mem = gTee->memPool.newInstance();
-    gTee->memPoolLock.unlock();
     if (!mem)
         return nullptr;
     mem->m.data = (uint8_t*)const_cast<void*>(data);
@@ -981,16 +978,14 @@ MemoryBlock* refMemoryBlockPtr(const void* data, uint32_t size)
 
 MemoryBlock* copyMemoryBlock(const void* data, uint32_t size, bx::AllocatorI* alloc)
 {
-    gTee->memPoolLock.lock();
+    bx::LockScope(gTee->memPoolLock);
     HeapMemoryImpl* mem = gTee->memPool.newInstance();
-    gTee->memPoolLock.unlock();
     if (!mem)
         return nullptr;
     if (!alloc)
         alloc = gAlloc;
     mem->m.data = (uint8_t*)BX_ALLOC(alloc, size);
     if (!mem->m.data) {
-        bx::LockScope l(gTee->memPoolLock);
         gTee->memPool.deleteInstance(mem);
         return nullptr;
     }
@@ -1011,6 +1006,7 @@ MemoryBlock* refMemoryBlock(MemoryBlock* mem)
 void releaseMemoryBlock(MemoryBlock* mem)
 {
     HeapMemoryImpl* m = (HeapMemoryImpl*)mem;
+    bx::LockScope(gTee->memPoolLock);
     if (bx::atomicDec(&m->refcount) == 0) {
         if (m->alloc) {
             BX_FREE(m->alloc, m->m.data);
@@ -1018,7 +1014,6 @@ void releaseMemoryBlock(MemoryBlock* mem)
             m->m.size = 0;
         }
 
-        bx::LockScope(gTee->memPoolLock);
         gTee->memPool.deleteInstance(m);
     }
 }
@@ -1288,6 +1283,17 @@ const Config& getConfig() TEE_THREAD_SAFE
 Config* getMutableConfig() TEE_THREAD_SAFE
 {
     return &gTee->conf;
+}
+
+TEE_API void setCacheDir(const char* dir)
+{
+    bx::FileInfo info;
+    bx::stat(dir, info);
+    if (info.m_type == bx::FileInfo::Directory) {
+        gCacheDir = dir;
+    } else {
+        BX_WARN("setCacheDir: '%s' is not a directory", dir);
+    }
 }
 
 const char* getCacheDir() TEE_THREAD_SAFE

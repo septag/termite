@@ -170,7 +170,7 @@ namespace tee {
         LoaderGroup* group = loader->groupPool.getHandleData<LoaderGroup>(0, handle);
         bool done = group->loadRequestList.isEmpty() & group->unloadRequestList.isEmpty();
         if (done) {
-            if ((flags & IncrLoaderFlags::RetryFailed) && !group->loadFailedList.isEmpty() && group->retryCount < 1) {
+            if ((flags & IncrLoaderFlags::RetryFailed) && !group->loadFailedList.isEmpty() && group->retryCount < 2) {
                 // The flag is set and there are some failed resources
                 // Reactivate the group and load those resources once again
                 loader->curGroupHandle = handle;

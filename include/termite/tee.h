@@ -249,6 +249,7 @@ namespace tee
     TEE_API bx::AllocatorI* getTempAlloc() TEE_THREAD_SAFE;
     TEE_API const Config& getConfig() TEE_THREAD_SAFE;
     TEE_API Config* getMutableConfig() TEE_THREAD_SAFE;
+    TEE_API void setCacheDir(const char* dir);
     TEE_API const char* getCacheDir() TEE_THREAD_SAFE;
     TEE_API const char* getDataDir() TEE_THREAD_SAFE;
     TEE_API const char* getPackageVersion() TEE_THREAD_SAFE;
