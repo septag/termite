@@ -68,6 +68,7 @@
 
 #if BX_PLATFORM_IOS || BX_PLATFORM_OSX
 uint8_t iosGetCoreCount();
+void iosGetCacheDir(bx::Path* pPath);
 #endif
 
 typedef std::chrono::high_resolution_clock TClock;
@@ -349,10 +350,12 @@ bool init(const Config& conf, UpdateCallback updateFn, const GfxPlatformData* pl
     gTee->updateFn = updateFn;
 
     // Set Data and Cache Dir paths
-#if !BX_PLATFORM_ANDROID
+#if BX_PLATFORM_WINDOWS
     gDataDir = conf.dataUri;
     gDataDir.normalizeSelf();
-    gCacheDir = bx::getTempDir();        
+    gCacheDir = bx::getTempDir();      
+#elif BX_PLATFORM_IOS
+    iosGetCacheDir(&gCacheDir);
 #endif
 
     // Error handler

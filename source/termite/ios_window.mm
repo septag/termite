@@ -3,6 +3,8 @@
 #include "tmath.h"
 #include <mach/mach_host.h>
 
+#include "bxx/path.h"
+
 void* iosCreateNativeLayer(void* wnd)
 {
     UIWindow* uiwnd = (__bridge UIWindow*)wnd;
@@ -34,4 +36,10 @@ void iosTurnOnAudioSession()
 uint8_t iosGetCoreCount()
 {
     return [[NSProcessInfo processInfo] processorCount];
+}
+
+void iosGetCacheDir(bx::Path* pPath)
+{
+    NSString* cachePath = [NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) lastObject];
+    *pPath = [cachePath UTF8String];
 }
