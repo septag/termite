@@ -64,7 +64,7 @@ struct MemoryPool
     size_t pageSize;
     bx::List<PageBucket*> bucketList;
     bx::List<MemoryPage*> pageList;
-    bx::RwLock lock;
+    bx::Lock lock;
 
     MemoryPool()
     {
@@ -168,8 +168,6 @@ bx::AllocatorI* tee::allocMemPage(uint64_t tag) TEE_THREAD_SAFE
 {
     BX_ASSERT(g_mempool);
 
-    bx::WriteLockScope lock(g_mempool->lock);
-
     PageBucket::LNode* node = g_mempool->bucketList.getFirst();
     while (node) {
         PageBucket* bucket = node->data;
@@ -191,8 +189,6 @@ bx::AllocatorI* tee::allocMemPage(uint64_t tag) TEE_THREAD_SAFE
 void tee::freeMemTag(uint64_t tag) TEE_THREAD_SAFE
 {
     BX_ASSERT(g_mempool);
-
-    bx::ReadLockScope lock(g_mempool->lock);
 
     // Search all pages for the tag
     MemoryPage::LNode* node = g_mempool->pageList.getFirst();
@@ -222,8 +218,6 @@ size_t tee::getNumMemPages() TEE_THREAD_SAFE
 
 size_t tee::getMemPoolAllocSize() TEE_THREAD_SAFE
 {
-    bx::ReadLockScope lock(g_mempool->lock);
-
     size_t sz = 0;
     MemoryPage::LNode* node = g_mempool->pageList.getFirst();
     while (node) {
@@ -238,8 +232,6 @@ size_t tee::getMemPoolAllocSize() TEE_THREAD_SAFE
 
 size_t tee::getMemTagAllocSize(uint64_t tag) TEE_THREAD_SAFE
 {
-    bx::ReadLockScope lock(g_mempool->lock);
-    
     size_t sz = 0;
     MemoryPage::LNode* node = g_mempool->pageList.getFirst();
     while (node) {
@@ -254,8 +246,6 @@ size_t tee::getMemTagAllocSize(uint64_t tag) TEE_THREAD_SAFE
 
 int tee::getMemTags(uint64_t* tags, int maxTags, size_t* pageSizes) TEE_THREAD_SAFE
 {
-    bx::ReadLockScope lock(g_mempool->lock);
-    
     int count = 0;
     MemoryPage::LNode* node = g_mempool->pageList.getFirst();
     while (node && count < maxTags) {

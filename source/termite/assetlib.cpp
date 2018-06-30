@@ -520,11 +520,13 @@ namespace tee {
                 assetLib->asyncLoadsTable.add(tinystl::hash_string(uri, strlen(uri)), reqHandle);
 
                 // Load the file, result will be called in onReadComplete
-                assetLib->driver->read(newUri.cstr(), IoPathType::Assets, 0);
+                assetLib->driver->read(newUri.cstr(), 
+                                       !(flags & AssetFlags::AbsolutePath) ? IoPathType::Assets : IoPathType::Absolute, 0);
             } else {
                 // Load the file
                 BX_ASSERT(assetLib->blockingDriver, "Blocking driver must be set int 'init'");
-                MemoryBlock* mem = assetLib->blockingDriver->read(newUri.cstr(), IoPathType::Assets, 0);
+                MemoryBlock* mem = assetLib->blockingDriver->read(newUri.cstr(), 
+                                                                  !(flags & AssetFlags::AbsolutePath) ? IoPathType::Assets : IoPathType::Absolute, 0);
                 if (!mem) {
                     BX_WARN("Opening asset '%s' failed", newUri.cstr());
                     BX_WARN(err::getString());

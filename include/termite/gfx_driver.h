@@ -272,7 +272,7 @@ namespace tee
                                             TextureFlag::Bits flags, const GfxMemory* mem/* = nullptr*/);
         void(*updateTextureCube)(TextureHandle handle, uint16_t layer, CubeSide::Enum side, uint8_t mip, uint16_t x, uint16_t y,
                                     uint16_t width, uint16_t height, const GfxMemory* mem, uint16_t pitch);
-        void(*readTexture)(TextureHandle handle, void* data, uint8_t mip/* = 0*/);
+        uint32_t(*readTexture)(TextureHandle handle, void* data, uint8_t mip/* = 0*/);
         bool(*isTextureValid)(uint16_t depth, bool cube, uint16_t numLayers, TextureFormat::Enum fmt, uint32_t flags);
         void(*destroyTexture)(TextureHandle handle);
 

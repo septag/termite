@@ -849,6 +849,31 @@ namespace tee {
         }
     }
 
+    void sprite::addFrame(Sprite* sprite, AssetHandle texHandle, const vec2_t sourceSize, SpriteFlag::Bits flags /*= 0*/, 
+                          const vec2_t pivot /*= vec2(0, 0)*/, const vec2_t topLeftCoords /*= vec2(0, 0)*/, 
+                          const vec2_t bottomRightCoords /*= vec2(1.0f, 1.0f)*/, const char* frameTag /*= nullptr*/)
+    {
+        if (texHandle.isValid()) {
+            // NOTE: this version does not require the sprite to be loaded
+            SpriteFrame* frame = BX_PLACEMENT_NEW(sprite->frames.push(), SpriteFrame);
+            if (frame) {
+                frame->texHandle = texHandle;
+                frame->flags = flags;
+                frame->pivot = pivot;
+                frame->frame = rect(topLeftCoords, bottomRightCoords);
+                frame->tagHash = !frameTag ? 0 : tinystl::hash_string(frameTag, strlen(frameTag));
+
+                Texture* tex = asset::getObjPtr<Texture>(texHandle);
+                frame->sourceSize = sourceSize;
+                frame->posOffset = vec2(0, 0);
+                frame->sizeOffset = vec2(1.0f, 1.0f);
+                frame->rotOffset = 0;
+                frame->pixelRatio = ((bottomRightCoords.x - topLeftCoords.x)*frame->sourceSize.x) /
+                    ((bottomRightCoords.y - topLeftCoords.y)*frame->sourceSize.y);
+            }
+        }
+    }
+
     void sprite::addFrame(Sprite* sprite,
                           AssetHandle ssHandle, const char* name, SpriteFlag::Bits flags, 
                           const char* frameTag /*= nullptr*/)

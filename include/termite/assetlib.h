@@ -32,7 +32,8 @@ namespace tee
         {
             None = 0x00,
             Reload = 0x01,
-            ForceBlockLoad = 0x02
+            ForceBlockLoad = 0x02,
+            AbsolutePath = 0x04
         };
 
         typedef uint8_t Bits;

@@ -97,6 +97,15 @@ namespace tee
                               const vec2_t bottomRightCoords = vec2(1.0f, 1.0f),
                               const char* frameTag = nullptr);
         TEE_API void addFrame(Sprite* sprite,
+                              AssetHandle texHandle,
+                              const vec2_t sourceSize,
+                              SpriteFlag::Bits flags = 0,
+                              const vec2_t pivot = vec2(0, 0),
+                              const vec2_t topLeftCoords = vec2(0, 0),
+                              const vec2_t bottomRightCoords = vec2(1.0f, 1.0f),
+                              const char* frameTag = nullptr);
+
+        TEE_API void addFrame(Sprite* sprite,
                                AssetHandle ssHandle,
                                const char* name,
                                SpriteFlag::Bits flags = 0,
@@ -114,6 +123,21 @@ namespace tee
             Sprite* s = create(alloc, halfSize);
             if (s)
                 addFrame(s, texHandle, flags, pivot, topLeftCoords, bottomRightCoords);
+            return s;
+        }
+
+        inline Sprite* createFromTexture(bx::AllocatorI* alloc,
+                                         const vec2_t& halfSize,
+                                         AssetHandle texHandle,
+                                         const vec2_t sourceSize,
+                                         SpriteFlag::Bits flags = 0,
+                                         const vec2_t& pivot = vec2(0, 0),
+                                         const vec2_t& topLeftCoords = vec2(0, 0),
+                                         const vec2_t& bottomRightCoords = vec2(1.0f, 1.0f))
+        {
+            Sprite* s = create(alloc, halfSize);
+            if (s)
+                addFrame(s, texHandle, sourceSize, flags, pivot, topLeftCoords, bottomRightCoords);
             return s;
         }
 

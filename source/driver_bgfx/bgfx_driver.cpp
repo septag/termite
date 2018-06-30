@@ -919,10 +919,10 @@ static void updateTextureCube(TextureHandle handle, uint16_t layer, CubeSide::En
     bgfx::updateTextureCube(h, layer, (uint8_t)side, mip, x, y, width, height, (const bgfx::Memory*)mem, pitch);
 }
 
-static void readTexture(TextureHandle handle, void* data, uint8_t mip)
+static uint32_t readTexture(TextureHandle handle, void* data, uint8_t mip)
 {
     BGFX_DECLARE_HANDLE(TextureHandle, h, handle);
-    bgfx::readTexture(h, data, mip);
+    return bgfx::readTexture(h, data, mip);
 }
 
 static void destroyTexture(TextureHandle handle)
