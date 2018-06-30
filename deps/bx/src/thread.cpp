@@ -304,7 +304,21 @@ namespace bx
 		return ptr;
 	}
 
-	int32_t Thread::entry()
+
+    void Thread::yield()
+    {
+#if BX_PLATFORM_WINDOWS
+        ::SwitchToThread();
+#elif  BX_PLATFORM_XBOXONE \
+	|| BX_PLATFORM_WINRT   \
+	|| BX_CRT_NONE
+        debugOutput("yield is not implemented"); debugBreak();
+#else
+        ::sched_yield();
+#endif // BX_PLATFORM_
+    }
+
+    int32_t Thread::entry()
 	{
 #if BX_PLATFORM_WINDOWS
 		ThreadInternal* ti = (ThreadInternal*)m_internal;

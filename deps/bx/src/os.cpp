@@ -84,14 +84,12 @@ namespace bx
 	void yield()
 	{
 #if BX_PLATFORM_WINDOWS
-		::SwitchToThread();
-#elif  BX_PLATFORM_XBOXONE \
-	|| BX_PLATFORM_WINRT   \
-	|| BX_CRT_NONE
-		debugOutput("yield is not implemented"); debugBreak();
-#else
-		::sched_yield();
-#endif // BX_PLATFORM_
+        _mm_pause();
+#elif BX_CPU_X86
+        __asm__ __volatile__("pause")
+#elif BX_CPU_ARM
+        __asm__ __volatile__("yield")
+#endif
 	}
 
 	uint32_t getTid()

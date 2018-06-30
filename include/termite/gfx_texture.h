@@ -49,5 +49,9 @@ namespace tee
                                    const uint8_t* src, int srcX, int srcY, int srcWidth, int srcHeight,
                                    int pixelSize);
         TEE_API void saveTextureCache();
+        TEE_API bool saveTexturePng(char const *filename, int w, int h, int comp, const void  *data, int stride_in_bytes);
+        TEE_API bool resizeTexture(const uint8_t* input_pixels, int input_w, int input_h, int input_stride_in_bytes,
+                                   uint8_t* output_pixels, int output_w, int output_h, int output_stride_in_bytes,
+                                   int num_channels);
     }
 } // namespace tee

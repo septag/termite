@@ -424,6 +424,18 @@ namespace tee {
             saveTextureCacheList(cacheFilepath.cstr(), gTexLoader->decodeCacheItems);
         }
     }
+    
+    bool gfx::saveTexturePng(char const *filename, int w, int h, int comp, const void *data, int stride_in_bytes)
+    {
+        return stbi_write_png(filename, w, h, comp, data, stride_in_bytes) != 0;
+    }
+
+    bool gfx::resizeTexture(const uint8_t* input_pixels, int input_w, int input_h, int input_stride_in_bytes, 
+                            uint8_t* output_pixels, int output_w, int output_h, int output_stride_in_bytes, int num_channels)
+    {
+        return stbir_resize_uint8(input_pixels, input_w, input_h, input_stride_in_bytes, output_pixels, 
+                                  output_w, output_h, output_stride_in_bytes, num_channels) != 0;
+    }
 
     static bool loadUncompressed(const MemoryBlock* mem, const AssetParams& params, uintptr_t* obj, bx::AllocatorI* alloc)
     {

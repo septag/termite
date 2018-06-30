@@ -52,10 +52,30 @@
 #include <random>
 #include <chrono>
 #include <thread>
+#include <atomic>
 
 #include "remotery/Remotery.h"
 #include "lz4/lz4.h"
 #include "tiny-AES128-C/aes.h"
+
+typedef std::atomic_flag sx_lock_t;
+#define sx_lock(_l)     while(_l.test_and_set(std::memory_order_acquire)) bx::yield()
+#define sx_unlock(_l)   _l.clear(std::memory_order_release)
+class ScopedLock
+{
+public:
+    explicit ScopedLock(sx_lock_t& l) : m_lock(l) {
+        sx_lock(l);
+    }
+
+    ~ScopedLock()
+    {
+        sx_unlock(m_lock);
+    }
+
+private:
+    sx_lock_t& m_lock;
+};
 
 #define MEM_POOL_BUCKET_SIZE 256
 #define IMGUI_VIEWID 255
@@ -82,6 +102,7 @@ static const uint8_t kAESIv[] = {0x0A, 0x2D, 0x76, 0x63, 0x9F, 0x28, 0x10, 0xCD,
 struct FrameData
 {
     uint64_t frame;
+    uint32_t renderFrame;
     double frameTime;
     double fps;
     double elapsedTime;
@@ -178,7 +199,8 @@ struct Tee
     FrameData frameData;
     double timeMultiplier;
     bx::Pool<HeapMemoryImpl> memPool;
-    bx::Lock memPoolLock;
+    //bx::Lock memPoolLock;
+    sx_lock_t memPoolLock;
     GfxDriver* gfxDriver;
     IoDriverDual* ioDriver;
     PhysDriver2D* phys2dDriver;
@@ -221,6 +243,7 @@ struct Tee
         randomFloatOffset = randomIntOffset = 0;
         randomPoolFloat = nullptr;
         randomPoolInt = nullptr;
+        memPoolLock.clear();
     }
 };
 
@@ -860,7 +883,7 @@ void doFrame()
 
     rmt_BeginCPUSample(Gfx_DrawFrame, 0);
     if (gTee->gfxDriver)
-        gTee->gfxDriver->frame();
+        gTee->frameData.renderFrame = gTee->gfxDriver->frame();
     rmt_EndCPUSample(); // Gfx_DrawFrame
 
 #ifdef termite_CURL
@@ -939,10 +962,15 @@ uint64_t getFrameIndex()
     return gTee->frameData.frame;
 }
 
+uint32_t getRenderFrameIndex()
+{
+    return gTee->frameData.renderFrame;
+}
+
 MemoryBlock* createMemoryBlock(uint32_t size, bx::AllocatorI* alloc)
 {
     if (size > 0) {
-        bx::LockScope(gTee->memPoolLock);
+        ScopedLock  l(gTee->memPoolLock);
         HeapMemoryImpl* mem = gTee->memPool.newInstance();
         if (!mem)
             return nullptr;
@@ -966,7 +994,7 @@ MemoryBlock* createMemoryBlock(uint32_t size, bx::AllocatorI* alloc)
 
 MemoryBlock* refMemoryBlockPtr(const void* data, uint32_t size)
 {
-    bx::LockScope(gTee->memPoolLock);
+    ScopedLock l(gTee->memPoolLock);
     HeapMemoryImpl* mem = gTee->memPool.newInstance();
     if (!mem)
         return nullptr;
@@ -978,7 +1006,7 @@ MemoryBlock* refMemoryBlockPtr(const void* data, uint32_t size)
 
 MemoryBlock* copyMemoryBlock(const void* data, uint32_t size, bx::AllocatorI* alloc)
 {
-    bx::LockScope(gTee->memPoolLock);
+    ScopedLock l(gTee->memPoolLock);
     HeapMemoryImpl* mem = gTee->memPool.newInstance();
     if (!mem)
         return nullptr;
@@ -1006,7 +1034,7 @@ MemoryBlock* refMemoryBlock(MemoryBlock* mem)
 void releaseMemoryBlock(MemoryBlock* mem)
 {
     HeapMemoryImpl* m = (HeapMemoryImpl*)mem;
-    bx::LockScope(gTee->memPoolLock);
+    ScopedLock l(gTee->memPoolLock);
     if (bx::atomicDec(&m->refcount) == 0) {
         if (m->alloc) {
             BX_FREE(m->alloc, m->m.data);

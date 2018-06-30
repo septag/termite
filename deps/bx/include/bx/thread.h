@@ -50,6 +50,9 @@ namespace bx
 		///
 		void* pop();
 
+        ///
+        void yield();
+
 	private:
 		friend struct ThreadInternal;
 		int32_t entry();

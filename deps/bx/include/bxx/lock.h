@@ -6,7 +6,63 @@
 
 #include "bx/cpu.h"
 #include "bx/os.h"
+#include <atomic>
 
+
+
+namespace bx
+{
+    class Lock
+    {
+        BX_CLASS(Lock,
+                 NO_COPY,
+                 NO_ASSIGNMENT);
+
+    public:
+        Lock()
+        {
+            m_lock.clear();
+        }
+
+        inline void lock()
+        {
+            while (m_lock.test_and_set(std::memory_order_acquire)) 
+                bx::yield();
+        }
+
+        inline void unlock()
+        {
+            m_lock.clear(std::memory_order_release);
+        }
+
+    private:
+        std::atomic_flag m_lock;
+    };
+
+    class LockScope
+    {
+        BX_CLASS(LockScope,
+                 NO_ASSIGNMENT,
+                 NO_COPY,
+                 NO_DEFAULT_CTOR);
+
+    public:
+        explicit LockScope(Lock& _lock) : m_lock(_lock)
+        {
+            m_lock.lock();
+        }
+
+        ~LockScope()
+        {
+            m_lock.unlock();
+        }
+
+    private:
+        Lock& m_lock;
+    };
+}
+
+#if 0
 namespace bx
 {
     // Normal 'Fair-Lock'
@@ -256,3 +312,4 @@ namespace bx
         RwLock& m_lock;
     };
 } // namespace bx
+#endif

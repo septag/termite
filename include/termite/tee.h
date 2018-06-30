@@ -210,6 +210,7 @@ namespace tee
     TEE_API double getFps();
     TEE_API double getSmoothFrameTime();
     TEE_API uint64_t getFrameIndex();
+    TEE_API uint32_t getRenderFrameIndex();
 
     TEE_API MemoryBlock* createMemoryBlock(uint32_t size, bx::AllocatorI* alloc = nullptr);
     TEE_API MemoryBlock* refMemoryBlockPtr(const void* data, uint32_t size);
