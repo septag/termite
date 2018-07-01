@@ -86,9 +86,9 @@ namespace bx
 #if BX_PLATFORM_WINDOWS
         _mm_pause();
 #elif BX_CPU_X86
-        __asm__ __volatile__("pause")
+        __asm__ __volatile__("pause");
 #elif BX_CPU_ARM
-        __asm__ __volatile__("yield")
+        __asm__ __volatile__("yield");
 #endif
 	}
 

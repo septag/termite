@@ -63,7 +63,6 @@
 #		define BGFX_CONFIG_RENDERER_OPENGLES (0 \
 					|| BX_PLATFORM_ANDROID      \
 					|| BX_PLATFORM_EMSCRIPTEN   \
-					|| BX_PLATFORM_IOS          \
 					|| BX_PLATFORM_RPI          \
 					|| BX_PLATFORM_STEAMLINK    \
 					|| BX_PLATFORM_NX           \

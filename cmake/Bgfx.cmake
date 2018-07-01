@@ -101,6 +101,8 @@ function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OU
                 if (${CMAKE_BUILD_TYPE} MATCHES "Debug")
                     set(ARGS ${ARGS} "--debug" "-O 0")
                 endif()
+            elseif (IOS)
+                set(ARGS ${ARGS} "--profile metal")
             endif()
 
             # Varyingdef files is the same name as the shader file (under the same directory) with .vdef extension
