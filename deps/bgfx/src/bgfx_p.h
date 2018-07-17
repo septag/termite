@@ -1506,7 +1506,7 @@ namespace bgfx
 		Binding m_bind[BGFX_CONFIG_MAX_TEXTURE_SAMPLERS];
 	};
 
-	BX_ALIGN_DECL_CACHE_LINE(struct) RenderDraw
+	struct/*BX_ALIGN_DECL_CACHE_LINE(struct)*/ RenderDraw
 	{
 		void clear()
 		{
@@ -1562,14 +1562,15 @@ namespace bgfx
 		uint16_t m_numIndirect;
 		uint16_t m_numMatrices;
 		uint16_t m_scissor;
-		uint8_t  m_submitFlags;
-		uint8_t  m_streamMask;
-		uint8_t  m_uniformIdx;
+        IndexBufferHandle    m_indexBuffer;
+        VertexBufferHandle   m_instanceDataBuffer;
+        IndirectBufferHandle m_indirectBuffer;
+        OcclusionQueryHandle m_occlusionQuery;
 
-		IndexBufferHandle    m_indexBuffer;
-		VertexBufferHandle   m_instanceDataBuffer;
-		IndirectBufferHandle m_indirectBuffer;
-		OcclusionQueryHandle m_occlusionQuery;
+        uint8_t  m_submitFlags;
+        uint8_t  m_streamMask;
+        uint8_t  m_uniformIdx;
+        //uint8_t  m_pad[23];
 	};
 
 	BX_ALIGN_DECL_CACHE_LINE(struct) RenderCompute
@@ -2332,11 +2333,11 @@ namespace bgfx
 				m_uniformSet.clear();
 			}
 
-			m_discard = false;
 			m_draw.clear();
 			m_compute.clear();
 			m_bind.clear();
-		}
+            m_discard = false;
+        }
 
 		void submit(ViewId _id, ProgramHandle _program, OcclusionQueryHandle _occlusionQuery, int32_t _depth, bool _preserveState);
 
@@ -2361,13 +2362,11 @@ namespace bgfx
 
 		void blit(ViewId _id, TextureHandle _dst, uint8_t _dstMip, uint16_t _dstX, uint16_t _dstY, uint16_t _dstZ, TextureHandle _src, uint8_t _srcMip, uint16_t _srcX, uint16_t _srcY, uint16_t _srcZ, uint16_t _width, uint16_t _height, uint16_t _depth);
 
-		Frame* m_frame;
-
-		SortKey m_key;
-
 		RenderDraw    m_draw;
 		RenderCompute m_compute;
 		RenderBind    m_bind;
+        SortKey m_key;
+        Frame* m_frame;
 
 		uint32_t m_numSubmitted;
 		uint32_t m_numDropped;

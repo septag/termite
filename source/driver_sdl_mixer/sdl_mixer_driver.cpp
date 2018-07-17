@@ -166,7 +166,7 @@ int mixerGetTagChannelCount(int tag/* = -1*/)
 
 int mixerGetAvailChannel(int tag/* = -1*/)
 {
-    return Mix_GroupAvailable(tag);
+    return  Mix_GroupAvailable(tag);
 }
 
 int mixerGetActiveChannelOldest(int tag)
@@ -193,6 +193,11 @@ uint8_t mixerSetVolume(int channelId, uint8_t vol)
 {
     static const uint8_t N = UINT8_MAX/MIX_MAX_VOLUME;
     return Mix_Volume(channelId, vol/N)*N;
+}
+
+uint8_t mixerSetMusicVolume(uint8_t vol)
+{
+    return Mix_VolumeMusic(vol/2)*2;
 }
 
 void mixerPause(int channelId)
@@ -508,6 +513,7 @@ void* initSdlMixerDriver(bx::AllocatorI* alloc, GetApiFunc getApi)
     soundApi.getMusicStatus = mixerGetMusicStatus;
     soundApi.setGlobalMusicEnabled = mixerSetGlobalMusicEnabled;
     soundApi.setGlobalSoundEnabled = mixerSetGlobalSoundEnabled;
+    soundApi.setMusicVolume = mixerSetMusicVolume;
 
     return &soundApi;
 }

@@ -114,6 +114,7 @@ namespace tee
         void(*setMusicFinishedCallback)(MusicFinishedCallback callback, void* userData);
         bool(*isMusicPlaying)();
         bool(*isMusicPaused)();
+        uint8_t(*setMusicVolume)(uint8_t vol);
         SoundFadeStatus::Enum(*getMusicStatus)();
 
         void(*setGlobalSoundEnabled)(bool enabled);

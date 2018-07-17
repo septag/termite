@@ -170,7 +170,7 @@ if(MSVC)
     remove_cxx_flags("/EHsc /GR")
     add_cxx_flags("/GR-")
 else()
-    add_compile_options(-fPIC)
+    add_compile_options(-fPIC )
     add_cxx_flags("-std=c++11 -Wno-switch -fno-rtti -fno-exceptions")
 endif()
 
