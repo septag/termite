@@ -30,6 +30,7 @@ static bx::Lock mi_lock;
 
 void *stb_leakcheck_malloc(size_t sz, const char *file, int line)
 {
+    size_t real_sz = sz + sizeof(stb_leakcheck_malloc_info);
    stb_leakcheck_malloc_info *mi = (stb_leakcheck_malloc_info *) malloc(sz + sizeof(stb_leakcheck_malloc_info));
 
    if (mi == NULL) return mi;

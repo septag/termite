@@ -740,6 +740,7 @@ void shutdown(ShutdownCallback callback, void* userData)
     }
 
     BX_BEGINP("Shutting down Graphics Subsystems");
+    gfx::destroyMaterialUniforms();
     gfx::shutdownMaterialLib();
     gfx::shutdownSpriteSystem();
 	shutdownImGui();

@@ -30,10 +30,10 @@ namespace tee {
         JniMethod m;
         bx::memSet(&m, 0x00, sizeof(m));
 
-        if (type == JniMethodType::Method) {
+        int envStat = gJavaVM->GetEnv((void **)&m.env, JNI_VERSION_1_6);
+        if (envStat == JNI_EDETACHED) {
+            BX_TRACE("Attaching JNI thread");
             gJavaVM->AttachCurrentThread(&m.env, nullptr);
-        } else if (type == JniMethodType::StaticMethod) {
-            gJavaVM->GetEnv((void **) &m.env, JNI_VERSION_1_6);
         }
 
         if (m.env == nullptr) {

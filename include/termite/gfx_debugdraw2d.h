@@ -29,6 +29,7 @@ namespace tee
         TEE_API void imageDbg2D(DebugDraw2D* ctx, float x, float y, const Texture* image);
         TEE_API void lineDbg2D(DebugDraw2D* ctx, const vec2_t& p1, const vec2_t& p2, float lineWidth);
         TEE_API void arrowDbg2D(DebugDraw2D* ctx, const vec2_t& p1, const vec2_t& p2, float lineWidth, float arrowLength);
+        TEE_API void arrowTwoSidedDbg2D(DebugDraw2D* ctx, const vec2_t& p1, const vec2_t& p2, float lineWidth, float arrowLength);
 
         // States
         TEE_API void scissorDbg2D(DebugDraw2D* ctx, const irect_t& rect);

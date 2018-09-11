@@ -220,6 +220,7 @@ def main():
         choices = ['low', 'normal', 'high'], help = '', default=ARG_Quality)
     cmdParser.add_option('--msize', action='store', type='int', dest='ARG_FixImageSizeModulo',
         default=4, help='Fix output image size to be a multiply of specified argument')
+    cmdParser.add_option('--exclude-hd', action='store_true', default=False, dest='ARG_ExcludeHD')
 
     (options, args) = cmdParser.parse_args()
     if options.ARG_InputFile:
@@ -240,8 +241,17 @@ def main():
     if ARG_ListFile:
         readHashFile()
         files = readListFile()
-        for f in files:
-            encodeFile(os.path.normpath(f))
+
+        # Remove all files that have -sd versions
+        if (options.ARG_ExcludeHD):
+            for f in files:
+                (first_part, ext) = os.path.splitext(f)
+                sd_version = first_part + '-sd' + ext
+                if not os.path.isfile(sd_version):
+                    encodeFile(os.path.normpath(f))
+        else:
+            for f in files:
+                encodeFile(os.path.normpath(f))
         writeHashFile()
     elif ARG_InputFile:
         encodeFile(ARG_InputFile)

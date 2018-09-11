@@ -15,6 +15,8 @@ def main():
         help='Prefix directory that will be appended at the begining of each filepath', default='')
     cmdParser.add_option('--out', action='store', type='string', dest='ARG_OutputFile',
         help='Output file list path', default='')
+    cmdParser.add_option('--exclude', action='store', type='string', dest='ARG_Excludes',
+        help='Exclude items with keywords in path, comma seperated', default='')
     (options, args) = cmdParser.parse_args()
 
     if options.ARG_Ext:
@@ -27,12 +29,20 @@ def main():
         raise Exception('--out argument is required. see --help')
     destFilepath = os.path.abspath(options.ARG_OutputFile)
 
+    excludes = []
+    if (options.ARG_Excludes):
+        excludes = options.ARG_Excludes.split(',')
+
     files = []
     numFiles = 0
     for root, dirnames, filenames in os.walk(destDir):
         for ext in extensions:
             for filename in fnmatch.filter(filenames, '*.' + ext):
-                files.append(os.path.join(options.ARG_Prefix, os.path.relpath(os.path.join(root, filename), destDir)))
+                df = os.path.join(root, filename)
+                if (len([e for e in excludes if e in df]) > 0 and ('-sd.' in df) ):
+                    print('Exclude: ' + df)
+                    continue                
+                files.append(os.path.join(options.ARG_Prefix, os.path.relpath(df, destDir)))
                 numFiles = numFiles + 1
     print('Writing to: ' + destFilepath)
     with open(destFilepath, 'w') as lf:

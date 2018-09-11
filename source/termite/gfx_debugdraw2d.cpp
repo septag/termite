@@ -647,6 +647,55 @@ namespace tee
         pushBatch(ctx, &gDebugDraw2D->lineHandler, &lineParams, sizeof(lineParams));
     }
 
+    void gfx::arrowTwoSidedDbg2D(DebugDraw2D* ctx, const vec2_t& p1, const vec2_t& p2, float lineWidth, float arrowLength)
+    {
+        if (!ctx->readyToDraw)
+            return;
+        VgState* state;
+        ctx->stateStack.peek(&state);
+
+        LineParams lineParams;
+
+        // main line
+        lineParams.p1 = p1;
+        lineParams.p2 = p2;
+        lineParams.width = lineWidth;
+        lineParams.color = tmath::colorPremultiplyAlpha(state->strokeColor, state->alpha);
+        lineParams.scissor = state->scissor;
+        lineParams.mtx = state->mtx;
+        pushBatch(ctx, &gDebugDraw2D->lineHandler, &lineParams, sizeof(lineParams));
+
+        vec2_t d = p2 - p1;
+        float totalLen = bx::vec2Length(d.f);
+        float t = bx::min(1.0f, arrowLength/totalLen);
+
+        vec2_t arrowStart;
+        bx::vec2Lerp(arrowStart.f, p2.f, p1.f, t);
+
+        d = d*(1.0f/totalLen);
+        vec2_t normal1 = vec2(-d.y, d.x);
+        vec2_t normal2 = vec2(d.y, -d.x);
+
+        // arrow line 1
+        lineParams.p1 = arrowStart + normal1*lineWidth*4.0f;
+        pushBatch(ctx, &gDebugDraw2D->lineHandler, &lineParams, sizeof(lineParams));
+
+        // arrow line 2
+        lineParams.p1 = arrowStart + normal2*lineWidth*4.0f;
+        pushBatch(ctx, &gDebugDraw2D->lineHandler, &lineParams, sizeof(lineParams));
+
+        // arrow line 1
+        bx::vec2Lerp(arrowStart.f, p1.f, p2.f, t);
+        lineParams.p2 = p1;
+
+        lineParams.p1 = arrowStart + normal1*lineWidth*4.0f;
+        pushBatch(ctx, &gDebugDraw2D->lineHandler, &lineParams, sizeof(lineParams));
+
+        // arrow line 2
+        lineParams.p1 = arrowStart + normal2*lineWidth*4.0f;
+        pushBatch(ctx, &gDebugDraw2D->lineHandler, &lineParams, sizeof(lineParams));
+    }
+
     void gfx::imageDbg2D(DebugDraw2D* ctx, const rect_t& rect, const Texture* image)
     {
         if (!ctx->readyToDraw)

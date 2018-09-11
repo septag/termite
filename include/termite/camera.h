@@ -40,14 +40,16 @@ namespace tee
         void calcFrustumCorners(vec3_t _result[8], float _aspectRatio, float _nearOverride = 0, float _farOverride = 0) const;
         void calcFrustumPlanes(plane_t _result[CameraPlane::Count], const mat4_t& _viewProjMtx) const;
         void rotatePitch(float _pitch);
+        void rotatePitch(float _pitch, float _min, float _max);
         void rotateYaw(float _yaw);
         void rotatePitchYaw(float _pitch, float _yaw);
         void rotateRoll(float _roll);
+        void setPitch(float _pitch);
+        void setYaw(float _yaw);
         void moveForward(float _fwd);
         void moveStrafe(float _strafe);
         mat4_t getViewMat() const;
         mat4_t getProjMat(float _aspectRatio) const;
-
     private:
         void updateRotation();
     };

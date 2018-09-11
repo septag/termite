@@ -123,6 +123,18 @@ namespace tee {
         updateRotation();
     }
 
+    void Camera::rotatePitch(float _pitch, float _min, float _max)
+    {
+        pitch += _pitch;
+        pitch = bx::clamp(pitch, _min, _max);
+        quat_t q1, q2;
+        bx::quatRotateAxis(q1.f, vec3(0, 1.0f, 0).f, yaw);
+        bx::quatRotateAxis(q2.f, vec3(1.0f, 0, 0).f, pitch);
+        bx::quatMul(quat.f, q2.f, q1.f);
+
+        updateRotation();
+    }
+
     void Camera::rotateYaw(float _yaw)
     {
         yaw += _yaw;
@@ -154,6 +166,28 @@ namespace tee {
         bx::quatRotateAxis(q.f, vec3(0, 0, 1.0f).f, _roll);
         quat_t qa = quat;
         bx::quatMul(quat.f, qa.f, q.f);
+
+        updateRotation();
+    }
+
+    void Camera::setPitch(float _pitch)
+    {
+        pitch = _pitch;
+        quat_t q1, q2;
+        bx::quatRotateAxis(q1.f, vec3(0, 1.0f, 0).f, yaw);
+        bx::quatRotateAxis(q2.f, vec3(1.0f, 0, 0).f, pitch);
+        bx::quatMul(quat.f, q2.f, q1.f);
+
+        updateRotation();
+    }
+
+    void Camera::setYaw(float _yaw)
+    {
+        yaw = _yaw;
+        quat_t q1, q2;
+        bx::quatRotateAxis(q1.f, vec3(0, 1.0f, 0).f, yaw);
+        bx::quatRotateAxis(q2.f, vec3(1.0f, 0, 0).f, pitch);
+        bx::quatMul(quat.f, q2.f, q1.f);
 
         updateRotation();
     }

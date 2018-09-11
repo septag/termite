@@ -179,6 +179,7 @@ namespace tee {
                 for (int i = 0, c = model->numGeos; i < c; i++) {
                     if (mi->i.dynVertexBuffers[i].isValid())
                         gDriver->destroyDynamicVertexBuffer(mi->i.dynVertexBuffers[i]);
+
                 }
             }
 
