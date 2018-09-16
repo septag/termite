@@ -10,21 +10,21 @@ void* iosCreateNativeLayer(void* wnd)
     UIWindow* uiwnd = (__bridge UIWindow*)wnd;
     
     // To create a sublayer (without SDL modification)
-    CAMetalLayer* glLayer = [CAMetalLayer layer];
+    CAMetalLayer* mlayer = [CAMetalLayer layer];
     CALayer* layer = uiwnd.rootViewController.view.layer;
-    [layer addSublayer:glLayer];
-    glLayer.contentsScale = [[UIScreen mainScreen] scale];
+    [layer addSublayer:mlayer];
+    mlayer.contentsScale = [[UIScreen mainScreen] scale];
+    mlayer.framebufferOnly = true;
     
-    glLayer.frame = layer.bounds;
-    return (__bridge void*)glLayer;
+    mlayer.frame = layer.bounds;
+    return (__bridge void*)mlayer;
 }
 
 tee::vec2_t iosGetScreenSize()
 {
-    CGRect screenBounds = [[UIScreen mainScreen] bounds];
-    CGFloat screenScale = [[UIScreen mainScreen] scale];
+    CGRect nativeBounds = [[UIScreen mainScreen] nativeBounds];
     
-    return tee::vec2(screenBounds.size.width*screenScale, screenBounds.size.height*screenScale);
+    return tee::vec2(nativeBounds.size.width, nativeBounds.size.height);
 }
 
 void iosTurnOnAudioSession()

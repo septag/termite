@@ -79,6 +79,7 @@ namespace tee
         ucolor_t strokeColor;
         ucolor_t fillColor;
         float alpha;
+        int ztest;
         irect_t scissor;
         AssetHandle fontHandle;
         SNode snode;
@@ -223,6 +224,7 @@ namespace tee
         strokeColor = ucolor(0, 0, 0);
         fillColor = ucolor(255, 255, 255);
         alpha = 1.0f;
+        ztest = 0;
         scissor = ctx->viewport;
         fontHandle = ctx->defaultFontHandle;
     }
@@ -287,8 +289,15 @@ namespace tee
 
     static void drawBatches(DebugDraw2D* ctx)
     {
+        VgState* state;
+        ctx->stateStack.peek(&state);
+
         GfxDriver* driver = ctx->driver;
         GfxState::Bits baseState = gfx::stateBlendAlpha() | GfxState::RGBWrite | GfxState::AlphaWrite;
+        if (state->ztest < 0) 
+            baseState |= GfxState::DepthTestLess;
+        else if (state->ztest > 0)
+            baseState |= GfxState::DepthTestGreater;
 
         uint8_t viewId = ctx->viewId;
         irect_t vp = ctx->viewport;
@@ -714,6 +723,13 @@ namespace tee
         rectParams.rect = rect;
 
         pushBatch(ctx, &gDebugDraw2D->rectHandler, &rectParams, sizeof(rectParams));
+    }
+
+    void gfx::ztestDbg2D(DebugDraw2D* ctx, int ztest)
+    {
+        VgState* state;
+        ctx->stateStack.peek(&state);
+        state->ztest = ztest;
     }
 
     void gfx::scissorDbg2D(DebugDraw2D* ctx, const irect_t& rect)

@@ -32,6 +32,7 @@ namespace tee
         TEE_API void arrowTwoSidedDbg2D(DebugDraw2D* ctx, const vec2_t& p1, const vec2_t& p2, float lineWidth, float arrowLength);
 
         // States
+        TEE_API void ztestDbg2D(DebugDraw2D* ctx, int ztest);
         TEE_API void scissorDbg2D(DebugDraw2D* ctx, const irect_t& rect);
         TEE_API void alphaDbg2D(DebugDraw2D* ctx, float alpha);
         TEE_API void textColorDbg2D(DebugDraw2D* ctx, ucolor_t color);
