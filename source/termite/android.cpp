@@ -68,6 +68,18 @@ namespace tee {
         return m;
     }
 
+    void android::detachJni()
+    {
+        if (gJavaVM) {
+            JNIEnv* env;
+            int envStat = gJavaVM->GetEnv((void **)&env, JNI_VERSION_1_6);
+            if (envStat == JNI_OK) {
+                BX_TRACE("Detaching JNI thread");
+                gJavaVM->DetachCurrentThread();
+            }
+        }
+    }
+
     // These functions are defined in Java as jni native calls
     extern "C" JNIEXPORT void JNICALL
     Java_com_termite_util_Platform_termiteInitEngineVars(JNIEnv *env, jclass cls,

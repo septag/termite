@@ -30,6 +30,7 @@ namespace tee {
         TEE_API JniMethod findMethod(const char* methodName, const char* methodSig, const char* classPath = nullptr,
                                      JniMethodType::Enum type = JniMethodType::Method);
 
+        TEE_API void detachJni();
         TEE_API void dumpStackTrace(bx::String<1024>& callstack);
     }
 }
