@@ -16,7 +16,6 @@ namespace tee {
     static jobject gActivityObj = 0;
     static CrashCallback gCrashCallback = nullptr;
     static void *gCrashUserData = nullptr;
-
     struct AndroidBacktrace {
         void **current;
         void **end;
@@ -101,7 +100,6 @@ namespace tee {
         env->ReleaseStringUTFChars(cacheDir, cacheDirStr);
         env->ReleaseStringUTFChars(dataDir, dataDirStr);
     }
-
 
     extern "C" JNIEXPORT void JNICALL
     Java_com_termite_util_Platform_termiteSetGraphicsReset(JNIEnv *env, jclass cls) {
@@ -196,5 +194,6 @@ namespace tee {
         }
     }
 }
+
 #endif
 

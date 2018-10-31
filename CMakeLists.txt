@@ -246,6 +246,10 @@ if (IOS)
     set(IOS_GENERAL_PROPERTIES XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${IOS_DEPLOYMENT_TARGET})
 endif()
 
+if (BUILD_MODELVIEWER AND ANDROID)
+    add_definitions(-DBGFX_CONFIG_READ_TEXTURE_WORKAROUND)
+endif()
+
 add_subdirectory(deps/deboost.context)
 add_subdirectory(deps/bx)
 add_subdirectory(deps/bgfx)

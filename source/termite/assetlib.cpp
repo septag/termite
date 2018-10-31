@@ -33,6 +33,7 @@ namespace tee {
         uintptr_t obj;
         size_t typeNameHash;
         uint32_t paramsHash;
+        AssetFlags::Bits flags;
         AssetState::Enum loadState;
         AssetState::Enum initLoadState;
     };
@@ -281,7 +282,8 @@ namespace tee {
     }
 
     static AssetHandle newAsset(AssetLibCallbacksI* callbacks, const char* uri, const void* userParams,
-                               int userParamsSize, uintptr_t obj, size_t typeNameHash, bx::AllocatorI* objAlloc)
+                                int userParamsSize, uintptr_t obj, size_t typeNameHash, bx::AllocatorI* objAlloc, 
+                                AssetFlags::Bits flags)
     {
         AssetLib* assetLib = gAssetLib;
 
@@ -302,6 +304,7 @@ namespace tee {
         rs->typeNameHash = typeNameHash;
         rs->objAlloc = objAlloc;
         rs->initLoadState = AssetState::LoadFailed;
+        rs->flags = flags;
 
         if (userParamsSize > 0) {
             BX_ASSERT(userParamsSize);
@@ -357,7 +360,7 @@ namespace tee {
 
     static AssetHandle addAsset(AssetLibCallbacksI* callbacks, const char* uri, const void* userParams,
                                 int userParamsSize, uintptr_t obj, AssetHandle overrideHandle, size_t typeNameHash,
-                                bx::AllocatorI* objAlloc)
+                                bx::AllocatorI* objAlloc, AssetFlags::Bits flags)
     {
         AssetLib* assetLib = gAssetLib;
         AssetHandle handle = overrideHandle;
@@ -375,7 +378,7 @@ namespace tee {
             if (userParamsSize > 0)
                 memcpy(rs->userParams, userParams, userParamsSize);
         } else {
-            handle = newAsset(callbacks, uri, userParams, userParamsSize, obj, typeNameHash, objAlloc);
+            handle = newAsset(callbacks, uri, userParams, userParamsSize, obj, typeNameHash, objAlloc, flags);
         }
 
         return handle;
@@ -505,7 +508,7 @@ namespace tee {
             if (assetLib->opMode == IoOperationMode::Async && !(flags & AssetFlags::ForceBlockLoad)) {
                 // Add asset with an empty object
                 handle = addAsset(tdata->callbacks, uri, userParams, tdata->userParamsSize,
-                                     tdata->asyncProgressObj, overrideHandle, nameHash, objAlloc);
+                                     tdata->asyncProgressObj, overrideHandle, nameHash, objAlloc, flags);
                 setAssetLoadState(handle, AssetState::LoadInProgress);
 
                 // Register async request
@@ -549,7 +552,8 @@ namespace tee {
                     obj = tdata->failObj;
                 }
 
-                handle = addAsset(tdata->callbacks, uri, userParams, tdata->userParamsSize, obj, overrideHandle, nameHash, objAlloc);
+                handle = addAsset(tdata->callbacks, uri, userParams, tdata->userParamsSize, obj, overrideHandle, nameHash, 
+                                  objAlloc, flags);
                 setAssetLoadState(handle, loaded ? AssetState::LoadOk : AssetState::LoadFailed);
 
                 // Trigger onReload callback
@@ -582,7 +586,7 @@ namespace tee {
 
         // Create a new failed asset
         AssetHandle handle = newAsset(tdata->callbacks, uri, userParams, tdata->userParamsSize, tdata->failObj,
-                                         typeNameHash, nullptr);
+                                         typeNameHash, nullptr, 0);
         setAssetLoadState(handle, AssetState::LoadFailed);
         return handle;
     }
@@ -690,7 +694,8 @@ namespace tee {
                 obj = tdata.failObj;
             }
 
-            handle = addAsset(tdata.callbacks, uri, userParams, tdata.userParamsSize, obj, overrideHandle, nameHash, objAlloc);
+            handle = addAsset(tdata.callbacks, uri, userParams, tdata.userParamsSize, obj, overrideHandle, nameHash, 
+                              objAlloc, flags);
             setAssetLoadState(handle, loaded ? AssetState::LoadOk : AssetState::LoadFailed);
 
             // Trigger onReload callback
@@ -961,7 +966,7 @@ namespace tee {
                 AssetHandle handle = assetLib->assets.handleAt(i);
                 Asset* r = assetLib->assets.getHandleData<Asset>(0, handle);
                 if (r->typeNameHash == hash && !(r->uri.isEqual("[FAIL]") | r->uri.isEqual("[ASYNC]"))) {
-                    loadAssetHashed(hash, r->uri.cstr(), r->userParams, AssetFlags::Reload, r->objAlloc);
+                    loadAssetHashed(hash, r->uri.cstr(), r->userParams, AssetFlags::Reload|r->flags, r->objAlloc);
                 }
             }
         }

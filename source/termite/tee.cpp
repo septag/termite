@@ -1538,3 +1538,4 @@ void GfxDriverEvents::onTraceVargs(const char* filepath, int line, const char* f
 }
 
 } // namespace tee
+

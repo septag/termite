@@ -2805,12 +2805,13 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 						, texture.m_id
 						, attachment[0].mip
 						) );
-
-					if (!BX_ENABLED(BX_PLATFORM_EMSCRIPTEN)
+#ifndef BGFX_CONFIG_READ_TEXTURE_WORKAROUND
+                    if (!BX_ENABLED(BX_PLATFORM_EMSCRIPTEN)
 					&&  !BX_ENABLED(BX_PLATFORM_IOS))
 					{
 						GL_CHECK(glReadBuffer(GL_COLOR_ATTACHMENT0) );
 					}
+#endif
 
 					if (GL_FRAMEBUFFER_COMPLETE == glCheckFramebufferStatus(GL_FRAMEBUFFER) )
 					{

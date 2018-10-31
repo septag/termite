@@ -27,7 +27,7 @@ namespace tee
     {
         size_t idHash;
         float scale;
-        char text[256];
+        char text[1024];
     };
 
     struct Lang

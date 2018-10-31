@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "camera.h"
+#include "bx/math.h"
 
 namespace tee {
 
@@ -212,15 +213,9 @@ namespace tee {
 
     mat4_t Camera::getProjMat(float _aspectRatio) const
     {
-        float xscale = 1.0f /bx::tan(bx::toRad(fov)*0.5f);
-        float yscale = _aspectRatio*xscale;
-        float zf = ffar;
-        float zn = fnear;
-
-        return mat4(xscale, 0, 0, 0,
-                    0, yscale, 0, 0,
-                    0, 0, zf / (zf - zn), 1.0f,
-                    0, 0, zn*zf / (zn - zf), 0);
+        mat4_t mat;
+        bx::mtxProj(mat.f, fov, _aspectRatio, 0.1f, 100.0f, BX_ENABLED(BX_PLATFORM_ANDROID) ? true : false);
+        return mat;
     }
 
     Camera2D::Camera2D()

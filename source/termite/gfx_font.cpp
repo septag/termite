@@ -151,7 +151,8 @@ namespace tee
         UnicodeReplaceRule(1606, 65254, 65255, 65256), // Ne
         UnicodeReplaceRule(1608, 65262), // Ve
         UnicodeReplaceRule(1607, 65258, 65259, 65260), // He
-        UnicodeReplaceRule(1740, 65266, 65267, 65268)  // Ye
+        UnicodeReplaceRule(1740, 65266, 65267, 65268), // Ye
+        UnicodeReplaceRule(1574, 65162, 65163, 65164)  // Ye Hamzeh
     };
 
     class FontLoader : public AssetLibCallbacksI
@@ -1077,7 +1078,7 @@ namespace tee
 
             for (int i = 0; i < len; i++) {
                 uint32_t code = utext[i];
-                bool isdigit = (code >= '0' && code <= '9');
+                bool isdigit = (code >= '0' && code <= '9') || (code >= 1776 && code <= 1785);
 
                 // Replace character code (glyphId) by the rules we have for each language
                 // If current character has "before" glyph, look for the next character and see if it has middle or after glyph
@@ -1104,6 +1105,8 @@ namespace tee
                 }
 
                 int gIdx = font->glyphTable.find(code);
+                if (gIdx == -1)
+                    gIdx = font->glyphTable.find(32);
                 if (gIdx != -1) {
                     memcpy(&glyphs[i], &font->glyphs[font->glyphTable[gIdx]], sizeof(FontGlyph));
                     if (kerns) {
@@ -1203,7 +1206,7 @@ namespace tee
         }
         
         vec2_t texSize = vec2(font->scaleW, font->scaleH);
-        FontGlyph glyphs[512];
+        FontGlyph glyphs[1024];
         int len = resolveGlyphs(text, font, glyphs, BX_COUNTOF(glyphs));
         if (len == 0)
             return;

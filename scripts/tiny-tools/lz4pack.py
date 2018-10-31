@@ -23,7 +23,7 @@ def compressLz4(filepath):
     print('LZ4 compressed (%dkb -> %dkb)' % (srcDataLen/1024, compressedLen/1024))
 
 def main():
-    cmdParser = optparse.OptionParser();
+    cmdParser = optparse.OptionParser()
     cmdParser.add_option('--file', action='store', type='string', dest='ARG_InputFile',
         help = 'Input file')
 

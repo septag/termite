@@ -41,6 +41,7 @@ namespace tee
         TEE_API void scaleDbg2D(DebugDraw2D* ctx, float sx, float sy);
         TEE_API void rotateDbg2D(DebugDraw2D* ctx, float theta);
         TEE_API void resetTransformDbg2D(DebugDraw2D* ctx);
+        TEE_API void textScaleDbg2D(DebugDraw2D* ctx, float scale);
 
         TEE_API void pushDbg2D(DebugDraw2D* ctx);
         TEE_API void popDbg2D(DebugDraw2D* ctx);

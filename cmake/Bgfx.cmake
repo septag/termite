@@ -101,6 +101,8 @@ function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OU
                 if (${CMAKE_BUILD_TYPE} MATCHES "Debug")
                     set(ARGS ${ARGS} "--debug" "-O 0")
                 endif()
+            #elseif (ANDROID)
+            #    set(ARGS ${ARGS} "--profile 3.00 ES")
             elseif (IOS)
                 set(ARGS ${ARGS} "--profile metal")
             endif()

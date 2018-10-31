@@ -79,6 +79,7 @@ namespace tee
         ucolor_t strokeColor;
         ucolor_t fillColor;
         float alpha;
+        float fontScale;
         irect_t scissor;
         AssetHandle fontHandle;
         SNode snode;
@@ -86,6 +87,7 @@ namespace tee
         VgState() :
             snode(this)
         {
+            fontScale = 1.0f;
         }
 
         void setDefault(DebugDraw2D* ctx);
@@ -791,6 +793,13 @@ namespace tee
         state->mtx = mat3I();
     }
 
+    void gfx::textScaleDbg2D(DebugDraw2D* ctx, float scale)
+    {
+        VgState* state;
+        ctx->stateStack.peek(&state);
+        state->fontScale = scale;
+    }
+
     void gfx::pushDbg2D(DebugDraw2D* ctx)
     {
         VgState* curState;
@@ -851,6 +860,10 @@ namespace tee
         int vertexIdx = 0;
         int indexIdx = 0;
 
+        VgState* state;
+        ctx->stateStack.peek(&state);      
+        float textScale = state->fontScale;
+
         for (int i = 0; i < len && (vertexIdx + 4) <= maxVerts && (indexIdx + 6) <= maxIndices; i++) {
             int gIdx = gfx::findFontCharGlyph(font, text[i]);
             if (gIdx != -1) {
@@ -861,40 +874,45 @@ namespace tee
                 vgVertexPosCoordColor& v2 = verts[vertexIdx + 2];
                 vgVertexPosCoordColor& v3 = verts[vertexIdx + 3];
 
+                float gw = glyph.width * textScale;
+                float gh = glyph.height * textScale;
+                float xoffset = glyph.xoffset * textScale;
+                float yoffset = glyph.yoffset * textScale;
+
                 // Top-Left
-                v0.x = pos.x + glyph.xoffset;
-                v0.y = pos.y + glyph.yoffset;
+                v0.x = pos.x + xoffset;
+                v0.y = pos.y + yoffset;
                 v0.tx = glyph.x / texSize.x;
                 v0.ty = glyph.y / texSize.y;
 
                 // Top-Right
-                v1.x = pos.x + glyph.xoffset + glyph.width;
-                v1.y = pos.y + glyph.yoffset;
+                v1.x = pos.x + xoffset + gw;
+                v1.y = pos.y + yoffset;
                 v1.tx = (glyph.x + glyph.width) / texSize.x;
                 v1.ty = glyph.y / texSize.y;
 
                 // Bottom-Left
-                v2.x = pos.x + glyph.xoffset;
-                v2.y = pos.y + glyph.yoffset + glyph.height;
+                v2.x = pos.x + xoffset;
+                v2.y = pos.y + yoffset + gh;
                 v2.tx = glyph.x / texSize.x;
                 v2.ty = (glyph.y + glyph.height) / texSize.y;
 
                 // Bottom-Right
-                v3.x = pos.x + glyph.xoffset + glyph.width;
-                v3.y = pos.y + glyph.yoffset + glyph.height;
+                v3.x = pos.x + xoffset + gw;
+                v3.y = pos.y + yoffset + gh;
                 v3.tx = (glyph.x + glyph.width) / texSize.x;
                 v3.ty = (glyph.y + glyph.height) / texSize.y;
 
                 v0.color = v1.color = v2.color = v3.color = color.n;
 
                 // Advance
-                pos.x += glyph.xadvance;
+                pos.x += glyph.xadvance*textScale;
 
                 // Kerning
                 if (i < len - 1) {
-                    int nextIdx = gfx::findFontCharGlyph(font, text[i + 1]);
+                    int nextIdx = gfx::findFontCharGlyph(font, text[i + 1])*textScale;
                     if (nextIdx != -1)
-                        pos.x += gfx::getFontGlyphKerning(font, gIdx, nextIdx);
+                        pos.x += gfx::getFontGlyphKerning(font, gIdx, nextIdx)*textScale;
                 }
 
                 // Make a quad from 4 verts
