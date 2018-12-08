@@ -43,3 +43,9 @@ void iosGetCacheDir(bx::Path* pPath)
     NSString* cachePath = [NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) lastObject];
     *pPath = [cachePath UTF8String];
 }
+
+void iosGetDataDir(bx::Path* pPath)
+{
+    NSString* cachePath = [NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES) lastObject];
+    *pPath = [cachePath UTF8String];
+}

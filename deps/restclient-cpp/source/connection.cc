@@ -347,8 +347,8 @@ RestClient::Connection::performCurlRequest(const std::string& uri) {
   }
 
   if (this->insecure) {
-      curl_easy_setopt(this->curlHandle, CURLOPT_SSL_VERIFYPEER, 0);
-      curl_easy_setopt(this->curlHandle, CURLOPT_SSL_VERIFYHOST, 0);
+      curl_easy_setopt(this->curlHandle, CURLOPT_SSL_VERIFYPEER, 0L);
+      curl_easy_setopt(this->curlHandle, CURLOPT_SSL_VERIFYHOST, 0L);
   }
 
   // set cert file path
@@ -380,7 +380,10 @@ RestClient::Connection::performCurlRequest(const std::string& uri) {
     curl_easy_setopt(this->curlHandle, CURLOPT_HTTPPROXYTUNNEL,
                      1L);
   }
-
+    
+  //curl_easy_setopt(this->curlHandle, CURLOPT_VERBOSE, true);
+  //  curl_easy_setopt(this->curlHandle, CURLOPT_CERTINFO, true);
+    
   res = curl_easy_perform(this->curlHandle);
   if (res != CURLE_OK) {
     switch (res) {

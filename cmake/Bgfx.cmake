@@ -104,7 +104,7 @@ function(bgfx_add_shaders SHADER_FILES SHADER_DEFINES INCLUDE_DIRS OUTPUT_DIR OU
             #elseif (ANDROID)
             #    set(ARGS ${ARGS} "--profile 3.00 ES")
             elseif (IOS)
-                set(ARGS ${ARGS} "--profile metal")
+                set(ARGS ${ARGS} --profile metal)
             endif()
 
             # Varyingdef files is the same name as the shader file (under the same directory) with .vdef extension

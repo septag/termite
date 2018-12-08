@@ -649,11 +649,15 @@ namespace bgfx { namespace mtl
 			m_gpuTimer.init();
 
 			g_internalData.context = m_device;
+            
+            m_pool = [[NSAutoreleasePool alloc] init];
 			return true;
 		}
 
 		void shutdown()
 		{
+            [m_pool release];
+            
 			m_occlusionQuery.postReset();
 			m_gpuTimer.shutdown();
 
@@ -1124,6 +1128,9 @@ namespace bgfx { namespace mtl
 
 			m_cmd.kick(true);
 			m_commandBuffer = 0;
+            
+            [m_pool release];
+            m_pool = [[NSAutoreleasePool alloc] init];
 		}
 
 		void updateResolution(const Resolution& _resolution)
@@ -1854,6 +1861,7 @@ namespace bgfx { namespace mtl
 		BlitCommandEncoder   m_blitCommandEncoder;
 		RenderCommandEncoder m_renderCommandEncoder;
 		FrameBufferHandle    m_renderCommandEncoderFrameBufferHandle;
+        NSAutoreleasePool*   m_pool;
 	};
 
 	static RendererContextMtl* s_renderMtl;
@@ -3080,7 +3088,7 @@ namespace bgfx { namespace mtl
 		if (0 != m_renderCommandEncoder)
 		{
 			m_renderCommandEncoder.endEncoding();
-			m_renderCommandEncoder = 0;
+			m_renderCommandEncoder = nil;
 		}
 
 		m_blitCommandEncoder = getBlitCommandEncoder();
@@ -4077,7 +4085,7 @@ namespace bgfx { namespace mtl
 		}
 
 		rce.endEncoding();
-		m_renderCommandEncoder = 0;
+		m_renderCommandEncoder = nil;
 		m_renderCommandEncoderFrameBufferHandle.idx = kInvalidHandle;
 
 		if (m_screenshotTarget)
